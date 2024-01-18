@@ -286,6 +286,6 @@ mod test {
             vec!["--extra-arg", "\"-std=c++17\"", "--extra-arg", "\"-Wall\""],
             args
         );
-        assert!(!tidy_advice.is_empty());
+        assert!(!tidy_advice.notes.is_empty());
     }
 }
