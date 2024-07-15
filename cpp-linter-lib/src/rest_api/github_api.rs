@@ -489,7 +489,7 @@ mod test {
             .unwrap()
             .to_str()
             .unwrap()
-            .ends_with("text+json"));
+            .ends_with("raw+json"));
         assert!(headers.contains_key("Authorization"));
         assert_eq!(headers.get("Authorization").unwrap(), "123456");
     }
