@@ -192,6 +192,24 @@ impl RestApiClient for GithubApiClient {
     ) {
         let (comment, format_checks_failed, tidy_checks_failed) =
             self.make_comment(files, format_advice, tidy_advice);
+
+        if user_inputs.file_annotations {
+            self.post_annotations(
+                files,
+                format_advice,
+                tidy_advice,
+                user_inputs.style.as_str(),
+            );
+        }
+        if user_inputs.step_summary {
+            self.post_step_summary(&comment);
+        }
+        self.set_exit_code(
+            format_checks_failed + tidy_checks_failed,
+            Some(format_checks_failed),
+            Some(tidy_checks_failed),
+        );
+
         if user_inputs.thread_comments.as_str() != "false" {
             // post thread comment for PR or push event
             if let Some(repo) = &self.repo {
@@ -240,22 +258,6 @@ impl RestApiClient for GithubApiClient {
                 }
             }
         }
-        if user_inputs.file_annotations {
-            self.post_annotations(
-                files,
-                format_advice,
-                tidy_advice,
-                user_inputs.style.as_str(),
-            );
-        }
-        if user_inputs.step_summary {
-            self.post_step_summary(&comment);
-        }
-        self.set_exit_code(
-            format_checks_failed + tidy_checks_failed,
-            Some(format_checks_failed),
-            Some(tidy_checks_failed),
-        );
     }
 }
 
