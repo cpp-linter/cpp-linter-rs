@@ -60,6 +60,17 @@ impl Clone for Replacement {
     }
 }
 
+/// Get a total count of clang-format advice from the given list of [FormatAdvice].
+pub fn tally_format_advice(format_advice: &[FormatAdvice]) -> u64 {
+    let mut format_checks_failed: u64 = 0;
+    for fmt_advice in format_advice.iter() {
+        if !fmt_advice.replacements.is_empty() {
+            format_checks_failed += 1;
+        }
+    }
+    format_checks_failed
+}
+
 /// Run clang-tidy for a specific `file`, then parse and return it's XML output.
 pub fn run_clang_format(
     cmd: &mut Command,
