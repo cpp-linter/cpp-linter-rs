@@ -130,7 +130,7 @@ impl RestApiClient for GithubApiClient {
             + if use_diff.is_some_and(|val| val) {
                 "diff"
             } else {
-                "text+json"
+                "raw+json"
             };
         headers.insert("Accept", return_fmt.parse().unwrap());
         let user_agent =
