@@ -10,7 +10,10 @@ use which::{which, which_in};
 
 // project-specific modules/crates
 use super::common_fs::FileObj;
-use crate::logger::{end_log_group, start_log_group};
+use crate::{
+    cli::LinesChangedOnly,
+    logger::{end_log_group, start_log_group},
+};
 pub mod clang_format;
 use clang_format::{run_clang_format, FormatAdvice};
 pub mod clang_tidy;
@@ -80,7 +83,7 @@ pub fn capture_clang_tools_output(
     version: &str,
     tidy_checks: &str,
     style: &str,
-    lines_changed_only: u8,
+    lines_changed_only: &LinesChangedOnly,
     database: Option<PathBuf>,
     extra_args: Option<Vec<&str>>,
 ) -> (Vec<FormatAdvice>, Vec<TidyAdvice>) {

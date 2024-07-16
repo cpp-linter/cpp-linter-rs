@@ -13,7 +13,7 @@ use openssl_probe;
 
 // project specific modules/crates
 use crate::clang_tools::capture_clang_tools_output;
-use crate::cli::{convert_extra_arg_val, get_arg_parser, parse_ignore};
+use crate::cli::{convert_extra_arg_val, get_arg_parser, parse_ignore, LinesChangedOnly};
 use crate::common_fs::{list_source_files, FileObj};
 use crate::github_api::GithubApiClient;
 use crate::logger::{self, end_log_group, start_log_group};
@@ -90,15 +90,14 @@ pub fn run_main(args: Vec<String>) -> i32 {
         .unwrap()
         .as_str()
     {
-        "false" => 0,
-        "true" => 1,
-        "diff" => 2,
-        _ => unreachable!(),
+        "true" => LinesChangedOnly::On,
+        "diff" => LinesChangedOnly::Diff,
+        _ => LinesChangedOnly::Off,
     };
     let files_changed_only = args.get_flag("files-changed-only");
 
     start_log_group(String::from("Get list of specified source files"));
-    let files: Vec<FileObj> = if lines_changed_only != 0 || files_changed_only {
+    let files: Vec<FileObj> = if lines_changed_only != LinesChangedOnly::Off || files_changed_only {
         // parse_diff(github_rest_api_payload)
         rest_api_client.get_list_of_changed_files(&extensions, &ignored, &not_ignored)
     } else {
@@ -128,7 +127,7 @@ pub fn run_main(args: Vec<String>) -> i32 {
         args.get_one::<String>("version").unwrap(),
         args.get_one::<String>("tidy-checks").unwrap(),
         user_inputs.style.as_str(),
-        lines_changed_only,
+        &lines_changed_only,
         database_path,
         extra_args,
     );

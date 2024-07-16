@@ -12,7 +12,10 @@ use regex::Regex;
 use serde::Deserialize;
 
 // project-specific modules/crates
-use crate::common_fs::{normalize_path, FileObj};
+use crate::{
+    cli::LinesChangedOnly,
+    common_fs::{normalize_path, FileObj},
+};
 
 /// Used to deserialize a JSON compilation database
 #[derive(Deserialize, Debug)]
@@ -169,7 +172,7 @@ pub fn run_clang_tidy(
     cmd: &mut Command,
     file: &FileObj,
     checks: &str,
-    lines_changed_only: u8,
+    lines_changed_only: &LinesChangedOnly,
     database: &Option<PathBuf>,
     extra_args: &Option<Vec<&str>>,
     database_json: &Option<CompilationDatabase>,
@@ -185,7 +188,7 @@ pub fn run_clang_tidy(
             cmd.args(["--extra-arg", format!("\"{}\"", arg).as_str()]);
         }
     }
-    if lines_changed_only > 0 {
+    if *lines_changed_only != LinesChangedOnly::Off {
         let ranges = file.get_ranges(lines_changed_only);
         let filter = format!(
             "[{{\"name\":{:?},\"lines\":{:?}}}]",
