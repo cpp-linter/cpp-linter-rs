@@ -471,7 +471,8 @@ mod test {
 
     use super::{GithubApiClient, USER_AGENT};
     use crate::{
-        clang_tools::capture_clang_tools_output, common_fs::FileObj, rest_api::RestApiClient,
+        clang_tools::capture_clang_tools_output, cli::LinesChangedOnly, common_fs::FileObj,
+        rest_api::RestApiClient,
     };
 
     // ************************** tests for GithubApiClient::make_headers()
@@ -555,7 +556,7 @@ mod test {
             env::var("CLANG-VERSION").unwrap_or("".to_string()).as_str(),
             "readability-*",
             "file",
-            0,
+            &LinesChangedOnly::Off,
             None,
             None,
         );
@@ -581,7 +582,7 @@ mod test {
             env::var("CLANG-VERSION").unwrap_or("".to_string()).as_str(),
             "-*",
             "",
-            0,
+            &LinesChangedOnly::Off,
             None,
             None,
         );

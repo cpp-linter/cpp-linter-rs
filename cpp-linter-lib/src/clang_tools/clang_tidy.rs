@@ -231,7 +231,7 @@ mod test {
 
     use regex::Regex;
 
-    use crate::{clang_tools::get_clang_tool_exe, common_fs::FileObj};
+    use crate::{clang_tools::get_clang_tool_exe, cli::LinesChangedOnly, common_fs::FileObj};
 
     use super::run_clang_tidy;
 
@@ -270,11 +270,11 @@ mod test {
         let tidy_advice = run_clang_tidy(
             &mut cmd,
             &file,
-            "",                // use .clang-tidy config file
-            0,                 // check all lines
-            &None,             // no database path
-            &Some(extra_args), // <---- the reason for this test
-            &None,             // no deserialized database
+            "",                     // use .clang-tidy config file
+            &LinesChangedOnly::Off, // check all lines
+            &None,                  // no database path
+            &Some(extra_args),      // <---- the reason for this test
+            &None,                  // no deserialized database
         );
         // since `cmd` was passed as a mutable reference, we can inspect the args that were added
         let mut args = cmd
