@@ -15,6 +15,7 @@ is used instead of python's ``sys.argv``, then the list of strings includes the 
 point alias ("path/to/cpp-linter.exe"). Thus, the parser in `cli.rs` will halt on an
 error because it is not configured to handle positional arguments.
 """
+
 import sys
 
 # Using relative import to load binary lib with same name as root package.

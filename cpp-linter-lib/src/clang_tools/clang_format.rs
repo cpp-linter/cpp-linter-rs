@@ -8,7 +8,10 @@ use serde::Deserialize;
 use serde_xml_rs::de::Deserializer;
 
 // project-specific crates/modules
-use crate::common_fs::{get_line_cols_from_offset, FileObj};
+use crate::{
+    cli::LinesChangedOnly,
+    common_fs::{get_line_cols_from_offset, FileObj},
+};
 
 /// A Structure used to deserialize clang-format's XML output.
 #[derive(Debug, Deserialize, PartialEq)]
@@ -62,7 +65,7 @@ pub fn run_clang_format(
     cmd: &mut Command,
     file: &FileObj,
     style: &str,
-    lines_changed_only: u8,
+    lines_changed_only: &LinesChangedOnly,
 ) -> FormatAdvice {
     cmd.args(["--style", style, "--output-replacements-xml"]);
     let ranges = file.get_ranges(lines_changed_only);

@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
+    rev: v4.6.0
     hooks:
       - id: trailing-whitespace
         exclude: cpp-linter-lib/tests/capture_tools_output/cpp-linter/cpp-linter/test_git_lib.patch
@@ -14,7 +14,7 @@ repos:
       - id: mixed-line-ending
         args: ["--fix=lf"]
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.1.8
+    rev: v0.5.2
     hooks:
       # Run the python linter.
       - id: ruff

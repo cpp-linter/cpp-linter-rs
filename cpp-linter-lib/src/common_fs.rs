@@ -5,6 +5,8 @@ use std::path::{Component, Path};
 use std::{fs, io};
 use std::{ops::RangeInclusive, path::PathBuf};
 
+use crate::cli::LinesChangedOnly;
+
 /// A structure to represent a file's path and line changes.
 #[derive(Debug)]
 pub struct FileObj {
@@ -52,7 +54,7 @@ impl FileObj {
     /// A helper function to consolidate a [Vec<u32>] of line numbers into a
     /// [Vec<RangeInclusive<u32>>] in which each range describes the beginning and
     /// ending of a group of consecutive line numbers.
-    fn consolidate_numbers_to_ranges(lines: &Vec<u32>) -> Vec<RangeInclusive<u32>> {
+    fn consolidate_numbers_to_ranges(lines: &[u32]) -> Vec<RangeInclusive<u32>> {
         let mut range_start = None;
         let mut ranges: Vec<RangeInclusive<u32>> = Vec::new();
         for (index, number) in lines.iter().enumerate() {
@@ -69,13 +71,11 @@ impl FileObj {
         ranges
     }
 
-    pub fn get_ranges(&self, lines_changed_only: u8) -> Vec<RangeInclusive<u32>> {
-        if lines_changed_only == 2 {
-            self.diff_chunks.to_vec()
-        } else if lines_changed_only == 1 {
-            self.added_ranges.to_vec()
-        } else {
-            Vec::new()
+    pub fn get_ranges(&self, lines_changed_only: &LinesChangedOnly) -> Vec<RangeInclusive<u32>> {
+        match lines_changed_only {
+            LinesChangedOnly::Diff => self.diff_chunks.to_vec(),
+            LinesChangedOnly::On => self.added_ranges.to_vec(),
+            _ => Vec::new(),
         }
     }
 }
@@ -249,6 +249,7 @@ mod test {
     use std::path::PathBuf;
 
     use super::{get_line_cols_from_offset, list_source_files, normalize_path, FileObj};
+    use crate::cli::LinesChangedOnly;
     use crate::cli::{get_arg_parser, parse_ignore};
     use crate::common_fs::is_file_in_list;
 
@@ -406,7 +407,7 @@ mod test {
     #[test]
     fn get_ranges_0() {
         let file_obj = FileObj::new(PathBuf::from("tests/demo/demo.cpp"));
-        let ranges = file_obj.get_ranges(0);
+        let ranges = file_obj.get_ranges(&LinesChangedOnly::Off);
         assert!(ranges.is_empty());
     }
 
@@ -419,7 +420,7 @@ mod test {
             added_lines,
             diff_chunks.clone(),
         );
-        let ranges = file_obj.get_ranges(2);
+        let ranges = file_obj.get_ranges(&LinesChangedOnly::Diff);
         assert_eq!(ranges, diff_chunks);
     }
 
@@ -432,7 +433,7 @@ mod test {
             added_lines,
             diff_chunks,
         );
-        let ranges = file_obj.get_ranges(1);
+        let ranges = file_obj.get_ranges(&LinesChangedOnly::On);
         assert_eq!(ranges, vec![4..=5, 9..=9]);
     }
 }

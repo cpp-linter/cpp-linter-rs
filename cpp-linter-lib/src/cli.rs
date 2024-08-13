@@ -6,6 +6,17 @@ use std::fs;
 use clap::builder::FalseyValueParser;
 use clap::{Arg, ArgAction, ArgMatches, Command};
 
+/// An enum to describe `--lines-changed-only` CLI option's behavior.
+#[derive(PartialEq)]
+pub enum LinesChangedOnly {
+    /// All lines are scanned
+    Off,
+    /// Only lines in the diff are scanned
+    Diff,
+    /// Only lines in the diff with additions are scanned.
+    On,
+}
+
 /// Builds and returns the Command Line Interface's argument parsing object.
 pub fn get_arg_parser() -> Command {
     Command::new("cpp-linter")
