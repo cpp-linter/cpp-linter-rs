@@ -14,10 +14,22 @@ updates:
         patterns:
           - "*"
   - package-ecosystem: pip
-    directory: /
+    directory: cpp-linter-py/
     schedule:
       interval: "daily"
     groups:
       pip:
+        patterns:
+          - "*"
+  - package-ecosystem: cargo
+    directories:
+      - cpp-linter-lib/
+      - cpp-linter-py/
+    schedule:
+      interval: "daily"
+    ignore:
+      - dependency-name: cpp-linter-lib
+    groups:
+      cargo:
         patterns:
           - "*"
