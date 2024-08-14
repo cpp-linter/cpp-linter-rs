@@ -1,3 +1,5 @@
 # cpp-linter
 
-The python binding to the cpp_linter_rs project.
+The python binding for the [cpp_linter_rs][this] project.
+
+[this]: https://github.com/cpp-linter/cpp_linter_rs

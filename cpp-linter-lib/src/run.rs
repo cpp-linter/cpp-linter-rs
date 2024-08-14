@@ -1,7 +1,7 @@
 //! This module is the native backend of the cpp-linter package written in Rust.
 //!
 //! In python, this module is exposed as `cpp_linter.run` that has 1 function exposed:
-//! [`main()`].
+//! `main()`.
 
 use std::env;
 use std::path::{Path, PathBuf};
@@ -19,6 +19,8 @@ use crate::github_api::GithubApiClient;
 use crate::logger::{self, end_log_group, start_log_group};
 use crate::rest_api::{FeedbackInput, RestApiClient};
 
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 #[cfg(feature = "openssl-vendored")]
 fn probe_ssl_certs() {
     openssl_probe::init_ssl_cert_env_vars();
@@ -32,10 +34,10 @@ fn probe_ssl_certs() {}
 /// The idea here is that all functionality is implemented in Rust. However, passing
 /// command line arguments is done differently in Python or Rust.
 ///
-/// - In python, the `sys.argv` list is passed from the `cpp_linter.entry_point` script
-///   to `run.main()`.
-/// - In rust, the [`std::env::args`] is passed to `run::main()` in the binary driver
-///   source `bin.rs`.
+/// - In python, the ``sys.argv`` list is passed from the ``cpp_linter.entry_point.main()``
+///   function to rust via the ``cpp_linter.run.main()`` binding (which wraps [`run_main()`]).
+/// - In rust, the [`std::env::args`] is passed to [`run_main()`] in the binary
+///   source `main.rs`.
 ///
 /// This is done because of the way the python entry point is invoked. If [`std::env::args`]
 /// is used instead of python's `sys.argv`, then the list of strings includes the entry point
@@ -47,7 +49,19 @@ pub fn run_main(args: Vec<String>) -> i32 {
     let arg_parser = get_arg_parser();
     let args = arg_parser.get_matches_from(args);
 
+    if let Some(_) = args.subcommand_matches("version") {
+        println!("cpp-linter v{}", VERSION);
+        return 0;
+    }
+
     logger::init().unwrap();
+
+    let version = args.get_one::<String>("version").unwrap();
+    if version == "NO-VERSION" {
+        log::error!("The `--version` arg is used to specify which version of clang to use.");
+        log::error!("To get the cpp-linter version, use `cpp-linter version` sub-command.");
+        return 1;
+    }
 
     let root_path = args.get_one::<String>("repo-root").unwrap();
     if root_path != &String::from(".") {
@@ -124,7 +138,7 @@ pub fn run_main(args: Vec<String>) -> i32 {
     let extra_args = convert_extra_arg_val(&args);
     let (format_advice, tidy_advice) = capture_clang_tools_output(
         &files,
-        args.get_one::<String>("version").unwrap(),
+        version,
         args.get_one::<String>("tidy-checks").unwrap(),
         user_inputs.style.as_str(),
         &lines_changed_only,

@@ -3,18 +3,15 @@ name: Docs
 on: [push, workflow_dispatch]
 
 jobs:
-  build:
-    permissions:
-      contents: write
+  build-sphinx:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: 3.x
 
-      - name: Install docs dependencies
+      - name: Install dependencies
         working-directory: cpp-linter-py
         run: pip install -r docs/requirements.txt
 
@@ -22,16 +19,28 @@ jobs:
         working-directory: cpp-linter-py
         run: sphinx-build docs docs/_build/html
 
-      - name: upload docs build as artifact
+      - name: Upload docs build as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: "cpp-linter-py-docs"
+          name: cpp-linter-py_docs
           path: cpp-linter-py/docs/_build/html
 
-      - name: upload to github pages
+      - name: Upload to github pages
         # only publish doc changes from main branch
         if: github.ref == 'refs/heads/main'
-        uses: peaceiris/actions-gh-pages@v3
+        uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: cpp-linter-py/docs/_build/html
+
+  build-rustdoc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup update --no-self-update
+      - run: cargo doc --no-deps --manifest-path cpp-linter-lib/Cargo.toml
+      - name: upload rustdoc build as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          path: target/doc
+          name: cpp-linter-lib_docs

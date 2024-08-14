@@ -3,8 +3,8 @@
 use std::fs;
 
 // non-std crates
-use clap::builder::FalseyValueParser;
-use clap::{Arg, ArgAction, ArgMatches, Command};
+use clap::builder::{ArgPredicate, FalseyValueParser};
+use clap::{Arg, ArgAction, ArgGroup, ArgMatches, Command};
 
 /// An enum to describe `--lines-changed-only` CLI option's behavior.
 #[derive(PartialEq)]
@@ -20,6 +20,10 @@ pub enum LinesChangedOnly {
 /// Builds and returns the Command Line Interface's argument parsing object.
 pub fn get_arg_parser() -> Command {
     Command::new("cpp-linter")
+        .subcommand(
+            Command::new("version")
+                .about("Display the cpp-linter version and exit.")
+        )
         .arg(
             Arg::new("verbosity")
                 .long("verbosity")
@@ -38,6 +42,7 @@ thread comments or file annotations.
             Arg::new("database")
                 .long("database")
                 .short('p')
+                .help_heading("clang-tidy options")
                 .long_help(
             "The path that is used to read a compile command database.
 For example, it can be a CMake build directory in which a file named
@@ -52,6 +57,7 @@ example of setting up Clang Tooling on a source tree.",
                 .short('s')
                 .long("style")
                 .default_value("llvm")
+                .help_heading("clang-format options")
                 .long_help(
                     "The style rules to use.
 
@@ -69,6 +75,7 @@ example of setting up Clang Tooling on a source tree.",
                 .default_value(
                     "boost-*,bugprone-*,performance-*,readability-*,portability-*,modernize-*,clang-analyzer-*,cppcoreguidelines-*",
                 )
+                .help_heading("clang-tidy options")
                 .long_help(
                     "A comma-separated list of globs with optional ``-`` prefix.
 Globs are processed in order of appearance in the list.
@@ -90,6 +97,9 @@ See also clang-tidy docs for more info.
             Arg::new("version")
                 .short('V')
                 .long("version")
+                .default_missing_value("NO-VERSION")
+                .num_args(0..=1)
+                .require_equals(true)
                 .default_value("")
                 .long_help(
                     "The desired version of the clang tools to use. Accepted options are
@@ -109,6 +119,7 @@ strings which can be 8, 9, 10, 11, 12, 13, 14, 15, 16, 17.
                 .long("extensions")
                 .value_delimiter(',')
                 .default_value("c,h,C,H,cpp,hpp,cc,hh,c++,h++,cxx,hxx")
+                .help_heading("source options")
                 .long_help("A comma-separated list of file extensions to analyze.
 "),
         )
@@ -117,6 +128,7 @@ strings which can be 8, 9, 10, 11, 12, 13, 14, 15, 16, 17.
                 .short('r')
                 .long("repo-root")
                 .default_value(".")
+                .help_heading("source options")
                 .long_help(
                     "The relative path to the repository root directory. This path is
 relative to the runner's ``GITHUB_WORKSPACE`` environment variable (or
@@ -130,6 +142,7 @@ the current working directory if not using a CI runner).
                 .long("ignore")
                 .value_delimiter('|')
                 .default_value(".github|target")
+                .help_heading("source options")
                 .long_help(
                     "Set this option with path(s) to ignore (or not ignore).
 
@@ -153,6 +166,7 @@ the current working directory if not using a CI runner).
                 .long("lines-changed-only")
                 .value_parser(["true", "false", "diff"])
                 .default_value("true")
+                .help_heading("source options")
                 .long_help(
                     "This controls what part of the files are analyzed.
 The following values are accepted:
@@ -168,8 +182,9 @@ The following values are accepted:
             Arg::new("files-changed-only")
                 .short('f')
                 .long("files-changed-only")
-                .default_value("false")
+                .default_value_if("lines-changed-only", ArgPredicate::Equals("true".into()), "true")
                 .value_parser(FalseyValueParser::new())
+                .help_heading("source options")
                 .long_help(
                     "Set this option to false to analyze any source files in the repo.
 This is automatically enabled if
@@ -190,6 +205,7 @@ This is automatically enabled if
                 .long("extra-arg")
                 .short('x')
                 .action(ArgAction::Append)
+                .help_heading("clang-tidy options")
                 .long_help(
                     "A string of extra arguments passed to clang-tidy for use as
 compiler arguments. This can be specified more than once for each
@@ -207,6 +223,7 @@ avoid using spaces between name and value (use ``=`` instead):
                 .short('g')
                 .value_parser(["true", "false", "updated"])
                 .default_value("false")
+                .help_heading("feedback options")
                 .long_help(
                     "Set this option to true to enable the use of thread comments as feedback.
 Set this to ``update`` to update an existing comment if one exists;
@@ -233,6 +250,7 @@ the value 'true' will always delete an old comment and post a new one if necessa
                 .short('t')
                 .value_parser(FalseyValueParser::new())
                 .default_value("true")
+                .help_heading("feedback options")
                 .long_help(
                     "Set this option to true or false to enable or disable the use of a
 thread comment that basically says 'Looks Good To Me' (when all checks pass).
@@ -248,6 +266,7 @@ thread comment that basically says 'Looks Good To Me' (when all checks pass).
                 .short('w')
                 .value_parser(FalseyValueParser::new())
                 .default_value("false")
+                .help_heading("feedback options")
                 .long_help(
                     "Set this option to true or false to enable or disable the use of
 a workflow step summary when the run has concluded.
@@ -260,12 +279,23 @@ a workflow step summary when the run has concluded.
                 .short('a')
                 .value_parser(FalseyValueParser::new())
                 .default_value("true")
+                .help_heading("feedback options")
                 .long_help(
                     "Set this option to false to disable the use of
 file annotations as feedback.
 ",
                 ),
-        )
+            )
+            .groups([
+                ArgGroup::new("Clang-tidy options")
+                    .args(["tidy-checks", "database", "extra-arg"]),
+                ArgGroup::new("Clang-format options").args(["style"]),
+                ArgGroup::new("General options").args(["verbosity", "version"]),
+                ArgGroup::new("Source options").args(["extensions", "repo-root", "ignore", "lines-changed-only", "files-changed-only"]),
+                ArgGroup::new("Feedback options").args([
+                    "thread-comments", "no-lgtm", "step-summary", "file-annotations"
+                ]),
+            ])
 }
 
 /// This will parse the list of paths specified from the CLI using the `--ignore`

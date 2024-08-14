@@ -25,7 +25,7 @@ pub struct FeedbackInput {
 }
 
 impl Default for FeedbackInput {
-    /// Construct a [`UserInput`] instance with default values.
+    /// Construct a [`FeedbackInput`] instance with default values.
     fn default() -> Self {
         FeedbackInput {
             thread_comments: "false".to_string(),

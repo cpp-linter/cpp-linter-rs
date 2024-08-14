@@ -2,16 +2,20 @@ name: Pre-commit
 
 on:
   push:
+    branches: [main]
   pull_request:
-    types: opened
+    branches: [main]
 
 jobs:
-  check-source-files:
+  pre-commit:
+    uses: cpp-linter/.github/.github/workflows/pre-commit.yml@main
+
+  cargo-tools:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
-      - run: python3 -m pip install pre-commit
-      - run: pre-commit run --all-files
+      - run: rustup update
+      - name: cargo clippy
+        run: cargo clippy
+      - name: cargo fmt
+        run: cargo fmt --check
