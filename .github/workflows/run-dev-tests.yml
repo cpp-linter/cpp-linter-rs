@@ -20,6 +20,7 @@ env:
 
 jobs:
   test:
+    name: test ${{ matrix.os }} w/ clang v${{ matrix.version }}
     strategy:
       fail-fast: false
       matrix:
@@ -33,12 +34,12 @@ jobs:
       - run: rustup component add llvm-tools-preview
 
       # https://docs.rs/openssl/latest/openssl/#automatic
-      - name: Install OpenSSL (Linux)
-        if: runner.os == 'Linux'
-        run: sudo apt-get install -y pkg-config libssl-dev
-      - name: Install OpenSSL (MacOS)
-        if: runner.os == 'macOS'
-        run: brew install openssl@3
+      # - name: Install OpenSSL (Linux)
+      #   if: runner.os == 'Linux'
+      #   run: sudo apt-get install -y pkg-config libssl-dev
+      # - name: Install OpenSSL (MacOS)
+      #   if: runner.os == 'macOS'
+      #   run: brew install openssl@3
       # - name: Install OpenSSL (Windows)
       #   if: runner.os == 'Windows'
       #   run: vcpkg install openssl
@@ -114,7 +115,7 @@ jobs:
         run: |
           cargo llvm-cov report --lcov --output-path lcov.info
 
-      - uses: codecov/codecov-action@v3
+      - uses: codecov/codecov-action@v4
         if: matrix.version == '16' && runner.os == 'Linux'
         with:
           token: ${{secrets.CODECOV_TOKEN}}

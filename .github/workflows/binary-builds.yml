@@ -34,53 +34,68 @@ jobs:
         include:
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-latest
-          ## I GIVE UP! For this target, OpenSSL needs to be cross compiled
-          ## which is driven by openssl-sys crate's custom build script...
-          ## Linux users with aarch64 (aka ARM64) using musl C lib can go fish (or build from source).
-          # - target: aarch64-unknown-linux-musl
-          #   os: ubuntu-latest
+            vendered: true
+            cross: true
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-latest
+            vendered: true
+            cross: true
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
+            vendered: false
+            cross: false
           - target: x86_64-unknown-linux-musl
             os: ubuntu-latest
+            vendered: true
+            cross: true
+          - target: arm-unknown-linux-gnueabi
+            os: ubuntu-latest
+            vendered: true
+            cross: true
+          - target: arm-unknown-linux-gnueabihf
+            os: ubuntu-latest
+            vendered: true
+            cross: true
+          - target: armv7-unknown-linux-gnueabihf
+            os: ubuntu-latest
+            vendered: true
+            cross: true
+          - target: powerpc-unknown-linux-gnu
+            os: ubuntu-latest
+            vendered: true
+            cross: true
+          - target: powerpc64-unknown-linux-gnu
+            os: ubuntu-latest
+            vendered: true
+            cross: true
+          - target: powerpc64le-unknown-linux-gnu
+            os: ubuntu-latest
+            vendered: true
+            cross: true
+          - target: s390x-unknown-linux-gnu
+            os: ubuntu-latest
+            vendered: true
+            cross: true
           - target: aarch64-apple-darwin
             os: macos-latest
+            vendered: true
+            cross: false
           - target: x86_64-apple-darwin
             os: macos-latest
+            vendered: true
+            cross: false
           - target: x86_64-pc-windows-msvc
             os: windows-latest
+            vendered: false
+            cross: false
+          - target: aarch64-pc-windows-msvc
+            os: windows-latest
+            vendered: false
+            cross: false
     runs-on: ${{ matrix.os }}
     permissions:
       contents: write
     steps:
-      - name: Install native OpenSSL on Linux
-        if: runner.os == 'Linux' && !(startsWith(matrix.target, 'aarch64') || endsWith(matrix.target, 'musl'))
-        run: sudo apt-get install -y pkg-config libssl-dev
-      - name: Install GCC for aarch64 (for cross-compiling openssl)
-        if: runner.os == 'Linux' && startsWith(matrix.target, 'aarch64')
-        run: |
-          sudo apt-get update
-          sudo apt-get install gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu
-          if [[ "${{matrix.target}}" == *musl ]]; then
-            sudo apt-get install musl-dev musl-tools
-          fi
-      - name: Install musl-gcc (for compiling OpenSSL)
-        if: matrix.target == 'x86_64-unknown-linux-musl'
-        run: sudo apt-get install musl-tools
-
-      - name: Calculate openssl-vendored
-        shell: bash
-        id: is-openssl-vendored
-        run: |
-          case "${{ matrix.target }}" in
-            "aarch64-apple-darwin" | "x86_64-apple-darwin" | "aarch64-unknown-linux-gnu" | "aarch64-unknown-linux-musl" | "x86_64-unknown-linux-musl")
-              echo "enabled=--features openssl-vendored" >> $GITHUB_OUTPUT
-              ;;
-            *)
-              echo "enabled=" >> $GITHUB_OUTPUT
-              ;;
-          esac
-
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -98,19 +113,19 @@ jobs:
         with:
           target: ${{ matrix.target }}
 
-        # problems with cross-compiling linux with musl
-      - run: echo "RUSTFLAGS=-D warnings -C target-feature=+crt-static -C link-self-contained=yes" >> "${GITHUB_ENV}"
-        if: contains(matrix.target, '-linux-musl')
-      - run: |
-          echo "CC=aarch64-linux-gnu-gcc" >> "$GITHUB_ENV"
-          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=aarch64-linux-gnu-gcc" >> "$GITHUB_ENV"
-        if: matrix.target == 'aarch64-unknown-linux-musl'
+      - name: Install cross (cargo cross compiler)
+        if: matrix.cross
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cross
 
-      - name: Build
-        env:
-          # problems with cross-compiling aarch64 linux with gnu
-          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: /usr/bin/aarch64-linux-gnu-gcc
-        run: cargo build --manifest-path cpp-linter-lib/Cargo.toml --release --bin cpp-linter --target ${{ matrix.target }} ${{ steps.is-openssl-vendored.outputs.enabled }}
+      - name: Build (native)
+        if: ${{ !matrix.cross }}
+        run: cargo build --manifest-path cpp-linter-lib/Cargo.toml --release --bin cpp-linter --target ${{ matrix.target }} ${{ matrix.vendered && '--features openssl-vendored' || '' }}
+
+      - name: Build (cross)
+        if: matrix.cross
+        run: cross build --manifest-path cpp-linter-lib/Cargo.toml --release --bin cpp-linter --target ${{ matrix.target }} ${{ matrix.vendered && '--features openssl-vendored' || '' }}
 
       - name: Prepare artifacts
         run: mv target/${{ matrix.target }}/release/cpp-linter${{ runner.os == 'Windows' && '.exe' || '' }} ./cpp-linter-${{ matrix.target }}${{ runner.os == 'Windows' && '.exe' || '' }}
