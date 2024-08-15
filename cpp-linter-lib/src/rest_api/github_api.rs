@@ -468,17 +468,15 @@ struct User {
 mod test {
     use std::{env, io::Read, path::PathBuf};
 
+    use regex::Regex;
     use tempfile::{tempdir, NamedTempFile};
 
     use super::{GithubApiClient, USER_AGENT};
     use crate::{
-        clang_tools::{
-            capture_clang_tools_output, clang_format::tally_format_advice,
-            clang_tidy::tally_tidy_advice,
-        },
+        clang_tools::capture_clang_tools_output,
         cli::LinesChangedOnly,
         common_fs::FileObj,
-        rest_api::RestApiClient,
+        rest_api::{FeedbackInput, RestApiClient, USER_OUTREACH},
     };
 
     // ************************** tests for GithubApiClient::make_headers()
@@ -513,94 +511,72 @@ mod test {
         assert_header(true, None);
     }
 
-    // ************************** tests for GithubApiClient::set_exit_code()
+    // ************************* tests for step-summary and output variables
 
-    #[test]
-    fn set_exit_code() {
-        let rest_api_client = GithubApiClient::new();
-        let checks_failed = 3;
-        let format_checks_failed = 2;
-        let tidy_checks_failed = 1;
+    fn create_comment(tidy_checks: &str, style: &str) -> (String, String) {
         let tmp_dir = tempdir().unwrap();
-        let mut tmp_file = NamedTempFile::new_in(tmp_dir.path()).unwrap();
-        env::set_var("GITHUB_OUTPUT", tmp_file.path());
-        assert_eq!(
-            checks_failed,
-            rest_api_client.set_exit_code(
-                checks_failed,
-                Some(format_checks_failed),
-                Some(tidy_checks_failed)
-            )
-        );
-        let mut output_file_content = String::new();
-        tmp_file.read_to_string(&mut output_file_content).unwrap();
-        assert!(output_file_content.contains(
-            format!(
-                "checks-failed={}\nformat-checks-failed={}\ntidy-checks-failed={}\n",
-                3, 2, 1
-            )
-            .as_str()
-        ));
-        println!("temp file used: {:?}", tmp_file.path());
-        drop(tmp_file);
-        drop(tmp_dir);
-    }
-
-    // ************************* tests for comment output
-
-    #[test]
-    fn check_comment_concerns() {
-        let tmp_dir = tempdir().unwrap();
-        let mut tmp_file = NamedTempFile::new_in(tmp_dir.path()).unwrap();
-        let rest_api_client = GithubApiClient::new();
+        let rest_api_client = GithubApiClient::default();
+        if env::var("ACTIONS_STEP_DEBUG").is_ok_and(|var| var == "true") {
+            assert!(rest_api_client.debug_enabled);
+        }
         let mut files = vec![FileObj::new(PathBuf::from("tests/demo/demo.cpp"))];
         capture_clang_tools_output(
             &mut files,
             env::var("CLANG-VERSION").unwrap_or("".to_string()).as_str(),
-            "readability-*",
-            "file",
+            tidy_checks,
+            style,
             &LinesChangedOnly::Off,
             None,
             None,
         );
-        let format_checks_failed = tally_format_advice(&files);
-        let tidy_checks_failed = tally_tidy_advice(&files);
-        let comment =
-            rest_api_client.make_comment(&files, format_checks_failed, tidy_checks_failed, None);
-        assert!(format_checks_failed > 0);
-        assert!(tidy_checks_failed > 0);
-        env::set_var("GITHUB_STEP_SUMMARY", tmp_file.path());
-        rest_api_client.post_step_summary(&comment);
-        let mut output_file_content = String::new();
-        tmp_file.read_to_string(&mut output_file_content).unwrap();
-        assert_eq!(format!("\n{comment}\n\n"), output_file_content);
+        let feedback_inputs = FeedbackInput {
+            style: style.to_string(),
+            step_summary: true,
+            ..Default::default()
+        };
+        let mut step_summary_path = NamedTempFile::new_in(tmp_dir.path()).unwrap();
+        env::set_var("GITHUB_STEP_SUMMARY", step_summary_path.path());
+        let mut gh_out_path = NamedTempFile::new_in(tmp_dir.path()).unwrap();
+        env::set_var("GITHUB_OUTPUT", gh_out_path.path());
+        rest_api_client.post_feedback(&files, feedback_inputs);
+        let mut step_summary_content = String::new();
+        step_summary_path
+            .read_to_string(&mut step_summary_content)
+            .unwrap();
+        assert!(&step_summary_content.contains(USER_OUTREACH));
+        let mut gh_out_content = String::new();
+        gh_out_path.read_to_string(&mut gh_out_content).unwrap();
+        assert!(gh_out_content.starts_with("checks-failed="));
+        (step_summary_content, gh_out_content)
+    }
+
+    #[test]
+    fn check_comment_concerns() {
+        let (comment, gh_out) = create_comment("readability-*", "file");
+        assert!(&comment.contains(":warning:\nSome files did not pass the configured checks!\n"));
+        let fmt_pattern = Regex::new(r"format-checks-failed=(\d+)\n").unwrap();
+        let tidy_pattern = Regex::new(r"tidy-checks-failed=(\d+)\n").unwrap();
+        for pattern in [fmt_pattern, tidy_pattern] {
+            let number = pattern
+                .captures(&gh_out)
+                .expect("found no number of checks-failed")
+                .get(1)
+                .unwrap()
+                .as_str()
+                .parse::<u64>()
+                .unwrap();
+            assert!(number > 0);
+        }
     }
 
     #[test]
     fn check_comment_lgtm() {
-        let tmp_dir = tempdir().unwrap();
-        let mut tmp_file = NamedTempFile::new_in(tmp_dir.path()).unwrap();
-        let rest_api_client = GithubApiClient::new();
-        let mut files = vec![FileObj::new(PathBuf::from("tests/demo/demo.cpp"))];
-        capture_clang_tools_output(
-            &mut files,
-            env::var("CLANG-VERSION").unwrap_or("".to_string()).as_str(),
-            "-*",
-            "",
-            &LinesChangedOnly::Off,
-            None,
-            None,
+        env::set_var("ACTIONS_STEP_DEBUG", "true");
+        let (comment, gh_out) = create_comment("-*", "");
+        assert!(&comment.contains(":heavy_check_mark:\nNo problems need attention."));
+        assert_eq!(
+            &gh_out,
+            "checks-failed=0\nformat-checks-failed=0\ntidy-checks-failed=0\n"
         );
-        let format_checks_failed = tally_format_advice(&files);
-        let tidy_checks_failed = tally_tidy_advice(&files);
-        let comment =
-            rest_api_client.make_comment(&files, format_checks_failed, tidy_checks_failed, None);
-        assert_eq!(format_checks_failed, 0);
-        assert_eq!(tidy_checks_failed, 0);
-        env::set_var("GITHUB_STEP_SUMMARY", tmp_file.path());
-        rest_api_client.post_step_summary(&comment);
-        let mut output_file_content = String::new();
-        tmp_file.read_to_string(&mut output_file_content).unwrap();
-        assert_eq!(format!("\n{comment}\n\n"), output_file_content);
     }
 }

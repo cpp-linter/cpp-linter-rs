@@ -8,6 +8,7 @@
 *.md text eol=lf
 *.rs text eol=lf
 *.yaml text eol=lf
+*.toml text eol=lf
 *.yml text eol=lf
 *.sh text eol=lf
 *.cpp text eol=lf
@@ -15,3 +16,4 @@
 *.patch text eol=lf
 .gitattributes text eol=lf
 *.txt text eol=lf
+*.code-workspace text eol=lf
