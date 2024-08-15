@@ -10,10 +10,10 @@ use reqwest::header::{HeaderMap, HeaderValue};
 
 // project specific modules/crates
 pub mod github_api;
-use crate::clang_tools::{clang_format::FormatAdvice, clang_tidy::TidyAdvice};
 use crate::common_fs::FileObj;
 
 pub static COMMENT_MARKER: &str = "<!-- cpp linter action -->";
+pub static USER_OUTREACH: &str = "\n\nHave any feedback or feature suggestions? [Share it here.](https://github.com/cpp-linter/cpp-linter-action/issues)";
 
 /// A struct to hold a collection of user inputs related to [`ResApiClient.post_feedback()`].
 pub struct FeedbackInput {
@@ -42,10 +42,10 @@ pub trait RestApiClient {
     /// A way to set output variables specific to cpp_linter executions in CI.
     fn set_exit_code(
         &self,
-        checks_failed: i32,
-        format_checks_failed: Option<i32>,
-        tidy_checks_failed: Option<i32>,
-    ) -> i32;
+        checks_failed: u64,
+        format_checks_failed: Option<u64>,
+        tidy_checks_failed: Option<u64>,
+    ) -> u64;
 
     /// A convenience method to create the headers attached to all REST API calls.
     ///
@@ -76,33 +76,100 @@ pub trait RestApiClient {
     fn make_comment(
         &self,
         files: &[FileObj],
-        format_advice: &[FormatAdvice],
-        tidy_advice: &[TidyAdvice],
-    ) -> (String, i32, i32) {
-        let mut comment = String::from("<!-- cpp linter action -->\n# Cpp-Linter Report ");
-        let mut format_checks_failed = 0;
-        let mut tidy_checks_failed = 0;
-        let mut format_comment = String::new();
-        for (index, fmt_advice) in format_advice.iter().enumerate() {
-            if !fmt_advice.replacements.is_empty() {
-                format_comment.push_str(
-                    &format!(
-                        "- {}\n",
-                        files[index].name.to_string_lossy().replace('\\', "/")
-                    )
-                    .to_string(),
+        format_checks_failed: u64,
+        tidy_checks_failed: u64,
+        max_len: Option<u64>,
+    ) -> String {
+        let mut comment = format!("{COMMENT_MARKER}\n# Cpp-Linter Report ");
+        let mut remaining_length =
+            max_len.unwrap_or(u64::MAX) - comment.len() as u64 - USER_OUTREACH.len() as u64;
+
+        if format_checks_failed > 0 || tidy_checks_failed > 0 {
+            let prompt = ":warning:\nSome files did not pass the configured checks!\n";
+            remaining_length -= prompt.len() as u64;
+            comment.push_str(prompt);
+            if format_checks_failed > 0 {
+                make_format_comment(
+                    files,
+                    &mut comment,
+                    format_checks_failed,
+                    &mut remaining_length,
                 );
-                format_checks_failed += 1;
+            }
+            if tidy_checks_failed > 0 {
+                make_tidy_comment(
+                    files,
+                    &mut comment,
+                    tidy_checks_failed,
+                    &mut remaining_length,
+                );
+            }
+        } else {
+            comment.push_str(":heavy_check_mark:\nNo problems need attention.");
+        }
+        comment.push_str(USER_OUTREACH);
+        comment
+    }
+
+    /// A way to post feedback in the form of `thread_comments`, `file_annotations`, and
+    /// `step_summary`.
+    ///
+    /// The given `files` should've been gathered from `get_list_of_changed_files()` or
+    /// `list_source_files()`.
+    ///
+    /// The `format_advice` and `tidy_advice` should be a result of parsing output from
+    /// clang-format and clang-tidy (see `capture_clang_tools_output()`).
+    ///
+    /// All other parameters correspond to CLI arguments.
+    fn post_feedback(&self, files: &[FileObj], user_inputs: FeedbackInput);
+}
+
+fn make_format_comment(
+    files: &[FileObj],
+    comment: &mut String,
+    format_checks_failed: u64,
+    remaining_length: &mut u64,
+) {
+    let opener = format!("\n<details><summary>clang-format reports: <strong>{} file(s) not formatted</strong></summary>\n\n", format_checks_failed);
+    let closer = String::from("\n</details>");
+    let mut format_comment = String::new();
+    *remaining_length -= opener.len() as u64 + closer.len() as u64;
+    for file in files {
+        if let Some(format_advice) = &file.format_advice {
+            if !format_advice.replacements.is_empty() && *remaining_length > 0 {
+                let note = format!("- {}\n", file.name.to_string_lossy().replace('\\', "/"));
+                if (note.len() as u64) < *remaining_length {
+                    format_comment.push_str(&note.to_string());
+                    *remaining_length -= note.len() as u64;
+                }
             }
         }
+    }
+    comment.push_str(&opener);
+    comment.push_str(&format_comment);
+    comment.push_str(&closer);
+}
 
-        let mut tidy_comment = String::new();
-        for (index, advice) in tidy_advice.iter().enumerate() {
-            for tidy_note in &advice.notes {
+fn make_tidy_comment(
+    files: &[FileObj],
+    comment: &mut String,
+    tidy_checks_failed: u64,
+    remaining_length: &mut u64,
+) {
+    let opener = format!(
+        "\n<details><summary>clang-tidy reports: <strong>{} concern(s)</strong></summary>\n\n",
+        tidy_checks_failed
+    );
+    let closer = String::from("\n</details>");
+    let mut tidy_comment = String::new();
+    *remaining_length -= opener.len() as u64 + closer.len() as u64;
+    for file in files {
+        if let Some(tidy_advice) = &file.tidy_advice {
+            for tidy_note in &tidy_advice.notes {
                 let file_path = PathBuf::from(&tidy_note.filename);
-                if file_path == files[index].name {
-                    tidy_comment.push_str(&format!("- {}\n\n", tidy_note.filename));
-                    tidy_comment.push_str(&format!(
+                if file_path == file.name {
+                    let mut tmp_note = format!("- {}\n\n", tidy_note.filename);
+                    tmp_note.push_str(&format!(
                         "   <strong>{filename}:{line}:{cols}:</strong> {severity}: [{diagnostic}]\n   > {rationale}\n{concerned_code}",
                         filename = tidy_note.filename,
                         line = tidy_note.line,
@@ -117,40 +184,16 @@ pub trait RestApiClient {
                             ).to_string()
                         },
                     ).to_string());
-                    tidy_checks_failed += 1;
+
+                    if (tmp_note.len() as u64) < *remaining_length {
+                        tidy_comment.push_str(&tmp_note);
+                        *remaining_length -= tmp_note.len() as u64;
+                    }
                 }
             }
         }
-        if format_checks_failed > 0 || tidy_checks_failed > 0 {
-            comment.push_str(":warning:\nSome files did not pass the configured checks!\n");
-            if format_checks_failed > 0 {
-                comment.push_str(&format!("\n<details><summary>clang-format reports: <strong>{} file(s) not formatted</strong></summary>\n\n{}\n</details>", format_checks_failed, &format_comment));
-            }
-            if tidy_checks_failed > 0 {
-                comment.push_str(&format!("\n<details><summary>clang-tidy reports: <strong>{} concern(s)</strong></summary>\n\n{}\n</details>", tidy_checks_failed, tidy_comment));
-            }
-        } else {
-            comment.push_str(":heavy_check_mark:\nNo problems need attention.");
-        }
-        comment.push_str("\n\nHave any feedback or feature suggestions? [Share it here.](https://github.com/cpp-linter/cpp-linter-action/issues)");
-        (comment, format_checks_failed, tidy_checks_failed)
     }
-
-    /// A way to post feedback in the form of `thread_comments`, `file_annotations`, and
-    /// `step_summary`.
-    ///
-    /// The given `files` should've been gathered from `get_list_of_changed_files()` or
-    /// `list_source_files()`.
-    ///
-    /// The `format_advice` and `tidy_advice` should be a result of parsing output from
-    /// clang-format and clang-tidy (see `capture_clang_tools_output()`).
-    ///
-    /// All other parameters correspond to CLI arguments.
-    fn post_feedback(
-        &self,
-        files: &[FileObj],
-        format_advice: &[FormatAdvice],
-        tidy_advice: &[TidyAdvice],
-        user_inputs: FeedbackInput,
-    );
+    comment.push_str(&opener);
+    comment.push_str(&tidy_comment);
+    comment.push_str(&closer);
 }

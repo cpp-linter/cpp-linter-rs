@@ -304,7 +304,7 @@ rename to /tests/demo/some source.cpp
             )
         }
 
-        fn assert_files_eq(files_from_a: &Vec<FileObj>, files_from_b: &Vec<FileObj>) {
+        fn assert_files_eq(files_from_a: &[FileObj], files_from_b: &[FileObj]) {
             assert_eq!(files_from_a.len(), files_from_b.len());
             for (a, b) in files_from_a.iter().zip(files_from_b) {
                 assert_eq!(a.name, b.name);

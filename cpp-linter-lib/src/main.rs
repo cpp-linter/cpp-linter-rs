@@ -1,4 +1,4 @@
-///! This crate is the binary executable's entrypoint.
+/// This crate is the binary executable's entrypoint.
 use std::env;
 
 use cpp_linter_lib::run::run_main;

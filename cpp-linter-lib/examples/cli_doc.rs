@@ -24,21 +24,20 @@ pub fn main() -> std::io::Result<()> {
         writeln!(&doc_file)?;
     }
     for group in command.get_groups() {
-        writeln!(&doc_file, "\n{}", group.get_id().to_string())?;
+        writeln!(&doc_file, "\n{}", group.get_id())?;
         for _ in group.get_id().to_string().chars() {
             write!(&doc_file, "-")?;
         }
         write!(&doc_file, "\n\n")?;
         for arg_id in group.get_args() {
             let mut arg_match = command.get_arguments().filter(|a| *a.get_id() == *arg_id);
-            let arg = arg_match.next().expect(
-                format!(
+            let arg = arg_match.next().unwrap_or_else(|| {
+                panic!(
                     "arg {} expected in group {}",
                     arg_id.as_str(),
                     group.get_id().as_str()
                 )
-                .as_str(),
-            );
+            });
             writeln!(
                 &doc_file,
                 ".. std:option:: -{}, --{}\n",

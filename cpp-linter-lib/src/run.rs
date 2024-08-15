@@ -49,7 +49,7 @@ pub fn run_main(args: Vec<String>) -> i32 {
     let arg_parser = get_arg_parser();
     let args = arg_parser.get_matches_from(args);
 
-    if let Some(_) = args.subcommand_matches("version") {
+    if args.subcommand_matches("version").is_some() {
         println!("cpp-linter v{}", VERSION);
         return 0;
     }
@@ -111,13 +111,14 @@ pub fn run_main(args: Vec<String>) -> i32 {
     let files_changed_only = args.get_flag("files-changed-only");
 
     start_log_group(String::from("Get list of specified source files"));
-    let files: Vec<FileObj> = if lines_changed_only != LinesChangedOnly::Off || files_changed_only {
-        // parse_diff(github_rest_api_payload)
-        rest_api_client.get_list_of_changed_files(&extensions, &ignored, &not_ignored)
-    } else {
-        // walk the folder and look for files with specified extensions according to ignore values.
-        list_source_files(&extensions, &ignored, &not_ignored, ".")
-    };
+    let mut files: Vec<FileObj> =
+        if lines_changed_only != LinesChangedOnly::Off || files_changed_only {
+            // parse_diff(github_rest_api_payload)
+            rest_api_client.get_list_of_changed_files(&extensions, &ignored, &not_ignored)
+        } else {
+            // walk the folder and look for files with specified extensions according to ignore values.
+            list_source_files(&extensions, &ignored, &not_ignored, ".")
+        };
     log::info!("Giving attention to the following files:");
     for file in &files {
         log::info!("  ./{}", file.name.to_string_lossy().replace('\\', "/"));
@@ -136,8 +137,8 @@ pub fn run_main(args: Vec<String>) -> i32 {
     };
 
     let extra_args = convert_extra_arg_val(&args);
-    let (format_advice, tidy_advice) = capture_clang_tools_output(
-        &files,
+    capture_clang_tools_output(
+        &mut files,
         version,
         args.get_one::<String>("tidy-checks").unwrap(),
         user_inputs.style.as_str(),
@@ -146,7 +147,7 @@ pub fn run_main(args: Vec<String>) -> i32 {
         extra_args,
     );
     start_log_group(String::from("Posting feedback"));
-    rest_api_client.post_feedback(&files, &format_advice, &tidy_advice, user_inputs);
+    rest_api_client.post_feedback(&files, user_inputs);
     end_log_group();
     0
 }

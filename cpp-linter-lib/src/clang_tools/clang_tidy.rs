@@ -44,6 +44,7 @@ struct CompilationUnit {
 }
 
 /// A structure that represents a single notification parsed from clang-tidy's stdout.
+#[derive(Debug)]
 pub struct TidyNotification {
     /// The file's path and name (supposedly relative to the repository root folder).
     pub filename: String,
@@ -86,6 +87,7 @@ impl TidyNotification {
 }
 
 /// A struct to hold notification from clang-tidy about a single file
+#[derive(Debug)]
 pub struct TidyAdvice {
     /// A list of notifications parsed from clang-tidy stdout.
     pub notes: Vec<TidyNotification>,
@@ -98,7 +100,7 @@ pub struct TidyAdvice {
 fn parse_tidy_output(
     tidy_stdout: &[u8],
     database_json: &Option<CompilationDatabase>,
-) -> TidyAdvice {
+) -> Option<TidyAdvice> {
     let note_header = Regex::new(r"^(.+):(\d+):(\d+):\s(\w+):(.*)\[([a-zA-Z\d\-\.]+)\]$").unwrap();
     let mut notification = None;
     let mut result = Vec::new();
@@ -163,19 +165,39 @@ fn parse_tidy_output(
     if let Some(note) = notification {
         result.push(note);
     }
-    TidyAdvice { notes: result }
+    if result.is_empty() {
+        None
+    } else {
+        Some(TidyAdvice { notes: result })
+    }
+}
+
+/// Get a total count of clang-tidy advice from the given list of [FileObj]s.
+pub fn tally_tidy_advice(files: &[FileObj]) -> u64 {
+    let mut total = 0;
+    for file in files {
+        if let Some(advice) = &file.tidy_advice {
+            for tidy_note in &advice.notes {
+                let file_path = PathBuf::from(&tidy_note.filename);
+                if file_path == file.name {
+                    total += 1;
+                }
+            }
+        }
+    }
+    total
 }
 
 /// Run clang-tidy, then parse and return it's output.
 pub fn run_clang_tidy(
     cmd: &mut Command,
-    file: &FileObj,
+    file: &mut FileObj,
     checks: &str,
     lines_changed_only: &LinesChangedOnly,
     database: &Option<PathBuf>,
     extra_args: &Option<Vec<&str>>,
     database_json: &Option<CompilationDatabase>,
-) -> TidyAdvice {
+) {
     if !checks.is_empty() {
         cmd.args(["-checks", checks]);
     }
@@ -222,7 +244,7 @@ pub fn run_clang_tidy(
             String::from_utf8(output.stderr).unwrap()
         );
     }
-    parse_tidy_output(&output.stdout, database_json)
+    file.tidy_advice = parse_tidy_output(&output.stdout, database_json);
 }
 
 #[cfg(test)]
@@ -265,11 +287,11 @@ mod test {
         )
         .unwrap();
         let mut cmd = Command::new(exe_path);
-        let file = FileObj::new(PathBuf::from("tests/demo/demo.cpp"));
+        let mut file = FileObj::new(PathBuf::from("tests/demo/demo.cpp"));
         let extra_args = vec!["-std=c++17", "-Wall"];
-        let tidy_advice = run_clang_tidy(
+        run_clang_tidy(
             &mut cmd,
-            &file,
+            &mut file,
             "",                     // use .clang-tidy config file
             &LinesChangedOnly::Off, // check all lines
             &None,                  // no database path
@@ -286,6 +308,8 @@ mod test {
             vec!["--extra-arg", "\"-std=c++17\"", "--extra-arg", "\"-Wall\""],
             args
         );
-        assert!(!tidy_advice.notes.is_empty());
+        assert!(!file
+            .tidy_advice
+            .is_some_and(|advice| advice.notes.is_empty()));
     }
 }

@@ -12,8 +12,9 @@ use reqwest::Method;
 use serde::Deserialize;
 use serde_json;
 
+use crate::clang_tools::clang_format::tally_format_advice;
+use crate::clang_tools::clang_tidy::tally_tidy_advice;
 // project specific modules/crates
-use crate::clang_tools::{clang_format::FormatAdvice, clang_tidy::TidyAdvice};
 use crate::common_fs::FileObj;
 use crate::git::{get_diff, open_repo, parse_diff, parse_diff_from_buf};
 
@@ -28,7 +29,7 @@ pub struct GithubApiClient {
     client: Client,
 
     /// The CI run's event payload from the webhook that triggered the workflow.
-    event_payload: Option<serde_json::Value>,
+    pull_request: Option<i64>,
 
     /// The name of the event that was triggered when running cpp_linter.
     pub event_name: String,
@@ -56,7 +57,7 @@ impl GithubApiClient {
     pub fn new() -> Self {
         GithubApiClient {
             client: reqwest::blocking::Client::new(),
-            event_payload: {
+            pull_request: {
                 if let Ok(event_payload_path) = env::var("GITHUB_EVENT_PATH") {
                     let file_buf = &mut String::new();
                     OpenOptions::new()
@@ -65,7 +66,11 @@ impl GithubApiClient {
                         .unwrap()
                         .read_to_string(file_buf)
                         .unwrap();
-                    Some(serde_json::from_str(file_buf.as_str()).unwrap())
+                    let json = serde_json::from_str::<serde_json::Map<String, serde_json::Value>>(
+                        file_buf.as_str(),
+                    )
+                    .unwrap();
+                    json["number"].as_i64()
                 } else {
                     None
                 }
@@ -94,10 +99,10 @@ impl GithubApiClient {
 impl RestApiClient for GithubApiClient {
     fn set_exit_code(
         &self,
-        checks_failed: i32,
-        format_checks_failed: Option<i32>,
-        tidy_checks_failed: Option<i32>,
-    ) -> i32 {
+        checks_failed: u64,
+        format_checks_failed: Option<u64>,
+        tidy_checks_failed: Option<u64>,
+    ) -> u64 {
         if let Ok(gh_out) = env::var("GITHUB_OUTPUT") {
             let mut gh_out_file = OpenOptions::new()
                 .append(true)
@@ -157,8 +162,10 @@ impl RestApiClient for GithubApiClient {
                 self.api_url,
                 self.repo.as_ref().unwrap(),
                 if self.event_name == "pull_request" {
-                    let pr_number = &self.event_payload.as_ref().unwrap()["number"];
-                    format!("pulls/{}", &pr_number)
+                    format!(
+                        "pulls/{}",
+                        &self.pull_request.expect("Pull request number unknown")
+                    )
                 } else {
                     format!("commits/{}", self.sha.as_ref().unwrap())
                 }
@@ -182,26 +189,18 @@ impl RestApiClient for GithubApiClient {
         }
     }
 
-    fn post_feedback(
-        &self,
-        files: &[FileObj],
-        format_advice: &[FormatAdvice],
-        tidy_advice: &[TidyAdvice],
-        user_inputs: FeedbackInput,
-    ) {
-        let (comment, format_checks_failed, tidy_checks_failed) =
-            self.make_comment(files, format_advice, tidy_advice);
+    fn post_feedback(&self, files: &[FileObj], user_inputs: FeedbackInput) {
+        let format_checks_failed = tally_format_advice(files);
+        let tidy_checks_failed = tally_tidy_advice(files);
+        let mut comment = None;
 
         if user_inputs.file_annotations {
-            self.post_annotations(
-                files,
-                format_advice,
-                tidy_advice,
-                user_inputs.style.as_str(),
-            );
+            self.post_annotations(files, user_inputs.style.as_str());
         }
         if user_inputs.step_summary {
-            self.post_step_summary(&comment);
+            comment =
+                Some(self.make_comment(files, format_checks_failed, tidy_checks_failed, None));
+            self.post_step_summary(comment.as_ref().unwrap());
         }
         self.set_exit_code(
             format_checks_failed + tidy_checks_failed,
@@ -211,13 +210,21 @@ impl RestApiClient for GithubApiClient {
 
         if user_inputs.thread_comments.as_str() != "false" {
             // post thread comment for PR or push event
+            if comment.as_ref().is_some_and(|c| c.len() > 65535) || comment.is_none() {
+                comment = Some(self.make_comment(
+                    files,
+                    format_checks_failed,
+                    tidy_checks_failed,
+                    Some(65535),
+                ));
+            }
             if let Some(repo) = &self.repo {
                 let is_pr = self.event_name == "pull_request";
                 let base_url = format!("{}/repos/{}/", &self.api_url, &repo);
                 let comments_url = if is_pr {
                     format!(
                         "{base_url}issues/{}",
-                        &self.event_payload.as_ref().unwrap()["number"]
+                        &self.pull_request.expect("Pull request number unknown")
                     )
                 } else {
                     format!("{base_url}/commits/{}", &self.sha.as_ref().unwrap())
@@ -238,7 +245,7 @@ impl RestApiClient for GithubApiClient {
                     };
                     self.update_comment(
                         &format!("{}/comments", &comments_url),
-                        &comment,
+                        &comment.unwrap(),
                         count,
                         user_inputs.no_lgtm,
                         format_checks_failed + tidy_checks_failed == 0,
@@ -273,34 +280,28 @@ impl GithubApiClient {
         }
     }
 
-    fn post_annotations(
-        &self,
-        files: &[FileObj],
-        format_advice: &[FormatAdvice],
-        tidy_advice: &[TidyAdvice],
-        style: &str,
-    ) {
-        if !format_advice.is_empty() {
-            // formalize the style guide name
-            let style_guide =
-                if ["google", "chromium", "microsoft", "mozilla", "webkit"].contains(&style) {
-                    // capitalize the first letter
-                    let mut char_iter = style.chars();
-                    match char_iter.next() {
-                        None => String::new(),
-                        Some(f) => f.to_uppercase().collect::<String>() + char_iter.as_str(),
-                    }
-                } else if style == "llvm" || style == "gnu" {
-                    style.to_ascii_uppercase()
-                } else {
-                    String::from("Custom")
-                };
+    fn post_annotations(&self, files: &[FileObj], style: &str) {
+        // formalize the style guide name
+        let style_guide =
+            if ["google", "chromium", "microsoft", "mozilla", "webkit"].contains(&style) {
+                // capitalize the first letter
+                let mut char_iter = style.chars();
+                match char_iter.next() {
+                    None => String::new(),
+                    Some(f) => f.to_uppercase().collect::<String>() + char_iter.as_str(),
+                }
+            } else if style == "llvm" || style == "gnu" {
+                style.to_ascii_uppercase()
+            } else {
+                String::from("Custom")
+            };
 
-            // iterate over clang-format advice and post annotations
-            for (index, advice) in format_advice.iter().enumerate() {
+        // iterate over clang-format advice and post annotations
+        for file in files {
+            if let Some(format_advice) = &file.format_advice {
                 // assemble a list of line numbers
                 let mut lines: Vec<usize> = Vec::new();
-                for replacement in &advice.replacements {
+                for replacement in &format_advice.replacements {
                     if let Some(line_int) = replacement.line {
                         if !lines.contains(&line_int) {
                             lines.push(line_int);
@@ -310,29 +311,29 @@ impl GithubApiClient {
                 // post annotation if any applicable lines were formatted
                 if !lines.is_empty() {
                     println!(
-                        "::notice file={name},title=Run clang-format on {name}::File {name} does not conform to {style_guide} style guidelines. (lines {line_set})",
-                        name = &files[index].name.to_string_lossy().replace('\\', "/"),
-                        line_set = lines.iter().map(|val| val.to_string()).collect::<Vec<_>>().join(","),
-                    );
+                            "::notice file={name},title=Run clang-format on {name}::File {name} does not conform to {style_guide} style guidelines. (lines {line_set})",
+                            name = &file.name.to_string_lossy().replace('\\', "/"),
+                            line_set = lines.iter().map(|val| val.to_string()).collect::<Vec<_>>().join(","),
+                        );
                 }
-            }
-        } // end format_advice iterations
+            } // end format_advice iterations
 
-        // iterate over clang-tidy advice and post annotations
-        // The tidy_advice vector is parallel to the files vector; meaning it serves as a file filterer.
-        // lines are already filter as specified to clang-tidy CLI.
-        for (index, advice) in tidy_advice.iter().enumerate() {
-            for note in &advice.notes {
-                if note.filename == files[index].name.to_string_lossy().replace('\\', "/") {
-                    println!(
-                        "::{severity} file={file},line={line},title={file}:{line}:{cols} [{diag}]::{info}",
-                        severity = if note.severity == *"note" { "notice".to_string() } else {note.severity.clone()},
-                        file = note.filename,
-                        line = note.line,
-                        cols = note.cols,
-                        diag = note.diagnostic,
-                        info = note.rationale,
-                    );
+            // iterate over clang-tidy advice and post annotations
+            // The tidy_advice vector is parallel to the files vector; meaning it serves as a file filterer.
+            // lines are already filter as specified to clang-tidy CLI.
+            if let Some(tidy_advice) = &file.tidy_advice {
+                for note in &tidy_advice.notes {
+                    if note.filename == file.name.to_string_lossy().replace('\\', "/") {
+                        println!(
+                            "::{severity} file={file},line={line},title={file}:{line}:{cols} [{diag}]::{info}",
+                            severity = if note.severity == *"note" { "notice".to_string() } else {note.severity.clone()},
+                            file = note.filename,
+                            line = note.line,
+                            cols = note.cols,
+                            diag = note.diagnostic,
+                            info = note.rationale,
+                        );
+                    }
                 }
             }
         }
@@ -471,17 +472,22 @@ mod test {
 
     use super::{GithubApiClient, USER_AGENT};
     use crate::{
-        clang_tools::capture_clang_tools_output, cli::LinesChangedOnly, common_fs::FileObj,
+        clang_tools::{
+            capture_clang_tools_output, clang_format::tally_format_advice,
+            clang_tidy::tally_tidy_advice,
+        },
+        cli::LinesChangedOnly,
+        common_fs::FileObj,
         rest_api::RestApiClient,
     };
 
     // ************************** tests for GithubApiClient::make_headers()
-
-    #[test]
-    fn get_headers_json_token() {
+    fn assert_header(use_diff: bool, auth: Option<&str>) {
         let rest_api_client = GithubApiClient::new();
-        env::set_var("GITHUB_TOKEN", "123456");
-        let headers = rest_api_client.make_headers(None);
+        if let Some(token) = auth {
+            env::set_var("GITHUB_TOKEN", token);
+        }
+        let headers = rest_api_client.make_headers(Some(use_diff));
         assert!(headers.contains_key("User-Agent"));
         assert_eq!(headers.get("User-Agent").unwrap(), USER_AGENT);
         assert!(headers.contains_key("Accept"));
@@ -490,24 +496,21 @@ mod test {
             .unwrap()
             .to_str()
             .unwrap()
-            .ends_with("raw+json"));
-        assert!(headers.contains_key("Authorization"));
-        assert_eq!(headers.get("Authorization").unwrap(), "123456");
+            .ends_with(if use_diff { "diff" } else { "raw+json" }));
+        if let Some(token) = auth {
+            assert!(headers.contains_key("Authorization"));
+            assert_eq!(headers.get("Authorization").unwrap(), token);
+        }
+    }
+
+    #[test]
+    fn get_headers_json_token() {
+        assert_header(false, Some("123456"));
     }
 
     #[test]
     fn get_headers_diff() {
-        let rest_api_client = GithubApiClient::new();
-        let headers = rest_api_client.make_headers(Some(true));
-        assert!(headers.contains_key("User-Agent"));
-        assert_eq!(headers.get("User-Agent").unwrap(), USER_AGENT);
-        assert!(headers.contains_key("Accept"));
-        assert!(headers
-            .get("Accept")
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .ends_with("diff"));
+        assert_header(true, None);
     }
 
     // ************************** tests for GithubApiClient::set_exit_code()
@@ -550,9 +553,9 @@ mod test {
         let tmp_dir = tempdir().unwrap();
         let mut tmp_file = NamedTempFile::new_in(tmp_dir.path()).unwrap();
         let rest_api_client = GithubApiClient::new();
-        let files = vec![FileObj::new(PathBuf::from("tests/demo/demo.cpp"))];
-        let (format_advice, tidy_advice) = capture_clang_tools_output(
-            &files,
+        let mut files = vec![FileObj::new(PathBuf::from("tests/demo/demo.cpp"))];
+        capture_clang_tools_output(
+            &mut files,
             env::var("CLANG-VERSION").unwrap_or("".to_string()).as_str(),
             "readability-*",
             "file",
@@ -560,8 +563,10 @@ mod test {
             None,
             None,
         );
-        let (comment, format_checks_failed, tidy_checks_failed) =
-            rest_api_client.make_comment(&files, &format_advice, &tidy_advice);
+        let format_checks_failed = tally_format_advice(&files);
+        let tidy_checks_failed = tally_tidy_advice(&files);
+        let comment =
+            rest_api_client.make_comment(&files, format_checks_failed, tidy_checks_failed, None);
         assert!(format_checks_failed > 0);
         assert!(tidy_checks_failed > 0);
         env::set_var("GITHUB_STEP_SUMMARY", tmp_file.path());
@@ -576,9 +581,9 @@ mod test {
         let tmp_dir = tempdir().unwrap();
         let mut tmp_file = NamedTempFile::new_in(tmp_dir.path()).unwrap();
         let rest_api_client = GithubApiClient::new();
-        let files = vec![FileObj::new(PathBuf::from("tests/demo/demo.cpp"))];
-        let (format_advice, tidy_advice) = capture_clang_tools_output(
-            &files,
+        let mut files = vec![FileObj::new(PathBuf::from("tests/demo/demo.cpp"))];
+        capture_clang_tools_output(
+            &mut files,
             env::var("CLANG-VERSION").unwrap_or("".to_string()).as_str(),
             "-*",
             "",
@@ -586,8 +591,10 @@ mod test {
             None,
             None,
         );
-        let (comment, format_checks_failed, tidy_checks_failed) =
-            rest_api_client.make_comment(&files, &format_advice, &tidy_advice);
+        let format_checks_failed = tally_format_advice(&files);
+        let tidy_checks_failed = tally_tidy_advice(&files);
+        let comment =
+            rest_api_client.make_comment(&files, format_checks_failed, tidy_checks_failed, None);
         assert_eq!(format_checks_failed, 0);
         assert_eq!(tidy_checks_failed, 0);
         env::set_var("GITHUB_STEP_SUMMARY", tmp_file.path());

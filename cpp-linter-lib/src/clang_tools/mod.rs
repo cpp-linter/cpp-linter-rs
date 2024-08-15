@@ -15,9 +15,9 @@ use crate::{
     logger::{end_log_group, start_log_group},
 };
 pub mod clang_format;
-use clang_format::{run_clang_format, FormatAdvice};
+use clang_format::run_clang_format;
 pub mod clang_tidy;
-use clang_tidy::{run_clang_tidy, CompilationDatabase, TidyAdvice};
+use clang_tidy::{run_clang_tidy, CompilationDatabase};
 
 /// Fetch the path to a clang tool by `name` (ie `"clang-tidy"` or `"clang-format"`) and
 /// `version`.
@@ -79,14 +79,14 @@ pub fn get_clang_tool_exe(name: &str, version: &str) -> Result<PathBuf, &'static
 /// If `tidy_checks` is `"-*"` then clang-tidy is not executed.
 /// If `style` is a blank string (`""`), then clang-format is not executed.
 pub fn capture_clang_tools_output(
-    files: &Vec<FileObj>,
+    files: &mut Vec<FileObj>,
     version: &str,
     tidy_checks: &str,
     style: &str,
     lines_changed_only: &LinesChangedOnly,
     database: Option<PathBuf>,
     extra_args: Option<Vec<&str>>,
-) -> (Vec<FormatAdvice>, Vec<TidyAdvice>) {
+) {
     // find the executable paths for clang-tidy and/or clang-format and show version
     // info as debugging output.
     let clang_tidy_command = if tidy_checks != "-*" {
@@ -129,12 +129,10 @@ pub fn capture_clang_tools_output(
     };
 
     // iterate over the discovered files and run the clang tools
-    let mut all_format_advice: Vec<FormatAdvice> = Vec::with_capacity(files.len());
-    let mut all_tidy_advice: Vec<TidyAdvice> = Vec::with_capacity(files.len());
     for file in files {
         start_log_group(format!("Analyzing {}", file.name.to_string_lossy()));
         if let Some(tidy_cmd) = &clang_tidy_command {
-            all_tidy_advice.push(run_clang_tidy(
+            run_clang_tidy(
                 &mut Command::new(tidy_cmd),
                 file,
                 tidy_checks,
@@ -142,19 +140,18 @@ pub fn capture_clang_tools_output(
                 &database,
                 &extra_args,
                 &database_json,
-            ));
+            );
         }
         if let Some(format_cmd) = &clang_format_command {
-            all_format_advice.push(run_clang_format(
+            run_clang_format(
                 &mut Command::new(format_cmd),
                 file,
                 style,
                 lines_changed_only,
-            ));
+            );
         }
         end_log_group();
     }
-    (all_format_advice, all_tidy_advice)
 }
 
 #[cfg(test)]

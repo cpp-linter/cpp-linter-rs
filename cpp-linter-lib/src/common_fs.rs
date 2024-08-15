@@ -5,6 +5,8 @@ use std::path::{Component, Path};
 use std::{fs, io};
 use std::{ops::RangeInclusive, path::PathBuf};
 
+use crate::clang_tools::clang_format::FormatAdvice;
+use crate::clang_tools::clang_tidy::TidyAdvice;
 use crate::cli::LinesChangedOnly;
 
 /// A structure to represent a file's path and line changes.
@@ -21,6 +23,12 @@ pub struct FileObj {
 
     /// The list of ranges that span the lines present in diff chunks.
     pub diff_chunks: Vec<RangeInclusive<u32>>,
+
+    /// The collection of clang-format advice for this file.
+    pub format_advice: Option<FormatAdvice>,
+
+    /// The collection of clang-format advice for this file.
+    pub tidy_advice: Option<TidyAdvice>,
 }
 
 impl FileObj {
@@ -33,6 +41,8 @@ impl FileObj {
             added_lines: Vec::<u32>::new(),
             added_ranges: Vec::<RangeInclusive<u32>>::new(),
             diff_chunks: Vec::<RangeInclusive<u32>>::new(),
+            format_advice: None,
+            tidy_advice: None,
         }
     }
 
@@ -48,6 +58,8 @@ impl FileObj {
             added_lines,
             added_ranges,
             diff_chunks,
+            format_advice: None,
+            tidy_advice: None,
         }
     }
 

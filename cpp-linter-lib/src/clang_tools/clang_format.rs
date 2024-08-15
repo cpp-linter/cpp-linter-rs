@@ -60,24 +60,26 @@ impl Clone for Replacement {
     }
 }
 
-/// Get a total count of clang-format advice from the given list of [FormatAdvice].
-pub fn tally_format_advice(format_advice: &[FormatAdvice]) -> u64 {
-    let mut format_checks_failed: u64 = 0;
-    for fmt_advice in format_advice.iter() {
-        if !fmt_advice.replacements.is_empty() {
-            format_checks_failed += 1;
+/// Get a total count of clang-format advice from the given list of [FileObj]s.
+pub fn tally_format_advice(files: &[FileObj]) -> u64 {
+    let mut total = 0;
+    for file in files {
+        if let Some(advice) = &file.format_advice {
+            if !advice.replacements.is_empty() {
+                total += 1;
+            }
         }
     }
-    format_checks_failed
+    total
 }
 
 /// Run clang-tidy for a specific `file`, then parse and return it's XML output.
 pub fn run_clang_format(
     cmd: &mut Command,
-    file: &FileObj,
+    file: &mut FileObj,
     style: &str,
     lines_changed_only: &LinesChangedOnly,
-) -> FormatAdvice {
+) {
     cmd.args(["--style", style, "--output-replacements-xml"]);
     let ranges = file.get_ranges(lines_changed_only);
     for range in &ranges {
@@ -104,9 +106,7 @@ pub fn run_clang_format(
     //     String::from_utf8(output.stdout.clone()).unwrap()
     // );
     if output.stdout.is_empty() {
-        return FormatAdvice {
-            replacements: vec![],
-        };
+        return;
     }
     let xml = String::from_utf8(output.stdout)
         .unwrap()
@@ -118,8 +118,8 @@ pub fn run_clang_format(
         .whitespace_to_characters(true)
         .ignore_root_level_whitespace(true);
     let event_reader = serde_xml_rs::EventReader::new_with_config(xml.as_bytes(), config);
-    let mut format_advice: FormatAdvice =
-        FormatAdvice::deserialize(&mut Deserializer::new(event_reader)).unwrap_or(FormatAdvice {
+    let mut format_advice = FormatAdvice::deserialize(&mut Deserializer::new(event_reader))
+        .unwrap_or(FormatAdvice {
             replacements: vec![],
         });
     if !format_advice.replacements.is_empty() {
@@ -141,7 +141,7 @@ pub fn run_clang_format(
         }
         format_advice.replacements = filtered_replacements;
     }
-    format_advice
+    file.format_advice = Some(format_advice)
 }
 
 #[cfg(test)]
