@@ -1,8 +1,8 @@
 //! A module to hold all common file system functionality.
 
+use std::fs;
 use std::io::Read;
 use std::path::{Component, Path};
-use std::{fs, io};
 use std::{ops::RangeInclusive, path::PathBuf};
 
 use crate::clang_tools::clang_format::FormatAdvice;
@@ -172,15 +172,12 @@ pub fn list_source_files(
     root_path: &str,
 ) -> Vec<FileObj> {
     let mut files: Vec<FileObj> = Vec::new();
-    let entries = fs::read_dir(root_path)
-        .expect("repo root-path should exist")
-        .map(|res| res.map(|e| e.path()))
-        .collect::<Result<Vec<_>, io::Error>>()
-        .unwrap();
-    for entry in entries {
-        if entry.is_dir() {
+    let entries = fs::read_dir(root_path).expect("repo root-path should exist");
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
             let mut is_hidden = false;
-            let parent = entry.components().last().expect("parent not known");
+            let parent = path.components().last().expect("parent not known");
             if parent.as_os_str().to_str().unwrap().starts_with('.') {
                 is_hidden = true;
             }
@@ -189,14 +186,14 @@ pub fn list_source_files(
                     extensions,
                     ignored,
                     not_ignored,
-                    &entry.into_os_string().into_string().unwrap(),
+                    &path.into_os_string().into_string().unwrap(),
                 ));
             }
         } else {
-            let is_valid_src = is_source_or_ignored(&entry, extensions, ignored, not_ignored);
+            let is_valid_src = is_source_or_ignored(&path, extensions, ignored, not_ignored);
             if is_valid_src {
                 files.push(FileObj::new(
-                    entry.clone().strip_prefix("./").unwrap().to_path_buf(),
+                    path.clone().strip_prefix("./").unwrap().to_path_buf(),
                 ));
             }
         }

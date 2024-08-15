@@ -12,5 +12,3 @@ authors = [
 ]
 description = "Run clang-format and clang-tidy on a batch of files."
 documentation = "https://example.com/bar"
-
-[workspace.dependencies]

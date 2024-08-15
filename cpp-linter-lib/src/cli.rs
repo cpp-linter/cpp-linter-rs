@@ -183,6 +183,7 @@ The following values are accepted:
                 .short('f')
                 .long("files-changed-only")
                 .default_value_if("lines-changed-only", ArgPredicate::Equals("true".into()), "true")
+                .default_value("false")
                 .value_parser(FalseyValueParser::new())
                 .help_heading("source options")
                 .long_help(
