@@ -19,7 +19,24 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  cache-deps:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ['windows-latest', ubuntu-latest]
+    steps:
+      - run: rustup update --no-self-update
+      - uses: actions/checkout@v4
+      - name: Cache .cargo locked resources
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+      - run: cargo fetch
+
   test:
+    needs: [cache-deps]
     name: test ${{ matrix.os }} w/ clang v${{ matrix.version }}
     strategy:
       fail-fast: false
@@ -88,7 +105,7 @@ jobs:
           clang-tools --install ${{ matrix.version }}
 
       - name: Cache .cargo locked resources
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: ~/.cargo
           key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
