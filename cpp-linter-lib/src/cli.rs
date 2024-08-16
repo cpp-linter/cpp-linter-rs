@@ -1,7 +1,5 @@
 //! This module holds the Command Line Interface design.
 
-use std::fs;
-
 // non-std crates
 use clap::builder::{ArgPredicate, FalseyValueParser};
 use clap::{Arg, ArgAction, ArgGroup, ArgMatches, Command};
@@ -161,6 +159,28 @@ the current working directory if not using a CI runner).
                 ),
         )
         .arg(
+            Arg::new("ignore-tidy")
+                .short('D')
+                .long("ignore-tidy")
+                .value_delimiter('|')
+                .default_value("")
+                .help_heading("clang-tidy options")
+                .long_help(
+                    "Similar to `--ignore` but applied exclusively to files analyzed by clang-tidy.",
+                ),
+        )
+        .arg(
+            Arg::new("ignore-format")
+                .short('M')
+                .long("ignore-format")
+                .value_delimiter('|')
+                .default_value("")
+                .help_heading("clang-format options")
+                .long_help(
+                    "Similar to `--ignore` but applied exclusively to files analyzed by clang-format.",
+                ),
+        )
+        .arg(
             Arg::new("lines-changed-only")
                 .short('l')
                 .long("lines-changed-only")
@@ -289,81 +309,14 @@ file annotations as feedback.
             )
             .groups([
                 ArgGroup::new("Clang-tidy options")
-                    .args(["tidy-checks", "database", "extra-arg"]),
-                ArgGroup::new("Clang-format options").args(["style"]),
+                    .args(["tidy-checks", "database", "extra-arg", "ignore-tidy"]),
+                ArgGroup::new("Clang-format options").args(["style", "ignore-format"]),
                 ArgGroup::new("General options").args(["verbosity", "version"]),
                 ArgGroup::new("Source options").args(["extensions", "repo-root", "ignore", "lines-changed-only", "files-changed-only"]),
                 ArgGroup::new("Feedback options").args([
                     "thread-comments", "no-lgtm", "step-summary", "file-annotations"
                 ]),
             ])
-}
-
-/// This will parse the list of paths specified from the CLI using the `--ignore`
-/// argument.
-///
-/// It returns 2 lists (in order):
-///
-/// - `ignored` paths
-/// - `not_ignored` paths
-///
-/// This function will also read a .gitmodules file located in the working directory.
-/// The named submodules' paths will be automatically added to the ignored list,
-/// unless the submodule's path is already specified in the not_ignored list.
-pub fn parse_ignore(ignore: &[&str]) -> (Vec<String>, Vec<String>) {
-    let mut ignored = vec![];
-    let mut not_ignored = vec![];
-    for pattern in ignore {
-        let as_posix = pattern.replace('\\', "/");
-        let mut pat = as_posix.as_str();
-        let is_ignored = !pat.starts_with('!');
-        if !is_ignored {
-            pat = &pat[1..];
-        }
-        if pat.starts_with("./") {
-            pat = &pat[2..];
-        }
-        let is_hidden = pat.starts_with('.');
-        if is_hidden || is_ignored {
-            ignored.push(format!("./{pat}"));
-        } else {
-            not_ignored.push(format!("./{pat}"));
-        }
-    }
-
-    if let Ok(read_buf) = fs::read_to_string(".gitmodules") {
-        for line in read_buf.split('\n') {
-            if line.trim_start().starts_with("path") {
-                assert!(line.find('=').unwrap() > 0);
-                let submodule = String::from("./") + line.split('=').last().unwrap().trim();
-                log::debug!("Found submodule: {submodule}");
-                let mut is_ignored = true;
-                for pat in &not_ignored {
-                    if pat == &submodule {
-                        is_ignored = false;
-                        break;
-                    }
-                }
-                if is_ignored && !ignored.contains(&submodule) {
-                    ignored.push(submodule);
-                }
-            }
-        }
-    }
-
-    if !ignored.is_empty() {
-        log::info!("Ignored:");
-        for pattern in &ignored {
-            log::info!("  {pattern}");
-        }
-    }
-    if !not_ignored.is_empty() {
-        log::info!("Not Ignored:");
-        for pattern in &not_ignored {
-            log::info!("  {pattern}");
-        }
-    }
-    (ignored, not_ignored)
 }
 
 /// Converts the parsed value of the `--extra-arg` option into an optional vector of strings.
@@ -386,29 +339,29 @@ pub fn parse_ignore(ignore: &[&str]) -> (Vec<String>, Vec<String>) {
 /// The cpp-linter-action (for Github CI workflows) can only use 1 `extra-arg` input option, so
 /// the value will be split at spaces.
 pub fn convert_extra_arg_val(args: &ArgMatches) -> Option<Vec<String>> {
-    if let Ok(raw_val) = args.try_get_many::<String>("extra-arg") {
-        if let Some(mut val) = raw_val {
-            if val.len() == 1 {
-                // specified once; split and return result
-                return Some(
-                    val.next()
-                        .unwrap()
-                        .trim_matches('\'')
-                        .trim_matches('"')
-                        .split(' ')
-                        .map(|i| i.to_string())
-                        .collect(),
-                );
-            } else {
-                // specified multiple times; just return
-                return Some(val.map(|i| i.to_string()).collect());
-            }
+    let raw_val = args
+        .try_get_many::<String>("extra-arg")
+        .expect("parser failed in set a default for `--extra-arf`");
+    if let Some(mut val) = raw_val {
+        if val.len() == 1 {
+            // specified once; split and return result
+            return Some(
+                val.next()
+                    .unwrap()
+                    .trim_matches('\'')
+                    .trim_matches('"')
+                    .split(' ')
+                    .map(|i| i.to_string())
+                    .collect(),
+            );
         } else {
-            // no value specified; just return
-            return None;
+            // specified multiple times; just return
+            Some(val.map(|i| i.to_string()).collect())
         }
+    } else {
+        // no value specified; just return
+        None
     }
-    None
 }
 
 #[cfg(test)]

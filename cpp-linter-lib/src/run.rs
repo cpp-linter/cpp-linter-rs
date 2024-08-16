@@ -13,9 +13,9 @@ use log::{set_max_level, LevelFilter};
 use openssl_probe;
 
 // project specific modules/crates
-use crate::clang_tools::capture_clang_tools_output;
-use crate::cli::{convert_extra_arg_val, get_arg_parser, parse_ignore, LinesChangedOnly};
-use crate::common_fs::list_source_files;
+use crate::clang_tools::{capture_clang_tools_output, ClangParams};
+use crate::cli::{convert_extra_arg_val, get_arg_parser, LinesChangedOnly};
+use crate::common_fs::FileFilter;
 use crate::github_api::GithubApiClient;
 use crate::logger::{self, end_log_group, start_log_group};
 use crate::rest_api::{FeedbackInput, RestApiClient};
@@ -91,14 +91,15 @@ pub async fn run_main(args: Vec<String>) -> i32 {
     let extensions = args
         .get_many::<String>("extensions")
         .unwrap()
-        .map(|s| s.as_str())
+        .map(|s| s.to_string())
         .collect::<Vec<_>>();
     let ignore = args
         .get_many::<String>("ignore")
         .unwrap()
         .map(|s| s.as_str())
         .collect::<Vec<_>>();
-    let (ignored, not_ignored) = parse_ignore(&ignore);
+    let mut file_filter = FileFilter::new(&ignore, extensions.clone());
+    file_filter.parse_submodules();
 
     let lines_changed_only = match args
         .get_one::<String>("lines-changed-only")
@@ -115,11 +116,11 @@ pub async fn run_main(args: Vec<String>) -> i32 {
     let files = if lines_changed_only != LinesChangedOnly::Off || files_changed_only {
         // parse_diff(github_rest_api_payload)
         rest_api_client
-            .get_list_of_changed_files(&extensions, &ignored, &not_ignored)
+            .get_list_of_changed_files(&file_filter)
             .await
     } else {
         // walk the folder and look for files with specified extensions according to ignore values.
-        list_source_files(&extensions, &ignored, &not_ignored, ".")
+        file_filter.list_source_files(".")
     };
     let mut arc_files = vec![];
     log::info!("Giving attention to the following files:");
@@ -139,18 +140,31 @@ pub async fn run_main(args: Vec<String>) -> i32 {
             .to_string(),
         file_annotations: args.get_flag("file-annotations"),
     };
+    let ignore_tidy = args
+        .get_many::<String>("ignore-tidy")
+        .unwrap()
+        .map(|s| s.as_str())
+        .collect::<Vec<_>>();
+    let ignore_format = args
+        .get_many::<String>("ignore-format")
+        .unwrap()
+        .map(|s| s.as_str())
+        .collect::<Vec<_>>();
 
     let extra_args = convert_extra_arg_val(&args);
-    capture_clang_tools_output(
-        &mut arc_files,
-        version,
-        args.get_one::<String>("tidy-checks").unwrap(),
-        user_inputs.style.as_str(),
-        &lines_changed_only,
-        database_path,
+    let mut clang_params = ClangParams {
+        tidy_checks: args.get_one::<String>("tidy-checks").unwrap().to_string(),
+        lines_changed_only,
+        database: database_path,
         extra_args,
-    )
-    .await;
+        database_json: None,
+        style: user_inputs.style.clone(),
+        clang_tidy_command: None,
+        clang_format_command: None,
+        tidy_filter: FileFilter::new(&ignore_tidy, extensions.clone()),
+        format_filter: FileFilter::new(&ignore_format, extensions),
+    };
+    capture_clang_tools_output(&mut arc_files, version, &mut clang_params).await;
     start_log_group(String::from("Posting feedback"));
     rest_api_client.post_feedback(&arc_files, user_inputs).await;
     end_log_group();

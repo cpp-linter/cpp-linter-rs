@@ -11,7 +11,7 @@ use reqwest::header::{HeaderMap, HeaderValue};
 
 // project specific modules/crates
 pub mod github_api;
-use crate::common_fs::FileObj;
+use crate::common_fs::{FileFilter, FileObj};
 
 pub static COMMENT_MARKER: &str = "<!-- cpp linter action -->";
 pub static USER_OUTREACH: &str = "\n\nHave any feedback or feature suggestions? [Share it here.](https://github.com/cpp-linter/cpp-linter-action/issues)";
@@ -61,9 +61,7 @@ pub trait RestApiClient {
     /// cpp_linter package is used.
     fn get_list_of_changed_files(
         &self,
-        extensions: &[&str],
-        ignored: &[String],
-        not_ignored: &[String],
+        file_filter: &FileFilter,
     ) -> impl Future<Output = Vec<FileObj>>;
 
     /// Makes a comment in MarkDown syntax based on the concerns in `format_advice` and

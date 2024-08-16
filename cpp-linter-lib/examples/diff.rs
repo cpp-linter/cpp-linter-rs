@@ -1,5 +1,5 @@
 use cpp_linter_lib::{
-    cli::parse_ignore,
+    common_fs::FileFilter,
     git::{get_diff, open_repo, parse_diff},
 };
 use std::error::Error;
@@ -12,9 +12,9 @@ pub fn main() -> Result<(), Box<dyn Error>> {
     let repo = open_repo(".")?;
     let diff = get_diff(&repo);
 
-    let extensions = vec!["cpp", "hpp", "rs"];
-    let (ignored, not_ignored) = parse_ignore(&Vec::from_iter(["target", ".github"]));
-    let files = parse_diff(&diff, &extensions, &ignored, &not_ignored);
+    let extensions = vec!["cpp".to_string(), "hpp".to_string(), "rs".to_string()];
+    let file_filter = FileFilter::new(&["target", ".github"], extensions);
+    let files = parse_diff(&diff, &file_filter);
 
     for file in &files {
         println!("{}", file.name.to_string_lossy());

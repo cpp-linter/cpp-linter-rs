@@ -16,7 +16,7 @@ use serde_json;
 use crate::clang_tools::clang_format::tally_format_advice;
 use crate::clang_tools::clang_tidy::tally_tidy_advice;
 // project specific modules/crates
-use crate::common_fs::FileObj;
+use crate::common_fs::{FileFilter, FileObj};
 use crate::git::{get_diff, open_repo, parse_diff, parse_diff_from_buf};
 
 use super::{FeedbackInput, RestApiClient, COMMENT_MARKER};
@@ -147,12 +147,7 @@ impl RestApiClient for GithubApiClient {
         headers
     }
 
-    async fn get_list_of_changed_files(
-        &self,
-        extensions: &[&str],
-        ignored: &[String],
-        not_ignored: &[String],
-    ) -> Vec<FileObj> {
+    async fn get_list_of_changed_files(&self, file_filter: &FileFilter) -> Vec<FileObj> {
         if env::var("CI").is_ok_and(|val| val.as_str() == "true")
             && self.repo.is_some()
             && self.sha.is_some()
@@ -182,12 +177,12 @@ impl RestApiClient for GithubApiClient {
                 .await
                 .unwrap();
 
-            parse_diff_from_buf(&response, extensions, ignored, not_ignored)
+            parse_diff_from_buf(&response, file_filter)
         } else {
             // get diff from libgit2 API
             let repo = open_repo(".")
                 .expect("Please ensure the repository is checked out before running cpp-linter.");
-            let list = parse_diff(&get_diff(&repo), extensions, ignored, not_ignored);
+            let list = parse_diff(&get_diff(&repo), file_filter);
             list
         }
     }
@@ -487,9 +482,9 @@ mod test {
 
     use super::{GithubApiClient, USER_AGENT};
     use crate::{
-        clang_tools::capture_clang_tools_output,
+        clang_tools::{capture_clang_tools_output, ClangParams},
         cli::LinesChangedOnly,
-        common_fs::FileObj,
+        common_fs::{FileFilter, FileObj},
         rest_api::{FeedbackInput, RestApiClient, USER_OUTREACH},
     };
 
@@ -536,14 +531,22 @@ mod test {
         let mut files = vec![Arc::new(Mutex::new(FileObj::new(PathBuf::from(
             "tests/demo/demo.cpp",
         ))))];
+        let mut clang_params = ClangParams {
+            tidy_checks: tidy_checks.to_string(),
+            lines_changed_only: LinesChangedOnly::Off,
+            database: None,
+            extra_args: None,
+            database_json: None,
+            style: style.to_string(),
+            clang_tidy_command: None,
+            clang_format_command: None,
+            tidy_filter: FileFilter::new(&[], vec!["cpp".to_string(), "hpp".to_string()]),
+            format_filter: FileFilter::new(&[], vec!["cpp".to_string(), "hpp".to_string()]),
+        };
         capture_clang_tools_output(
             &mut files,
             env::var("CLANG-VERSION").unwrap_or("".to_string()).as_str(),
-            tidy_checks,
-            style,
-            &LinesChangedOnly::Off,
-            None,
-            None,
+            &mut clang_params,
         )
         .await;
         let feedback_inputs = FeedbackInput {

@@ -19,6 +19,7 @@ use which::{which, which_in};
 use super::common_fs::FileObj;
 use crate::{
     cli::LinesChangedOnly,
+    common_fs::FileFilter,
     logger::{end_log_group, start_log_group},
 };
 pub mod clang_format;
@@ -77,15 +78,17 @@ pub fn get_clang_tool_exe(name: &str, version: &str) -> Result<PathBuf, &'static
 }
 
 #[derive(Debug, Clone)]
-struct ClangParams {
-    tidy_checks: String,
-    lines_changed_only: LinesChangedOnly,
-    database: Option<PathBuf>,
-    extra_args: Option<Vec<String>>,
-    database_json: Option<CompilationDatabase>,
-    style: String,
-    clang_tidy_command: Option<PathBuf>,
-    clang_format_command: Option<PathBuf>,
+pub struct ClangParams {
+    pub tidy_checks: String,
+    pub lines_changed_only: LinesChangedOnly,
+    pub database: Option<PathBuf>,
+    pub extra_args: Option<Vec<String>>,
+    pub database_json: Option<CompilationDatabase>,
+    pub style: String,
+    pub clang_tidy_command: Option<PathBuf>,
+    pub clang_format_command: Option<PathBuf>,
+    pub tidy_filter: FileFilter,
+    pub format_filter: FileFilter,
 }
 
 /// This creates a task to run clang-tidy and clang-format on a single file.
@@ -100,104 +103,114 @@ fn analyze_single_file(
     file: &mut Arc<Mutex<FileObj>>,
     clang_params: Arc<ClangParams>,
 ) -> (PathBuf, Vec<(log::Level, String)>) {
+    let file_lock = file.lock().unwrap();
+    let file_name = file_lock.name.clone();
+    drop(file_lock);
     let mut logs = vec![];
     if let Some(tidy_cmd) = &clang_params.clang_tidy_command {
-        let tidy_result = run_clang_tidy(
-            &mut Command::new(tidy_cmd),
-            file,
-            clang_params.tidy_checks.as_str(),
-            &clang_params.lines_changed_only,
-            &clang_params.database,
-            &clang_params.extra_args,
-            &clang_params.database_json,
-        );
-        logs.extend(tidy_result);
+        if clang_params
+            .tidy_filter
+            .is_source_or_ignored(file_name.as_path())
+        {
+            let tidy_result = run_clang_tidy(
+                &mut Command::new(tidy_cmd),
+                file,
+                clang_params.tidy_checks.as_str(),
+                &clang_params.lines_changed_only,
+                &clang_params.database,
+                &clang_params.extra_args,
+                &clang_params.database_json,
+            );
+            logs.extend(tidy_result);
+        } else {
+            logs.push((
+                log::Level::Info,
+                format!(
+                    "{} not scanned due to `--ignore-tidy`",
+                    file_name.as_os_str().to_string_lossy()
+                ),
+            ))
+        }
     }
     if let Some(format_cmd) = &clang_params.clang_format_command {
-        let format_result = run_clang_format(
-            &mut Command::new(format_cmd),
-            file,
-            clang_params.style.as_str(),
-            &clang_params.lines_changed_only,
-        );
-        logs.extend(format_result);
+        if clang_params
+            .format_filter
+            .is_source_or_ignored(file_name.as_path())
+        {
+            let format_result = run_clang_format(
+                &mut Command::new(format_cmd),
+                file,
+                clang_params.style.as_str(),
+                &clang_params.lines_changed_only,
+            );
+            logs.extend(format_result);
+        } else {
+            logs.push((
+                log::Level::Info,
+                format!(
+                    "{} not scanned by clang-format due to `--ignore-format`",
+                    file_name.as_os_str().to_string_lossy()
+                ),
+            ));
+        }
     }
-    let file = file.lock().unwrap();
-    (file.name.clone(), logs)
+    (file_name, logs)
 }
 
 /// Runs clang-tidy and/or clang-format and returns the parsed output from each.
-///
-/// The returned list of [`FormatAdvice`] is parallel to the `files` list passed in
-/// here. The returned 2D list of [`TidyAdvice`] is also parallel on the first
-/// dimension. The second dimension is a list of notes specific to a translation unit
-/// (each element of `files`).
 ///
 /// If `tidy_checks` is `"-*"` then clang-tidy is not executed.
 /// If `style` is a blank string (`""`), then clang-format is not executed.
 pub async fn capture_clang_tools_output(
     files: &mut Vec<Arc<Mutex<FileObj>>>,
     version: &str,
-    tidy_checks: &str,
-    style: &str,
-    lines_changed_only: &LinesChangedOnly,
-    database: Option<PathBuf>,
-    extra_args: Option<Vec<String>>,
+    clang_params: &mut ClangParams,
 ) {
     // find the executable paths for clang-tidy and/or clang-format and show version
     // info as debugging output.
-    let clang_tidy_command = if tidy_checks != "-*" {
-        let cmd = get_clang_tool_exe("clang-tidy", version).unwrap();
-        log::debug!(
-            "{} --version\n{}",
-            &cmd.to_string_lossy(),
-            String::from_utf8_lossy(&Command::new(&cmd).arg("--version").output().unwrap().stdout)
-        );
-        Some(cmd)
-    } else {
-        None
+    if clang_params.tidy_checks != "-*" {
+        clang_params.clang_tidy_command = {
+            let cmd = get_clang_tool_exe("clang-tidy", version).unwrap();
+            log::debug!(
+                "{} --version\n{}",
+                &cmd.to_string_lossy(),
+                String::from_utf8_lossy(
+                    &Command::new(&cmd).arg("--version").output().unwrap().stdout
+                )
+            );
+            Some(cmd)
+        }
     };
-    let clang_format_command = if !style.is_empty() {
-        let cmd = get_clang_tool_exe("clang-format", version).unwrap();
-        log::debug!(
-            "{} --version\n{}",
-            &cmd.to_string_lossy(),
-            String::from_utf8_lossy(&Command::new(&cmd).arg("--version").output().unwrap().stdout)
-        );
-        Some(cmd)
-    } else {
-        None
+    if !clang_params.style.is_empty() {
+        clang_params.clang_format_command = {
+            let cmd = get_clang_tool_exe("clang-format", version).unwrap();
+            log::debug!(
+                "{} --version\n{}",
+                &cmd.to_string_lossy(),
+                String::from_utf8_lossy(
+                    &Command::new(&cmd).arg("--version").output().unwrap().stdout
+                )
+            );
+            Some(cmd)
+        }
     };
 
     // parse database (if provided) to match filenames when parsing clang-tidy's stdout
-    let database_json: Option<CompilationDatabase> = if let Some(db_path) = &database {
+    if let Some(db_path) = &clang_params.database {
         if let Ok(db_str) = fs::read(db_path) {
-            Some(
+            clang_params.database_json = Some(
                 serde_json::from_str::<CompilationDatabase>(
                     String::from_utf8(db_str).unwrap().as_str(),
                 )
                 .unwrap(),
             )
-        } else {
-            None
         }
-    } else {
-        None
     };
+
     let mut executors = JoinSet::new();
     // iterate over the discovered files and run the clang tools
     for file in files {
-        let clang_params = ClangParams {
-            tidy_checks: tidy_checks.to_string(),
-            lines_changed_only: lines_changed_only.clone(),
-            database: database.clone(),
-            extra_args: extra_args.clone(),
-            database_json: database_json.clone(),
-            style: style.to_string(),
-            clang_tidy_command: clang_tidy_command.clone(),
-            clang_format_command: clang_format_command.clone(),
-        };
-        let arc_params = Arc::new(clang_params);
+        let arc_params = Arc::new(clang_params.clone());
         let mut arc_file = Arc::clone(file);
         executors.spawn(async move { analyze_single_file(&mut arc_file, arc_params) });
     }
