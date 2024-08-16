@@ -3,7 +3,8 @@
 //!
 //! Currently, only Github is supported.
 
-use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+use std::{future::Future, path::PathBuf};
 
 // non-std crates
 use reqwest::header::{HeaderMap, HeaderValue};
@@ -63,7 +64,7 @@ pub trait RestApiClient {
         extensions: &[&str],
         ignored: &[String],
         not_ignored: &[String],
-    ) -> Vec<FileObj>;
+    ) -> impl Future<Output = Vec<FileObj>>;
 
     /// Makes a comment in MarkDown syntax based on the concerns in `format_advice` and
     /// `tidy_advice` about the given set of `files`.
@@ -75,7 +76,7 @@ pub trait RestApiClient {
     /// `format_checks_failed` and `tidy_checks_failed` (in respective order).
     fn make_comment(
         &self,
-        files: &[FileObj],
+        files: &[Arc<Mutex<FileObj>>],
         format_checks_failed: u64,
         tidy_checks_failed: u64,
         max_len: Option<u64>,
@@ -121,11 +122,15 @@ pub trait RestApiClient {
     /// clang-format and clang-tidy (see `capture_clang_tools_output()`).
     ///
     /// All other parameters correspond to CLI arguments.
-    fn post_feedback(&self, files: &[FileObj], user_inputs: FeedbackInput);
+    fn post_feedback(
+        &self,
+        files: &[Arc<Mutex<FileObj>>],
+        user_inputs: FeedbackInput,
+    ) -> impl Future<Output = ()>;
 }
 
 fn make_format_comment(
-    files: &[FileObj],
+    files: &[Arc<Mutex<FileObj>>],
     comment: &mut String,
     format_checks_failed: u64,
     remaining_length: &mut u64,
@@ -135,6 +140,7 @@ fn make_format_comment(
     let mut format_comment = String::new();
     *remaining_length -= opener.len() as u64 + closer.len() as u64;
     for file in files {
+        let file = file.lock().unwrap();
         if let Some(format_advice) = &file.format_advice {
             if !format_advice.replacements.is_empty() && *remaining_length > 0 {
                 let note = format!("- {}\n", file.name.to_string_lossy().replace('\\', "/"));
@@ -151,7 +157,7 @@ fn make_format_comment(
 }
 
 fn make_tidy_comment(
-    files: &[FileObj],
+    files: &[Arc<Mutex<FileObj>>],
     comment: &mut String,
     tidy_checks_failed: u64,
     remaining_length: &mut u64,
@@ -164,6 +170,7 @@ fn make_tidy_comment(
     let mut tidy_comment = String::new();
     *remaining_length -= opener.len() as u64 + closer.len() as u64;
     for file in files {
+        let file = file.lock().unwrap();
         if let Some(tidy_advice) = &file.tidy_advice {
             for tidy_note in &tidy_advice.notes {
                 let file_path = PathBuf::from(&tidy_note.filename);

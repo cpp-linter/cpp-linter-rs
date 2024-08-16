@@ -87,6 +87,12 @@ jobs:
           python -m pip install clang-tools
           clang-tools --install ${{ matrix.version }}
 
+      - name: Cache .cargo locked resources
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+
       - name: Collect Coverage
         working-directory: cpp-linter-lib
         env:

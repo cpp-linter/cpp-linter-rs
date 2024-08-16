@@ -7,13 +7,16 @@ words:
   - endgroup
   - Falsey
   - gitmodules
+  - iomanip
   - libgit
   - nonminimal
   - peekable
   - posix
+  - pybind
   - pyfunction
   - pymodule
   - reqwest
+  - revparse
   - tempdir
   - tempfile
   - venv

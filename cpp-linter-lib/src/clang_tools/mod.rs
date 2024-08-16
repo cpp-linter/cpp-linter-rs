@@ -1,11 +1,18 @@
 //! This crate holds the functionality related to running clang-format and/or
 //! clang-tidy.
 
-use std::{env::current_dir, fs, path::PathBuf, process::Command};
+use std::{
+    env::current_dir,
+    fs,
+    path::PathBuf,
+    process::Command,
+    sync::{Arc, Mutex},
+};
 
 // non-std crates
 use lenient_semver;
 use semver::Version;
+use tokio::task::JoinSet;
 use which::{which, which_in};
 
 // project-specific modules/crates
@@ -69,6 +76,56 @@ pub fn get_clang_tool_exe(name: &str, version: &str) -> Result<PathBuf, &'static
     }
 }
 
+#[derive(Debug, Clone)]
+struct ClangParams {
+    tidy_checks: String,
+    lines_changed_only: LinesChangedOnly,
+    database: Option<PathBuf>,
+    extra_args: Option<Vec<String>>,
+    database_json: Option<CompilationDatabase>,
+    style: String,
+    clang_tidy_command: Option<PathBuf>,
+    clang_format_command: Option<PathBuf>,
+}
+
+/// This creates a task to run clang-tidy and clang-format on a single file.
+///
+/// Returns a Future that infallibly resolves to a 2-tuple that contains
+///
+/// 1. The file's path.
+/// 2. A collections of cached logs. A [`Vec`] of tuples that hold
+///    - log level
+///    - messages
+fn analyze_single_file(
+    file: &mut Arc<Mutex<FileObj>>,
+    clang_params: Arc<ClangParams>,
+) -> (PathBuf, Vec<(log::Level, String)>) {
+    let mut logs = vec![];
+    if let Some(tidy_cmd) = &clang_params.clang_tidy_command {
+        let tidy_result = run_clang_tidy(
+            &mut Command::new(tidy_cmd),
+            file,
+            clang_params.tidy_checks.as_str(),
+            &clang_params.lines_changed_only,
+            &clang_params.database,
+            &clang_params.extra_args,
+            &clang_params.database_json,
+        );
+        logs.extend(tidy_result);
+    }
+    if let Some(format_cmd) = &clang_params.clang_format_command {
+        let format_result = run_clang_format(
+            &mut Command::new(format_cmd),
+            file,
+            clang_params.style.as_str(),
+            &clang_params.lines_changed_only,
+        );
+        logs.extend(format_result);
+    }
+    let file = file.lock().unwrap();
+    (file.name.clone(), logs)
+}
+
 /// Runs clang-tidy and/or clang-format and returns the parsed output from each.
 ///
 /// The returned list of [`FormatAdvice`] is parallel to the `files` list passed in
@@ -78,14 +135,14 @@ pub fn get_clang_tool_exe(name: &str, version: &str) -> Result<PathBuf, &'static
 ///
 /// If `tidy_checks` is `"-*"` then clang-tidy is not executed.
 /// If `style` is a blank string (`""`), then clang-format is not executed.
-pub fn capture_clang_tools_output(
-    files: &mut Vec<FileObj>,
+pub async fn capture_clang_tools_output(
+    files: &mut Vec<Arc<Mutex<FileObj>>>,
     version: &str,
     tidy_checks: &str,
     style: &str,
     lines_changed_only: &LinesChangedOnly,
     database: Option<PathBuf>,
-    extra_args: Option<Vec<&str>>,
+    extra_args: Option<Vec<String>>,
 ) {
     // find the executable paths for clang-tidy and/or clang-format and show version
     // info as debugging output.
@@ -127,30 +184,33 @@ pub fn capture_clang_tools_output(
     } else {
         None
     };
-
+    let mut executors = JoinSet::new();
     // iterate over the discovered files and run the clang tools
     for file in files {
-        start_log_group(format!("Analyzing {}", file.name.to_string_lossy()));
-        if let Some(tidy_cmd) = &clang_tidy_command {
-            run_clang_tidy(
-                &mut Command::new(tidy_cmd),
-                file,
-                tidy_checks,
-                lines_changed_only,
-                &database,
-                &extra_args,
-                &database_json,
-            );
+        let clang_params = ClangParams {
+            tidy_checks: tidy_checks.to_string(),
+            lines_changed_only: lines_changed_only.clone(),
+            database: database.clone(),
+            extra_args: extra_args.clone(),
+            database_json: database_json.clone(),
+            style: style.to_string(),
+            clang_tidy_command: clang_tidy_command.clone(),
+            clang_format_command: clang_format_command.clone(),
+        };
+        let arc_params = Arc::new(clang_params);
+        let mut arc_file = Arc::clone(file);
+        executors.spawn(async move { analyze_single_file(&mut arc_file, arc_params) });
+    }
+
+    while let Some(output) = executors.join_next().await {
+        if let Ok(out) = output {
+            let (file_name, logs) = out;
+            start_log_group(format!("Analyzing {}", file_name.to_string_lossy()));
+            for (level, msg) in logs {
+                log::log!(level, "{}", msg);
+            }
+            end_log_group();
         }
-        if let Some(format_cmd) = &clang_format_command {
-            run_clang_format(
-                &mut Command::new(format_cmd),
-                file,
-                style,
-                lines_changed_only,
-            );
-        }
-        end_log_group();
     }
 }
 

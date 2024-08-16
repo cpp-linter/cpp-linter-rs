@@ -382,7 +382,7 @@ mod test {
         tmp
     }
 
-    fn checkout_cpp_linter_py_repo(
+    async fn checkout_cpp_linter_py_repo(
         sha: &str,
         extensions: &[&str],
         tmp: &TempDir,
@@ -399,31 +399,33 @@ mod test {
         let (ignored, not_ignored) = parse_ignore(&["target"]);
         set_current_dir(tmp).unwrap();
         env::set_var("CI", "false"); // avoid use of REST API when testing in CI
-        rest_api_client.get_list_of_changed_files(extensions, &ignored, &not_ignored)
+        rest_api_client
+            .get_list_of_changed_files(extensions, &ignored, &not_ignored)
+            .await
     }
 
-    #[test]
-    fn with_no_changed_sources() {
+    #[tokio::test]
+    async fn with_no_changed_sources() {
         // commit with no modified C/C++ sources
         let sha = "0c236809891000b16952576dc34de082d7a40bf3";
         let cur_dir = current_dir().unwrap();
         let tmp = get_temp_dir();
         let extensions = vec!["cpp", "hpp"];
-        let files = checkout_cpp_linter_py_repo(sha, &extensions, &tmp, None);
+        let files = checkout_cpp_linter_py_repo(sha, &extensions, &tmp, None).await;
         println!("files = {:?}", files);
         assert!(files.is_empty());
         set_current_dir(cur_dir).unwrap(); // prep to delete temp_folder
         drop(tmp); // delete temp_folder
     }
 
-    #[test]
-    fn with_changed_sources() {
+    #[tokio::test]
+    async fn with_changed_sources() {
         // commit with modified C/C++ sources
         let sha = "950ff0b690e1903797c303c5fc8d9f3b52f1d3c5";
         let cur_dir = current_dir().unwrap();
         let tmp = get_temp_dir();
         let extensions = vec!["cpp", "hpp"];
-        let files = checkout_cpp_linter_py_repo(sha, &extensions, &tmp, None);
+        let files = checkout_cpp_linter_py_repo(sha, &extensions, &tmp, None).await;
         println!("files = {:?}", files);
         assert!(files.len() >= 2);
         for file in files {
@@ -441,8 +443,8 @@ mod test {
         drop(tmp); // delete temp_folder
     }
 
-    #[test]
-    fn with_staged_changed_sources() {
+    #[tokio::test]
+    async fn with_staged_changed_sources() {
         // commit with no modified C/C++ sources
         let sha = "0c236809891000b16952576dc34de082d7a40bf3";
         let cur_dir = current_dir().unwrap();
@@ -453,7 +455,8 @@ mod test {
             &extensions,
             &tmp,
             Some("tests/capture_tools_output/cpp-linter/cpp-linter/test_git_lib.patch"),
-        );
+        )
+        .await;
         println!("files = {:?}", files);
         assert!(!files.is_empty());
         for file in files {

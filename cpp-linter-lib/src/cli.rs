@@ -7,7 +7,7 @@ use clap::builder::{ArgPredicate, FalseyValueParser};
 use clap::{Arg, ArgAction, ArgGroup, ArgMatches, Command};
 
 /// An enum to describe `--lines-changed-only` CLI option's behavior.
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone, Debug)]
 pub enum LinesChangedOnly {
     /// All lines are scanned
     Off,
@@ -385,30 +385,30 @@ pub fn parse_ignore(ignore: &[&str]) -> (Vec<String>, Vec<String>) {
 /// ```
 /// The cpp-linter-action (for Github CI workflows) can only use 1 `extra-arg` input option, so
 /// the value will be split at spaces.
-pub fn convert_extra_arg_val(args: &ArgMatches) -> Option<Vec<&str>> {
-    let raw_val = if let Ok(extra_args) = args.try_get_many::<String>("extra-arg") {
-        extra_args.map(|extras| extras.map(|val| val.as_str()).collect::<Vec<_>>())
-    } else {
-        None
-    };
-    if let Some(val) = raw_val {
-        if val.len() == 1 {
-            // specified once; split and return result
-            Some(
-                val[0]
-                    .trim_matches('\'')
-                    .trim_matches('"')
-                    .split(' ')
-                    .collect(),
-            )
+pub fn convert_extra_arg_val(args: &ArgMatches) -> Option<Vec<String>> {
+    if let Ok(raw_val) = args.try_get_many::<String>("extra-arg") {
+        if let Some(mut val) = raw_val {
+            if val.len() == 1 {
+                // specified once; split and return result
+                return Some(
+                    val.next()
+                        .unwrap()
+                        .trim_matches('\'')
+                        .trim_matches('"')
+                        .split(' ')
+                        .map(|i| i.to_string())
+                        .collect(),
+                );
+            } else {
+                // specified multiple times; just return
+                return Some(val.map(|i| i.to_string()).collect());
+            }
         } else {
-            // specified multiple times; just return
-            Some(val)
+            // no value specified; just return
+            return None;
         }
-    } else {
-        // no value specified; just return
-        None
     }
+    None
 }
 
 #[cfg(test)]

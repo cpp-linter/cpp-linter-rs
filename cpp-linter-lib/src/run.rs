@@ -5,6 +5,7 @@
 
 use std::env;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
 // non-std crates
 use log::{set_max_level, LevelFilter};
@@ -14,7 +15,7 @@ use openssl_probe;
 // project specific modules/crates
 use crate::clang_tools::capture_clang_tools_output;
 use crate::cli::{convert_extra_arg_val, get_arg_parser, parse_ignore, LinesChangedOnly};
-use crate::common_fs::{list_source_files, FileObj};
+use crate::common_fs::list_source_files;
 use crate::github_api::GithubApiClient;
 use crate::logger::{self, end_log_group, start_log_group};
 use crate::rest_api::{FeedbackInput, RestApiClient};
@@ -43,7 +44,7 @@ fn probe_ssl_certs() {}
 /// is used instead of python's `sys.argv`, then the list of strings includes the entry point
 /// alias ("path/to/cpp-linter.exe"). Thus, the parser in [`crate::cli`] will halt on an error
 /// because it is not configured to handle positional arguments.
-pub fn run_main(args: Vec<String>) -> i32 {
+pub async fn run_main(args: Vec<String>) -> i32 {
     probe_ssl_certs();
 
     let arg_parser = get_arg_parser();
@@ -111,17 +112,20 @@ pub fn run_main(args: Vec<String>) -> i32 {
     let files_changed_only = args.get_flag("files-changed-only");
 
     start_log_group(String::from("Get list of specified source files"));
-    let mut files: Vec<FileObj> =
-        if lines_changed_only != LinesChangedOnly::Off || files_changed_only {
-            // parse_diff(github_rest_api_payload)
-            rest_api_client.get_list_of_changed_files(&extensions, &ignored, &not_ignored)
-        } else {
-            // walk the folder and look for files with specified extensions according to ignore values.
-            list_source_files(&extensions, &ignored, &not_ignored, ".")
-        };
+    let files = if lines_changed_only != LinesChangedOnly::Off || files_changed_only {
+        // parse_diff(github_rest_api_payload)
+        rest_api_client
+            .get_list_of_changed_files(&extensions, &ignored, &not_ignored)
+            .await
+    } else {
+        // walk the folder and look for files with specified extensions according to ignore values.
+        list_source_files(&extensions, &ignored, &not_ignored, ".")
+    };
+    let mut arc_files = vec![];
     log::info!("Giving attention to the following files:");
-    for file in &files {
+    for file in files {
         log::info!("  ./{}", file.name.to_string_lossy().replace('\\', "/"));
+        arc_files.push(Arc::new(Mutex::new(file)));
     }
     end_log_group();
 
@@ -138,16 +142,17 @@ pub fn run_main(args: Vec<String>) -> i32 {
 
     let extra_args = convert_extra_arg_val(&args);
     capture_clang_tools_output(
-        &mut files,
+        &mut arc_files,
         version,
         args.get_one::<String>("tidy-checks").unwrap(),
         user_inputs.style.as_str(),
         &lines_changed_only,
         database_path,
         extra_args,
-    );
+    )
+    .await;
     start_log_group(String::from("Posting feedback"));
-    rest_api_client.post_feedback(&files, user_inputs);
+    rest_api_client.post_feedback(&arc_files, user_inputs).await;
     end_log_group();
     0
 }

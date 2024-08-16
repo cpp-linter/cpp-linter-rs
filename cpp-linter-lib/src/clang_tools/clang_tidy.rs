@@ -5,6 +5,7 @@ use std::{
     env::{consts::OS, current_dir},
     path::PathBuf,
     process::Command,
+    sync::{Arc, Mutex},
 };
 
 // non-std crates
@@ -18,7 +19,7 @@ use crate::{
 };
 
 /// Used to deserialize a JSON compilation database
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct CompilationDatabase {
     /// A list of [`CompilationUnit`]
     units: Vec<CompilationUnit>,
@@ -28,7 +29,7 @@ pub struct CompilationDatabase {
 ///
 /// The only purpose this serves is to normalize relative paths for build systems that
 /// use/need relative paths (ie ninja).
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 struct CompilationUnit {
     /// The directory of the build environment
     directory: String,
@@ -44,7 +45,7 @@ struct CompilationUnit {
 }
 
 /// A structure that represents a single notification parsed from clang-tidy's stdout.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TidyNotification {
     /// The file's path and name (supposedly relative to the repository root folder).
     pub filename: String,
@@ -87,7 +88,7 @@ impl TidyNotification {
 }
 
 /// A struct to hold notification from clang-tidy about a single file
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TidyAdvice {
     /// A list of notifications parsed from clang-tidy stdout.
     pub notes: Vec<TidyNotification>,
@@ -173,9 +174,10 @@ fn parse_tidy_output(
 }
 
 /// Get a total count of clang-tidy advice from the given list of [FileObj]s.
-pub fn tally_tidy_advice(files: &[FileObj]) -> u64 {
+pub fn tally_tidy_advice(files: &[Arc<Mutex<FileObj>>]) -> u64 {
     let mut total = 0;
     for file in files {
+        let file = file.lock().unwrap();
         if let Some(advice) = &file.tidy_advice {
             for tidy_note in &advice.notes {
                 let file_path = PathBuf::from(&tidy_note.filename);
@@ -191,13 +193,15 @@ pub fn tally_tidy_advice(files: &[FileObj]) -> u64 {
 /// Run clang-tidy, then parse and return it's output.
 pub fn run_clang_tidy(
     cmd: &mut Command,
-    file: &mut FileObj,
+    file: &mut Arc<Mutex<FileObj>>,
     checks: &str,
     lines_changed_only: &LinesChangedOnly,
     database: &Option<PathBuf>,
-    extra_args: &Option<Vec<&str>>,
+    extra_args: &Option<Vec<String>>,
     database_json: &Option<CompilationDatabase>,
-) {
+) -> Vec<(log::Level, std::string::String)> {
+    let mut logs = vec![];
+    let mut file = file.lock().unwrap();
     if !checks.is_empty() {
         cmd.args(["-checks", checks]);
     }
@@ -225,31 +229,46 @@ pub fn run_clang_tidy(
         cmd.args(["--line-filter", filter.as_str()]);
     }
     cmd.arg(file.name.to_string_lossy().as_ref());
-    log::info!(
-        "Running \"{} {}\"",
-        cmd.get_program().to_string_lossy(),
-        cmd.get_args()
-            .map(|x| x.to_str().unwrap())
-            .collect::<Vec<&str>>()
-            .join(" ")
-    );
+    logs.push((
+        log::Level::Info,
+        format!(
+            "Running \"{} {}\"",
+            cmd.get_program().to_string_lossy(),
+            cmd.get_args()
+                .map(|x| x.to_str().unwrap())
+                .collect::<Vec<&str>>()
+                .join(" ")
+        ),
+    ));
     let output = cmd.output().unwrap();
-    log::debug!(
-        "Output from clang-tidy:\n{}",
-        String::from_utf8(output.stdout.to_vec()).unwrap()
-    );
+    logs.push((
+        log::Level::Debug,
+        format!(
+            "Output from clang-tidy:\n{}",
+            String::from_utf8(output.stdout.to_vec()).unwrap()
+        ),
+    ));
     if !output.stderr.is_empty() {
-        log::debug!(
-            "clang-tidy made the following summary:\n{}",
-            String::from_utf8(output.stderr).unwrap()
-        );
+        logs.push((
+            log::Level::Debug,
+            format!(
+                "clang-tidy made the following summary:\n{}",
+                String::from_utf8(output.stderr).unwrap()
+            ),
+        ));
     }
     file.tidy_advice = parse_tidy_output(&output.stdout, database_json);
+    logs
 }
 
 #[cfg(test)]
 mod test {
-    use std::{env, path::PathBuf, process::Command};
+    use std::{
+        env,
+        path::PathBuf,
+        process::Command,
+        sync::{Arc, Mutex},
+    };
 
     use regex::Regex;
 
@@ -287,11 +306,12 @@ mod test {
         )
         .unwrap();
         let mut cmd = Command::new(exe_path);
-        let mut file = FileObj::new(PathBuf::from("tests/demo/demo.cpp"));
-        let extra_args = vec!["-std=c++17", "-Wall"];
+        let file = FileObj::new(PathBuf::from("tests/demo/demo.cpp"));
+        let mut arc_ref = Arc::new(Mutex::new(file));
+        let extra_args = vec!["-std=c++17".to_string(), "-Wall".to_string()];
         run_clang_tidy(
             &mut cmd,
-            &mut file,
+            &mut arc_ref,
             "",                     // use .clang-tidy config file
             &LinesChangedOnly::Off, // check all lines
             &None,                  // no database path
@@ -299,17 +319,19 @@ mod test {
             &None,                  // no deserialized database
         );
         // since `cmd` was passed as a mutable reference, we can inspect the args that were added
+        let locked_file = arc_ref.lock().unwrap();
         let mut args = cmd
             .get_args()
             .map(|arg| arg.to_str().unwrap())
             .collect::<Vec<&str>>();
-        assert_eq!(file.name.to_string_lossy(), args.pop().unwrap());
+        assert_eq!(locked_file.name.to_string_lossy(), args.pop().unwrap());
         assert_eq!(
             vec!["--extra-arg", "\"-std=c++17\"", "--extra-arg", "\"-Wall\""],
             args
         );
-        assert!(!file
+        assert!(!locked_file
             .tidy_advice
+            .as_ref()
             .is_some_and(|advice| advice.notes.is_empty()));
     }
 }

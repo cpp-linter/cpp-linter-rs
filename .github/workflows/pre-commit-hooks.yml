@@ -15,6 +15,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: rustup update
+      - name: Cache .cargo locked resources
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
       - name: cargo clippy
         run: cargo clippy
       - name: cargo fmt

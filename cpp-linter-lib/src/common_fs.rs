@@ -10,7 +10,7 @@ use crate::clang_tools::clang_tidy::TidyAdvice;
 use crate::cli::LinesChangedOnly;
 
 /// A structure to represent a file's path and line changes.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FileObj {
     /// The path to the file.
     pub name: PathBuf,

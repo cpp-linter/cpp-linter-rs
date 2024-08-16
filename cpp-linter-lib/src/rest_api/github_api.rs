@@ -4,10 +4,11 @@ use std::collections::HashMap;
 use std::env;
 use std::fs::OpenOptions;
 use std::io::{Read, Write};
+use std::sync::{Arc, Mutex};
 
 // non-std crates
-use reqwest::blocking::Client;
 use reqwest::header::{HeaderMap, HeaderValue};
+use reqwest::Client;
 use reqwest::Method;
 use serde::Deserialize;
 use serde_json;
@@ -56,7 +57,7 @@ impl Default for GithubApiClient {
 impl GithubApiClient {
     pub fn new() -> Self {
         GithubApiClient {
-            client: reqwest::blocking::Client::new(),
+            client: Client::new(),
             pull_request: {
                 if let Ok(event_payload_path) = env::var("GITHUB_EVENT_PATH") {
                     let file_buf = &mut String::new();
@@ -146,7 +147,7 @@ impl RestApiClient for GithubApiClient {
         headers
     }
 
-    fn get_list_of_changed_files(
+    async fn get_list_of_changed_files(
         &self,
         extensions: &[&str],
         ignored: &[String],
@@ -175,8 +176,10 @@ impl RestApiClient for GithubApiClient {
                 .get(url)
                 .headers(self.make_headers(Some(true)))
                 .send()
+                .await
                 .unwrap()
                 .bytes()
+                .await
                 .unwrap();
 
             parse_diff_from_buf(&response, extensions, ignored, not_ignored)
@@ -189,7 +192,7 @@ impl RestApiClient for GithubApiClient {
         }
     }
 
-    fn post_feedback(&self, files: &[FileObj], user_inputs: FeedbackInput) {
+    async fn post_feedback(&self, files: &[Arc<Mutex<FileObj>>], user_inputs: FeedbackInput) {
         let format_checks_failed = tally_format_advice(files);
         let tidy_checks_failed = tally_tidy_advice(files);
         let mut comment = None;
@@ -235,9 +238,10 @@ impl RestApiClient for GithubApiClient {
                     .client
                     .get(&comments_url)
                     .headers(self.make_headers(None))
-                    .send();
+                    .send()
+                    .await;
                 if let Ok(response) = request {
-                    let json = response.json::<serde_json::Value>().unwrap();
+                    let json = response.json::<serde_json::Value>().await.unwrap();
                     let count = if is_pr {
                         json["comments"].as_u64().unwrap()
                     } else {
@@ -250,7 +254,8 @@ impl RestApiClient for GithubApiClient {
                         user_inputs.no_lgtm,
                         format_checks_failed + tidy_checks_failed == 0,
                         user_inputs.thread_comments.as_str() == "update",
-                    );
+                    )
+                    .await;
                 } else {
                     let error = request.unwrap_err();
                     if let Some(status) = error.status() {
@@ -280,7 +285,7 @@ impl GithubApiClient {
         }
     }
 
-    fn post_annotations(&self, files: &[FileObj], style: &str) {
+    fn post_annotations(&self, files: &[Arc<Mutex<FileObj>>], style: &str) {
         // formalize the style guide name
         let style_guide =
             if ["google", "chromium", "microsoft", "mozilla", "webkit"].contains(&style) {
@@ -298,6 +303,7 @@ impl GithubApiClient {
 
         // iterate over clang-format advice and post annotations
         for file in files {
+            let file = file.lock().unwrap();
             if let Some(format_advice) = &file.format_advice {
                 // assemble a list of line numbers
                 let mut lines: Vec<usize> = Vec::new();
@@ -341,7 +347,7 @@ impl GithubApiClient {
 
     /// update existing comment or remove old comment(s) and post a new comment
     #[allow(clippy::too_many_arguments)]
-    fn update_comment(
+    async fn update_comment(
         &self,
         url: &String,
         comment: &String,
@@ -350,8 +356,9 @@ impl GithubApiClient {
         is_lgtm: bool,
         update_only: bool,
     ) {
-        let comment_url =
-            self.remove_bot_comments(url, count, !update_only || (is_lgtm && no_lgtm));
+        let comment_url = self
+            .remove_bot_comments(url, count, !update_only || (is_lgtm && no_lgtm))
+            .await;
         #[allow(clippy::nonminimal_bool)] // an inaccurate assessment
         if (is_lgtm && !no_lgtm) || !is_lgtm {
             let payload = HashMap::from([("body", comment)]);
@@ -374,6 +381,7 @@ impl GithubApiClient {
                 .headers(self.make_headers(None))
                 .json(&payload)
                 .send()
+                .await
             {
                 log::info!(
                     "Got {} response from {:?}ing comment",
@@ -384,17 +392,17 @@ impl GithubApiClient {
         }
     }
 
-    fn remove_bot_comments(&self, url: &String, count: u64, delete: bool) -> Option<String> {
+    async fn remove_bot_comments(&self, url: &String, count: u64, delete: bool) -> Option<String> {
         let mut page = 1;
         let mut comment_url = None;
         let mut total = count;
         while total > 0 {
-            let request = self.client.get(format!("{url}/?page={page}")).send();
+            let request = self.client.get(format!("{url}/?page={page}")).send().await;
             if request.is_err() {
                 log::error!("Failed to get list of existing comments");
                 return None;
             } else if let Ok(response) = request {
-                let payload: JsonCommentsPayload = response.json().unwrap();
+                let payload: JsonCommentsPayload = response.json().await.unwrap();
                 let mut comment_count = 0;
                 for comment in payload.comments {
                     if comment.body.starts_with(COMMENT_MARKER) {
@@ -420,6 +428,7 @@ impl GithubApiClient {
                                 .delete(del_url)
                                 .headers(self.make_headers(None))
                                 .send()
+                                .await
                             {
                                 log::info!(
                                     "Got {} from DELETE {}",
@@ -466,7 +475,12 @@ struct User {
 
 #[cfg(test)]
 mod test {
-    use std::{env, io::Read, path::PathBuf};
+    use std::{
+        env,
+        io::Read,
+        path::PathBuf,
+        sync::{Arc, Mutex},
+    };
 
     use regex::Regex;
     use tempfile::{tempdir, NamedTempFile};
@@ -513,13 +527,15 @@ mod test {
 
     // ************************* tests for step-summary and output variables
 
-    fn create_comment(tidy_checks: &str, style: &str) -> (String, String) {
+    async fn create_comment(tidy_checks: &str, style: &str) -> (String, String) {
         let tmp_dir = tempdir().unwrap();
         let rest_api_client = GithubApiClient::default();
         if env::var("ACTIONS_STEP_DEBUG").is_ok_and(|var| var == "true") {
             assert!(rest_api_client.debug_enabled);
         }
-        let mut files = vec![FileObj::new(PathBuf::from("tests/demo/demo.cpp"))];
+        let mut files = vec![Arc::new(Mutex::new(FileObj::new(PathBuf::from(
+            "tests/demo/demo.cpp",
+        ))))];
         capture_clang_tools_output(
             &mut files,
             env::var("CLANG-VERSION").unwrap_or("".to_string()).as_str(),
@@ -528,7 +544,8 @@ mod test {
             &LinesChangedOnly::Off,
             None,
             None,
-        );
+        )
+        .await;
         let feedback_inputs = FeedbackInput {
             style: style.to_string(),
             step_summary: true,
@@ -538,7 +555,7 @@ mod test {
         env::set_var("GITHUB_STEP_SUMMARY", step_summary_path.path());
         let mut gh_out_path = NamedTempFile::new_in(tmp_dir.path()).unwrap();
         env::set_var("GITHUB_OUTPUT", gh_out_path.path());
-        rest_api_client.post_feedback(&files, feedback_inputs);
+        rest_api_client.post_feedback(&files, feedback_inputs).await;
         let mut step_summary_content = String::new();
         step_summary_path
             .read_to_string(&mut step_summary_content)
@@ -550,9 +567,9 @@ mod test {
         (step_summary_content, gh_out_content)
     }
 
-    #[test]
-    fn check_comment_concerns() {
-        let (comment, gh_out) = create_comment("readability-*", "file");
+    #[tokio::test]
+    async fn check_comment_concerns() {
+        let (comment, gh_out) = create_comment("readability-*", "file").await;
         assert!(&comment.contains(":warning:\nSome files did not pass the configured checks!\n"));
         let fmt_pattern = Regex::new(r"format-checks-failed=(\d+)\n").unwrap();
         let tidy_pattern = Regex::new(r"tidy-checks-failed=(\d+)\n").unwrap();
@@ -569,10 +586,10 @@ mod test {
         }
     }
 
-    #[test]
-    fn check_comment_lgtm() {
+    #[tokio::test]
+    async fn check_comment_lgtm() {
         env::set_var("ACTIONS_STEP_DEBUG", "true");
-        let (comment, gh_out) = create_comment("-*", "");
+        let (comment, gh_out) = create_comment("-*", "").await;
         assert!(&comment.contains(":heavy_check_mark:\nNo problems need attention."));
         assert_eq!(
             &gh_out,
