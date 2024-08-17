@@ -22,9 +22,7 @@ updates:
         patterns:
           - "*"
   - package-ecosystem: cargo
-    directories:
-      - cpp-linter-lib/
-      - cpp-linter-py/
+    directory: /
     schedule:
       interval: "daily"
     ignore:
