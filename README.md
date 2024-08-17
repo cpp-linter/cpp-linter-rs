@@ -23,7 +23,7 @@ A Python and Rust package for linting C/C++ code with clang-tidy and/or clang-fo
 
 > [!CAUTION]
 >
-> [![codecov-status][[codecov-badge]]][codecov-project]
+> [![codecov-status][codecov-badge]][codecov-project]
 >
 > This project is still experimental and subject to drastic changes.
 > Please use the pure python [cpp-linter](https://github.com/cpp-linter/cpp-linter)
