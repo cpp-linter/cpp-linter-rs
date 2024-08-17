@@ -1,4 +1,4 @@
-name: "Check rust code"
+name: "Test CI"
 
 on:
   push:
