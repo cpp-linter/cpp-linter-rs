@@ -170,3 +170,58 @@ pub async fn run_main(args: Vec<String>) -> i32 {
     end_log_group();
     0
 }
+
+#[cfg(test)]
+mod test {
+    use super::run_main;
+
+    #[tokio::test]
+    async fn run() {
+        assert_eq!(
+            run_main(vec![
+                "cpp-linter".to_string(),
+                "-l".to_string(),
+                "false".to_string()
+            ])
+            .await,
+            0
+        );
+    }
+
+    #[tokio::test]
+    async fn run_version_command() {
+        assert_eq!(
+            run_main(vec!["cpp-linter".to_string(), "version".to_string()]).await,
+            0
+        );
+    }
+
+    #[tokio::test]
+    async fn run_force_debug_output() {
+        assert_eq!(
+            run_main(vec![
+                "cpp-linter".to_string(),
+                "-l".to_string(),
+                "false".to_string(),
+                "-v".to_string(),
+                "debug".to_string(),
+            ])
+            .await,
+            0
+        );
+    }
+
+    #[tokio::test]
+    async fn run_bad_version_input() {
+        assert_eq!(
+            run_main(vec![
+                "cpp-linter".to_string(),
+                "-l".to_string(),
+                "false".to_string(),
+                "-V".to_string()
+            ])
+            .await,
+            1
+        );
+    }
+}
