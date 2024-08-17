@@ -6,6 +6,7 @@ on:
     paths:
       - "**.rs"
       - "*.toml"
+      - "Cargo.lock"
       - ".github/workflows/run-dev-tests.yml"
   pull_request:
     # types: opened
@@ -13,6 +14,7 @@ on:
     paths:
       - "**.rs"
       - "*.toml"
+      - "Cargo.lock"
       - ".github/workflows/run-dev-tests.yml"
 
 env:
