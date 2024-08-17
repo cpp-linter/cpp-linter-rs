@@ -1,38 +1,18 @@
-Command Line Interface Options
-==============================
 
-.. std:option:: -v, --verbosity
+Command Line Interface
+======================
 
-    This controls the action's verbosity in the workflow's logs.
-    Supported options are defined by the `logging-level <logging-levels>`_.
-    This option does not affect the verbosity of resulting
-    thread comments or file annotations.
-    
+Commands
+--------
 
-    :Default:
-        ``"info"``
-.. std:option:: -p, --database
+.. std:option:: version
 
-    The path that is used to read a compile command database.
-    For example, it can be a CMake build directory in which a file named
-    compile_commands.json exists (set ``CMAKE_EXPORT_COMPILE_COMMANDS`` to ``ON``).
-    When no build path is specified, a search for compile_commands.json will be
-    attempted through all parent paths of the first input file. See
-    https://clang.llvm.org/docs/HowToSetupToolingForLLVM.html for an
-    example of setting up Clang Tooling on a source tree.
+    Display the cpp-linter version and exit.
 
-.. std:option:: -s, --style
 
-    The style rules to use.
-    
-    - Set this to ``file`` to have clang-format use the closest relative
-      .clang-format file.
-    - Set this to a blank string (``''``) to disable using clang-format
-      entirely.
-    
+Clang-tidy options
+------------------
 
-    :Default:
-        ``"llvm"``
 .. std:option:: -c, --tidy-checks
 
     A comma-separated list of globs with optional ``-`` prefix.
@@ -52,6 +32,69 @@ Command Line Interface Options
 
     :Default:
         ``"boost-*,bugprone-*,performance-*,readability-*,portability-*,modernize-*,clang-analyzer-*,cppcoreguidelines-*"``
+.. std:option:: -p, --database
+
+    The path that is used to read a compile command database.
+    For example, it can be a CMake build directory in which a file named
+    compile_commands.json exists (set ``CMAKE_EXPORT_COMPILE_COMMANDS`` to ``ON``).
+    When no build path is specified, a search for compile_commands.json will be
+    attempted through all parent paths of the first input file. See
+    https://clang.llvm.org/docs/HowToSetupToolingForLLVM.html for an
+    example of setting up Clang Tooling on a source tree.
+
+.. std:option:: -x, --extra-arg
+
+    A string of extra arguments passed to clang-tidy for use as
+    compiler arguments. This can be specified more than once for each
+    additional argument. Recommend using quotes around the value and
+    avoid using spaces between name and value (use ``=`` instead):
+    
+    .. code-block:: shell
+    
+        cpp-linter --extra-arg="-std=c++17" --extra-arg="-Wall"
+
+.. std:option:: -D, --ignore-tidy
+
+    Similar to `--ignore` but applied exclusively to files analyzed by clang-tidy.
+
+    :Default:
+        ``""``
+
+Clang-format options
+--------------------
+
+.. std:option:: -s, --style
+
+    The style rules to use.
+    
+    - Set this to ``file`` to have clang-format use the closest relative
+      .clang-format file.
+    - Set this to a blank string (``''``) to disable using clang-format
+      entirely.
+    
+
+    :Default:
+        ``"llvm"``
+.. std:option:: -M, --ignore-format
+
+    Similar to `--ignore` but applied exclusively to files analyzed by clang-format.
+
+    :Default:
+        ``""``
+
+General options
+---------------
+
+.. std:option:: -v, --verbosity
+
+    This controls the action's verbosity in the workflow's logs.
+    Supported options are defined by the `logging-level <logging-levels>`_.
+    This option does not affect the verbosity of resulting
+    thread comments or file annotations.
+    
+
+    :Default:
+        ``"info"``
 .. std:option:: -V, --version
 
     The desired version of the clang tools to use. Accepted options are
@@ -66,6 +109,10 @@ Command Line Interface Options
 
     :Default:
         ``""``
+
+Source options
+--------------
+
 .. std:option:: -e, --extensions
 
     A comma-separated list of file extensions to analyze.
@@ -131,16 +178,9 @@ Command Line Interface Options
 
     :Default:
         ``"false"``
-.. std:option:: -x, --extra-arg
 
-    A string of extra arguments passed to clang-tidy for use as
-    compiler arguments. This can be specified more than once for each
-    additional argument. Recommend using quotes around the value and
-    avoid using spaces between name and value (use ``=`` instead):
-    
-    .. code-block:: shell
-    
-        cpp-linter --extra-arg="-std=c++17" --extra-arg="-Wall"
+Feedback options
+----------------
 
 .. std:option:: -g, --thread-comments
 
