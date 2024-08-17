@@ -2,11 +2,7 @@
 #![doc(
     html_favicon_url = "https://github.com/cpp-linter/cpp-linter/raw/main/docs/_static/favicon.ico"
 )]
-//! The root module for the cpp_linter package when compiled as a library.
-//! This module mainly holds the declarations of this package's other modules.
-//!
-//! The python binding is also defined here, and it is exposed in python as
-//! `cpp_linter.cpp_linter` in the python path.
+#![doc = include_str!("../README.md")]
 
 // project specific modules/crates
 pub mod clang_tools;

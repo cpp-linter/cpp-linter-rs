@@ -14,7 +14,7 @@ use std::{ops::RangeInclusive, path::PathBuf};
 use git2::{Diff, Error, Patch, Repository};
 
 // project specific modules/crates
-use crate::common_fs::{is_source_or_ignored, FileObj};
+use crate::common_fs::{FileFilter, FileObj};
 
 /// This (re-)initializes the repository located in the specified `path`.
 ///
@@ -99,12 +99,7 @@ fn parse_patch(patch: &Patch) -> (Vec<u32>, Vec<RangeInclusive<u32>>) {
 ///
 /// The specified list of `extensions`, `ignored` and `not_ignored` files are used as
 /// filters to expedite the process and only focus on the data cpp_linter can use.
-pub fn parse_diff(
-    diff: &git2::Diff,
-    extensions: &[&str],
-    ignored: &[String],
-    not_ignored: &[String],
-) -> Vec<FileObj> {
+pub fn parse_diff(diff: &git2::Diff, file_filter: &FileFilter) -> Vec<FileObj> {
     let mut files: Vec<FileObj> = Vec::new();
     for file_idx in 0..diff.deltas().count() {
         let diff_delta = diff.get_delta(file_idx).unwrap();
@@ -115,7 +110,7 @@ pub fn parse_diff(
             git2::Delta::Renamed,
         ]
         .contains(&diff_delta.status())
-            && is_source_or_ignored(&file_path, extensions, ignored, not_ignored)
+            && file_filter.is_source_or_ignored(&file_path)
         {
             let (added_lines, diff_chunks) =
                 parse_patch(&Patch::from_diff(diff, file_idx).unwrap().unwrap());
@@ -132,22 +127,12 @@ pub fn parse_diff(
 /// log warning and error are output when this occurs. Please report this instance for
 /// troubleshooting/diagnosis as this likely means the diff is malformed or there is a
 /// bug in libgit2 source.
-pub fn parse_diff_from_buf(
-    buff: &[u8],
-    extensions: &[&str],
-    ignored: &[String],
-    not_ignored: &[String],
-) -> Vec<FileObj> {
+pub fn parse_diff_from_buf(buff: &[u8], file_filter: &FileFilter) -> Vec<FileObj> {
     if let Ok(diff_obj) = &Diff::from_buffer(buff) {
-        parse_diff(diff_obj, extensions, ignored, not_ignored)
+        parse_diff(diff_obj, file_filter)
     } else {
         log::warn!("libgit2 failed to parse the diff");
-        brute_force_parse_diff::parse_diff(
-            &String::from_utf8_lossy(buff),
-            extensions,
-            ignored,
-            not_ignored,
-        )
+        brute_force_parse_diff::parse_diff(&String::from_utf8_lossy(buff), file_filter)
     }
 }
 
@@ -163,7 +148,7 @@ mod brute_force_parse_diff {
     use regex::Regex;
     use std::{ops::RangeInclusive, path::PathBuf};
 
-    use crate::common_fs::{is_source_or_ignored, FileObj};
+    use crate::common_fs::{FileFilter, FileObj};
 
     fn get_filename_from_front_matter(front_matter: &str) -> Option<&str> {
         let diff_file_name = Regex::new(r"(?m)^\+\+\+\sb?/(.*)$").unwrap();
@@ -177,7 +162,7 @@ mod brute_force_parse_diff {
                 return Some(captures.get(1).unwrap().as_str());
             }
         }
-        if diff_binary_file.is_match(front_matter) {
+        if !diff_binary_file.is_match(front_matter) {
             log::warn!("Unrecognized diff starting with:\n{}", front_matter);
         }
         None
@@ -226,12 +211,7 @@ mod brute_force_parse_diff {
         (additions, diff_chunks)
     }
 
-    pub fn parse_diff(
-        diff: &str,
-        extensions: &[&str],
-        ignored: &[String],
-        not_ignored: &[String],
-    ) -> Vec<FileObj> {
+    pub fn parse_diff(diff: &str, file_filter: &FileFilter) -> Vec<FileObj> {
         log::error!("Using brute force diff parsing!");
         let mut results = Vec::new();
         let diff_file_delimiter = Regex::new(r"(?m)^diff --git a/.*$").unwrap();
@@ -242,20 +222,23 @@ mod brute_force_parse_diff {
             if file_diff.is_empty() || file_diff.starts_with("deleted file") {
                 continue;
             }
-            if let Some(first_hunk) = hunk_info.find(file_diff) {
-                let front_matter = &file_diff[..first_hunk.start()];
-                if let Some(file_name) = get_filename_from_front_matter(front_matter) {
-                    let file_path = PathBuf::from(file_name);
-                    if is_source_or_ignored(&file_path, extensions, ignored, not_ignored) {
-                        let (added_lines, diff_chunks) =
-                            parse_patch(&file_diff[first_hunk.start()..]);
-                        results.push(FileObj::from(file_path, added_lines, diff_chunks));
-                    }
-                }
+            let hunk_start = if let Some(first_hunk) = hunk_info.find(file_diff) {
+                first_hunk.start()
             } else {
-                // file has no changed content. moving on
-                continue;
+                file_diff.len()
+            };
+            let front_matter = &file_diff[..hunk_start];
+            if let Some(file_name) = get_filename_from_front_matter(front_matter) {
+                let file_path = PathBuf::from(file_name);
+                if file_filter.is_source_or_ignored(&file_path) {
+                    let (added_lines, diff_chunks) = parse_patch(&file_diff[hunk_start..]);
+                    results.push(FileObj::from(file_path, added_lines, diff_chunks));
+                }
             }
+            // } else {
+            //     // file has no changed content. moving on
+            //     continue;
+            // }
         }
         results
     }
@@ -265,12 +248,19 @@ mod brute_force_parse_diff {
     mod test {
 
         use super::parse_diff;
-        use crate::{common_fs::FileObj, git::parse_diff_from_buf, logger};
+        use crate::{
+            common_fs::{FileFilter, FileObj},
+            git::parse_diff_from_buf,
+        };
 
-        static RENAMED_DIFF: &str = r"diff --git a/tests/demo/some source.cpp b/tests/demo/some source.cpp
+        static RENAMED_DIFF: &str = r#"diff --git a/tests/demo/some source.cpp b/tests/demo/some source.cpp
 similarity index 100%
 rename from /tests/demo/some source.cpp
-rename to /tests/demo/some source.cpp\n";
+rename to /tests/demo/some source.cpp
+diff --git a/some picture.png b/some picture.png
+new file mode 100644
+Binary files /dev/null and b/some picture.png differ
+"#;
 
         static RENAMED_DIFF_WITH_CHANGES: &str = r#"diff --git a/tests/demo/some source.cpp b/tests/demo/some source.cpp
 similarity index 99%
@@ -283,28 +273,41 @@ rename to /tests/demo/some source.cpp
         #[test]
         fn parse_renamed_diff() {
             let diff_buf = RENAMED_DIFF.as_bytes();
-            let files = parse_diff_from_buf(diff_buf, &[&String::from("cpp")], &[], &[]);
-            assert!(files.is_empty());
+            let files = parse_diff_from_buf(
+                diff_buf,
+                &FileFilter::new(&["target"], vec![String::from("cpp")]),
+            );
+            assert!(!files.is_empty());
+            assert!(files
+                .first()
+                .unwrap()
+                .name
+                .ends_with("tests/demo/some source.cpp"));
         }
 
         #[test]
         fn parse_renamed_diff_with_patch() {
             let diff_buf = RENAMED_DIFF_WITH_CHANGES.as_bytes();
-            let files = parse_diff_from_buf(diff_buf, &[&String::from("cpp")], &[], &[]);
+            let files = parse_diff_from_buf(
+                diff_buf,
+                &FileFilter::new(&["target"], vec![String::from("cpp")]),
+            );
             assert!(!files.is_empty());
         }
 
         /// Used to parse the same string buffer using both libgit2 and brute force regex.
         /// Returns 2 vectors of [FileObj] that should be equivalent.
-        fn setup_parsed(buf: &str, extensions: &[&str]) -> (Vec<FileObj>, Vec<FileObj>) {
-            logger::init().unwrap_or_default();
+        fn setup_parsed(buf: &str, extensions: &[String]) -> (Vec<FileObj>, Vec<FileObj>) {
             (
-                parse_diff_from_buf(buf.as_bytes(), extensions, &[], &[]),
-                parse_diff(buf, extensions, &[], &[]),
+                parse_diff_from_buf(
+                    buf.as_bytes(),
+                    &FileFilter::new(&["target"], extensions.to_owned()),
+                ),
+                parse_diff(buf, &FileFilter::new(&["target"], extensions.to_owned())),
             )
         }
 
-        fn assert_files_eq(files_from_a: &Vec<FileObj>, files_from_b: &Vec<FileObj>) {
+        fn assert_files_eq(files_from_a: &[FileObj], files_from_b: &[FileObj]) {
             assert_eq!(files_from_a.len(), files_from_b.len());
             for (a, b) in files_from_a.iter().zip(files_from_b) {
                 assert_eq!(a.name, b.name);
@@ -323,7 +326,7 @@ rename to /tests/demo/some source.cpp
                             -#include <some_lib/render/animation.hpp>\n\
                             +#include <some_lib/render/animations.hpp>\n \n \n \n";
 
-            let (files_from_buf, files_from_str) = setup_parsed(diff_buf, &[&String::from("cpp")]);
+            let (files_from_buf, files_from_str) = setup_parsed(diff_buf, &[String::from("cpp")]);
             assert!(!files_from_buf.is_empty());
             assert_files_eq(&files_from_buf, &files_from_str);
         }
@@ -334,7 +337,7 @@ rename to /tests/demo/some source.cpp
                 new file mode 100644\n\
                 Binary files /dev/null and b/some picture.png differ\n";
 
-            let (files_from_buf, files_from_str) = setup_parsed(diff_buf, &[&String::from("png")]);
+            let (files_from_buf, files_from_str) = setup_parsed(diff_buf, &[String::from("png")]);
             assert!(files_from_buf.is_empty());
             assert_files_eq(&files_from_buf, &files_from_str);
         }
@@ -374,7 +377,7 @@ mod test {
 
     use tempfile::{tempdir, TempDir};
 
-    use crate::{cli::parse_ignore, github_api::GithubApiClient, rest_api::RestApiClient};
+    use crate::{common_fs::FileFilter, github_api::GithubApiClient, rest_api::RestApiClient};
 
     fn get_temp_dir() -> TempDir {
         let tmp = tempdir().unwrap();
@@ -382,9 +385,9 @@ mod test {
         tmp
     }
 
-    fn checkout_cpp_linter_py_repo(
+    async fn checkout_cpp_linter_py_repo(
         sha: &str,
-        extensions: &[&str],
+        extensions: &[String],
         tmp: &TempDir,
         patch_path: Option<&str>,
     ) -> Vec<crate::common_fs::FileObj> {
@@ -396,76 +399,67 @@ mod test {
             patch_path,
         );
         let rest_api_client = GithubApiClient::new();
-        let (ignored, not_ignored) = parse_ignore(&["target"]);
+        let file_filter = FileFilter::new(&["target"], extensions.to_owned());
         set_current_dir(tmp).unwrap();
         env::set_var("CI", "false"); // avoid use of REST API when testing in CI
-        rest_api_client.get_list_of_changed_files(extensions, &ignored, &not_ignored)
+        rest_api_client
+            .get_list_of_changed_files(&file_filter)
+            .await
     }
 
-    #[test]
-    fn with_no_changed_sources() {
+    #[tokio::test]
+    async fn with_no_changed_sources() {
         // commit with no modified C/C++ sources
         let sha = "0c236809891000b16952576dc34de082d7a40bf3";
         let cur_dir = current_dir().unwrap();
         let tmp = get_temp_dir();
-        let extensions = vec!["cpp", "hpp"];
-        let files = checkout_cpp_linter_py_repo(sha, &extensions, &tmp, None);
+        let extensions = vec!["cpp".to_string(), "hpp".to_string()];
+        let files = checkout_cpp_linter_py_repo(sha, &extensions, &tmp, None).await;
         println!("files = {:?}", files);
         assert!(files.is_empty());
         set_current_dir(cur_dir).unwrap(); // prep to delete temp_folder
         drop(tmp); // delete temp_folder
     }
 
-    #[test]
-    fn with_changed_sources() {
+    #[tokio::test]
+    async fn with_changed_sources() {
         // commit with modified C/C++ sources
         let sha = "950ff0b690e1903797c303c5fc8d9f3b52f1d3c5";
         let cur_dir = current_dir().unwrap();
         let tmp = get_temp_dir();
-        let extensions = vec!["cpp", "hpp"];
-        let files = checkout_cpp_linter_py_repo(sha, &extensions, &tmp, None);
+        let extensions = vec!["cpp".to_string(), "hpp".to_string()];
+        let files = checkout_cpp_linter_py_repo(sha, &extensions.clone(), &tmp, None).await;
         println!("files = {:?}", files);
         assert!(files.len() >= 2);
         for file in files {
-            assert!(extensions.contains(
-                &file
-                    .name
-                    .extension()
-                    .unwrap()
-                    .to_string_lossy()
-                    .to_string()
-                    .as_str()
-            ));
+            assert!(
+                extensions.contains(&file.name.extension().unwrap().to_string_lossy().to_string())
+            );
         }
         set_current_dir(cur_dir).unwrap(); // prep to delete temp_folder
         drop(tmp); // delete temp_folder
     }
 
-    #[test]
-    fn with_staged_changed_sources() {
+    #[tokio::test]
+    async fn with_staged_changed_sources() {
         // commit with no modified C/C++ sources
         let sha = "0c236809891000b16952576dc34de082d7a40bf3";
         let cur_dir = current_dir().unwrap();
         let tmp = get_temp_dir();
-        let extensions = vec!["cpp", "hpp"];
+        let extensions = vec!["cpp".to_string(), "hpp".to_string()];
         let files = checkout_cpp_linter_py_repo(
             sha,
-            &extensions,
+            &extensions.clone(),
             &tmp,
             Some("tests/capture_tools_output/cpp-linter/cpp-linter/test_git_lib.patch"),
-        );
+        )
+        .await;
         println!("files = {:?}", files);
         assert!(!files.is_empty());
         for file in files {
-            assert!(extensions.contains(
-                &file
-                    .name
-                    .extension()
-                    .unwrap()
-                    .to_string_lossy()
-                    .to_string()
-                    .as_str()
-            ));
+            assert!(
+                extensions.contains(&file.name.extension().unwrap().to_string_lossy().to_string())
+            );
         }
         set_current_dir(cur_dir).unwrap(); // prep to delete temp_folder
         drop(tmp); // delete temp_folder

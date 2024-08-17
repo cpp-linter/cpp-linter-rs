@@ -1,0 +1,15 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {},
+	"extensions": {
+		"recommendations": [
+			"rust-lang.rust-analyzer",
+			"streetsidesoftware.code-spell-checker",
+			"fill-labs.dependi",
+		]
+	}
+}

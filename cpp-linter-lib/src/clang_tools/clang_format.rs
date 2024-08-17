@@ -1,7 +1,10 @@
 //! This module holds functionality specific to running clang-format and parsing it's
 //! output.
 
-use std::process::Command;
+use std::{
+    process::Command,
+    sync::{Arc, Mutex},
+};
 
 // non-std crates
 use serde::Deserialize;
@@ -14,7 +17,7 @@ use crate::{
 };
 
 /// A Structure used to deserialize clang-format's XML output.
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Debug, Deserialize, PartialEq, Clone)]
 #[serde(rename = "replacements")]
 pub struct FormatAdvice {
     /// A list of [`Replacement`]s that clang-tidy wants to make.
@@ -60,42 +63,58 @@ impl Clone for Replacement {
     }
 }
 
+/// Get a total count of clang-format advice from the given list of [FileObj]s.
+pub fn tally_format_advice(files: &[Arc<Mutex<FileObj>>]) -> u64 {
+    let mut total = 0;
+    for file in files {
+        let file = file.lock().unwrap();
+        if let Some(advice) = &file.format_advice {
+            if !advice.replacements.is_empty() {
+                total += 1;
+            }
+        }
+    }
+    total
+}
+
 /// Run clang-tidy for a specific `file`, then parse and return it's XML output.
 pub fn run_clang_format(
     cmd: &mut Command,
-    file: &FileObj,
+    file: &mut Arc<Mutex<FileObj>>,
     style: &str,
     lines_changed_only: &LinesChangedOnly,
-) -> FormatAdvice {
+) -> Vec<(log::Level, String)> {
+    let mut logs = vec![];
+    let mut file = file.lock().unwrap();
     cmd.args(["--style", style, "--output-replacements-xml"]);
     let ranges = file.get_ranges(lines_changed_only);
     for range in &ranges {
         cmd.arg(format!("--lines={}:{}", range.start(), range.end()));
     }
     cmd.arg(file.name.to_string_lossy().as_ref());
-    log::info!(
-        "Running \"{} {}\"",
-        cmd.get_program().to_string_lossy(),
-        cmd.get_args()
-            .map(|x| x.to_str().unwrap())
-            .collect::<Vec<&str>>()
-            .join(" ")
-    );
+    logs.push((
+        log::Level::Info,
+        format!(
+            "Running \"{} {}\"",
+            cmd.get_program().to_string_lossy(),
+            cmd.get_args()
+                .map(|x| x.to_str().unwrap())
+                .collect::<Vec<&str>>()
+                .join(" ")
+        ),
+    ));
     let output = cmd.output().unwrap();
     if !output.stderr.is_empty() || !output.status.success() {
-        log::debug!(
-            "clang-format raised the follow errors:\n{}",
-            String::from_utf8(output.stderr).unwrap()
-        );
+        logs.push((
+            log::Level::Debug,
+            format!(
+                "clang-format raised the follow errors:\n{}",
+                String::from_utf8(output.stderr).unwrap()
+            ),
+        ));
     }
-    // log::debug!(
-    //     "clang-format XML output:\n{}",
-    //     String::from_utf8(output.stdout.clone()).unwrap()
-    // );
     if output.stdout.is_empty() {
-        return FormatAdvice {
-            replacements: vec![],
-        };
+        return logs;
     }
     let xml = String::from_utf8(output.stdout)
         .unwrap()
@@ -107,8 +126,8 @@ pub fn run_clang_format(
         .whitespace_to_characters(true)
         .ignore_root_level_whitespace(true);
     let event_reader = serde_xml_rs::EventReader::new_with_config(xml.as_bytes(), config);
-    let mut format_advice: FormatAdvice =
-        FormatAdvice::deserialize(&mut Deserializer::new(event_reader)).unwrap_or(FormatAdvice {
+    let mut format_advice = FormatAdvice::deserialize(&mut Deserializer::new(event_reader))
+        .unwrap_or(FormatAdvice {
             replacements: vec![],
         });
     if !format_advice.replacements.is_empty() {
@@ -130,7 +149,8 @@ pub fn run_clang_format(
         }
         format_advice.replacements = filtered_replacements;
     }
-    format_advice
+    file.format_advice = Some(format_advice);
+    logs
 }
 
 #[cfg(test)]

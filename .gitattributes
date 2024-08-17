@@ -5,7 +5,23 @@
 # to native line endings on checkout.
 *.py text eol=lf
 *.rst text eol=lf
+*.css text eol=lf
+*.md text eol=lf
+*.rs text eol=lf
+*.yaml text eol=lf
+*.toml text eol=lf
+*.lock text eol=lf
+*.yml text eol=lf
 *.sh text eol=lf
 *.cpp text eol=lf
 *.hpp text eol=lf
 *.patch text eol=lf
+*.diff text eol=lf
+.gitattributes text eol=lf
+.gitmodules text eol=lf
+.gitignore text eol=lf
+*.txt text eol=lf
+*.json text eol=lf
+*.code-workspace text eol=lf
+*.clang-tidy text eol=lf
+*.clang-format text eol=lf

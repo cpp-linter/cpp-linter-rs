@@ -81,5 +81,5 @@ def setup(app: Sphinx):
     subprocess.run(
         ["cargo", "run", "--example", "cli_doc"],
         check=True,
-        cwd=str(Path(__file__).parent.parent.parent / "cpp-linter-lib"),
+        cwd=str(Path(__file__).parent.parent.parent),
     )

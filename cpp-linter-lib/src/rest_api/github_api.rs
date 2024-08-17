@@ -4,20 +4,25 @@ use std::collections::HashMap;
 use std::env;
 use std::fs::OpenOptions;
 use std::io::{Read, Write};
+use std::sync::{Arc, Mutex};
 
 // non-std crates
-use reqwest::blocking::Client;
 use reqwest::header::{HeaderMap, HeaderValue};
+use reqwest::Client;
 use reqwest::Method;
 use serde::Deserialize;
 use serde_json;
 
+use crate::clang_tools::clang_format::tally_format_advice;
+use crate::clang_tools::clang_tidy::tally_tidy_advice;
 // project specific modules/crates
-use crate::clang_tools::{clang_format::FormatAdvice, clang_tidy::TidyAdvice};
-use crate::common_fs::FileObj;
+use crate::common_fs::{FileFilter, FileObj};
 use crate::git::{get_diff, open_repo, parse_diff, parse_diff_from_buf};
 
 use super::{FeedbackInput, RestApiClient, COMMENT_MARKER};
+
+static USER_AGENT: &str =
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:120.0) Gecko/20100101 Firefox/120.0";
 
 /// A structure to work with Github REST API.
 pub struct GithubApiClient {
@@ -25,7 +30,7 @@ pub struct GithubApiClient {
     client: Client,
 
     /// The CI run's event payload from the webhook that triggered the workflow.
-    event_payload: Option<serde_json::Value>,
+    pull_request: Option<i64>,
 
     /// The name of the event that was triggered when running cpp_linter.
     pub event_name: String,
@@ -52,18 +57,21 @@ impl Default for GithubApiClient {
 impl GithubApiClient {
     pub fn new() -> Self {
         GithubApiClient {
-            client: reqwest::blocking::Client::new(),
-            event_payload: {
-                let event_payload_path = env::var("GITHUB_EVENT_PATH");
-                if event_payload_path.is_ok() {
+            client: Client::new(),
+            pull_request: {
+                if let Ok(event_payload_path) = env::var("GITHUB_EVENT_PATH") {
                     let file_buf = &mut String::new();
                     OpenOptions::new()
                         .read(true)
-                        .open(event_payload_path.unwrap())
+                        .open(event_payload_path)
                         .unwrap()
                         .read_to_string(file_buf)
                         .unwrap();
-                    Some(serde_json::from_str(file_buf.as_str()).unwrap())
+                    let json = serde_json::from_str::<serde_json::Map<String, serde_json::Value>>(
+                        file_buf.as_str(),
+                    )
+                    .unwrap();
+                    json["number"].as_i64()
                 } else {
                     None
                 }
@@ -92,10 +100,10 @@ impl GithubApiClient {
 impl RestApiClient for GithubApiClient {
     fn set_exit_code(
         &self,
-        checks_failed: i32,
-        format_checks_failed: Option<i32>,
-        tidy_checks_failed: Option<i32>,
-    ) -> i32 {
+        checks_failed: u64,
+        format_checks_failed: Option<u64>,
+        tidy_checks_failed: Option<u64>,
+    ) -> u64 {
         if let Ok(gh_out) = env::var("GITHUB_OUTPUT") {
             let mut gh_out_file = OpenOptions::new()
                 .append(true)
@@ -124,7 +132,6 @@ impl RestApiClient for GithubApiClient {
     }
 
     fn make_headers(&self, use_diff: Option<bool>) -> HeaderMap<HeaderValue> {
-        let gh_token = env::var("GITHUB_TOKEN");
         let mut headers = HeaderMap::new();
         let return_fmt = "application/vnd.github.".to_owned()
             + if use_diff.is_some_and(|val| val) {
@@ -133,21 +140,14 @@ impl RestApiClient for GithubApiClient {
                 "raw+json"
             };
         headers.insert("Accept", return_fmt.parse().unwrap());
-        let user_agent =
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:120.0) Gecko/20100101 Firefox/120.0";
-        headers.insert("User-Agent", user_agent.parse().unwrap());
-        if let Ok(token) = gh_token {
+        headers.insert("User-Agent", USER_AGENT.parse().unwrap());
+        if let Ok(token) = env::var("GITHUB_TOKEN") {
             headers.insert("Authorization", token.parse().unwrap());
         }
         headers
     }
 
-    fn get_list_of_changed_files(
-        &self,
-        extensions: &[&str],
-        ignored: &[String],
-        not_ignored: &[String],
-    ) -> Vec<FileObj> {
+    async fn get_list_of_changed_files(&self, file_filter: &FileFilter) -> Vec<FileObj> {
         if env::var("CI").is_ok_and(|val| val.as_str() == "true")
             && self.repo.is_some()
             && self.sha.is_some()
@@ -158,8 +158,10 @@ impl RestApiClient for GithubApiClient {
                 self.api_url,
                 self.repo.as_ref().unwrap(),
                 if self.event_name == "pull_request" {
-                    let pr_number = &self.event_payload.as_ref().unwrap()["number"];
-                    format!("pulls/{}", &pr_number)
+                    format!(
+                        "pulls/{}",
+                        &self.pull_request.expect("Pull request number unknown")
+                    )
                 } else {
                     format!("commits/{}", self.sha.as_ref().unwrap())
                 }
@@ -169,40 +171,34 @@ impl RestApiClient for GithubApiClient {
                 .get(url)
                 .headers(self.make_headers(Some(true)))
                 .send()
+                .await
                 .unwrap()
                 .bytes()
+                .await
                 .unwrap();
 
-            parse_diff_from_buf(&response, extensions, ignored, not_ignored)
+            parse_diff_from_buf(&response, file_filter)
         } else {
             // get diff from libgit2 API
             let repo = open_repo(".")
                 .expect("Please ensure the repository is checked out before running cpp-linter.");
-            let list = parse_diff(&get_diff(&repo), extensions, ignored, not_ignored);
+            let list = parse_diff(&get_diff(&repo), file_filter);
             list
         }
     }
 
-    fn post_feedback(
-        &self,
-        files: &[FileObj],
-        format_advice: &[FormatAdvice],
-        tidy_advice: &[TidyAdvice],
-        user_inputs: FeedbackInput,
-    ) {
-        let (comment, format_checks_failed, tidy_checks_failed) =
-            self.make_comment(files, format_advice, tidy_advice);
+    async fn post_feedback(&self, files: &[Arc<Mutex<FileObj>>], user_inputs: FeedbackInput) {
+        let format_checks_failed = tally_format_advice(files);
+        let tidy_checks_failed = tally_tidy_advice(files);
+        let mut comment = None;
 
         if user_inputs.file_annotations {
-            self.post_annotations(
-                files,
-                format_advice,
-                tidy_advice,
-                user_inputs.style.as_str(),
-            );
+            self.post_annotations(files, user_inputs.style.as_str());
         }
         if user_inputs.step_summary {
-            self.post_step_summary(&comment);
+            comment =
+                Some(self.make_comment(files, format_checks_failed, tidy_checks_failed, None));
+            self.post_step_summary(comment.as_ref().unwrap());
         }
         self.set_exit_code(
             format_checks_failed + tidy_checks_failed,
@@ -212,13 +208,21 @@ impl RestApiClient for GithubApiClient {
 
         if user_inputs.thread_comments.as_str() != "false" {
             // post thread comment for PR or push event
+            if comment.as_ref().is_some_and(|c| c.len() > 65535) || comment.is_none() {
+                comment = Some(self.make_comment(
+                    files,
+                    format_checks_failed,
+                    tidy_checks_failed,
+                    Some(65535),
+                ));
+            }
             if let Some(repo) = &self.repo {
                 let is_pr = self.event_name == "pull_request";
                 let base_url = format!("{}/repos/{}/", &self.api_url, &repo);
                 let comments_url = if is_pr {
                     format!(
                         "{base_url}issues/{}",
-                        &self.event_payload.as_ref().unwrap()["number"]
+                        &self.pull_request.expect("Pull request number unknown")
                     )
                 } else {
                     format!("{base_url}/commits/{}", &self.sha.as_ref().unwrap())
@@ -229,9 +233,10 @@ impl RestApiClient for GithubApiClient {
                     .client
                     .get(&comments_url)
                     .headers(self.make_headers(None))
-                    .send();
+                    .send()
+                    .await;
                 if let Ok(response) = request {
-                    let json = response.json::<serde_json::Value>().unwrap();
+                    let json = response.json::<serde_json::Value>().await.unwrap();
                     let count = if is_pr {
                         json["comments"].as_u64().unwrap()
                     } else {
@@ -239,12 +244,13 @@ impl RestApiClient for GithubApiClient {
                     };
                     self.update_comment(
                         &format!("{}/comments", &comments_url),
-                        &comment,
+                        &comment.unwrap(),
                         count,
                         user_inputs.no_lgtm,
                         format_checks_failed + tidy_checks_failed == 0,
                         user_inputs.thread_comments.as_str() == "update",
-                    );
+                    )
+                    .await;
                 } else {
                     let error = request.unwrap_err();
                     if let Some(status) = error.status() {
@@ -274,34 +280,29 @@ impl GithubApiClient {
         }
     }
 
-    fn post_annotations(
-        &self,
-        files: &[FileObj],
-        format_advice: &[FormatAdvice],
-        tidy_advice: &[TidyAdvice],
-        style: &str,
-    ) {
-        if !format_advice.is_empty() {
-            // formalize the style guide name
-            let style_guide =
-                if ["google", "chromium", "microsoft", "mozilla", "webkit"].contains(&style) {
-                    // capitalize the first letter
-                    let mut char_iter = style.chars();
-                    match char_iter.next() {
-                        None => String::new(),
-                        Some(f) => f.to_uppercase().collect::<String>() + char_iter.as_str(),
-                    }
-                } else if style == "llvm" || style == "gnu" {
-                    style.to_ascii_uppercase()
-                } else {
-                    String::from("Custom")
-                };
+    fn post_annotations(&self, files: &[Arc<Mutex<FileObj>>], style: &str) {
+        // formalize the style guide name
+        let style_guide =
+            if ["google", "chromium", "microsoft", "mozilla", "webkit"].contains(&style) {
+                // capitalize the first letter
+                let mut char_iter = style.chars();
+                match char_iter.next() {
+                    None => String::new(),
+                    Some(f) => f.to_uppercase().collect::<String>() + char_iter.as_str(),
+                }
+            } else if style == "llvm" || style == "gnu" {
+                style.to_ascii_uppercase()
+            } else {
+                String::from("Custom")
+            };
 
-            // iterate over clang-format advice and post annotations
-            for (index, advice) in format_advice.iter().enumerate() {
+        // iterate over clang-format advice and post annotations
+        for file in files {
+            let file = file.lock().unwrap();
+            if let Some(format_advice) = &file.format_advice {
                 // assemble a list of line numbers
                 let mut lines: Vec<usize> = Vec::new();
-                for replacement in &advice.replacements {
+                for replacement in &format_advice.replacements {
                     if let Some(line_int) = replacement.line {
                         if !lines.contains(&line_int) {
                             lines.push(line_int);
@@ -311,29 +312,29 @@ impl GithubApiClient {
                 // post annotation if any applicable lines were formatted
                 if !lines.is_empty() {
                     println!(
-                        "::notice file={name},title=Run clang-format on {name}::File {name} does not conform to {style_guide} style guidelines. (lines {line_set})",
-                        name = &files[index].name.to_string_lossy().replace('\\', "/"),
-                        line_set = lines.iter().map(|val| val.to_string()).collect::<Vec<_>>().join(","),
-                    );
+                            "::notice file={name},title=Run clang-format on {name}::File {name} does not conform to {style_guide} style guidelines. (lines {line_set})",
+                            name = &file.name.to_string_lossy().replace('\\', "/"),
+                            line_set = lines.iter().map(|val| val.to_string()).collect::<Vec<_>>().join(","),
+                        );
                 }
-            }
-        } // end format_advice iterations
+            } // end format_advice iterations
 
-        // iterate over clang-tidy advice and post annotations
-        // The tidy_advice vector is parallel to the files vector; meaning it serves as a file filterer.
-        // lines are already filter as specified to clang-tidy CLI.
-        for (index, advice) in tidy_advice.iter().enumerate() {
-            for note in &advice.notes {
-                if note.filename == files[index].name.to_string_lossy().replace('\\', "/") {
-                    println!(
-                        "::{severity} file={file},line={line},title={file}:{line}:{cols} [{diag}]::{info}",
-                        severity = if note.severity == *"note" { "notice".to_string() } else {note.severity.clone()},
-                        file = note.filename,
-                        line = note.line,
-                        cols = note.cols,
-                        diag = note.diagnostic,
-                        info = note.rationale,
-                    );
+            // iterate over clang-tidy advice and post annotations
+            // The tidy_advice vector is parallel to the files vector; meaning it serves as a file filterer.
+            // lines are already filter as specified to clang-tidy CLI.
+            if let Some(tidy_advice) = &file.tidy_advice {
+                for note in &tidy_advice.notes {
+                    if note.filename == file.name.to_string_lossy().replace('\\', "/") {
+                        println!(
+                            "::{severity} file={file},line={line},title={file}:{line}:{cols} [{diag}]::{info}",
+                            severity = if note.severity == *"note" { "notice".to_string() } else {note.severity.clone()},
+                            file = note.filename,
+                            line = note.line,
+                            cols = note.cols,
+                            diag = note.diagnostic,
+                            info = note.rationale,
+                        );
+                    }
                 }
             }
         }
@@ -341,7 +342,7 @@ impl GithubApiClient {
 
     /// update existing comment or remove old comment(s) and post a new comment
     #[allow(clippy::too_many_arguments)]
-    fn update_comment(
+    async fn update_comment(
         &self,
         url: &String,
         comment: &String,
@@ -350,8 +351,9 @@ impl GithubApiClient {
         is_lgtm: bool,
         update_only: bool,
     ) {
-        let comment_url =
-            self.remove_bot_comments(url, count, !update_only || (is_lgtm && no_lgtm));
+        let comment_url = self
+            .remove_bot_comments(url, count, !update_only || (is_lgtm && no_lgtm))
+            .await;
         #[allow(clippy::nonminimal_bool)] // an inaccurate assessment
         if (is_lgtm && !no_lgtm) || !is_lgtm {
             let payload = HashMap::from([("body", comment)]);
@@ -374,6 +376,7 @@ impl GithubApiClient {
                 .headers(self.make_headers(None))
                 .json(&payload)
                 .send()
+                .await
             {
                 log::info!(
                     "Got {} response from {:?}ing comment",
@@ -384,17 +387,17 @@ impl GithubApiClient {
         }
     }
 
-    fn remove_bot_comments(&self, url: &String, count: u64, delete: bool) -> Option<String> {
+    async fn remove_bot_comments(&self, url: &String, count: u64, delete: bool) -> Option<String> {
         let mut page = 1;
         let mut comment_url = None;
         let mut total = count;
         while total > 0 {
-            let request = self.client.get(format!("{url}/?page={page}")).send();
+            let request = self.client.get(format!("{url}/?page={page}")).send().await;
             if request.is_err() {
                 log::error!("Failed to get list of existing comments");
                 return None;
             } else if let Ok(response) = request {
-                let payload: JsonCommentsPayload = response.json().unwrap();
+                let payload: JsonCommentsPayload = response.json().await.unwrap();
                 let mut comment_count = 0;
                 for comment in payload.comments {
                     if comment.body.starts_with(COMMENT_MARKER) {
@@ -420,6 +423,7 @@ impl GithubApiClient {
                                 .delete(del_url)
                                 .headers(self.make_headers(None))
                                 .send()
+                                .await
                             {
                                 log::info!(
                                     "Got {} from DELETE {}",
@@ -462,4 +466,137 @@ struct Comment {
 struct User {
     pub login: String,
     pub id: u64,
+}
+
+#[cfg(test)]
+mod test {
+    use std::{
+        env,
+        io::Read,
+        path::PathBuf,
+        sync::{Arc, Mutex},
+    };
+
+    use regex::Regex;
+    use tempfile::{tempdir, NamedTempFile};
+
+    use super::{GithubApiClient, USER_AGENT};
+    use crate::{
+        clang_tools::{capture_clang_tools_output, ClangParams},
+        cli::LinesChangedOnly,
+        common_fs::{FileFilter, FileObj},
+        rest_api::{FeedbackInput, RestApiClient, USER_OUTREACH},
+    };
+
+    // ************************** tests for GithubApiClient::make_headers()
+    fn assert_header(use_diff: bool, auth: Option<&str>) {
+        let rest_api_client = GithubApiClient::new();
+        if let Some(token) = auth {
+            env::set_var("GITHUB_TOKEN", token);
+        }
+        let headers = rest_api_client.make_headers(Some(use_diff));
+        assert!(headers.contains_key("User-Agent"));
+        assert_eq!(headers.get("User-Agent").unwrap(), USER_AGENT);
+        assert!(headers.contains_key("Accept"));
+        assert!(headers
+            .get("Accept")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .ends_with(if use_diff { "diff" } else { "raw+json" }));
+        if let Some(token) = auth {
+            assert!(headers.contains_key("Authorization"));
+            assert_eq!(headers.get("Authorization").unwrap(), token);
+        }
+    }
+
+    #[test]
+    fn get_headers_json_token() {
+        assert_header(false, Some("123456"));
+    }
+
+    #[test]
+    fn get_headers_diff() {
+        assert_header(true, None);
+    }
+
+    // ************************* tests for step-summary and output variables
+
+    async fn create_comment(tidy_checks: &str, style: &str) -> (String, String) {
+        let tmp_dir = tempdir().unwrap();
+        let rest_api_client = GithubApiClient::default();
+        if env::var("ACTIONS_STEP_DEBUG").is_ok_and(|var| var == "true") {
+            assert!(rest_api_client.debug_enabled);
+        }
+        let mut files = vec![Arc::new(Mutex::new(FileObj::new(PathBuf::from(
+            "tests/demo/demo.cpp",
+        ))))];
+        let mut clang_params = ClangParams {
+            tidy_checks: tidy_checks.to_string(),
+            lines_changed_only: LinesChangedOnly::Off,
+            database: None,
+            extra_args: None,
+            database_json: None,
+            style: style.to_string(),
+            clang_tidy_command: None,
+            clang_format_command: None,
+            tidy_filter: FileFilter::new(&[], vec!["cpp".to_string(), "hpp".to_string()]),
+            format_filter: FileFilter::new(&[], vec!["cpp".to_string(), "hpp".to_string()]),
+        };
+        capture_clang_tools_output(
+            &mut files,
+            env::var("CLANG-VERSION").unwrap_or("".to_string()).as_str(),
+            &mut clang_params,
+        )
+        .await;
+        let feedback_inputs = FeedbackInput {
+            style: style.to_string(),
+            step_summary: true,
+            ..Default::default()
+        };
+        let mut step_summary_path = NamedTempFile::new_in(tmp_dir.path()).unwrap();
+        env::set_var("GITHUB_STEP_SUMMARY", step_summary_path.path());
+        let mut gh_out_path = NamedTempFile::new_in(tmp_dir.path()).unwrap();
+        env::set_var("GITHUB_OUTPUT", gh_out_path.path());
+        rest_api_client.post_feedback(&files, feedback_inputs).await;
+        let mut step_summary_content = String::new();
+        step_summary_path
+            .read_to_string(&mut step_summary_content)
+            .unwrap();
+        assert!(&step_summary_content.contains(USER_OUTREACH));
+        let mut gh_out_content = String::new();
+        gh_out_path.read_to_string(&mut gh_out_content).unwrap();
+        assert!(gh_out_content.starts_with("checks-failed="));
+        (step_summary_content, gh_out_content)
+    }
+
+    #[tokio::test]
+    async fn check_comment_concerns() {
+        let (comment, gh_out) = create_comment("readability-*", "file").await;
+        assert!(&comment.contains(":warning:\nSome files did not pass the configured checks!\n"));
+        let fmt_pattern = Regex::new(r"format-checks-failed=(\d+)\n").unwrap();
+        let tidy_pattern = Regex::new(r"tidy-checks-failed=(\d+)\n").unwrap();
+        for pattern in [fmt_pattern, tidy_pattern] {
+            let number = pattern
+                .captures(&gh_out)
+                .expect("found no number of checks-failed")
+                .get(1)
+                .unwrap()
+                .as_str()
+                .parse::<u64>()
+                .unwrap();
+            assert!(number > 0);
+        }
+    }
+
+    #[tokio::test]
+    async fn check_comment_lgtm() {
+        env::set_var("ACTIONS_STEP_DEBUG", "true");
+        let (comment, gh_out) = create_comment("-*", "").await;
+        assert!(&comment.contains(":heavy_check_mark:\nNo problems need attention."));
+        assert_eq!(
+            &gh_out,
+            "checks-failed=0\nformat-checks-failed=0\ntidy-checks-failed=0\n"
+        );
+    }
 }

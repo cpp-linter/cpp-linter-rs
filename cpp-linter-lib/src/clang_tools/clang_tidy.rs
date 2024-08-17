@@ -5,6 +5,7 @@ use std::{
     env::{consts::OS, current_dir},
     path::PathBuf,
     process::Command,
+    sync::{Arc, Mutex},
 };
 
 // non-std crates
@@ -18,7 +19,7 @@ use crate::{
 };
 
 /// Used to deserialize a JSON compilation database
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct CompilationDatabase {
     /// A list of [`CompilationUnit`]
     units: Vec<CompilationUnit>,
@@ -28,7 +29,7 @@ pub struct CompilationDatabase {
 ///
 /// The only purpose this serves is to normalize relative paths for build systems that
 /// use/need relative paths (ie ninja).
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 struct CompilationUnit {
     /// The directory of the build environment
     directory: String,
@@ -44,6 +45,7 @@ struct CompilationUnit {
 }
 
 /// A structure that represents a single notification parsed from clang-tidy's stdout.
+#[derive(Debug, Clone)]
 pub struct TidyNotification {
     /// The file's path and name (supposedly relative to the repository root folder).
     pub filename: String,
@@ -86,6 +88,7 @@ impl TidyNotification {
 }
 
 /// A struct to hold notification from clang-tidy about a single file
+#[derive(Debug, Clone)]
 pub struct TidyAdvice {
     /// A list of notifications parsed from clang-tidy stdout.
     pub notes: Vec<TidyNotification>,
@@ -98,10 +101,11 @@ pub struct TidyAdvice {
 fn parse_tidy_output(
     tidy_stdout: &[u8],
     database_json: &Option<CompilationDatabase>,
-) -> TidyAdvice {
+) -> Option<TidyAdvice> {
     let note_header = Regex::new(r"^(.+):(\d+):(\d+):\s(\w+):(.*)\[([a-zA-Z\d\-\.]+)\]$").unwrap();
     let mut notification = None;
     let mut result = Vec::new();
+    let cur_dir = current_dir().unwrap();
     for line in String::from_utf8(tidy_stdout.to_vec()).unwrap().lines() {
         if let Some(captured) = note_header.captures(line) {
             if let Some(note) = notification {
@@ -126,22 +130,20 @@ fn parse_tidy_output(
                         // file was not a named unit in the database;
                         // try to normalize path as if relative to working directory.
                         // NOTE: This shouldn't happen with a properly formed JSON database
-                        filename = normalize_path(&PathBuf::from_iter([
-                            &current_dir().unwrap(),
-                            &filename,
-                        ]));
+                        filename = normalize_path(&PathBuf::from_iter([&cur_dir, &filename]));
                     }
                 } else {
                     // still need to normalize the relative path despite missing database info.
                     // let's assume the file is relative to current working directory.
-                    filename =
-                        normalize_path(&PathBuf::from_iter([&current_dir().unwrap(), &filename]));
+                    filename = normalize_path(&PathBuf::from_iter([&cur_dir, &filename]));
                 }
             }
             assert!(filename.is_absolute());
-            if filename.is_absolute() {
+            if filename.is_absolute() && filename.starts_with(&cur_dir) {
+                // if this filename can't be made into a relative path, then it is
+                // likely not a member of the project's sources (ie /usr/include/stdio.h)
                 filename = filename
-                    .strip_prefix(current_dir().unwrap())
+                    .strip_prefix(&cur_dir)
                     .expect("cannot determine filename by relative path.")
                     .to_path_buf();
             }
@@ -164,19 +166,42 @@ fn parse_tidy_output(
     if let Some(note) = notification {
         result.push(note);
     }
-    TidyAdvice { notes: result }
+    if result.is_empty() {
+        None
+    } else {
+        Some(TidyAdvice { notes: result })
+    }
+}
+
+/// Get a total count of clang-tidy advice from the given list of [FileObj]s.
+pub fn tally_tidy_advice(files: &[Arc<Mutex<FileObj>>]) -> u64 {
+    let mut total = 0;
+    for file in files {
+        let file = file.lock().unwrap();
+        if let Some(advice) = &file.tidy_advice {
+            for tidy_note in &advice.notes {
+                let file_path = PathBuf::from(&tidy_note.filename);
+                if file_path == file.name {
+                    total += 1;
+                }
+            }
+        }
+    }
+    total
 }
 
 /// Run clang-tidy, then parse and return it's output.
 pub fn run_clang_tidy(
     cmd: &mut Command,
-    file: &FileObj,
+    file: &mut Arc<Mutex<FileObj>>,
     checks: &str,
     lines_changed_only: &LinesChangedOnly,
     database: &Option<PathBuf>,
-    extra_args: &Option<Vec<&str>>,
+    extra_args: &Option<Vec<String>>,
     database_json: &Option<CompilationDatabase>,
-) -> TidyAdvice {
+) -> Vec<(log::Level, std::string::String)> {
+    let mut logs = vec![];
+    let mut file = file.lock().unwrap();
     if !checks.is_empty() {
         cmd.args(["-checks", checks]);
     }
@@ -204,35 +229,59 @@ pub fn run_clang_tidy(
         cmd.args(["--line-filter", filter.as_str()]);
     }
     cmd.arg(file.name.to_string_lossy().as_ref());
-    log::info!(
-        "Running \"{} {}\"",
-        cmd.get_program().to_string_lossy(),
-        cmd.get_args()
-            .map(|x| x.to_str().unwrap())
-            .collect::<Vec<&str>>()
-            .join(" ")
-    );
+    logs.push((
+        log::Level::Info,
+        format!(
+            "Running \"{} {}\"",
+            cmd.get_program().to_string_lossy(),
+            cmd.get_args()
+                .map(|x| x.to_str().unwrap())
+                .collect::<Vec<&str>>()
+                .join(" ")
+        ),
+    ));
     let output = cmd.output().unwrap();
-    log::debug!(
-        "Output from clang-tidy:\n{}",
-        String::from_utf8(output.stdout.to_vec()).unwrap()
-    );
+    logs.push((
+        log::Level::Debug,
+        format!(
+            "Output from clang-tidy:\n{}",
+            String::from_utf8(output.stdout.to_vec()).unwrap()
+        ),
+    ));
     if !output.stderr.is_empty() {
-        log::debug!(
-            "clang-tidy made the following summary:\n{}",
-            String::from_utf8(output.stderr).unwrap()
-        );
+        logs.push((
+            log::Level::Debug,
+            format!(
+                "clang-tidy made the following summary:\n{}",
+                String::from_utf8(output.stderr).unwrap()
+            ),
+        ));
     }
-    parse_tidy_output(&output.stdout, database_json)
+    file.tidy_advice = parse_tidy_output(&output.stdout, database_json);
+    logs
 }
 
 #[cfg(test)]
 mod test {
+    use std::{
+        env,
+        path::PathBuf,
+        process::Command,
+        sync::{Arc, Mutex},
+    };
+
+    use regex::Regex;
+
+    use crate::{clang_tools::get_clang_tool_exe, cli::LinesChangedOnly, common_fs::FileObj};
+
+    use super::run_clang_tidy;
+
+    // ***************** test for regex parsing of clang-tidy stdout
+
     #[test]
     fn test_capture() {
         let src = "tests/demo/demo.hpp:11:11: warning: use a trailing return type for this function [modernize-use-trailing-return-type]";
-        let pat =
-            regex::Regex::new(r"^(.+):(\d+):(\d+):\s(\w+):(.*)\[([a-zA-Z\d\-\.]+)\]$").unwrap();
+        let pat = Regex::new(r"^(.+):(\d+):(\d+):\s(\w+):(.*)\[([a-zA-Z\d\-\.]+)\]$").unwrap();
         let cap = pat.captures(src).unwrap();
         assert_eq!(
             cap.get(0).unwrap().as_str(),
@@ -247,5 +296,42 @@ mod test {
             )
             .as_str()
         )
+    }
+
+    #[test]
+    fn use_extra_args() {
+        let exe_path = get_clang_tool_exe(
+            "clang-tidy",
+            env::var("CLANG_VERSION").unwrap_or("".to_string()).as_str(),
+        )
+        .unwrap();
+        let mut cmd = Command::new(exe_path);
+        let file = FileObj::new(PathBuf::from("tests/demo/demo.cpp"));
+        let mut arc_ref = Arc::new(Mutex::new(file));
+        let extra_args = vec!["-std=c++17".to_string(), "-Wall".to_string()];
+        run_clang_tidy(
+            &mut cmd,
+            &mut arc_ref,
+            "",                     // use .clang-tidy config file
+            &LinesChangedOnly::Off, // check all lines
+            &None,                  // no database path
+            &Some(extra_args),      // <---- the reason for this test
+            &None,                  // no deserialized database
+        );
+        // since `cmd` was passed as a mutable reference, we can inspect the args that were added
+        let locked_file = arc_ref.lock().unwrap();
+        let mut args = cmd
+            .get_args()
+            .map(|arg| arg.to_str().unwrap())
+            .collect::<Vec<&str>>();
+        assert_eq!(locked_file.name.to_string_lossy(), args.pop().unwrap());
+        assert_eq!(
+            vec!["--extra-arg", "\"-std=c++17\"", "--extra-arg", "\"-Wall\""],
+            args
+        );
+        assert!(!locked_file
+            .tidy_advice
+            .as_ref()
+            .is_some_and(|advice| advice.notes.is_empty()));
     }
 }

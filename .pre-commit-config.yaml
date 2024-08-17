@@ -21,20 +21,3 @@ repos:
         args: [ --fix ]
       # Run the python formatter.
       - id: ruff-format
-  - repo: local
-    # these hooks require a tools managed by the rustup installer
-    hooks:
-      # Run the rust formatter.
-      # Run the rust linter.
-      - id: cargo-clippy
-        name: cargo clippy
-        description: Lint all rust files with the clippy tool
-        entry: cargo clippy --allow-staged --allow-dirty --fix
-        language: rust
-        pass_filenames: false
-      - id: cargo-fmt
-        name: cargo fmt
-        description: Format all rust files with the rustfmt tool
-        entry: cargo fmt
-        language: rust
-        pass_filenames: false

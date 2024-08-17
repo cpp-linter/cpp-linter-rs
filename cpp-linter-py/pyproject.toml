@@ -41,3 +41,8 @@ tracker = "https://github.com/cpp-linter/cpp-linter/issues"
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
+exclude = [
+    {path = "**/tests/**", format="sdist"},
+    {path = "**/examples/**", format="sdist"},
+    {path = "**/docs/**", format="sdist"},
+]

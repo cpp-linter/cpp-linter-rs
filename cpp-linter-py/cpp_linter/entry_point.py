@@ -7,8 +7,8 @@ command line arguments is done differently in Python or Rust.
 
 - In python, the ``sys.argv`` list is passed from the ``cpp_linter.entry_point.main()``
   function to rust via the ``cpp_linter.run.main()`` binding.
-- In rust, the ``std::env::args`` is passed to ``run::main()`` in the binary driver
-  source `bin.rs`.
+- In rust, the ``std::env::args`` is passed to ``run::run_main()`` in the binary driver
+  source `main.rs`.
 
 This is done because of the way the python entry point is invoked. If ``std::env::args``
 is used instead of python's ``sys.argv``, then the list of strings includes the entry

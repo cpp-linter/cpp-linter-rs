@@ -1,13 +1,11 @@
 //! This module holds the Command Line Interface design.
 
-use std::fs;
-
 // non-std crates
-use clap::builder::FalseyValueParser;
-use clap::{Arg, ArgAction, ArgMatches, Command};
+use clap::builder::{ArgPredicate, FalseyValueParser};
+use clap::{Arg, ArgAction, ArgGroup, ArgMatches, Command};
 
 /// An enum to describe `--lines-changed-only` CLI option's behavior.
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone, Debug)]
 pub enum LinesChangedOnly {
     /// All lines are scanned
     Off,
@@ -20,6 +18,10 @@ pub enum LinesChangedOnly {
 /// Builds and returns the Command Line Interface's argument parsing object.
 pub fn get_arg_parser() -> Command {
     Command::new("cpp-linter")
+        .subcommand(
+            Command::new("version")
+                .about("Display the cpp-linter version and exit.")
+        )
         .arg(
             Arg::new("verbosity")
                 .long("verbosity")
@@ -38,6 +40,7 @@ thread comments or file annotations.
             Arg::new("database")
                 .long("database")
                 .short('p')
+                .help_heading("clang-tidy options")
                 .long_help(
             "The path that is used to read a compile command database.
 For example, it can be a CMake build directory in which a file named
@@ -52,6 +55,7 @@ example of setting up Clang Tooling on a source tree.",
                 .short('s')
                 .long("style")
                 .default_value("llvm")
+                .help_heading("clang-format options")
                 .long_help(
                     "The style rules to use.
 
@@ -69,6 +73,7 @@ example of setting up Clang Tooling on a source tree.",
                 .default_value(
                     "boost-*,bugprone-*,performance-*,readability-*,portability-*,modernize-*,clang-analyzer-*,cppcoreguidelines-*",
                 )
+                .help_heading("clang-tidy options")
                 .long_help(
                     "A comma-separated list of globs with optional ``-`` prefix.
 Globs are processed in order of appearance in the list.
@@ -90,6 +95,9 @@ See also clang-tidy docs for more info.
             Arg::new("version")
                 .short('V')
                 .long("version")
+                .default_missing_value("NO-VERSION")
+                .num_args(0..=1)
+                .require_equals(true)
                 .default_value("")
                 .long_help(
                     "The desired version of the clang tools to use. Accepted options are
@@ -109,6 +117,7 @@ strings which can be 8, 9, 10, 11, 12, 13, 14, 15, 16, 17.
                 .long("extensions")
                 .value_delimiter(',')
                 .default_value("c,h,C,H,cpp,hpp,cc,hh,c++,h++,cxx,hxx")
+                .help_heading("source options")
                 .long_help("A comma-separated list of file extensions to analyze.
 "),
         )
@@ -117,6 +126,7 @@ strings which can be 8, 9, 10, 11, 12, 13, 14, 15, 16, 17.
                 .short('r')
                 .long("repo-root")
                 .default_value(".")
+                .help_heading("source options")
                 .long_help(
                     "The relative path to the repository root directory. This path is
 relative to the runner's ``GITHUB_WORKSPACE`` environment variable (or
@@ -130,6 +140,7 @@ the current working directory if not using a CI runner).
                 .long("ignore")
                 .value_delimiter('|')
                 .default_value(".github|target")
+                .help_heading("source options")
                 .long_help(
                     "Set this option with path(s) to ignore (or not ignore).
 
@@ -148,11 +159,34 @@ the current working directory if not using a CI runner).
                 ),
         )
         .arg(
+            Arg::new("ignore-tidy")
+                .short('D')
+                .long("ignore-tidy")
+                .value_delimiter('|')
+                .default_value("")
+                .help_heading("clang-tidy options")
+                .long_help(
+                    "Similar to `--ignore` but applied exclusively to files analyzed by clang-tidy.",
+                ),
+        )
+        .arg(
+            Arg::new("ignore-format")
+                .short('M')
+                .long("ignore-format")
+                .value_delimiter('|')
+                .default_value("")
+                .help_heading("clang-format options")
+                .long_help(
+                    "Similar to `--ignore` but applied exclusively to files analyzed by clang-format.",
+                ),
+        )
+        .arg(
             Arg::new("lines-changed-only")
                 .short('l')
                 .long("lines-changed-only")
                 .value_parser(["true", "false", "diff"])
                 .default_value("true")
+                .help_heading("source options")
                 .long_help(
                     "This controls what part of the files are analyzed.
 The following values are accepted:
@@ -168,8 +202,10 @@ The following values are accepted:
             Arg::new("files-changed-only")
                 .short('f')
                 .long("files-changed-only")
+                .default_value_if("lines-changed-only", ArgPredicate::Equals("true".into()), "true")
                 .default_value("false")
                 .value_parser(FalseyValueParser::new())
+                .help_heading("source options")
                 .long_help(
                     "Set this option to false to analyze any source files in the repo.
 This is automatically enabled if
@@ -190,6 +226,7 @@ This is automatically enabled if
                 .long("extra-arg")
                 .short('x')
                 .action(ArgAction::Append)
+                .help_heading("clang-tidy options")
                 .long_help(
                     "A string of extra arguments passed to clang-tidy for use as
 compiler arguments. This can be specified more than once for each
@@ -207,6 +244,7 @@ avoid using spaces between name and value (use ``=`` instead):
                 .short('g')
                 .value_parser(["true", "false", "updated"])
                 .default_value("false")
+                .help_heading("feedback options")
                 .long_help(
                     "Set this option to true to enable the use of thread comments as feedback.
 Set this to ``update`` to update an existing comment if one exists;
@@ -233,6 +271,7 @@ the value 'true' will always delete an old comment and post a new one if necessa
                 .short('t')
                 .value_parser(FalseyValueParser::new())
                 .default_value("true")
+                .help_heading("feedback options")
                 .long_help(
                     "Set this option to true or false to enable or disable the use of a
 thread comment that basically says 'Looks Good To Me' (when all checks pass).
@@ -248,6 +287,7 @@ thread comment that basically says 'Looks Good To Me' (when all checks pass).
                 .short('w')
                 .value_parser(FalseyValueParser::new())
                 .default_value("false")
+                .help_heading("feedback options")
                 .long_help(
                     "Set this option to true or false to enable or disable the use of
 a workflow step summary when the run has concluded.
@@ -260,79 +300,23 @@ a workflow step summary when the run has concluded.
                 .short('a')
                 .value_parser(FalseyValueParser::new())
                 .default_value("true")
+                .help_heading("feedback options")
                 .long_help(
                     "Set this option to false to disable the use of
 file annotations as feedback.
 ",
                 ),
-        )
-}
-
-/// This will parse the list of paths specified from the CLI using the `--ignore`
-/// argument.
-///
-/// It returns 2 lists (in order):
-///
-/// - `ignored` paths
-/// - `not_ignored` paths
-///
-/// This function will also read a .gitmodules file located in the working directory.
-/// The named submodules' paths will be automatically added to the ignored list,
-/// unless the submodule's path is already specified in the not_ignored list.
-pub fn parse_ignore(ignore: &[&str]) -> (Vec<String>, Vec<String>) {
-    let mut ignored = vec![];
-    let mut not_ignored = vec![];
-    for pattern in ignore {
-        let as_posix = pattern.replace('\\', "/");
-        let mut pat = as_posix.as_str();
-        let is_ignored = !pat.starts_with('!');
-        if !is_ignored {
-            pat = &pat[1..];
-        }
-        if pat.starts_with("./") {
-            pat = &pat[2..];
-        }
-        let is_hidden = pat.starts_with('.');
-        if is_hidden || is_ignored {
-            ignored.push(format!("./{pat}"));
-        } else {
-            not_ignored.push(format!("./{pat}"));
-        }
-    }
-
-    if let Ok(read_buf) = fs::read_to_string(".gitmodules") {
-        for line in read_buf.split('\n') {
-            if line.trim_start().starts_with("path") {
-                assert!(line.find('=').unwrap() > 0);
-                let submodule = String::from("./") + line.split('=').last().unwrap().trim();
-                log::debug!("Found submodule: {submodule}");
-                let mut is_ignored = true;
-                for pat in &not_ignored {
-                    if pat == &submodule {
-                        is_ignored = false;
-                        break;
-                    }
-                }
-                if is_ignored && !ignored.contains(&submodule) {
-                    ignored.push(submodule);
-                }
-            }
-        }
-    }
-
-    if !ignored.is_empty() {
-        log::info!("Ignored:");
-        for pattern in &ignored {
-            log::info!("  {pattern}");
-        }
-    }
-    if !not_ignored.is_empty() {
-        log::info!("Not Ignored:");
-        for pattern in &not_ignored {
-            log::info!("  {pattern}");
-        }
-    }
-    (ignored, not_ignored)
+            )
+            .groups([
+                ArgGroup::new("Clang-tidy options")
+                    .args(["tidy-checks", "database", "extra-arg", "ignore-tidy"]),
+                ArgGroup::new("Clang-format options").args(["style", "ignore-format"]),
+                ArgGroup::new("General options").args(["verbosity", "version"]),
+                ArgGroup::new("Source options").args(["extensions", "repo-root", "ignore", "lines-changed-only", "files-changed-only"]),
+                ArgGroup::new("Feedback options").args([
+                    "thread-comments", "no-lgtm", "step-summary", "file-annotations"
+                ]),
+            ])
 }
 
 /// Converts the parsed value of the `--extra-arg` option into an optional vector of strings.
@@ -354,25 +338,25 @@ pub fn parse_ignore(ignore: &[&str]) -> (Vec<String>, Vec<String>) {
 /// ```
 /// The cpp-linter-action (for Github CI workflows) can only use 1 `extra-arg` input option, so
 /// the value will be split at spaces.
-pub fn convert_extra_arg_val(args: &ArgMatches) -> Option<Vec<&str>> {
-    let raw_val = if let Ok(extra_args) = args.try_get_many::<String>("extra-arg") {
-        extra_args.map(|extras| extras.map(|val| val.as_str()).collect::<Vec<_>>())
-    } else {
-        None
-    };
-    if let Some(val) = raw_val {
+pub fn convert_extra_arg_val(args: &ArgMatches) -> Option<Vec<String>> {
+    let raw_val = args
+        .try_get_many::<String>("extra-arg")
+        .expect("parser failed in set a default for `--extra-arf`");
+    if let Some(mut val) = raw_val {
         if val.len() == 1 {
             // specified once; split and return result
-            Some(
-                val[0]
+            return Some(
+                val.next()
+                    .unwrap()
                     .trim_matches('\'')
                     .trim_matches('"')
                     .split(' ')
+                    .map(|i| i.to_string())
                     .collect(),
-            )
+            );
         } else {
             // specified multiple times; just return
-            Some(val)
+            Some(val.map(|i| i.to_string()).collect())
         }
     } else {
         // no value specified; just return
