@@ -56,10 +56,12 @@ impl Default for GithubApiClient {
 
 impl GithubApiClient {
     pub fn new() -> Self {
-        GithubApiClient {
-            client: Client::new(),
-            pull_request: {
-                if let Ok(event_payload_path) = env::var("GITHUB_EVENT_PATH") {
+        let event_name = env::var("GITHUB_EVENT_NAME").unwrap_or(String::from("unknown"));
+        let pull_request = {
+            match event_name.as_str() {
+                "pull_request" => {
+                    let event_payload_path = env::var("GITHUB_EVENT_PATH")
+                        .expect("GITHUB_EVENT_NAME is set to 'pull_request', but GITHUB_EVENT_PATH is not set");
                     let file_buf = &mut String::new();
                     OpenOptions::new()
                         .read(true)
@@ -72,21 +74,23 @@ impl GithubApiClient {
                     )
                     .unwrap();
                     json["number"].as_i64()
-                } else {
-                    None
                 }
-            },
-            event_name: env::var("GITHUB_EVENT_NAME").unwrap_or(String::from("default")),
+                _ => None,
+            }
+        };
+
+        GithubApiClient {
+            client: Client::new(),
+            pull_request,
+            event_name,
             api_url: env::var("GITHUB_API_URL").unwrap_or(String::from("https://api.github.com")),
-            repo: if let Ok(val) = env::var("GITHUB_REPOSITORY") {
-                Some(val)
-            } else {
-                None
+            repo: match env::var("GITHUB_REPOSITORY") {
+                Ok(val) => Some(val),
+                Err(_) => None,
             },
-            sha: if let Ok(val) = env::var("GITHUB_SHA") {
-                Some(val)
-            } else {
-                None
+            sha: match env::var("GITHUB_SHA") {
+                Ok(val) => Some(val),
+                Err(_) => None,
             },
             debug_enabled: match env::var("ACTIONS_STEP_DEBUG") {
                 Ok(val) => val == "true",
