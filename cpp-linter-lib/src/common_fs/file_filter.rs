@@ -30,10 +30,10 @@ impl FileFilter {
         let mut not_ignored = vec![];
         for pattern in ignore {
             let as_posix = pattern.replace('\\', "/");
-            let mut pat = as_posix.as_str();
+            let mut pat = as_posix.as_str().trim();
             let is_ignored = !pat.starts_with('!');
             if !is_ignored {
-                pat = &pat[1..];
+                pat = pat[1..].trim_start();
             }
             if pat.starts_with("./") {
                 pat = &pat[2..];

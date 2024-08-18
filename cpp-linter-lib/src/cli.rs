@@ -30,10 +30,8 @@ pub fn get_arg_parser() -> Command {
                 .value_parser(["debug", "info"])
                 .long_help(
                     "This controls the action's verbosity in the workflow's logs.
-Supported options are defined by the `logging-level <logging-levels>`_.
 This option does not affect the verbosity of resulting
-thread comments or file annotations.
-",
+thread comments or file annotations.",
                 ),
         )
         .arg(
@@ -44,11 +42,11 @@ thread comments or file annotations.
                 .long_help(
             "The path that is used to read a compile command database.
 For example, it can be a CMake build directory in which a file named
-compile_commands.json exists (set ``CMAKE_EXPORT_COMPILE_COMMANDS`` to ``ON``).
+compile_commands.json exists (set `CMAKE_EXPORT_COMPILE_COMMANDS` to `ON`).
 When no build path is specified, a search for compile_commands.json will be
-attempted through all parent paths of the first input file. See
-https://clang.llvm.org/docs/HowToSetupToolingForLLVM.html for an
-example of setting up Clang Tooling on a source tree.",
+attempted through all parent paths of the first input file. See [LLVM docs about
+setup tooling](https://clang.llvm.org/docs/HowToSetupToolingForLLVM.html)
+for an example of setting up Clang Tooling on a source tree.",
         ))
         .arg(
             Arg::new("style")
@@ -59,11 +57,10 @@ example of setting up Clang Tooling on a source tree.",
                 .long_help(
                     "The style rules to use.
 
-- Set this to ``file`` to have clang-format use the closest relative
+- Set this to `file` to have clang-format use the closest relative
   .clang-format file.
-- Set this to a blank string (``''``) to disable using clang-format
-  entirely.
-",
+- Set this to a blank string (`''`) to disable using clang-format
+  entirely.",
                 ),
         )
         .arg(
@@ -75,20 +72,19 @@ example of setting up Clang Tooling on a source tree.",
                 )
                 .help_heading("clang-tidy options")
                 .long_help(
-                    "A comma-separated list of globs with optional ``-`` prefix.
+                    "A comma-separated list of globs with optional `-` prefix.
 Globs are processed in order of appearance in the list.
-Globs without ``-`` prefix add checks with matching names to the set,
-globs with the ``-`` prefix remove checks with matching names from the set of
+Globs without `-` prefix add checks with matching names to the set,
+globs with the `-` prefix remove checks with matching names from the set of
 enabled checks. This option's value is appended to the value of the 'Checks'
 option in a .clang-tidy file (if any).
 
 - It is possible to disable clang-tidy entirely by setting this option to
-  ``'-*'``.
+  `'-*'`.
 - It is also possible to rely solely on a .clang-tidy config file by
-  specifying this option as a blank string (``''``).
+  specifying this option as a blank string (`''`).
 
-See also clang-tidy docs for more info.
-",
+See also clang-tidy docs for more info.",
                 ),
         )
         .arg(
@@ -103,12 +99,11 @@ See also clang-tidy docs for more info.
                     "The desired version of the clang tools to use. Accepted options are
 strings which can be 8, 9, 10, 11, 12, 13, 14, 15, 16, 17.
 
-- Set this option to a blank string (``''``) to use the
+- Set this option to a blank string (`''`) to use the
   platform's default installed version.
 - This value can also be a path to where the clang tools are
   installed (if using a custom install location). All paths specified
-  here are converted to absolute.
-",
+  here are converted to absolute.",
                 ),
         )
         .arg(
@@ -118,8 +113,7 @@ strings which can be 8, 9, 10, 11, 12, 13, 14, 15, 16, 17.
                 .value_delimiter(',')
                 .default_value("c,h,C,H,cpp,hpp,cc,hh,c++,h++,cxx,hxx")
                 .help_heading("source options")
-                .long_help("A comma-separated list of file extensions to analyze.
-"),
+                .long_help("A comma-separated list of file extensions to analyze."),
         )
         .arg(
             Arg::new("repo-root")
@@ -129,9 +123,8 @@ strings which can be 8, 9, 10, 11, 12, 13, 14, 15, 16, 17.
                 .help_heading("source options")
                 .long_help(
                     "The relative path to the repository root directory. This path is
-relative to the runner's ``GITHUB_WORKSPACE`` environment variable (or
-the current working directory if not using a CI runner).
-",
+relative to the runner's `GITHUB_WORKSPACE` environment variable (or
+the current working directory if not using a CI runner).",
                 ),
         )
         .arg(
@@ -145,17 +138,16 @@ the current working directory if not using a CI runner).
                     "Set this option with path(s) to ignore (or not ignore).
 
 - In the case of multiple paths, you can use `|` to separate each path.
-- There is no need to use ``./`` for each entry; a blank string (``''``)
+- There is no need to use `./` for each entry; a blank string (`''`)
   represents the repo-root path.
 - This can also have files, but the file's path (relative to
-  the :std:option:`--repo-root`) has to be specified with the filename.
+  the [`--repo-root`](#-r---repo-root)) has to be specified with the filename.
 - Submodules are automatically ignored. Hidden directories (beginning
-  with a ``.``) are also ignored automatically.
-- Prefix a path with ``!`` to explicitly not ignore it. This can be
+  with a `.`) are also ignored automatically.
+- Prefix a path with `!` to explicitly not ignore it. This can be
   applied to a submodule's path (if desired) but not hidden directories.
-- Glob patterns are not supported here. All asterisk characters (``*``)
-  are literal.
-",
+- Glob patterns are not supported here. All asterisk characters (`*`)
+  are literal.",
                 ),
         )
         .arg(
@@ -166,7 +158,8 @@ the current working directory if not using a CI runner).
                 .default_value("")
                 .help_heading("clang-tidy options")
                 .long_help(
-                    "Similar to `--ignore` but applied exclusively to files analyzed by clang-tidy.",
+                    "Similar to [`--ignore`](#-i---ignore) but applied
+exclusively to files analyzed by clang-tidy.",
                 ),
         )
         .arg(
@@ -177,7 +170,8 @@ the current working directory if not using a CI runner).
                 .default_value("")
                 .help_heading("clang-format options")
                 .long_help(
-                    "Similar to `--ignore` but applied exclusively to files analyzed by clang-format.",
+                    "Similar to [`--ignore`](#-i---ignore) but applied
+exclusively to files analyzed by clang-format.",
                 ),
         )
         .arg(
@@ -191,11 +185,10 @@ the current working directory if not using a CI runner).
                     "This controls what part of the files are analyzed.
 The following values are accepted:
 
-- ``false``: All lines in a file are analyzed.
-- ``true``: Only lines in the diff that contain additions are analyzed.
-- ``diff``: All lines in the diff are analyzed (including unchanged
-  lines but not subtractions).
-",
+- `false`: All lines in a file are analyzed.
+- `true`: Only lines in the diff that contain additions are analyzed.
+- `diff`: All lines in the diff are analyzed (including unchanged
+  lines but not subtractions).",
                 ),
         )
         .arg(
@@ -209,16 +202,15 @@ The following values are accepted:
                 .long_help(
                     "Set this option to false to analyze any source files in the repo.
 This is automatically enabled if
-:std:option:`--lines-changed-only` is enabled.
+[`--lines-changed-only`](#-l---lines-changed-only) is enabled.
 
-.. note::
-    The ``GITHUB_TOKEN`` should be supplied when running on a
-    private repository with this option enabled, otherwise the runner
-    does not not have the privilege to list the changed files for an event.
-
-    See `Authenticating with the GITHUB_TOKEN
-    <https://docs.github.com/en/actions/reference/authentication-in-a-workflow>`_
-",
+> [!note]
+> The `GITHUB_TOKEN` should be supplied when running on a
+> private repository with this option enabled, otherwise the runner
+> does not not have the privilege to list the changed files for an event.
+>
+> See [Authenticating with the `GITHUB_TOKEN`](
+> https://docs.github.com/en/actions/reference/authentication-in-a-workflow).",
                 ),
         )
         .arg(
@@ -231,11 +223,11 @@ This is automatically enabled if
                     "A string of extra arguments passed to clang-tidy for use as
 compiler arguments. This can be specified more than once for each
 additional argument. Recommend using quotes around the value and
-avoid using spaces between name and value (use ``=`` instead):
+avoid using spaces between name and value (use `=` instead):
 
-.. code-block:: shell
-
-    cpp-linter --extra-arg=\"-std=c++17\" --extra-arg=\"-Wall\"",
+```shell
+cpp-linter --extra-arg=\"-std=c++17\" --extra-arg=\"-Wall\"
+```",
                 ),
         )
         .arg(
@@ -247,22 +239,16 @@ avoid using spaces between name and value (use ``=`` instead):
                 .help_heading("feedback options")
                 .long_help(
                     "Set this option to true to enable the use of thread comments as feedback.
-Set this to ``update`` to update an existing comment if one exists;
+Set this to `update` to update an existing comment if one exists;
 the value 'true' will always delete an old comment and post a new one if necessary.
 
-.. note::
-    To use thread comments, the ``GITHUB_TOKEN`` (provided by
-    Github to each repository) must be declared as an environment
-    variable.
-
-    See `Authenticating with the GITHUB_TOKEN
-    <https://docs.github.com/en/actions/reference/authentication-in-a-workflow>`_
-
-.. hint::
-    If run on a private repository, then this feature is
-    disabled because the GitHub REST API behaves
-    differently for thread comments on a private repository.
-",
+> [!note]
+> To use thread comments, the `GITHUB_TOKEN` (provided by
+> Github to each repository) must be declared as an environment
+> variable.
+>
+> See [Authenticating with the `GITHUB_TOKEN`](
+> https://docs.github.com/en/actions/reference/authentication-in-a-workflow).",
                 ),
         )
         .arg(
@@ -276,9 +262,9 @@ the value 'true' will always delete an old comment and post a new one if necessa
                     "Set this option to true or false to enable or disable the use of a
 thread comment that basically says 'Looks Good To Me' (when all checks pass).
 
-.. seealso::
-    The :std:option:`--thread-comments` option also notes further implications.
-",
+> [!important]
+> The [`--thread-comments`](#-g---thread-comments)
+> option also notes further implications.",
                 ),
         )
         .arg(
@@ -290,8 +276,7 @@ thread comment that basically says 'Looks Good To Me' (when all checks pass).
                 .help_heading("feedback options")
                 .long_help(
                     "Set this option to true or false to enable or disable the use of
-a workflow step summary when the run has concluded.
-",
+a workflow step summary when the run has concluded.",
                 ),
         )
         .arg(
@@ -303,8 +288,7 @@ a workflow step summary when the run has concluded.
                 .help_heading("feedback options")
                 .long_help(
                     "Set this option to false to disable the use of
-file annotations as feedback.
-",
+file annotations as feedback.",
                 ),
             )
             .groups([

@@ -35,7 +35,7 @@ For usage in a CI workflow, see
 [the cpp-linter/cpp-linter-action repository](https://github.com/cpp-linter/cpp-linter-action).
 
 For the description of supported Command Line Interface options, see
-[the CLI documentation](https://cpp-linter.github.io/cpp_linter_rs/cli_args.html).
+[the CLI documentation](https://cpp-linter.github.io/cpp_linter_rs/cli.html).
 
 ## Have question or feedback?
 

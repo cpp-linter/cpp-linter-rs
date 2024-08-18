@@ -1,0 +1,36 @@
+[book]
+authors = ["Brendan Doherty"]
+language = "en"
+multilingual = false
+src = "src"
+title = "cpp-linter"
+description = "Some documentation about the cpp_linter_rs project"
+
+[build]
+create-missing = false
+build-dir = "book/html"
+
+[output.html]
+theme = "theme"
+default-theme = "ayu"
+preferred-dark-theme = "ayu"
+git-repository-url = "https://github.com/cpp-linter/cpp_linter_rs"
+additional-css = ["theme/pagetoc.css"]
+additional-js  = ["theme/pagetoc.js"]
+
+[preprocessor.alerts]
+after = ["links"]
+
+[preprocessor.cli-gen]
+command = "cargo run --bin cli-gen"
+before = ["links"]
+groups-order = [
+    "General options",
+    "Source options",
+    "Clang-format options",
+    "Clang-tidy options",
+    "Feedback options",
+]
+
+# [output.markdown]
+# for debugging the cli-gen preprocessor (src/main.rs)
