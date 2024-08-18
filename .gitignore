@@ -193,6 +193,8 @@ debug/
 # ignore vscode stuff
 .vscode/
 
+# mdbook builds
+book
 
 # ignore generated files
 .cpp-linter_cache/

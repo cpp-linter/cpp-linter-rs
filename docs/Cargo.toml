@@ -1,0 +1,18 @@
+
+[package]
+name = "cli-gen"
+version.workspace = true
+authors.workspace = true
+description.workspace = true
+documentation.workspace = true
+
+[dependencies]
+cpp-linter-lib = { path = "../cpp-linter-lib", version = "*" }
+clap = "4.5.16"
+mdbook = "0.4.40"
+semver = "1.0.23"
+serde_json = "1.0.125"
+
+[[bin]]
+name = "cli-gen"
+path = "src/main.rs"

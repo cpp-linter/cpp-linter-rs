@@ -1,4 +1,4 @@
-name: Binary executable builds
+name: Binary builds
 
 permissions:
   contents: read

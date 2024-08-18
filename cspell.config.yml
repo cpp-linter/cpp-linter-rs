@@ -10,9 +10,12 @@ words:
   - gitmodules
   - iomanip
   - libgit
+  - markdownlint
+  - mdbook
   - nonminimal
   - peekable
   - posix
+  - preprocess
   - pybind
   - pyfunction
   - pymodule

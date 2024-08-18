@@ -1,4 +1,4 @@
-name: Python packaging
+name: Python builds
 
 on:
   push:
