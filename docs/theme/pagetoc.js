@@ -8,6 +8,7 @@ const listenActive = () => {
       [...elems].forEach((el) => el.classList.remove("active"));
       el.classList.add("active");
       // Prevent scroll updates for a short period
+      // eslint-disable-next-line no-async-operation
       scrollTimeout = setTimeout(() => {
         scrollTimeout = null;
       }, 100); // Adjust timing as needed
@@ -45,9 +46,7 @@ const updateFunction = () => {
   const scrolledY = window.scrollY;
 
   // Find the last header that is above the current scroll position
-  let headerOffsets = headers.filter((el) => {
-    return scrolledY >= el.offsetTop;
-  });
+  let headerOffsets = headers.filter((el) => scrolledY >= el.offsetTop);
   const lastHeader = headerOffsets.reverse().shift();
 
   const pagetocLinks = [...document.querySelector(".pagetoc").children];
@@ -61,9 +60,8 @@ const updateFunction = () => {
   }
 };
 
-window.addEventListener("load", () => {
+const onLoad = () => {
   const pagetoc = getPagetoc();
-  console.log(pagetoc);
   var headers = [...document.getElementsByClassName("header")];
   headers.shift();
   headers.forEach((header) => {
@@ -77,4 +75,6 @@ window.addEventListener("load", () => {
   updateFunction();
   listenActive();
   window.addEventListener("scroll", updateFunction);
-});
+};
+
+window.addEventListener("load", onLoad);
