@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Introduction - cpp-linter</title>
+        <title>Command Line Interface - cpp-linter</title>
 
 
         <!-- Custom HTML head -->
@@ -88,7 +88,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html" class="active"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="cli.html"><strong aria-hidden="true">2.</strong> Command Line Interface</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="cli.html" class="active"><strong aria-hidden="true">2.</strong> Command Line Interface</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle">
                 <div class="sidebar-resize-indicator"></div>
@@ -243,104 +243,172 @@
 }
 
 </style>
-<!-- markdownlint-disable MD041 -->
-<p><a href="https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/python-packaging.yml"><img src="https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/python-packaging.yml/badge.svg" alt="Python packaging" /></a>
-<a href="https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/binary-builds.yml"><img src="https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/binary-builds.yml/badge.svg" alt="Binary executable builds" /></a>
-<a href="https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/run-dev-tests.yml"><img src="https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/run-dev-tests.yml/badge.svg" alt="Test CI" /></a>
-<a href="https://cpp-linter.github.io/cpp_linter_rs"><img src="https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/build-docs.yml/badge.svg" alt="Docs" /></a>
-<a href="https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/pre-commit-hooks.yml"><img src="https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/pre-commit-hooks.yml/badge.svg" alt="Pre-commit-ci" /></a></p>
-<h1 id="cc-linting-package"><a class="header" href="#cc-linting-package">C/C++ Linting Package</a></h1>
-<p>A Python and Rust package for linting C/C++ code with clang-tidy and/or clang-format to collect feedback provided in the form of thread comments, step summary, or file annotations.</p>
-<div class="mdbook-alerts mdbook-alerts-caution">
+<h1 id="command-line-interface"><a class="header" href="#command-line-interface">Command Line Interface</a></h1>
+<!-- markdownlint-disable MD033 MD028 -->
+<h2 id="commands"><a class="header" href="#commands">Commands</a></h2>
+<h3 id="version"><a class="header" href="#version"><code>version</code></a></h3>
+<p>Display the cpp-linter version and exit.</p>
+<h2 id="general-options"><a class="header" href="#general-options">General options</a></h2>
+<h3 id="-v---verbosity"><a class="header" href="#-v---verbosity"><code>-v, --verbosity</code></a></h3>
+<dt>Default</dt><dd><code>"info"</code></dd>
+<p>This controls the action's verbosity in the workflow's logs.
+This option does not affect the verbosity of resulting
+thread comments or file annotations.</p>
+<h3 id="-v---version"><a class="header" href="#-v---version"><code>-V, --version</code></a></h3>
+<dt>Default</dt><dd><code>""</code></dd>
+<p>The desired version of the clang tools to use. Accepted options are
+strings which can be 8, 9, 10, 11, 12, 13, 14, 15, 16, 17.</p>
+<ul>
+<li>Set this option to a blank string (<code>''</code>) to use the
+platform's default installed version.</li>
+<li>This value can also be a path to where the clang tools are
+installed (if using a custom install location). All paths specified
+here are converted to absolute.</li>
+</ul>
+<h2 id="source-options"><a class="header" href="#source-options">Source options</a></h2>
+<h3 id="-e---extensions"><a class="header" href="#-e---extensions"><code>-e, --extensions</code></a></h3>
+<dt>Default</dt><dd><code>"c,h,C,H,cpp,hpp,cc,hh,c++,h++,cxx,hxx"</code></dd>
+<p>A comma-separated list of file extensions to analyze.</p>
+<h3 id="-r---repo-root"><a class="header" href="#-r---repo-root"><code>-r, --repo-root</code></a></h3>
+<dt>Default</dt><dd><code>"."</code></dd>
+<p>The relative path to the repository root directory. This path is
+relative to the runner's <code>GITHUB_WORKSPACE</code> environment variable (or
+the current working directory if not using a CI runner).</p>
+<h3 id="-i---ignore"><a class="header" href="#-i---ignore"><code>-i, --ignore</code></a></h3>
+<dt>Default</dt><dd><code>".github|target"</code></dd>
+<p>Set this option with path(s) to ignore (or not ignore).</p>
+<ul>
+<li>In the case of multiple paths, you can use <code>|</code> to separate each path.</li>
+<li>There is no need to use <code>./</code> for each entry; a blank string (<code>''</code>)
+represents the repo-root path.</li>
+<li>This can also have files, but the file's path (relative to
+the <a href="#-r---repo-root"><code>--repo-root</code></a>) has to be specified with the filename.</li>
+<li>Submodules are automatically ignored. Hidden directories (beginning
+with a <code>.</code>) are also ignored automatically.</li>
+<li>Prefix a path with <code>!</code> to explicitly not ignore it. This can be
+applied to a submodule's path (if desired) but not hidden directories.</li>
+<li>Glob patterns are not supported here. All asterisk characters (<code>*</code>)
+are literal.</li>
+</ul>
+<h3 id="-l---lines-changed-only"><a class="header" href="#-l---lines-changed-only"><code>-l, --lines-changed-only</code></a></h3>
+<dt>Default</dt><dd><code>"true"</code></dd>
+<p>This controls what part of the files are analyzed.
+The following values are accepted:</p>
+<ul>
+<li><code>false</code>: All lines in a file are analyzed.</li>
+<li><code>true</code>: Only lines in the diff that contain additions are analyzed.</li>
+<li><code>diff</code>: All lines in the diff are analyzed (including unchanged
+lines but not subtractions).</li>
+</ul>
+<h3 id="-f---files-changed-only"><a class="header" href="#-f---files-changed-only"><code>-f, --files-changed-only</code></a></h3>
+<dt>Default</dt><dd><code>"false"</code></dd>
+<p>Set this option to false to analyze any source files in the repo.
+This is automatically enabled if
+<a href="#-l---lines-changed-only"><code>--lines-changed-only</code></a> is enabled.</p>
+<div class="mdbook-alerts mdbook-alerts-note">
 <p class="mdbook-alerts-title">
   <span class="mdbook-alerts-icon"></span>
-  caution
+  note
 </p>
-<p><a href="https://codecov.io/gh/cpp-linter/cpp_linter_rs"><img src="https://codecov.io/gh/cpp-linter/cpp_linter_rs/graph/badge.svg?token=7ibzERx2AD" alt="codecov-status" /></a></p>
-<p>This project is still experimental and subject to drastic changes.
-Please use the pure python <a href="https://github.com/cpp-linter/cpp-linter">cpp-linter</a>
-package until this project is ready for deployment.</p>
+<p>The <code>GITHUB_TOKEN</code> should be supplied when running on a
+private repository with this option enabled, otherwise the runner
+does not not have the privilege to list the changed files for an event.</p>
+<p>See <a href="https://docs.github.com/en/actions/reference/authentication-in-a-workflow">Authenticating with the <code>GITHUB_TOKEN</code></a>.</p>
 </div>
-<h2 id="usage"><a class="header" href="#usage">Usage</a></h2>
-<p>For usage in a CI workflow, see
-<a href="https://github.com/cpp-linter/cpp-linter-action">the cpp-linter/cpp-linter-action repository</a>.</p>
-<p>For the description of supported Command Line Interface options, see
-<a href="https://cpp-linter.github.io/cpp_linter_rs/cli.html">the CLI documentation</a>.</p>
-<h2 id="have-question-or-feedback"><a class="header" href="#have-question-or-feedback">Have question or feedback?</a></h2>
-<p>To provide feedback (requesting a feature or reporting a bug) please post to
-<a href="https://github.com/cpp-linter/cpp_linter_rs/issues">issues</a>.</p>
-<h2 id="license"><a class="header" href="#license">License</a></h2>
-<p>The scripts and documentation in this project are released under the <a href="https://choosealicense.com/licenses/mit">MIT</a>.</p>
-<p>Dependencies (that are redistributed by us in binary form) have the following
-license agreements:</p>
+<h2 id="clang-format-options"><a class="header" href="#clang-format-options">Clang-format options</a></h2>
+<h3 id="-s---style"><a class="header" href="#-s---style"><code>-s, --style</code></a></h3>
+<dt>Default</dt><dd><code>"llvm"</code></dd>
+<p>The style rules to use.</p>
 <ul>
-<li>
-<p><a href="https://crates.io/crates/clap">clap</a>:
-Dual-licensed under <a href="https://choosealicense.com/licenses/apache-2.0/">Apache 2.0</a> or <a href="https://choosealicense.com/licenses/mit">MIT</a>.</p>
-</li>
-<li>
-<p><a href="https://crates.io/crates/git2">git2</a>:
-Dual-licensed under <a href="https://choosealicense.com/licenses/apache-2.0/">Apache 2.0</a> or <a href="https://choosealicense.com/licenses/mit">MIT</a>.</p>
-<p>The following are conditionally included in binaries (using the <code>openssl-vendored</code> feature on a
-case-by-case basis) because it is a dependency of git2:</p>
+<li>Set this to <code>file</code> to have clang-format use the closest relative
+.clang-format file.</li>
+<li>Set this to a blank string (<code>''</code>) to disable using clang-format
+entirely.</li>
+</ul>
+<h3 id="-m---ignore-format"><a class="header" href="#-m---ignore-format"><code>-M, --ignore-format</code></a></h3>
+<dt>Default</dt><dd><code>""</code></dd>
+<p>Similar to <a href="#-i---ignore"><code>--ignore</code></a> but applied
+exclusively to files analyzed by clang-format.</p>
+<h2 id="clang-tidy-options"><a class="header" href="#clang-tidy-options">Clang-tidy options</a></h2>
+<h3 id="-c---tidy-checks"><a class="header" href="#-c---tidy-checks"><code>-c, --tidy-checks</code></a></h3>
+<dt>Default</dt><dd><code>"boost-*,bugprone-*,performance-*,readability-*,portability-*,modernize-*,clang-analyzer-*,cppcoreguidelines-*"</code></dd>
+<p>A comma-separated list of globs with optional <code>-</code> prefix.
+Globs are processed in order of appearance in the list.
+Globs without <code>-</code> prefix add checks with matching names to the set,
+globs with the <code>-</code> prefix remove checks with matching names from the set of
+enabled checks. This option's value is appended to the value of the 'Checks'
+option in a .clang-tidy file (if any).</p>
 <ul>
-<li><a href="https://crates.io/crates/openssl">openssl</a>: Licensed under <a href="https://choosealicense.com/licenses/apache-2.0/">Apache 2.0</a></li>
-<li><a href="https://crates.io/crates/openssl-probe">openssl-probe</a>:
-Dual-licensed under <a href="https://choosealicense.com/licenses/apache-2.0/">Apache 2.0</a> or <a href="https://choosealicense.com/licenses/mit">MIT</a>.</li>
+<li>It is possible to disable clang-tidy entirely by setting this option to
+<code>'-*'</code>.</li>
+<li>It is also possible to rely solely on a .clang-tidy config file by
+specifying this option as a blank string (<code>''</code>).</li>
 </ul>
-</li>
-<li>
-<p><a href="https://crates.io/crates/lenient_semver">lenient_semver</a>:
-Dual-licensed under <a href="https://choosealicense.com/licenses/apache-2.0/">Apache 2.0</a> or <a href="https://choosealicense.com/licenses/mit">MIT</a>.</p>
-</li>
-<li>
-<p><a href="https://crates.io/crates/log">log</a>:
-Dual-licensed under <a href="https://choosealicense.com/licenses/apache-2.0/">Apache 2.0</a> or <a href="https://choosealicense.com/licenses/mit">MIT</a>.</p>
-</li>
-<li>
-<p><a href="https://crates.io/crates/regex">regex</a>:
-Dual-licensed under <a href="https://choosealicense.com/licenses/apache-2.0/">Apache 2.0</a> or <a href="https://choosealicense.com/licenses/mit">MIT</a>.</p>
-</li>
-<li>
-<p><a href="https://crates.io/crates/reqwest">reqwest</a>:
-Dual-licensed under <a href="https://choosealicense.com/licenses/apache-2.0/">Apache 2.0</a> or <a href="https://choosealicense.com/licenses/mit">MIT</a>.</p>
-</li>
-<li>
-<p><a href="https://crates.io/crates/semver">semver</a>:
-Dual-licensed under <a href="https://choosealicense.com/licenses/apache-2.0/">Apache 2.0</a> or <a href="https://choosealicense.com/licenses/mit">MIT</a>.</p>
-</li>
-<li>
-<p><a href="https://crates.io/crates/serde">serde</a>:
-Dual-licensed under <a href="https://choosealicense.com/licenses/apache-2.0/">Apache 2.0</a> or <a href="https://choosealicense.com/licenses/mit">MIT</a>.</p>
-</li>
-<li>
-<p><a href="https://crates.io/crates/serde-xml-rs">serde-xml-rs</a>: Licensed under <a href="https://choosealicense.com/licenses/mit">MIT</a>.</p>
-</li>
-<li>
-<p><a href="https://crates.io/crates/serde_json">serde_json</a>:
-Dual-licensed under <a href="https://choosealicense.com/licenses/apache-2.0/">Apache 2.0</a> or <a href="https://choosealicense.com/licenses/mit">MIT</a>.</p>
-</li>
-<li>
-<p><a href="https://crates.io/crates/which">which</a>: Licensed under <a href="https://choosealicense.com/licenses/mit">MIT</a>.</p>
-</li>
-<li>
-<p><a href="https://crates.io/crates/tokio">tokio</a>: Licensed under <a href="https://choosealicense.com/licenses/mit">MIT</a></p>
-</li>
-</ul>
-<p>The python binding uses</p>
-<ul>
-<li><a href="https://crates.io/crates/pyo3">pyo3</a>:
-Dual-licensed under <a href="https://choosealicense.com/licenses/apache-2.0/">Apache 2.0</a> or <a href="https://choosealicense.com/licenses/mit">MIT</a>.</li>
-</ul>
+<p>See also clang-tidy docs for more info.</p>
+<h3 id="-p---database"><a class="header" href="#-p---database"><code>-p, --database</code></a></h3>
+<p>The path that is used to read a compile command database.
+For example, it can be a CMake build directory in which a file named
+compile_commands.json exists (set <code>CMAKE_EXPORT_COMPILE_COMMANDS</code> to <code>ON</code>).
+When no build path is specified, a search for compile_commands.json will be
+attempted through all parent paths of the first input file. See <a href="https://clang.llvm.org/docs/HowToSetupToolingForLLVM.html">LLVM docs about
+setup tooling</a>
+for an example of setting up Clang Tooling on a source tree.</p>
+<h3 id="-x---extra-arg"><a class="header" href="#-x---extra-arg"><code>-x, --extra-arg</code></a></h3>
+<p>A string of extra arguments passed to clang-tidy for use as
+compiler arguments. This can be specified more than once for each
+additional argument. Recommend using quotes around the value and
+avoid using spaces between name and value (use <code>=</code> instead):</p>
+<pre><code class="language-shell">cpp-linter --extra-arg="-std=c++17" --extra-arg="-Wall"
+</code></pre>
+<h3 id="-d---ignore-tidy"><a class="header" href="#-d---ignore-tidy"><code>-D, --ignore-tidy</code></a></h3>
+<dt>Default</dt><dd><code>""</code></dd>
+<p>Similar to <a href="#-i---ignore"><code>--ignore</code></a> but applied
+exclusively to files analyzed by clang-tidy.</p>
+<h2 id="feedback-options"><a class="header" href="#feedback-options">Feedback options</a></h2>
+<h3 id="-g---thread-comments"><a class="header" href="#-g---thread-comments"><code>-g, --thread-comments</code></a></h3>
+<dt>Default</dt><dd><code>"false"</code></dd>
+<p>Set this option to true to enable the use of thread comments as feedback.
+Set this to <code>update</code> to update an existing comment if one exists;
+the value 'true' will always delete an old comment and post a new one if necessary.</p>
+<div class="mdbook-alerts mdbook-alerts-note">
+<p class="mdbook-alerts-title">
+  <span class="mdbook-alerts-icon"></span>
+  note
+</p>
+<p>To use thread comments, the <code>GITHUB_TOKEN</code> (provided by
+Github to each repository) must be declared as an environment
+variable.</p>
+<p>See <a href="https://docs.github.com/en/actions/reference/authentication-in-a-workflow">Authenticating with the <code>GITHUB_TOKEN</code></a>.</p>
+</div>
+<h3 id="-t---no-lgtm"><a class="header" href="#-t---no-lgtm"><code>-t, --no-lgtm</code></a></h3>
+<dt>Default</dt><dd><code>"true"</code></dd>
+<p>Set this option to true or false to enable or disable the use of a
+thread comment that basically says 'Looks Good To Me' (when all checks pass).</p>
+<div class="mdbook-alerts mdbook-alerts-important">
+<p class="mdbook-alerts-title">
+  <span class="mdbook-alerts-icon"></span>
+  important
+</p>
+<p>The <a href="#-g---thread-comments"><code>--thread-comments</code></a>
+option also notes further implications.</p>
+</div>
+<h3 id="-w---step-summary"><a class="header" href="#-w---step-summary"><code>-w, --step-summary</code></a></h3>
+<dt>Default</dt><dd><code>"false"</code></dd>
+<p>Set this option to true or false to enable or disable the use of
+a workflow step summary when the run has concluded.</p>
+<h3 id="-a---file-annotations"><a class="header" href="#-a---file-annotations"><code>-a, --file-annotations</code></a></h3>
+<dt>Default</dt><dd><code>"true"</code></dd>
+<p>Set this option to false to disable the use of
+file annotations as feedback.</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-
-                            <a rel="next prefetch" href="cli.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
-                                <i class="fa fa-angle-right"></i>
+                            <a rel="prev" href="index.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
                             </a>
+
 
                         <div style="clear: both"></div>
                     </nav>
@@ -348,10 +416,10 @@ Dual-licensed under <a href="https://choosealicense.com/licenses/apache-2.0/">Ap
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-
-                    <a rel="next prefetch" href="cli.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
-                        <i class="fa fa-angle-right"></i>
+                    <a rel="prev" href="index.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
                     </a>
+
             </nav>
 
         </div>
