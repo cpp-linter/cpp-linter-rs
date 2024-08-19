@@ -199,3 +199,5 @@ book
 # ignore generated files
 .cpp-linter_cache/
 cpp-linter-py/docs/cli_args.rst
+lcov.info
+coverage.json

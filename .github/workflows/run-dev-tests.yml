@@ -19,6 +19,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
 
 jobs:
   cache-deps:
@@ -63,10 +64,10 @@ jobs:
       #   if: runner.os == 'Windows'
       #   run: vcpkg install openssl
 
-      - name: Install cargo-nextest and cargo-llvm-cov
+      - name: Install third-party binaries
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-nextest,cargo-llvm-cov,cargo-binstall
+          tool: cargo-nextest,cargo-llvm-cov,cargo-binstall,just
 
       - name: Install llvm-cov-pretty (HTML report generator)
         run: cargo binstall -y llvm-cov-pretty
@@ -116,15 +117,13 @@ jobs:
         working-directory: cpp-linter-lib
         env:
           CLANG_VERSION: ${{ matrix.version }}
-        run: cargo llvm-cov --lib --no-report nextest
+        run: just test
 
       - name: Generate Coverage HTML report
         working-directory: cpp-linter-lib
         env:
           CLANG_VERSION: ${{ matrix.version }}
-        run: |
-          cargo llvm-cov report --json --output-path .coverage.json
-          llvm-cov-pretty .coverage.json
+        run: just pretty-cov
 
       - name: Upload coverage data
         uses: actions/upload-artifact@v4
