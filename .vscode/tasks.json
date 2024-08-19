@@ -1,0 +1,222 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "cargo",
+			"command": "run",
+			"problemMatcher": [
+				"$rustc"
+			],
+			"label": "rust: cargo run cpp-linter",
+			"args": [
+				"--bin",
+				"cpp-linter",
+				"--manifest-path",
+				"cpp-linter-lib/Cargo.toml",
+				"--",
+				"${input:binArgs}"
+			],
+			"group": "build"
+		},
+		{
+			"type": "cargo",
+			"command": "clippy",
+			"problemMatcher": [
+				"$rustc"
+			],
+			"label": "rust: cargo clippy",
+			"args": [
+				"--fix",
+				"--allow-dirty",
+				"--allow-staged"
+			],
+			"presentation": {
+				"close": true,
+				"revealProblems": "onProblem",
+				"clear": true
+			},
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			}
+		},
+		{
+			"type": "cargo",
+			"command": "fmt",
+			"problemMatcher": [
+				"$rustc"
+			],
+			"label": "rust: cargo fmt",
+			"args": [],
+			"presentation": {
+				"close": true,
+				"revealProblems": "onProblem",
+				"clear": true
+			},
+			"group": "build"
+		},
+		{
+			"type": "cargo",
+			"command": "llvm-cov",
+			"problemMatcher": [
+				"$rustc"
+			],
+			"label": "rust: cargo llvm-cov nextest",
+			"args": [
+				"--no-report",
+				"nextest",
+				"--lib",
+				"--manifest-path",
+				"cpp-linter-lib/Cargo.toml"
+			],
+			"group": {
+				"kind": "test",
+				"isDefault": true
+			}
+		},
+		{
+			"type": "cargo",
+			"command": "llvm-cov",
+			"problemMatcher": [],
+			"label": "rust: cargo llvm-cov report json",
+			"args": [
+				"report",
+				"--json",
+				"--output-path",
+				"coverage.json"
+			],
+			"presentation": {
+				"close": true,
+				"revealProblems": "onProblem",
+				"clear": true
+			},
+			"group": "test"
+		},
+		{
+			"type": "shell",
+			"command": "llvm-cov-pretty",
+			"problemMatcher": [],
+			"label": "rust: cargo llvm-cov-pretty html",
+			"args": [
+				"coverage.json",
+				"--open"
+			],
+			"presentation": {
+				"close": true,
+				"revealProblems": "onProblem",
+				"clear": true
+			},
+			"group": "test"
+		},
+		{
+			"type": "cargo",
+			"command": "llvm-cov",
+			"problemMatcher": [],
+			"label": "rust: cargo llvm-cov report html",
+			"args": [
+				"report",
+				"--html",
+				"--open"
+			],
+			"presentation": {
+				"close": true,
+				"revealProblems": "onProblem",
+				"clear": true
+			},
+			"group": "test"
+		},
+		{
+			"type": "cargo",
+			"command": "llvm-cov",
+			"problemMatcher": [],
+			"label": "rust: cargo llvm-cov report lcov",
+			"args": [
+				"report",
+				"--lcov",
+				"--output-path",
+				"lcov.info"
+			],
+			"presentation": {
+				"close": true,
+				"revealProblems": "onProblem",
+				"clear": true
+			},
+			"group": "test"
+		},
+		{
+			"type": "cargo",
+			"command": "doc",
+			"problemMatcher": [
+				"$rustc"
+			],
+			"label": "rust: cargo doc",
+			"args": [
+				"--no-deps",
+				"--lib",
+				"--manifest-path",
+				"cpp-linter-lib/Cargo.toml",
+				"--open"
+			],
+			"group": "build"
+		},
+		{
+			"type": "shell",
+			"command": "mdbook",
+			"label": "mdbook: serve",
+			"args": [
+				"serve",
+				"docs",
+				"--open"
+			],
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"type": "shell",
+			"command": "mdbook",
+			"label": "mdbook: build",
+			"args": [
+				"build",
+				"docs",
+				"--open"
+			],
+			"presentation": {
+				"close": true,
+				"revealProblems": "onProblem",
+				"clear": true
+			},
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"type": "shell",
+			"command": "python",
+			"label": "workspace: bump version",
+			"args": [
+				".github/workflows/bump_version.py",
+				"${input:bumpComponent}"
+			],
+			"problemMatcher": [],
+			"group": "none"
+		}
+	],
+	"inputs": [
+		{
+			"type": "promptString",
+			"id": "binArgs",
+			"description": "Arguments for the cpp-linter binary executable",
+			"default": "-h"
+		},
+		{
+			"type": "pickString",
+			"id": "bumpComponent",
+			"description": "Which version component to bump?",
+			"default": "patch",
+			"options": [
+				"major",
+				"minor",
+				"patch"
+			]
+		}
+	]
+}

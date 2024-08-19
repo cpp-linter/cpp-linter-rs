@@ -191,7 +191,9 @@ debug/
 # End of https://www.toptal.com/developers/gitignore/api/rust,python
 
 # ignore vscode stuff
-.vscode/
+.vscode/**
+!.vscode/tasks.json
+!.vscode/extensions.json
 
 # mdbook builds
 book
