@@ -12,6 +12,11 @@ jobs:
 
   cargo-tools:
     runs-on: ubuntu-latest
+
+    env:
+      CARGO_TERM_COLOR: always
+      RUST_BACKTRACE: 1
+
     steps:
       - uses: actions/checkout@v4
       - run: rustup update

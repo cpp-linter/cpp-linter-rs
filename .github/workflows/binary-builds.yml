@@ -12,13 +12,8 @@ on:
     branches: [main]
 
 env:
-  CARGO_INCREMENTAL: 0
-  CARGO_NET_GIT_FETCH_WITH_CLI: true
-  CARGO_NET_RETRY: 10
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
-  RUSTFLAGS: -D warnings
-  RUSTUP_MAX_RETRIES: 10
 
 defaults:
   run:
@@ -99,15 +94,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          python-version: '3.x'
-
-      - name: Increment version
-        if: startsWith(github.ref, 'refs/tags/')
-        run: python .github/workflows/replace_version_spec.py --new-version=${{ github.ref_name }}
-
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -119,13 +105,15 @@ jobs:
         with:
           tool: cross
 
-      - name: Build (native)
-        if: ${{ !matrix.cross }}
-        run: cargo build --manifest-path cpp-linter-lib/Cargo.toml --release --bin cpp-linter --target ${{ matrix.target }} ${{ matrix.vendered && '--features openssl-vendored' || '' }}
-
-      - name: Build (cross)
-        if: matrix.cross
-        run: cross build --manifest-path cpp-linter-lib/Cargo.toml --release --bin cpp-linter --target ${{ matrix.target }} ${{ matrix.vendered && '--features openssl-vendored' || '' }}
+      - name: Build
+        run: >-
+          ${{ matrix.cross && 'cross' || 'cargo '}}
+          build
+          --manifest-path cpp-linter-lib/Cargo.toml
+          --bin cpp-linter
+          --release
+          --target ${{ matrix.target }}
+          ${{ matrix.vendered && '--features openssl-vendored' || '' }}
 
       - name: Prepare artifacts
         run: mv target/${{ matrix.target }}/release/cpp-linter${{ runner.os == 'Windows' && '.exe' || '' }} ./cpp-linter-${{ matrix.target }}${{ runner.os == 'Windows' && '.exe' || '' }}
