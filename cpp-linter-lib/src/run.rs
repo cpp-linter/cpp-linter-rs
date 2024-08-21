@@ -65,7 +65,8 @@ pub async fn run_main(args: Vec<String>) -> i32 {
     }
 
     if cli.repo_root != "." {
-        env::set_current_dir(Path::new(&cli.repo_root)).unwrap();
+        env::set_current_dir(Path::new(&cli.repo_root))
+            .unwrap_or_else(|_| panic!("'{}' is inaccessible or does not exist", cli.repo_root));
     }
 
     let rest_api_client = GithubApiClient::new();
@@ -78,6 +79,9 @@ pub async fn run_main(args: Vec<String>) -> i32 {
 
     let mut file_filter = FileFilter::new(&cli.ignore, cli.extensions.clone());
     file_filter.parse_submodules();
+    if let Some(files) = &cli.not_ignored {
+        file_filter.not_ignored.extend(files.clone());
+    }
 
     if !file_filter.ignored.is_empty() {
         log::info!("Ignored:");
@@ -89,14 +93,6 @@ pub async fn run_main(args: Vec<String>) -> i32 {
         log::info!("Not Ignored:");
         for pattern in &file_filter.not_ignored {
             log::info!("  {pattern}");
-        }
-    }
-
-    if let Some(files) = args.get_many::<Vec<String>>("files") {
-        for list in files {
-            file_filter
-                .not_ignored
-                .extend(list.iter().map(|v| v.to_string()).collect::<Vec<String>>());
         }
     }
 
@@ -140,7 +136,10 @@ mod test {
             run_main(vec![
                 "cpp-linter".to_string(),
                 "-l".to_string(),
-                "false".to_string()
+                "false".to_string(),
+                "--repo-root".to_string(),
+                "tests".to_string(),
+                "demo/demo.cpp".to_string(),
             ])
             .await,
             0

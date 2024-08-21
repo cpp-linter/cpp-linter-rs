@@ -295,13 +295,13 @@ Further filtering can still be applied (see [Source options](#source-options))."
             )
             .groups([
                 ArgGroup::new("Clang-tidy options")
-                    .args(["tidy-checks", "database", "extra-arg", "ignore-tidy"]),
-                ArgGroup::new("Clang-format options").args(["style", "ignore-format"]),
-                ArgGroup::new("General options").args(["verbosity", "version"]),
-                ArgGroup::new("Source options").args(["extensions", "repo-root", "ignore", "lines-changed-only", "files-changed-only"]),
+                    .args(["tidy-checks", "database", "extra-arg", "ignore-tidy"]).multiple(true),
+                ArgGroup::new("Clang-format options").args(["style", "ignore-format"]).multiple(true),
+                ArgGroup::new("General options").args(["verbosity", "version"]).multiple(true),
+                ArgGroup::new("Source options").args(["extensions", "repo-root", "ignore", "lines-changed-only", "files-changed-only"]).multiple(true),
                 ArgGroup::new("Feedback options").args([
                     "thread-comments", "no-lgtm", "step-summary", "file-annotations"
-                ]),
+                ]).multiple(true),
             ])
             .next_line_help(true)
 }

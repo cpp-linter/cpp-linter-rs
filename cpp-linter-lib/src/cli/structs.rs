@@ -45,6 +45,7 @@ pub struct Cli {
     pub no_lgtm: bool,
     pub step_summary: bool,
     pub file_annotations: bool,
+    pub not_ignored: Option<Vec<String>>,
 }
 
 impl From<&ArgMatches> for Cli {
@@ -101,6 +102,9 @@ impl From<&ArgMatches> for Cli {
             step_summary: args.get_flag("step-summary"),
             thread_comments,
             file_annotations: args.get_flag("file-annotations"),
+            not_ignored: args
+                .get_many::<String>("files")
+                .map(|files| Vec::from_iter(files.map(|v| v.to_owned()))),
         }
     }
 }
@@ -194,5 +198,23 @@ impl Default for FeedbackInput {
             file_annotations: true,
             style: "llvm".to_string(),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::cli::get_arg_parser;
+
+    use super::Cli;
+
+    #[test]
+    fn parse_positional() {
+        let parser = get_arg_parser();
+        let args = parser.get_matches_from(["cpp-linter", "file1.c", "file2.h"]);
+        let cli = Cli::from(&args);
+        let not_ignored = cli.not_ignored.expect("failed to parse positional args");
+        assert!(!not_ignored.is_empty());
+        assert!(not_ignored.contains(&String::from("file1.c")));
+        assert!(not_ignored.contains(&String::from("file2.h")));
     }
 }
