@@ -11,32 +11,11 @@ use reqwest::header::{HeaderMap, HeaderValue};
 
 // project specific modules/crates
 pub mod github_api;
+use crate::cli::FeedbackInput;
 use crate::common_fs::{FileFilter, FileObj};
 
 pub static COMMENT_MARKER: &str = "<!-- cpp linter action -->";
 pub static USER_OUTREACH: &str = "\n\nHave any feedback or feature suggestions? [Share it here.](https://github.com/cpp-linter/cpp-linter-action/issues)";
-
-/// A struct to hold a collection of user inputs related to [`ResApiClient.post_feedback()`].
-pub struct FeedbackInput {
-    pub thread_comments: String,
-    pub no_lgtm: bool,
-    pub step_summary: bool,
-    pub file_annotations: bool,
-    pub style: String,
-}
-
-impl Default for FeedbackInput {
-    /// Construct a [`FeedbackInput`] instance with default values.
-    fn default() -> Self {
-        FeedbackInput {
-            thread_comments: "false".to_string(),
-            no_lgtm: true,
-            step_summary: false,
-            file_annotations: true,
-            style: "llvm".to_string(),
-        }
-    }
-}
 
 /// A custom trait that templates necessary functionality with a Git server's REST API.
 pub trait RestApiClient {
@@ -124,7 +103,7 @@ pub trait RestApiClient {
         &self,
         files: &[Arc<Mutex<FileObj>>],
         user_inputs: FeedbackInput,
-    ) -> impl Future<Output = ()>;
+    ) -> impl Future<Output = u64>;
 }
 
 fn make_format_comment(

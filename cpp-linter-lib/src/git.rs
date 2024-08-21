@@ -275,7 +275,7 @@ rename to /tests/demo/some source.cpp
             let diff_buf = RENAMED_DIFF.as_bytes();
             let files = parse_diff_from_buf(
                 diff_buf,
-                &FileFilter::new(&["target"], vec![String::from("cpp")]),
+                &FileFilter::new(&["target".to_string()], vec![String::from("cpp")]),
             );
             assert!(!files.is_empty());
             assert!(files
@@ -290,7 +290,7 @@ rename to /tests/demo/some source.cpp
             let diff_buf = RENAMED_DIFF_WITH_CHANGES.as_bytes();
             let files = parse_diff_from_buf(
                 diff_buf,
-                &FileFilter::new(&["target"], vec![String::from("cpp")]),
+                &FileFilter::new(&["target".to_string()], vec![String::from("cpp")]),
             );
             assert!(!files.is_empty());
         }
@@ -298,12 +298,13 @@ rename to /tests/demo/some source.cpp
         /// Used to parse the same string buffer using both libgit2 and brute force regex.
         /// Returns 2 vectors of [FileObj] that should be equivalent.
         fn setup_parsed(buf: &str, extensions: &[String]) -> (Vec<FileObj>, Vec<FileObj>) {
+            let ignore = ["target".to_string()];
             (
                 parse_diff_from_buf(
                     buf.as_bytes(),
-                    &FileFilter::new(&["target"], extensions.to_owned()),
+                    &FileFilter::new(&ignore, extensions.to_owned()),
                 ),
-                parse_diff(buf, &FileFilter::new(&["target"], extensions.to_owned())),
+                parse_diff(buf, &FileFilter::new(&ignore, extensions.to_owned())),
             )
         }
 
@@ -399,7 +400,7 @@ mod test {
             patch_path,
         );
         let rest_api_client = GithubApiClient::new();
-        let file_filter = FileFilter::new(&["target"], extensions.to_owned());
+        let file_filter = FileFilter::new(&["target".to_string()], extensions.to_owned());
         set_current_dir(tmp).unwrap();
         env::set_var("CI", "false"); // avoid use of REST API when testing in CI
         rest_api_client

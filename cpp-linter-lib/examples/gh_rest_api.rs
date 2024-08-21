@@ -14,7 +14,7 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
     let client_controller = GithubApiClient::new();
 
     let file_filter = FileFilter::new(
-        &["target", ".github"],
+        &["target".to_string(), ".github".to_string()],
         vec!["cpp".to_string(), "hpp".to_string()],
     );
 

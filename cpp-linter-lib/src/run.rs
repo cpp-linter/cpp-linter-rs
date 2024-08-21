@@ -4,7 +4,7 @@
 //! `main()`.
 
 use std::env;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 // non-std crates
@@ -13,12 +13,12 @@ use log::{set_max_level, LevelFilter};
 use openssl_probe;
 
 // project specific modules/crates
-use crate::clang_tools::{capture_clang_tools_output, ClangParams};
-use crate::cli::{convert_extra_arg_val, get_arg_parser, LinesChangedOnly};
+use crate::clang_tools::capture_clang_tools_output;
+use crate::cli::{get_arg_parser, ClangParams, Cli, FeedbackInput, LinesChangedOnly};
 use crate::common_fs::FileFilter;
 use crate::github_api::GithubApiClient;
 use crate::logger::{self, end_log_group, start_log_group};
-use crate::rest_api::{FeedbackInput, RestApiClient};
+use crate::rest_api::RestApiClient;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -49,6 +49,7 @@ pub async fn run_main(args: Vec<String>) -> i32 {
 
     let arg_parser = get_arg_parser();
     let args = arg_parser.get_matches_from(args);
+    let cli = Cli::from(&args);
 
     if args.subcommand_matches("version").is_some() {
         println!("cpp-linter v{}", VERSION);
@@ -57,63 +58,46 @@ pub async fn run_main(args: Vec<String>) -> i32 {
 
     logger::init().unwrap();
 
-    let version = args.get_one::<String>("version").unwrap();
-    if version == "NO-VERSION" {
+    if cli.version == "NO-VERSION" {
         log::error!("The `--version` arg is used to specify which version of clang to use.");
         log::error!("To get the cpp-linter version, use `cpp-linter version` sub-command.");
         return 1;
     }
 
-    let root_path = args.get_one::<String>("repo-root").unwrap();
-    if root_path != &String::from(".") {
-        env::set_current_dir(Path::new(root_path)).unwrap();
+    if cli.repo_root != "." {
+        env::set_current_dir(Path::new(&cli.repo_root))
+            .unwrap_or_else(|_| panic!("'{}' is inaccessible or does not exist", cli.repo_root));
     }
 
-    let database_path = if let Some(database) = args.get_one::<String>("database") {
-        if !database.is_empty() {
-            Some(PathBuf::from(database).canonicalize().unwrap())
-        } else {
-            None
-        }
-    } else {
-        None
-    };
-
     let rest_api_client = GithubApiClient::new();
-    let verbosity = args.get_one::<String>("verbosity").unwrap().as_str() == "debug";
-    set_max_level(if verbosity || rest_api_client.debug_enabled {
+    set_max_level(if cli.verbosity || rest_api_client.debug_enabled {
         LevelFilter::Debug
     } else {
         LevelFilter::Info
     });
     log::info!("Processing event {}", rest_api_client.event_name);
 
-    let extensions = args
-        .get_many::<String>("extensions")
-        .unwrap()
-        .map(|s| s.to_string())
-        .collect::<Vec<_>>();
-    let ignore = args
-        .get_many::<String>("ignore")
-        .unwrap()
-        .map(|s| s.as_str())
-        .collect::<Vec<_>>();
-    let mut file_filter = FileFilter::new(&ignore, extensions.clone());
+    let mut file_filter = FileFilter::new(&cli.ignore, cli.extensions.clone());
     file_filter.parse_submodules();
+    if let Some(files) = &cli.not_ignored {
+        file_filter.not_ignored.extend(files.clone());
+    }
 
-    let lines_changed_only = match args
-        .get_one::<String>("lines-changed-only")
-        .unwrap()
-        .as_str()
-    {
-        "true" => LinesChangedOnly::On,
-        "diff" => LinesChangedOnly::Diff,
-        _ => LinesChangedOnly::Off,
-    };
-    let files_changed_only = args.get_flag("files-changed-only");
+    if !file_filter.ignored.is_empty() {
+        log::info!("Ignored:");
+        for pattern in &file_filter.ignored {
+            log::info!("  {pattern}");
+        }
+    }
+    if !file_filter.not_ignored.is_empty() {
+        log::info!("Not Ignored:");
+        for pattern in &file_filter.not_ignored {
+            log::info!("  {pattern}");
+        }
+    }
 
     start_log_group(String::from("Get list of specified source files"));
-    let files = if lines_changed_only != LinesChangedOnly::Off || files_changed_only {
+    let files = if cli.lines_changed_only != LinesChangedOnly::Off || cli.files_changed_only {
         // parse_diff(github_rest_api_payload)
         rest_api_client
             .get_list_of_changed_files(&file_filter)
@@ -130,44 +114,15 @@ pub async fn run_main(args: Vec<String>) -> i32 {
     }
     end_log_group();
 
-    let user_inputs = FeedbackInput {
-        style: args.get_one::<String>("style").unwrap().to_string(),
-        no_lgtm: args.get_flag("no-lgtm"),
-        step_summary: args.get_flag("step-summary"),
-        thread_comments: args
-            .get_one::<String>("thread-comments")
-            .unwrap()
-            .to_string(),
-        file_annotations: args.get_flag("file-annotations"),
-    };
-    let ignore_tidy = args
-        .get_many::<String>("ignore-tidy")
-        .unwrap()
-        .map(|s| s.as_str())
-        .collect::<Vec<_>>();
-    let ignore_format = args
-        .get_many::<String>("ignore-format")
-        .unwrap()
-        .map(|s| s.as_str())
-        .collect::<Vec<_>>();
-
-    let extra_args = convert_extra_arg_val(&args);
-    let mut clang_params = ClangParams {
-        tidy_checks: args.get_one::<String>("tidy-checks").unwrap().to_string(),
-        lines_changed_only,
-        database: database_path,
-        extra_args,
-        database_json: None,
-        style: user_inputs.style.clone(),
-        clang_tidy_command: None,
-        clang_format_command: None,
-        tidy_filter: FileFilter::new(&ignore_tidy, extensions.clone()),
-        format_filter: FileFilter::new(&ignore_format, extensions),
-    };
-    capture_clang_tools_output(&mut arc_files, version, &mut clang_params).await;
+    let mut clang_params = ClangParams::from(&cli);
+    let user_inputs = FeedbackInput::from(&cli);
+    capture_clang_tools_output(&mut arc_files, cli.version.as_str(), &mut clang_params).await;
     start_log_group(String::from("Posting feedback"));
-    rest_api_client.post_feedback(&arc_files, user_inputs).await;
+    let checks_failed = rest_api_client.post_feedback(&arc_files, user_inputs).await;
     end_log_group();
+    if env::var("PRE_COMMIT").is_ok_and(|v| v == "1") {
+        return (checks_failed > 1) as i32;
+    }
     0
 }
 
@@ -181,7 +136,10 @@ mod test {
             run_main(vec![
                 "cpp-linter".to_string(),
                 "-l".to_string(),
-                "false".to_string()
+                "false".to_string(),
+                "--repo-root".to_string(),
+                "tests".to_string(),
+                "demo/demo.cpp".to_string(),
             ])
             .await,
             0
