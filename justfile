@@ -26,7 +26,7 @@ test:
 [group("code coverage")]
 pretty-cov *args='':
     cargo llvm-cov report --json --output-path coverage.json
-    @llvm-cov-pretty coverage.json {{ args }}
+    llvm-cov-pretty coverage.json {{ args }}
 
 # generate and open detailed coverage report
 [group("code coverage")]

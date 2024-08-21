@@ -13,13 +13,14 @@ use reqwest::Method;
 use serde::Deserialize;
 use serde_json;
 
+// project specific modules/crates
 use crate::clang_tools::clang_format::tally_format_advice;
 use crate::clang_tools::clang_tidy::tally_tidy_advice;
-// project specific modules/crates
+use crate::cli::{FeedbackInput, ThreadComments};
 use crate::common_fs::{FileFilter, FileObj};
 use crate::git::{get_diff, open_repo, parse_diff, parse_diff_from_buf};
 
-use super::{FeedbackInput, RestApiClient, COMMENT_MARKER};
+use super::{RestApiClient, COMMENT_MARKER};
 
 static USER_AGENT: &str =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:120.0) Gecko/20100101 Firefox/120.0";
@@ -214,7 +215,7 @@ impl RestApiClient for GithubApiClient {
             Some(tidy_checks_failed),
         );
 
-        if user_inputs.thread_comments.as_str() != "false" {
+        if user_inputs.thread_comments != ThreadComments::Off {
             // post thread comment for PR or push event
             if comment.as_ref().is_some_and(|c| c.len() > 65535) || comment.is_none() {
                 comment = Some(self.make_comment(
@@ -256,7 +257,7 @@ impl RestApiClient for GithubApiClient {
                         count,
                         user_inputs.no_lgtm,
                         format_checks_failed + tidy_checks_failed == 0,
-                        user_inputs.thread_comments.as_str() == "update",
+                        user_inputs.thread_comments == ThreadComments::Update,
                     )
                     .await;
                 } else {
@@ -491,10 +492,10 @@ mod test {
 
     use super::{GithubApiClient, USER_AGENT};
     use crate::{
-        clang_tools::{capture_clang_tools_output, ClangParams},
-        cli::LinesChangedOnly,
+        clang_tools::capture_clang_tools_output,
+        cli::{ClangParams, FeedbackInput, LinesChangedOnly},
         common_fs::{FileFilter, FileObj},
-        rest_api::{FeedbackInput, RestApiClient, USER_OUTREACH},
+        rest_api::{RestApiClient, USER_OUTREACH},
     };
 
     // ************************** tests for GithubApiClient::make_headers()

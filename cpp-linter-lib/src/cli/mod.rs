@@ -1,19 +1,12 @@
 //! This module holds the Command Line Interface design.
+use std::path::PathBuf;
 
 // non-std crates
 use clap::builder::{ArgPredicate, FalseyValueParser};
-use clap::{Arg, ArgAction, ArgGroup, ArgMatches, Command};
+use clap::{value_parser, Arg, ArgAction, ArgGroup, ArgMatches, Command};
 
-/// An enum to describe `--lines-changed-only` CLI option's behavior.
-#[derive(PartialEq, Clone, Debug)]
-pub enum LinesChangedOnly {
-    /// All lines are scanned
-    Off,
-    /// Only lines in the diff are scanned
-    Diff,
-    /// Only lines in the diff with additions are scanned.
-    On,
-}
+mod structs;
+pub use structs::{ClangParams, Cli, FeedbackInput, LinesChangedOnly, ThreadComments};
 
 /// Builds and returns the Command Line Interface's argument parsing object.
 pub fn get_arg_parser() -> Command {
@@ -38,9 +31,10 @@ thread comments or file annotations.\n\n",
             Arg::new("database")
                 .long("database")
                 .short('p')
+                .value_parser(value_parser!(PathBuf))
                 .help_heading("clang-tidy options")
                 .help(
-            "The path that is used to read a compile command database.
+                    "The path that is used to read a compile command database.
 For example, it can be a CMake build directory in which a file named
 compile_commands.json exists (set `CMAKE_EXPORT_COMPILE_COMMANDS` to `ON`).
 When no build path is specified, a search for compile_commands.json will be
@@ -155,7 +149,6 @@ the current working directory if not using a CI runner).\n\n",
                 .short('D')
                 .long("ignore-tidy")
                 .value_delimiter('|')
-                .default_value("")
                 .help_heading("clang-tidy options")
                 .help(
                     "Similar to [`--ignore`](#-i---ignore) but applied
@@ -167,7 +160,6 @@ exclusively to files analyzed by clang-tidy.\n\n",
                 .short('M')
                 .long("ignore-format")
                 .value_delimiter('|')
-                .default_value("")
                 .help_heading("clang-format options")
                 .help(
                     "Similar to [`--ignore`](#-i---ignore) but applied
@@ -178,7 +170,7 @@ exclusively to files analyzed by clang-format.\n\n",
             Arg::new("lines-changed-only")
                 .short('l')
                 .long("lines-changed-only")
-                .value_parser(["true", "false", "diff"])
+                .value_parser(["true", "on", "1", "false", "off", "0", "diff"])
                 .default_value("true")
                 .help_heading("Source options")
                 .help(
@@ -220,21 +212,21 @@ This is automatically enabled if
                 .action(ArgAction::Append)
                 .help_heading("clang-tidy options")
                 .help(
-                    "A string of extra arguments passed to clang-tidy for use as
+                    r#"A string of extra arguments passed to clang-tidy for use as
 compiler arguments. This can be specified more than once for each
 additional argument. Recommend using quotes around the value and
 avoid using spaces between name and value (use `=` instead):
 
 ```shell
-cpp-linter --extra-arg=\"-std=c++17\" --extra-arg=\"-Wall\"
-```",
+cpp-linter --extra-arg="-std=c++17" --extra-arg="-Wall"
+```"#,
                 ),
         )
         .arg(
             Arg::new("thread-comments")
                 .long("thread-comments")
                 .short('g')
-                .value_parser(["true", "false", "updated"])
+                .value_parser(["true", "on", "1", "false", "off", "0", "updated"])
                 .default_value("false")
                 .help_heading("feedback options")
                 .help(
@@ -381,11 +373,9 @@ mod test {
     fn extra_arg_1() {
         let args = parser_args(vec!["cpp-linter", "--extra-arg='-std=c++17 -Wall'"]);
         let extras = convert_extra_arg_val(&args);
-        assert!(extras.is_some());
-        if let Some(extra_args) = extras {
-            assert_eq!(extra_args.len(), 2);
-            assert_eq!(extra_args, ["-std=c++17", "-Wall"])
-        }
+        let extra_args = extras.expect("extra-arg not parsed properly");
+        assert_eq!(extra_args.len(), 2);
+        assert_eq!(extra_args, ["-std=c++17", "-Wall"])
     }
 
     #[test]
@@ -397,9 +387,8 @@ mod test {
         ]);
         let extras = convert_extra_arg_val(&args);
         assert!(extras.is_some());
-        if let Some(extra_args) = extras {
-            assert_eq!(extra_args.len(), 2);
-            assert_eq!(extra_args, ["-std=c++17", "-Wall"])
-        }
+        let extra_args = extras.expect("extra-arg not parsed properly");
+        assert_eq!(extra_args.len(), 2);
+        assert_eq!(extra_args, ["-std=c++17", "-Wall"])
     }
 }

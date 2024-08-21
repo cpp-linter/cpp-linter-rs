@@ -18,8 +18,7 @@ use which::{which, which_in};
 // project-specific modules/crates
 use super::common_fs::FileObj;
 use crate::{
-    cli::LinesChangedOnly,
-    common_fs::FileFilter,
+    cli::ClangParams,
     logger::{end_log_group, start_log_group},
 };
 pub mod clang_format;
@@ -75,20 +74,6 @@ pub fn get_clang_tool_exe(name: &str, version: &str) -> Result<PathBuf, &'static
             Err("Could not find clang tool by path")
         }
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct ClangParams {
-    pub tidy_checks: String,
-    pub lines_changed_only: LinesChangedOnly,
-    pub database: Option<PathBuf>,
-    pub extra_args: Option<Vec<String>>,
-    pub database_json: Option<CompilationDatabase>,
-    pub style: String,
-    pub clang_tidy_command: Option<PathBuf>,
-    pub clang_format_command: Option<PathBuf>,
-    pub tidy_filter: FileFilter,
-    pub format_filter: FileFilter,
 }
 
 /// This creates a task to run clang-tidy and clang-format on a single file.

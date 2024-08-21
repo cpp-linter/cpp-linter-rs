@@ -9,7 +9,7 @@ pub struct FileFilter {
     pub extensions: Vec<String>,
 }
 impl FileFilter {
-    pub fn new(ignore: &[&str], extensions: Vec<String>) -> Self {
+    pub fn new(ignore: &[String], extensions: Vec<String>) -> Self {
         let (ignored, not_ignored) = Self::parse_ignore(ignore);
         Self {
             ignored,
@@ -25,7 +25,7 @@ impl FileFilter {
     ///
     /// - `ignored` paths
     /// - `not_ignored` paths
-    fn parse_ignore(ignore: &[&str]) -> (Vec<String>, Vec<String>) {
+    fn parse_ignore(ignore: &[String]) -> (Vec<String>, Vec<String>) {
         let mut ignored = vec![];
         let mut not_ignored = vec![];
         for pattern in ignore {
@@ -43,19 +43,6 @@ impl FileFilter {
                 ignored.push(format!("./{pat}"));
             } else {
                 not_ignored.push(format!("./{pat}"));
-            }
-        }
-
-        if !ignored.is_empty() {
-            log::info!("Ignored:");
-            for pattern in &ignored {
-                log::info!("  {pattern}");
-            }
-        }
-        if !not_ignored.is_empty() {
-            log::info!("Not Ignored:");
-            for pattern in &not_ignored {
-                log::info!("  {pattern}");
             }
         }
         (ignored, not_ignored)
@@ -187,7 +174,7 @@ mod tests {
         let ignore_arg = args
             .get_many::<String>("ignore")
             .unwrap()
-            .map(|s| s.as_str())
+            .map(|s| s.to_owned())
             .collect::<Vec<_>>();
         let file_filter = FileFilter::new(&ignore_arg, extension);
         println!("ignored = {:?}", file_filter.ignored);
