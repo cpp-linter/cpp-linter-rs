@@ -100,6 +100,13 @@ pub async fn run_main(args: Vec<String>) -> i32 {
         .collect::<Vec<_>>();
     let mut file_filter = FileFilter::new(&ignore, extensions.clone());
     file_filter.parse_submodules();
+    if let Some(files) = args.get_many::<Vec<String>>("files") {
+        for list in files {
+            file_filter
+                .not_ignored
+                .extend(list.iter().map(|v| v.to_string()).collect::<Vec<String>>());
+        }
+    }
 
     let lines_changed_only = match args
         .get_one::<String>("lines-changed-only")
@@ -166,8 +173,11 @@ pub async fn run_main(args: Vec<String>) -> i32 {
     };
     capture_clang_tools_output(&mut arc_files, version, &mut clang_params).await;
     start_log_group(String::from("Posting feedback"));
-    rest_api_client.post_feedback(&arc_files, user_inputs).await;
+    let checks_failed = rest_api_client.post_feedback(&arc_files, user_inputs).await;
     end_log_group();
+    if env::var("PRE_COMMIT").is_ok_and(|v| v == "1") {
+        return (checks_failed > 1) as i32;
+    }
     0
 }
 

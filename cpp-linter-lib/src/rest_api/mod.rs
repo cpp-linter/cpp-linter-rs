@@ -124,7 +124,7 @@ pub trait RestApiClient {
         &self,
         files: &[Arc<Mutex<FileObj>>],
         user_inputs: FeedbackInput,
-    ) -> impl Future<Output = ()>;
+    ) -> impl Future<Output = u64>;
 }
 
 fn make_format_comment(

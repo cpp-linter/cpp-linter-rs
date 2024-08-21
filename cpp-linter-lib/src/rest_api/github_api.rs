@@ -191,7 +191,11 @@ impl RestApiClient for GithubApiClient {
         }
     }
 
-    async fn post_feedback(&self, files: &[Arc<Mutex<FileObj>>], user_inputs: FeedbackInput) {
+    async fn post_feedback(
+        &self,
+        files: &[Arc<Mutex<FileObj>>],
+        user_inputs: FeedbackInput,
+    ) -> u64 {
         let format_checks_failed = tally_format_advice(files);
         let tidy_checks_failed = tally_tidy_advice(files);
         let mut comment = None;
@@ -268,6 +272,7 @@ impl RestApiClient for GithubApiClient {
                 }
             }
         }
+        format_checks_failed + tidy_checks_failed
     }
 }
 

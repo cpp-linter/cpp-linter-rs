@@ -4,9 +4,9 @@ use super::FileObj;
 
 #[derive(Debug, Clone)]
 pub struct FileFilter {
-    ignored: Vec<String>,
-    not_ignored: Vec<String>,
-    extensions: Vec<String>,
+    pub ignored: Vec<String>,
+    pub not_ignored: Vec<String>,
+    pub extensions: Vec<String>,
 }
 impl FileFilter {
     pub fn new(ignore: &[&str], extensions: Vec<String>) -> Self {
