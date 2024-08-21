@@ -248,6 +248,12 @@
 <h2 id="commands"><a class="header" href="#commands">Commands</a></h2>
 <h3 id="version"><a class="header" href="#version"><code>version</code></a></h3>
 <p>Display the cpp-linter version and exit.</p>
+<h2 id="arguments"><a class="header" href="#arguments">Arguments</a></h2>
+<h3 id="files"><a class="header" href="#files"><code>files</code></a></h3>
+<p>An explicit path to a file.
+This can be specified zero or more times, resulting in a list of files.
+The list of files is appended to the internal list of 'not ignored' files.
+Further filtering can still be applied (see <a href="#source-options">Source options</a>).</p>
 <h2 id="general-options"><a class="header" href="#general-options">General options</a></h2>
 <h3 id="-v---verbosity"><a class="header" href="#-v---verbosity"><code>-v, --verbosity</code></a></h3>
 <dt>Default</dt><dd><code>"info"</code></dd>
@@ -326,7 +332,6 @@ does not not have the privilege to list the changed files for an event.</p>
 entirely.</li>
 </ul>
 <h3 id="-m---ignore-format"><a class="header" href="#-m---ignore-format"><code>-M, --ignore-format</code></a></h3>
-<dt>Default</dt><dd><code>""</code></dd>
 <p>Similar to <a href="#-i---ignore"><code>--ignore</code></a> but applied
 exclusively to files analyzed by clang-format.</p>
 <h2 id="clang-tidy-options"><a class="header" href="#clang-tidy-options">Clang-tidy options</a></h2>
@@ -361,7 +366,6 @@ avoid using spaces between name and value (use <code>=</code> instead):</p>
 <pre><code class="language-shell">cpp-linter --extra-arg="-std=c++17" --extra-arg="-Wall"
 </code></pre>
 <h3 id="-d---ignore-tidy"><a class="header" href="#-d---ignore-tidy"><code>-D, --ignore-tidy</code></a></h3>
-<dt>Default</dt><dd><code>""</code></dd>
 <p>Similar to <a href="#-i---ignore"><code>--ignore</code></a> but applied
 exclusively to files analyzed by clang-tidy.</p>
 <h2 id="feedback-options"><a class="header" href="#feedback-options">Feedback options</a></h2>

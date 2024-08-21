@@ -99,6 +99,13 @@ mod cli_gen_lib {
                     format!("{}\n", &cmd.get_about().unwrap().to_string().trim()).as_str(),
                 );
             }
+            out.push_str("## Arguments\n");
+            for arg in command.get_positionals() {
+                out.push_str(format!("\n### `{}`\n\n", arg.get_id().as_str()).as_str());
+                if let Some(help) = arg.get_help() {
+                    out.push_str(format!("{}\n", help.to_string().trim()).as_str());
+                }
+            }
             let arg_groups = if let Some(groups) = groups_order {
                 eprintln!("ordering groups into {:?}", groups);
                 let mut ordered = Vec::with_capacity(command.get_groups().count());
@@ -146,9 +153,9 @@ mod cli_gen_lib {
                                 .as_str(),
                         );
                     }
-                    out.push_str(
-                        format!("{}\n", &arg.get_long_help().unwrap().to_string().trim()).as_str(),
-                    );
+                    if let Some(help) = &arg.get_help() {
+                        out.push_str(format!("{}\n", help.to_string().trim()).as_str());
+                    }
                 }
             }
             out
