@@ -253,36 +253,36 @@ mod brute_force_parse_diff {
             git::parse_diff_from_buf,
         };
 
-        static RENAMED_DIFF: &str = r#"diff --git a/tests/demo/some source.cpp b/tests/demo/some source.cpp
+        static RENAMED_DIFF: &str = r#"diff --git a/tests/demo/some source.cpp b/tests/demo/some source.c
 similarity index 100%
 rename from /tests/demo/some source.cpp
-rename to /tests/demo/some source.cpp
+rename to /tests/demo/some source.c
 diff --git a/some picture.png b/some picture.png
 new file mode 100644
 Binary files /dev/null and b/some picture.png differ
 "#;
 
-        static RENAMED_DIFF_WITH_CHANGES: &str = r#"diff --git a/tests/demo/some source.cpp b/tests/demo/some source.cpp
+        static RENAMED_DIFF_WITH_CHANGES: &str = r#"diff --git a/tests/demo/some source.cpp b/tests/demo/some source.c
 similarity index 99%
 rename from /tests/demo/some source.cpp
-rename to /tests/demo/some source.cpp
+rename to /tests/demo/some source.c
 @@ -3,7 +3,7 @@
 \n \n \n-#include "iomanip"
-+#include <iomanip>\n \n \n \n"#;
++#include <cstdlib>\n \n \n \n"#;
 
         #[test]
         fn parse_renamed_diff() {
             let diff_buf = RENAMED_DIFF.as_bytes();
             let files = parse_diff_from_buf(
                 diff_buf,
-                &FileFilter::new(&["target".to_string()], vec![String::from("cpp")]),
+                &FileFilter::new(&["target".to_string()], vec!["c".to_string()]),
             );
             assert!(!files.is_empty());
             assert!(files
                 .first()
                 .unwrap()
                 .name
-                .ends_with("tests/demo/some source.cpp"));
+                .ends_with("tests/demo/some source.c"));
         }
 
         #[test]
@@ -290,7 +290,7 @@ rename to /tests/demo/some source.cpp
             let diff_buf = RENAMED_DIFF_WITH_CHANGES.as_bytes();
             let files = parse_diff_from_buf(
                 diff_buf,
-                &FileFilter::new(&["target".to_string()], vec![String::from("cpp")]),
+                &FileFilter::new(&["target".to_string()], vec!["c".to_string()]),
             );
             assert!(!files.is_empty());
         }
@@ -378,7 +378,10 @@ mod test {
 
     use tempfile::{tempdir, TempDir};
 
-    use crate::{common_fs::FileFilter, github_api::GithubApiClient, rest_api::RestApiClient};
+    use crate::{
+        common_fs::FileFilter,
+        rest_api::{github_api::GithubApiClient, RestApiClient},
+    };
 
     fn get_temp_dir() -> TempDir {
         let tmp = tempdir().unwrap();

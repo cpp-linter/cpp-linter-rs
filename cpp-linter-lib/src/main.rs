@@ -1,3 +1,4 @@
+#![cfg(not(test))]
 /// This crate is the binary executable's entrypoint.
 use std::env;
 
