@@ -67,7 +67,7 @@ For [`push` events][push-events].
 * The `contents` permission is needed to post or update a commit comment.
   This also allows us to delete an outdated comment if needed.
 
-### Pull_request
+### Pull Request
 
 For [`pull_request` events][pr-events].
 
