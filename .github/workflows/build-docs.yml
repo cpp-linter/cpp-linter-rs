@@ -16,7 +16,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cargo
-          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+          key: ${{ runner.os }}-docs-cargo-${{ hashFiles('Cargo.lock') }}
       - run: cargo fetch
 
   build-mdbook:
@@ -30,7 +30,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ~/.cargo
-          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+          key: ${{ runner.os }}-docs-cargo-${{ hashFiles('Cargo.lock') }}
       - name: Install mdbook
         uses: taiki-e/install-action@v2
         with:
@@ -62,7 +62,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ~/.cargo
-          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+          key: ${{ runner.os }}-docs-cargo-${{ hashFiles('Cargo.lock') }}
       - run: cargo doc --no-deps --manifest-path cpp-linter-lib/Cargo.toml
       - name: upload rustdoc build as artifact
         uses: actions/upload-artifact@v4
