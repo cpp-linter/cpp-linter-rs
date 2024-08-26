@@ -16,9 +16,8 @@ use openssl_probe;
 use crate::clang_tools::capture_clang_tools_output;
 use crate::cli::{get_arg_parser, ClangParams, Cli, FeedbackInput, LinesChangedOnly};
 use crate::common_fs::FileFilter;
-use crate::github_api::GithubApiClient;
 use crate::logger::{self, end_log_group, start_log_group};
-use crate::rest_api::RestApiClient;
+use crate::rest_api::{github_api::GithubApiClient, RestApiClient};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 

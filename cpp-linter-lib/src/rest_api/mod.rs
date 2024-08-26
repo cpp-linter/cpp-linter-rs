@@ -3,19 +3,37 @@
 //!
 //! Currently, only Github is supported.
 
+use std::collections::HashMap;
+use std::future::Future;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use std::{future::Future, path::PathBuf};
+use std::time::Duration;
 
 // non-std crates
+use chrono::DateTime;
+use futures::future::{BoxFuture, FutureExt};
 use reqwest::header::{HeaderMap, HeaderValue};
+use reqwest::{Client, IntoUrl, Method, Request, Response, Url};
 
 // project specific modules/crates
 pub mod github_api;
 use crate::cli::FeedbackInput;
 use crate::common_fs::{FileFilter, FileObj};
 
-pub static COMMENT_MARKER: &str = "<!-- cpp linter action -->";
+pub static COMMENT_MARKER: &str = "<!-- cpp linter action -->\n";
 pub static USER_OUTREACH: &str = "\n\nHave any feedback or feature suggestions? [Share it here.](https://github.com/cpp-linter/cpp-linter-action/issues)";
+
+/// A structure to contain the different forms of headers that
+/// describe a REST API's rate limit status.
+#[derive(Debug, Clone)]
+pub struct RestApiRateLimitHeaders {
+    /// The header key of the rate limit's reset time.
+    pub reset: String,
+    /// The header key of the rate limit's remaining attempts.
+    pub remaining: String,
+    /// The header key of the rate limit's "backoff" time interval.
+    pub retry: String,
+}
 
 /// A custom trait that templates necessary functionality with a Git server's REST API.
 pub trait RestApiClient {
@@ -29,9 +47,160 @@ pub trait RestApiClient {
 
     /// A convenience method to create the headers attached to all REST API calls.
     ///
-    /// If an authentication token is provided, this method shall include the relative
-    /// information in the returned [HeaderMap].
-    fn make_headers(&self, use_diff: Option<bool>) -> HeaderMap<HeaderValue>;
+    /// If an authentication token is provided (via environment variable),
+    /// this method shall include the relative information.
+    fn make_headers() -> HeaderMap<HeaderValue>;
+
+    /// Construct a HTTP request to be sent.
+    ///
+    /// The idea here is that this method is called before [`RestApiClient::send_api_request()`].
+    /// ```ignore
+    /// let request = Self::make_api_request(
+    ///     &self.client,
+    ///     "https://example.com",
+    ///     Method::GET,
+    ///     None,
+    ///     None
+    /// );
+    /// let response = Self::send_api_request(
+    ///     self.client.clone(),
+    ///     request,
+    ///     false, // false means don't panic
+    ///     0, // start recursion count at 0
+    /// );
+    /// match response.await {
+    ///     Some(res) => {/* handle response */}
+    ///     None => {/* handle failure */}
+    /// }
+    /// ```
+    fn make_api_request(
+        client: &Client,
+        url: impl IntoUrl,
+        method: Method,
+        data: Option<HashMap<&str, String>>,
+        headers: Option<HeaderMap>,
+    ) -> Request {
+        let mut req = client.request(method, url);
+        if let Some(h) = headers {
+            req = req.headers(h);
+        }
+        if let Some(d) = data {
+            req = req.json(&d);
+        }
+        req.build().expect("Failed to create a HTTP request")
+    }
+
+    /// A convenience function to send HTTP requests and respect a REST API rate limits.
+    ///
+    /// This method must own all the data passed to it because asynchronous recursion is used.
+    /// Recursion is needed when a secondary rate limit is hit. The server tells the client that
+    /// it should back off and retry after a specified time interval.
+    ///
+    /// Setting the `strict` parameter to true will panic when the HTTP request fails to send or
+    /// the HTTP response's status code does not describe success. This should only be used for
+    /// requests that are vital to the app operation.
+    /// With `strict` as true, the returned type is guaranteed to be a [`Some`] value.
+    /// If `strict` is false, then a failure to send the request is returned as a [`None`] value,
+    /// and a [`Some`] value could also indicate if the server failed to process the request.
+    fn send_api_request(
+        client: Client,
+        request: Request,
+        strict: bool,
+        rate_limit_headers: RestApiRateLimitHeaders,
+        retries: u64,
+    ) -> BoxFuture<'static, Option<Response>> {
+        async move {
+            match client
+                .execute(
+                    request
+                        .try_clone()
+                        .expect("Could not clone HTTP request object"),
+                )
+                .await
+            {
+                Ok(response) => {
+                    if [403u16, 429u16].contains(&response.status().as_u16()) {
+                        // rate limit exceeded
+
+                        // check if primary rate limit was violated; panic if so.
+                        let remaining = response
+                            .headers()
+                            .get(&rate_limit_headers.remaining)
+                            .expect("Response headers do not include remaining API usage count")
+                            .to_str()
+                            .expect("Failed to extract remaining attempts about rate limit")
+                            .parse::<i64>()
+                            .expect("Failed to parse i64 from remaining attempts about rate limit");
+                        let reset = DateTime::from_timestamp(
+                            response
+                                .headers()
+                                .get(&rate_limit_headers.reset)
+                                .expect("response headers does not include a reset timestamp")
+                                .to_str()
+                                .expect("Failed to extract reset info about rate limit")
+                                .parse::<i64>()
+                                .expect("Failed to parse i64 from reset time about rate limit"),
+                            0,
+                        )
+                        .expect("rate limit reset UTC timestamp is an invalid");
+                        if remaining <= 0 {
+                            panic!("REST API rate limit exceeded! Resets at {}", reset);
+                        }
+
+                        // check if secondary rate limit is violated; backoff and try again.
+                        if retries >= 5 {
+                            panic!("REST API secondary rate limit exceeded");
+                        }
+                        if let Some(retry) = response.headers().get(&rate_limit_headers.retry) {
+                            let interval = Duration::from_secs(
+                                retry
+                                    .to_str()
+                                    .expect("Failed to extract retry interval about rate limit")
+                                    .parse::<u64>()
+                                    .expect(
+                                        "Failed to parse u64 from retry interval about rate limit",
+                                    )
+                                    + retries.pow(2),
+                            );
+                            tokio::time::sleep(interval).await;
+                            return Self::send_api_request(
+                                client,
+                                request,
+                                strict,
+                                rate_limit_headers,
+                                retries + 1,
+                            )
+                            .await;
+                        }
+                    }
+                    if !response.status().is_success() {
+                        let summary = format!(
+                            "Got {} response from {}ing to {}",
+                            response.status().as_u16(),
+                            request.method().as_str(),
+                            request.url().as_str(),
+                        );
+                        if strict {
+                            panic!(
+                                "{summary}: {}",
+                                response.text().await.unwrap_or("".to_string())
+                            );
+                        }
+                        log::error!("{summary}");
+                    }
+                    Some(response)
+                }
+                Err(e) => {
+                    if strict {
+                        panic!("Failed to complete the HTTP request.\n{}", e);
+                    } else {
+                        None
+                    }
+                }
+            }
+        }
+        .boxed()
+    }
 
     /// A way to get the list of changed files using REST API calls. It is this method's
     /// job to parse diff blobs and return a list of changed files.
@@ -58,7 +227,7 @@ pub trait RestApiClient {
         tidy_checks_failed: u64,
         max_len: Option<u64>,
     ) -> String {
-        let mut comment = format!("{COMMENT_MARKER}\n# Cpp-Linter Report ");
+        let mut comment = format!("{COMMENT_MARKER}# Cpp-Linter Report ");
         let mut remaining_length =
             max_len.unwrap_or(u64::MAX) - comment.len() as u64 - USER_OUTREACH.len() as u64;
 
@@ -104,6 +273,33 @@ pub trait RestApiClient {
         files: &[Arc<Mutex<FileObj>>],
         user_inputs: FeedbackInput,
     ) -> impl Future<Output = u64>;
+
+    /// Gets the URL for the next page in a paginated response.
+    ///
+    /// Returns [`None`] if current response is the last page.
+    fn try_next_page(headers: &HeaderMap) -> Option<Url> {
+        if headers.contains_key("link") {
+            let pages = headers["link"]
+                .to_str()
+                .expect("Failed to convert header value of links to a str")
+                .split(", ");
+            for page in pages {
+                if page.ends_with("; rel=\"next\"") {
+                    let url = page
+                        .split_once(">;")
+                        .expect("header link for pagination is malformed")
+                        .0
+                        .trim_start_matches("<")
+                        .to_string();
+                    return Some(
+                        Url::parse(&url)
+                            .expect("Failed to parse next page link from response header"),
+                    );
+                }
+            }
+        }
+        None
+    }
 }
 
 fn make_format_comment(
@@ -164,7 +360,7 @@ fn make_tidy_comment(
                         concerned_code = if tidy_note.suggestion.is_empty() {String::from("")} else {
                             format!("\n   ```{ext}\n   {suggestion}\n   ```\n",
                                 ext = file_path.extension().expect("file extension was not determined").to_string_lossy(),
-                                suggestion = tidy_note.suggestion.join("\n    "),
+                                suggestion = tidy_note.suggestion.join("\n   "),
                             ).to_string()
                         },
                     ).to_string());

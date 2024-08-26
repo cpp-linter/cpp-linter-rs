@@ -151,7 +151,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          files=$(ls dist/cpp-linter*
+          files=$(ls dist/cpp-linter*)
           gh release create ${{ github.ref_name }} --generate-notes $files
       - run: cargo publish
         working-directory: cpp-linter-lib

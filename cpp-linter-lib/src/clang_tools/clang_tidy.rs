@@ -77,7 +77,7 @@ impl TidyNotification {
     pub fn diagnostic_link(&self) -> String {
         let ret_val = if let Some((category, name)) = self.diagnostic.split_once('-') {
             format!(
-                "[{}](https://clang.llvm.org/extra/clang-tidy/checks/{category}/{name}).html",
+                "[{}](https://clang.llvm.org/extra/clang-tidy/checks/{category}/{name}.html)",
                 self.diagnostic
             )
         } else {
@@ -153,7 +153,7 @@ fn parse_tidy_output(
                 line: captured[2].parse::<u32>().unwrap(),
                 cols: captured[3].parse::<u32>().unwrap(),
                 severity: String::from(&captured[4]),
-                rationale: String::from(&captured[5]),
+                rationale: String::from(&captured[5]).trim().to_string(),
                 diagnostic: String::from(&captured[6]),
                 suggestion: Vec::new(),
             });

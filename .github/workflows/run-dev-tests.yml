@@ -76,16 +76,16 @@ jobs:
         with:
           python-version: 3.x
 
-      # - name: Install workflow deps
-      #   run: python3 -m pip install meson
+      - name: Install workflow deps
+        run: python3 -m pip install meson
 
       # # https://github.com/ninja-build/ninja/wiki/Pre-built-Ninja-packages
-      # - name: Install ninja (Linux)
-      #   if: runner.os == 'Linux'
-      #   run: sudo apt-get install ninja-build
-      # - name: Install ninja (Windows)
-      #   if: runner.os == 'Windows'
-      #   run: choco install ninja
+      - name: Install ninja (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get install ninja-build
+      - name: Install ninja (Windows)
+        if: runner.os == 'Windows'
+        run: choco install ninja
 
       - name: Install Linux clang dependencies
         if: runner.os == 'Linux'

@@ -1,4 +1,7 @@
-use std::{fs, path::Path};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 use super::FileObj;
 
@@ -82,13 +85,21 @@ impl FileFilter {
     /// Returns a [`Some`] value of the the path/pattern that matches the given `file_name`.
     /// If given `file_name` is not in the specified list, then [`None`] is returned.
     pub fn is_file_in_list(&self, file_name: &Path, is_ignored: bool) -> Option<String> {
+        let file_name = PathBuf::from(format!(
+            "./{}",
+            file_name
+                .as_os_str()
+                .to_string_lossy()
+                .to_string()
+                .replace("\\", "/")
+        ));
         let set = if is_ignored {
             &self.ignored
         } else {
             &self.not_ignored
         };
         for pattern in set {
-            let pat = Path::new(&pattern);
+            let pat = PathBuf::from(&pattern);
             if (pat.is_file() && file_name == pat) || (pat.is_dir() && file_name.starts_with(pat)) {
                 return Some(pattern.to_owned());
             }

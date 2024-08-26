@@ -3,9 +3,11 @@ language: en
 words:
   - Boolish
   - bugprone
+  - chrono
   - codecov
   - consts
   - cppcoreguidelines
+  - cstdio
   - endgroup
   - Falsey
   - gitmodules
@@ -20,10 +22,12 @@ words:
   - pybind
   - pyfunction
   - pymodule
+  - ratelimit
   - reqwest
   - revparse
   - tempdir
   - tempfile
+  - vararg
   - venv
 ignorePaths:
   - .env/**

@@ -20,7 +20,10 @@ py-dev:
 # run the test suite
 [group("code coverage")]
 test:
-    cargo llvm-cov --no-report nextest --manifest-path cpp-linter-lib/Cargo.toml --lib
+    cargo llvm-cov --no-report --tests \
+    nextest --manifest-path cpp-linter-lib/Cargo.toml \
+    #--success-output=final \
+    --lib --color always
 
 # generate and open pretty coverage report
 [group("code coverage")]

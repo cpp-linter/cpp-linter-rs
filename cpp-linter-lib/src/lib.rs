@@ -11,7 +11,6 @@ pub mod clang_tools;
 pub mod cli;
 pub mod common_fs;
 pub mod git;
-pub mod rest_api;
-pub use rest_api::github_api;
 pub mod logger;
+pub mod rest_api;
 pub mod run;

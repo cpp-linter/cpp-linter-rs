@@ -226,7 +226,7 @@ cpp-linter --extra-arg="-std=c++17" --extra-arg="-Wall"
             Arg::new("thread-comments")
                 .long("thread-comments")
                 .short('g')
-                .value_parser(["true", "on", "1", "false", "off", "0", "updated"])
+                .value_parser(["true", "on", "1", "false", "off", "0", "update"])
                 .default_value("false")
                 .help_heading("feedback options")
                 .help(
