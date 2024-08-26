@@ -20,21 +20,20 @@ py-dev:
 # run the test suite
 [group("code coverage")]
 test:
-    cargo llvm-cov --no-report --tests \
+    cargo llvm-cov --no-report \
     nextest --manifest-path cpp-linter-lib/Cargo.toml \
-    #--success-output=final \
     --lib --color always
 
 # generate and open pretty coverage report
 [group("code coverage")]
 pretty-cov *args='':
-    cargo llvm-cov report --json --output-path coverage.json
+    cargo llvm-cov report --json --output-path coverage.json --ignore-filename-regex main
     llvm-cov-pretty coverage.json {{ args }}
 
 # generate and open detailed coverage report
 [group("code coverage")]
 llvm-cov *args='':
-    cargo llvm-cov report --html {{ args }}
+    cargo llvm-cov report --html --ignore-filename-regex main {{ args }}
 
 # This is useful for IDE gutter indicators of line coverage.
 # See Coverage Gutters ext in VSCode.

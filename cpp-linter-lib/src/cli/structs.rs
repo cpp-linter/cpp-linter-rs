@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use clap::ArgMatches;
 
 use super::convert_extra_arg_val;
-use crate::{clang_tools::clang_tidy::CompilationDatabase, common_fs::FileFilter};
+use crate::{clang_tools::clang_tidy::CompilationUnit, common_fs::FileFilter};
 
 /// An enum to describe `--lines-changed-only` CLI option's behavior.
 #[derive(PartialEq, Clone, Debug)]
@@ -139,7 +139,7 @@ pub struct ClangParams {
     pub lines_changed_only: LinesChangedOnly,
     pub database: Option<PathBuf>,
     pub extra_args: Option<Vec<String>>,
-    pub database_json: Option<CompilationDatabase>,
+    pub database_json: Option<Vec<CompilationUnit>>,
     pub style: String,
     pub clang_tidy_command: Option<PathBuf>,
     pub clang_format_command: Option<PathBuf>,

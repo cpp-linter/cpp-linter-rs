@@ -361,7 +361,6 @@ impl GithubApiClient {
         #[allow(clippy::nonminimal_bool)] // an inaccurate assessment
         if (is_lgtm && !no_lgtm) || !is_lgtm {
             let payload = HashMap::from([("body", comment.to_owned())]);
-            #[cfg(not(test))]
             log::debug!("payload body:\n{:?}", payload);
             let req_meth = if comment_url.is_some() {
                 Method::PATCH
@@ -529,7 +528,10 @@ mod test {
         sync::{Arc, Mutex},
     };
 
+    use chrono::Utc;
+    use mockito::{Matcher, Server};
     use regex::Regex;
+    use reqwest::{Method, Url};
     use tempfile::{tempdir, NamedTempFile};
 
     use super::GithubApiClient;
@@ -618,5 +620,50 @@ mod test {
             &gh_out,
             "checks-failed=0\nformat-checks-failed=0\ntidy-checks-failed=0\n"
         );
+    }
+
+    async fn simulate_rate_limit(secondary: bool) {
+        let mut server = Server::new_async().await;
+        let url = Url::parse(server.url().as_str()).unwrap();
+        env::set_var("GITHUB_API_URL", server.url());
+        let client = GithubApiClient::default();
+        let reset_timestamp = (Utc::now().timestamp() + 60).to_string();
+        let mock = server
+            .mock("GET", "/")
+            .match_query(Matcher::Any)
+            .with_status(429)
+            .with_header(
+                &client.rate_limit_headers.remaining,
+                if secondary { "1" } else { "0" },
+            )
+            .with_header(&client.rate_limit_headers.reset, &reset_timestamp);
+        if secondary {
+            mock.with_header(&client.rate_limit_headers.retry, "0")
+                .create();
+        } else {
+            mock.create();
+        }
+        let request =
+            GithubApiClient::make_api_request(&client.client, url, Method::GET, None, None);
+        let _response = GithubApiClient::send_api_request(
+            client.client.clone(),
+            request,
+            true,
+            client.rate_limit_headers.clone(),
+            0,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    #[should_panic(expected = "REST API secondary rate limit exceeded")]
+    async fn secondary_rate_limit() {
+        simulate_rate_limit(true).await;
+    }
+
+    #[tokio::test]
+    #[should_panic(expected = "REST API rate limit exceeded!")]
+    async fn primary_rate_limit() {
+        simulate_rate_limit(false).await;
     }
 }

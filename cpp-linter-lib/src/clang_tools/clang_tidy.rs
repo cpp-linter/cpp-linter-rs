@@ -18,19 +18,19 @@ use crate::{
     common_fs::{normalize_path, FileObj},
 };
 
-/// Used to deserialize a JSON compilation database
-#[derive(Deserialize, Debug, Clone)]
-pub struct CompilationDatabase {
-    /// A list of [`CompilationUnit`]
-    units: Vec<CompilationUnit>,
-}
+// /// Used to deserialize a JSON compilation database
+// #[derive(Deserialize, Debug, Clone)]
+// pub struct CompilationDatabase {
+//     /// A list of [`CompilationUnit`]
+//     units: Vec<CompilationUnit>,
+// }
 
 /// Used to deserialize a json compilation database's translation unit.
 ///
 /// The only purpose this serves is to normalize relative paths for build systems that
 /// use/need relative paths (ie ninja).
 #[derive(Deserialize, Debug, Clone)]
-struct CompilationUnit {
+pub struct CompilationUnit {
     /// The directory of the build environment
     directory: String,
 
@@ -75,15 +75,14 @@ pub struct TidyNotification {
 
 impl TidyNotification {
     pub fn diagnostic_link(&self) -> String {
-        let ret_val = if let Some((category, name)) = self.diagnostic.split_once('-') {
-            format!(
-                "[{}](https://clang.llvm.org/extra/clang-tidy/checks/{category}/{name}.html)",
-                self.diagnostic
-            )
-        } else {
-            self.diagnostic.clone()
-        };
-        ret_val
+        if self.diagnostic.starts_with("clang-diagnostic") {
+            return self.diagnostic.clone();
+        }
+        let (category, name) = self.diagnostic.split_once('-').unwrap();
+        format!(
+            "[{}](https://clang.llvm.org/extra/clang-tidy/checks/{category}/{name}.html)",
+            self.diagnostic
+        )
     }
 }
 
@@ -100,7 +99,7 @@ pub struct TidyAdvice {
 /// in the notifications.
 fn parse_tidy_output(
     tidy_stdout: &[u8],
-    database_json: &Option<CompilationDatabase>,
+    database_json: &Option<Vec<CompilationUnit>>,
 ) -> Option<TidyAdvice> {
     let note_header = Regex::new(r"^(.+):(\d+):(\d+):\s(\w+):(.*)\[([a-zA-Z\d\-\.]+)\]$").unwrap();
     let mut notification = None;
@@ -114,29 +113,29 @@ fn parse_tidy_output(
 
             // normalize the filename path and try to make it relative to the repo root
             let mut filename = PathBuf::from(&captured[1]);
-            if filename.is_relative() {
-                // if database was given try to use that first
-                if let Some(db_json) = &database_json {
-                    let mut found_unit = false;
-                    for unit in &db_json.units {
-                        if unit.file == captured[0] {
-                            filename =
-                                normalize_path(&PathBuf::from_iter([&unit.directory, &unit.file]));
-                            found_unit = true;
-                            break;
-                        }
+            // if database was given try to use that first
+            if let Some(db_json) = &database_json {
+                let mut found_unit = false;
+                for unit in db_json {
+                    let unit_path =
+                        PathBuf::from_iter([unit.directory.as_str(), unit.file.as_str()]);
+                    if unit_path == filename {
+                        filename =
+                            normalize_path(&PathBuf::from_iter([&unit.directory, &unit.file]));
+                        found_unit = true;
+                        break;
                     }
-                    if !found_unit {
-                        // file was not a named unit in the database;
-                        // try to normalize path as if relative to working directory.
-                        // NOTE: This shouldn't happen with a properly formed JSON database
-                        filename = normalize_path(&PathBuf::from_iter([&cur_dir, &filename]));
-                    }
-                } else {
-                    // still need to normalize the relative path despite missing database info.
-                    // let's assume the file is relative to current working directory.
+                }
+                if !found_unit {
+                    // file was not a named unit in the database;
+                    // try to normalize path as if relative to working directory.
+                    // NOTE: This shouldn't happen with a properly formed JSON database
                     filename = normalize_path(&PathBuf::from_iter([&cur_dir, &filename]));
                 }
+            } else {
+                // still need to normalize the relative path despite missing database info.
+                // let's assume the file is relative to current working directory.
+                filename = normalize_path(&PathBuf::from_iter([&cur_dir, &filename]));
             }
             assert!(filename.is_absolute());
             if filename.is_absolute() && filename.starts_with(&cur_dir) {
@@ -198,7 +197,7 @@ pub fn run_clang_tidy(
     lines_changed_only: &LinesChangedOnly,
     database: &Option<PathBuf>,
     extra_args: &Option<Vec<String>>,
-    database_json: &Option<CompilationDatabase>,
+    database_json: &Option<Vec<CompilationUnit>>,
 ) -> Vec<(log::Level, std::string::String)> {
     let mut logs = vec![];
     let mut file = file.lock().unwrap();

@@ -1,7 +1,14 @@
 use chrono::Utc;
 use cpp_linter_lib::run::run_main;
 use mockito::{Matcher, Server, ServerGuard};
-use std::{env, fmt::Display, fs, io::Write, path::Path, process::Command};
+use std::{
+    env,
+    fmt::Display,
+    fs,
+    io::{self, BufRead, Write},
+    path::Path,
+    process::Command,
+};
 use tempfile::{NamedTempFile, TempDir};
 
 const SHA: &str = "8d68756375e0483c7ac2b4d6bbbece420dbbb495";
@@ -155,6 +162,8 @@ async fn setup(
         "--ignore-format=src/some source.c".to_string(),
         format!("--thread-comments={thread_comments}"),
         format!("--no-lgtm={no_lgtm}"),
+        "-p=build".to_string(),
+        "-i=build".to_string(),
     ];
     if is_lgtm {
         args.push("-e=c".to_string());
@@ -176,9 +185,17 @@ fn create_test_space() -> TempDir {
     }
 
     // generate compilation database with meson (& ninja)
-    let test_dir = tmp.path().to_str().unwrap();
+    let test_dir = tmp.path().join("src");
     let mut cmd = Command::new("meson");
-    cmd.args(["init", "-C", test_dir]);
+    cmd.args([
+        "init",
+        "-C",
+        test_dir.to_str().unwrap(),
+        "--name",
+        "demo",
+        "demo.cpp",
+        "demo.hpp",
+    ]);
     let output = cmd.output().expect("Failed to run 'meson init'");
     println!(
         "meson init stdout:\n{}",
@@ -190,7 +207,7 @@ fn create_test_space() -> TempDir {
         "setup",
         "--backend=ninja",
         meson_build_dir.as_path().to_str().unwrap(),
-        test_dir,
+        test_dir.to_str().unwrap(),
     ]);
     let output = cmd
         .output()
@@ -199,6 +216,11 @@ fn create_test_space() -> TempDir {
         "meson setup stdout:\n{}",
         String::from_utf8(output.stdout.to_vec()).unwrap()
     );
+    let db = fs::File::open(meson_build_dir.join("compile_commands.json"))
+        .expect("Failed to open compilation database");
+    for line in io::BufReader::new(db).lines().map_while(Result::ok) {
+        println!("{line}");
+    }
     tmp
 }
 

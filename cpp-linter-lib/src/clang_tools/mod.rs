@@ -24,7 +24,7 @@ use crate::{
 pub mod clang_format;
 use clang_format::run_clang_format;
 pub mod clang_tidy;
-use clang_tidy::{run_clang_tidy, CompilationDatabase};
+use clang_tidy::{run_clang_tidy, CompilationUnit};
 
 /// Fetch the path to a clang tool by `name` (ie `"clang-tidy"` or `"clang-format"`) and
 /// `version`.
@@ -182,12 +182,12 @@ pub async fn capture_clang_tools_output(
 
     // parse database (if provided) to match filenames when parsing clang-tidy's stdout
     if let Some(db_path) = &clang_params.database {
-        if let Ok(db_str) = fs::read(db_path) {
+        if let Ok(db_str) = fs::read(db_path.join("compile_commands.json")) {
             clang_params.database_json = Some(
-                serde_json::from_str::<CompilationDatabase>(
+                serde_json::from_str::<Vec<CompilationUnit>>(
                     String::from_utf8(db_str).unwrap().as_str(),
                 )
-                .unwrap(),
+                .expect("Failed to parse compile_commands.json"),
             )
         }
     };

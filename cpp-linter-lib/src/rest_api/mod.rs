@@ -131,24 +131,24 @@ pub trait RestApiClient {
                             .expect("Failed to extract remaining attempts about rate limit")
                             .parse::<i64>()
                             .expect("Failed to parse i64 from remaining attempts about rate limit");
-                        let reset = DateTime::from_timestamp(
-                            response
-                                .headers()
-                                .get(&rate_limit_headers.reset)
-                                .expect("response headers does not include a reset timestamp")
-                                .to_str()
-                                .expect("Failed to extract reset info about rate limit")
-                                .parse::<i64>()
-                                .expect("Failed to parse i64 from reset time about rate limit"),
-                            0,
-                        )
-                        .expect("rate limit reset UTC timestamp is an invalid");
                         if remaining <= 0 {
+                            let reset = DateTime::from_timestamp(
+                                response
+                                    .headers()
+                                    .get(&rate_limit_headers.reset)
+                                    .expect("response headers does not include a reset timestamp")
+                                    .to_str()
+                                    .expect("Failed to extract reset info about rate limit")
+                                    .parse::<i64>()
+                                    .expect("Failed to parse i64 from reset time about rate limit"),
+                                0,
+                            )
+                            .expect("rate limit reset UTC timestamp is an invalid");
                             panic!("REST API rate limit exceeded! Resets at {}", reset);
                         }
 
                         // check if secondary rate limit is violated; backoff and try again.
-                        if retries >= 5 {
+                        if retries > 4 {
                             panic!("REST API secondary rate limit exceeded");
                         }
                         if let Some(retry) = response.headers().get(&rate_limit_headers.retry) {
