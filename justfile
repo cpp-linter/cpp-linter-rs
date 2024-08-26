@@ -22,7 +22,7 @@ py-dev:
 test:
     cargo llvm-cov --no-report \
     nextest --manifest-path cpp-linter-lib/Cargo.toml \
-    --lib --color always
+    --lib --tests --color always
 
 # generate and open pretty coverage report
 [group("code coverage")]
@@ -40,29 +40,27 @@ llvm-cov *args='':
 # generate lcov.info
 [group("code coverage")]
 lcov:
-    @cargo llvm-cov report --lcov --output-path lcov.info
+    cargo llvm-cov report --lcov --output-path lcov.info --ignore-filename-regex main
 
 # serve docs
 [group("docs")]
 docs open='':
-    @mdbook serve docs {{ open }}
+    mdbook serve docs {{ open }}
 
 # build docs
 [group("docs")]
-docs-build:
-    mdbook build docs --open
+docs-build open='':
+    mdbook build docs {{ open }}
 
 # rust docs
 [group("docs")]
-docs-rs:
-    cargo doc --no-deps --lib --manifest-path cpp-linter-lib/Cargo.toml --open
+docs-rs open='':
+    cargo doc --no-deps --lib --manifest-path cpp-linter-lib/Cargo.toml {{ open }}
 
 # run cpp-linter native binary
 [group("bin")]
 run *args:
     cargo run --bin cpp-linter --manifest-path cpp-linter-lib/Cargo.toml -- {{ args }}
-
-# The tool parameter can be set to 'cross' when cross compiling.
 
 # build the native binary
 [group("bin")]

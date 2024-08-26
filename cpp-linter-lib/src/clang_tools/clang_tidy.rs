@@ -18,13 +18,6 @@ use crate::{
     common_fs::{normalize_path, FileObj},
 };
 
-// /// Used to deserialize a JSON compilation database
-// #[derive(Deserialize, Debug, Clone)]
-// pub struct CompilationDatabase {
-//     /// A list of [`CompilationUnit`]
-//     units: Vec<CompilationUnit>,
-// }
-
 /// Used to deserialize a json compilation database's translation unit.
 ///
 /// The only purpose this serves is to normalize relative paths for build systems that
