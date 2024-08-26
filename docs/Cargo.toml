@@ -11,7 +11,7 @@ cpp-linter-lib = { path = "../cpp-linter-lib", version = "*" }
 clap = "4.5.16"
 mdbook = "0.4.40"
 semver = "1.0.23"
-serde_json = "1.0.125"
+serde_json = "1.0.127"
 
 [[bin]]
 name = "cli-gen"
