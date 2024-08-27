@@ -42,8 +42,13 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-nextest,cargo-llvm-cov,cargo-binstall,just
+      - uses: actions/setup-python@v5
+        with:
+          python-version: 3.x
+      - name: Install workflow deps
+        run: python3 -m pip install meson
       - run: just test
-        continue-on-error: true
+        # continue-on-error: true
       - name: save build as artifact
         uses: actions/upload-artifact@v4
         with:
