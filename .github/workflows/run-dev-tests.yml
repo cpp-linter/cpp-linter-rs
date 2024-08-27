@@ -60,7 +60,7 @@ jobs:
       - name: save build as artifact
         uses: actions/upload-artifact@v4
         with:
-          path: llvm-cov-target.tar
+          path: llvm-cov-assets.tar
           name: cpp-linter-lib_tests-${{ runner.os }}-${{ github.run_id }}
           retention-days: 1
 
