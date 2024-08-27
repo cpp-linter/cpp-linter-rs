@@ -1,8 +1,10 @@
+<!-- markdownlint-disable MD041 -->
 [![Python packaging][py-build-badge]][py-build-ci]
 [![Binary executable builds][bin-build-badge]][bin-build-ci]
 [![Test CI][test-ci-badge]][test-ci]
 [![Docs][docs-ci-badge]][docs-site]
 [![Pre-commit-ci][pre-commit-badge]][pre-commit-ci]
+[![codecov-status][codecov-badge]][codecov-project]
 
 [py-build-ci]: https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/python-packaging.yml
 [py-build-badge]: https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/python-packaging.yml/badge.svg
@@ -22,9 +24,6 @@
 A Python and Rust package for linting C/C++ code with clang-tidy and/or clang-format to collect feedback provided in the form of thread comments, step summary, or file annotations.
 
 > [!CAUTION]
->
-> [![codecov-status][codecov-badge]][codecov-project]
->
 > This project is still experimental and subject to drastic changes.
 > Please use the pure python [cpp-linter](https://github.com/cpp-linter/cpp-linter)
 > package until this project is ready for deployment.
@@ -77,7 +76,11 @@ license agreements:
 - [serde_json](https://crates.io/crates/serde_json):
   Dual-licensed under [Apache 2.0][Apache2] or [MIT][MIT].
 - [which](https://crates.io/crates/which): Licensed under [MIT][MIT].
-- [tokio](https://crates.io/crates/tokio): Licensed under [MIT][MIT]
+- [tokio](https://crates.io/crates/tokio): Licensed under [MIT][MIT].
+- [futures](https://crates.io/crates/futures):
+  Dual-licensed under [Apache 2.0][Apache2] or [MIT][MIT].
+- [chrono](https://crates.io/crates/chrono):
+  Dual-licensed under [Apache 2.0][Apache2] or [MIT][MIT].
 
 The python binding uses
 
