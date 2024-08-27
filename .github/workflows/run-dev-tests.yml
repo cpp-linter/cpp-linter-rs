@@ -47,6 +47,12 @@ jobs:
           python-version: 3.x
       - name: Install workflow deps
         run: python3 -m pip install meson
+      - name: Install ninja (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get install ninja-build
+      - name: Install ninja (Windows)
+        if: runner.os == 'Windows'
+        run: choco install ninja
       - run: just test
         # continue-on-error: true
       - name: save build as artifact
