@@ -55,10 +55,12 @@ jobs:
         run: choco install ninja
       - run: just test
         # continue-on-error: true
+      - name: Tar build assets
+        run: tar -cvf llvm-cov-target.tar target/llvm-cov-target
       - name: save build as artifact
         uses: actions/upload-artifact@v4
         with:
-          path: target/llvm-cov-target
+          path: llvm-cov-target.tar
           name: cpp-linter-lib_tests-${{ runner.os }}-${{ github.run_id }}
           retention-days: 1
 
@@ -140,8 +142,9 @@ jobs:
       - name: restore build from artifact
         uses: actions/download-artifact@v4
         with:
-          path: target/llvm-cov-target
           name: cpp-linter-lib_tests-${{ runner.os }}-${{ github.run_id }}
+      - name: Un-Tar build assets
+        run: tar -xvf llvm-cov-assets.tar
 
       - name: Collect Coverage
         working-directory: cpp-linter-lib
