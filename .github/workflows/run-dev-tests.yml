@@ -56,7 +56,7 @@ jobs:
       - run: just test
         # continue-on-error: true
       - name: Tar build assets
-        run: tar -cvf llvm-cov-target.tar target/llvm-cov-target
+        run: tar -cvf llvm-cov-assets.tar target/llvm-cov-target
       - name: save build as artifact
         uses: actions/upload-artifact@v4
         with:
