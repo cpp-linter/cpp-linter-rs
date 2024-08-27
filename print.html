@@ -459,8 +459,8 @@ the <a href="cli.html#-r---repo-root"><code>--repo-root</code></a>) has to be sp
 with a <code>.</code>) are also ignored automatically.</li>
 <li>Prefix a path with <code>!</code> to explicitly not ignore it. This can be
 applied to a submodule's path (if desired) but not hidden directories.</li>
-<li>Glob patterns are not supported here. All asterisk characters (<code>*</code>)
-are literal.</li>
+<li>Glob patterns are supported here. Path separators in glob patterns should
+use <code>/</code> because <code>\</code> represents an escaped literal.</li>
 </ul>
 <h3 id="-l---lines-changed-only"><a class="header" href="#-l---lines-changed-only"><code>-l, --lines-changed-only</code></a></h3>
 <dt>Default</dt><dd><code>"true"</code></dd>
