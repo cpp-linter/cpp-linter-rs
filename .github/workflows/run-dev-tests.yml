@@ -37,6 +37,19 @@ jobs:
           path: ~/.cargo
           key: ${{ runner.os }}-test-cargo-${{ hashFiles('Cargo.lock') }}
       - run: cargo fetch
+      - run: rustup component add llvm-tools-preview
+      - name: Install third-party binaries
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest,cargo-llvm-cov,cargo-binstall,just
+      - run: just test
+        continue-on-error: true
+      - name: save build as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          path: target/llvm-cov-target
+          name: cpp-linter-lib_tests-${{ runner.os }}-${{ github.run_id }}
+          retention-days: 1
 
   test:
     needs: [cache-deps]
@@ -112,6 +125,12 @@ jobs:
         with:
           path: ~/.cargo
           key: ${{ runner.os }}-test-cargo-${{ hashFiles('Cargo.lock') }}
+
+      - name: restore build from artifact
+        uses: actions/download-artifact@v4
+        with:
+          path: target/llvm-cov-target
+          name: cpp-linter-lib_tests-${{ runner.os }}-${{ github.run_id }}
 
       - name: Collect Coverage
         working-directory: cpp-linter-lib
