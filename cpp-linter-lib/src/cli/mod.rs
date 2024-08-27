@@ -140,8 +140,8 @@ the current working directory if not using a CI runner).\n\n",
   with a `.`) are also ignored automatically.
 - Prefix a path with `!` to explicitly not ignore it. This can be
   applied to a submodule's path (if desired) but not hidden directories.
-- Glob patterns are not supported here. All asterisk characters (`*`)
-  are literal.\n\n",
+- Glob patterns are supported here. Path separators in glob patterns should
+  use `/` because `\\` represents an escaped literal.\n\n",
                 ),
         )
         .arg(

@@ -3,6 +3,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use fast_glob::glob_match;
+
 use super::FileObj;
 
 #[derive(Debug, Clone)]
@@ -76,15 +78,15 @@ impl FileFilter {
         }
     }
 
-    /// Describes if a specified `file_name` is contained within the given `set` of paths.
+    /// Describes if a specified `file_name` is contained within the specified set of paths.
     ///
-    /// The `is_ignored` flag describes which list of paths is used as domains.
+    /// The `is_ignored` flag describes which set of paths is used as domains.
     /// The specified `file_name` can be a direct or distant descendant of any paths in
-    /// the list.
+    /// the set.
     ///
-    /// Returns a [`Some`] value of the the path/pattern that matches the given `file_name`.
-    /// If given `file_name` is not in the specified list, then [`None`] is returned.
-    pub fn is_file_in_list(&self, file_name: &Path, is_ignored: bool) -> Option<String> {
+    /// Returns a `true` value of the the path/pattern that matches the given `file_name`.
+    /// If given `file_name` is not in the specified set, then `false` is returned.
+    pub fn is_file_in_list(&self, file_name: &Path, is_ignored: bool) -> bool {
         let file_name = PathBuf::from(format!(
             "./{}",
             file_name
@@ -92,6 +94,7 @@ impl FileFilter {
                 .to_string_lossy()
                 .to_string()
                 .replace("\\", "/")
+                .trim_start_matches("./")
         ));
         let set = if is_ignored {
             &self.ignored
@@ -99,12 +102,17 @@ impl FileFilter {
             &self.not_ignored
         };
         for pattern in set {
+            let glob_matched =
+                glob_match(pattern, file_name.to_string_lossy().to_string().as_str());
             let pat = PathBuf::from(&pattern);
-            if (pat.is_file() && file_name == pat) || (pat.is_dir() && file_name.starts_with(pat)) {
-                return Some(pattern.to_owned());
+            if glob_matched
+                || (pat.is_file() && file_name == pat)
+                || (pat.is_dir() && file_name.starts_with(pat))
+            {
+                return true;
             }
         }
-        None
+        false
     }
 
     /// A helper function that checks if `entry` satisfies the following conditions (in
@@ -130,7 +138,7 @@ impl FileFilter {
         if !is_ignored {
             let is_in_ignored = self.is_file_in_list(entry, true);
             let is_in_not_ignored = self.is_file_in_list(entry, false);
-            if is_in_not_ignored.is_some() || is_in_ignored.is_none() {
+            if is_in_not_ignored || !is_in_ignored {
                 return true;
             }
         }
@@ -145,7 +153,7 @@ impl FileFilter {
     pub fn list_source_files(&self, root_path: &str) -> Vec<FileObj> {
         let mut files: Vec<FileObj> = Vec::new();
         let entries = fs::read_dir(root_path).expect("repo root-path should exist");
-        for entry in entries.flatten() {
+        for entry in entries.filter_map(|p| p.ok()) {
             let path = entry.path();
             if path.is_dir() {
                 let mut is_hidden = false;
@@ -196,34 +204,31 @@ mod tests {
     #[test]
     fn ignore_src() {
         let file_filter = setup_ignore("src", vec![]);
-        assert!(file_filter
-            .is_file_in_list(&PathBuf::from("./src/lib.rs"), true)
-            .is_some());
-        assert!(file_filter
-            .is_file_in_list(&PathBuf::from("./src/lib.rs"), false)
-            .is_none());
+        assert!(file_filter.is_file_in_list(&PathBuf::from("./src/lib.rs"), true));
+        assert!(!file_filter.is_file_in_list(&PathBuf::from("./src/lib.rs"), false));
     }
 
     #[test]
     fn ignore_root() {
         let file_filter = setup_ignore("!src/lib.rs|./", vec![]);
-        assert!(file_filter
-            .is_file_in_list(&PathBuf::from("./cargo.toml"), true)
-            .is_some());
-        assert!(file_filter
-            .is_file_in_list(&PathBuf::from("./src/lib.rs"), false)
-            .is_some());
+        assert!(file_filter.is_file_in_list(&PathBuf::from("./Cargo.toml"), true));
+        assert!(file_filter.is_file_in_list(&PathBuf::from("./src/lib.rs"), false));
     }
 
     #[test]
     fn ignore_root_implicit() {
         let file_filter = setup_ignore("!src|", vec![]);
-        assert!(file_filter
-            .is_file_in_list(&PathBuf::from("./cargo.toml"), true)
-            .is_some());
-        assert!(file_filter
-            .is_file_in_list(&PathBuf::from("./src/lib.rs"), false)
-            .is_some());
+        assert!(file_filter.is_file_in_list(&PathBuf::from("./Cargo.toml"), true));
+        assert!(file_filter.is_file_in_list(&PathBuf::from("./src/lib.rs"), false));
+    }
+
+    #[test]
+    fn ignore_glob() {
+        let file_filter = setup_ignore("!src/**/*", vec![]);
+        assert!(file_filter.is_file_in_list(&PathBuf::from("./src/lib.rs"), false));
+        assert!(
+            file_filter.is_file_in_list(&PathBuf::from("./src/common_fs/file_filter.rs"), false)
+        );
     }
 
     #[test]
@@ -235,17 +240,13 @@ mod tests {
         // using Vec::contains() because these files don't actually exist in project files
         for ignored_submodule in ["./RF24", "./RF24Network", "./RF24Mesh"] {
             assert!(file_filter.ignored.contains(&ignored_submodule.to_string()));
-            assert!(file_filter
-                .is_file_in_list(
-                    &PathBuf::from(ignored_submodule.to_string() + "/some_src.cpp"),
-                    true
-                )
-                .is_none());
+            assert!(!file_filter.is_file_in_list(
+                &PathBuf::from(ignored_submodule.to_string() + "/some_src.cpp"),
+                true
+            ));
         }
         assert!(file_filter.not_ignored.contains(&"./pybind11".to_string()));
-        assert!(file_filter
-            .is_file_in_list(&PathBuf::from("./pybind11/some_src.cpp"), false)
-            .is_none());
+        assert!(!file_filter.is_file_in_list(&PathBuf::from("./pybind11/some_src.cpp"), false));
     }
 
     // *********************** tests for recursive path search
