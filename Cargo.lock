@@ -323,6 +323,7 @@ version = "2.0.0"
 dependencies = [
  "chrono",
  "clap",
+ "fast-glob",
  "futures",
  "git2",
  "lenient_semver",
@@ -497,6 +498,12 @@ dependencies = [
  "libc",
  "windows-sys 0.52.0",
 ]
+
+[[package]]
+name = "fast-glob"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb10ed0f8a3dca52477be37ac0fb8f9d1fd4cd8d311b4484bdd45c1c56e0c9ec"
 
 [[package]]
 name = "fastrand"
