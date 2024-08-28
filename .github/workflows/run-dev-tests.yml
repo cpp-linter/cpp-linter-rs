@@ -136,8 +136,7 @@ jobs:
         working-directory: cpp-linter-lib
         env:
           CLANG_VERSION: ${{ matrix.version }}
-        run: |
-          cargo llvm-cov report --lcov --output-path lcov.info
+        run: just lcov
 
       - uses: codecov/codecov-action@v4
         if: matrix.version == '16' && runner.os == 'Linux'
