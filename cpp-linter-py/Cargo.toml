@@ -14,7 +14,7 @@ crate-type = ["cdylib"]
 [dependencies]
 pyo3 = { version = "0.22.2", features = ["extension-module"] }
 cpp-linter-lib = { path = "../cpp-linter-lib", version = "*" }
-tokio = "1.39.3"
+tokio = "1.40.0"
 
 [features]
 openssl-vendored = ["cpp-linter-lib/openssl-vendored"]
