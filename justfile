@@ -24,6 +24,11 @@ test:
     nextest --manifest-path cpp-linter-lib/Cargo.toml \
     --lib --tests --color always
 
+# Clear previous test build artifacts
+[group("code coverage")]
+test-clean:
+    cargo llvm-cov clean
+
 # generate and open pretty coverage report
 [group("code coverage")]
 pretty-cov *args='':
