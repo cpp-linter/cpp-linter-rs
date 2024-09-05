@@ -8,10 +8,10 @@ documentation.workspace = true
 
 [dependencies]
 cpp-linter-lib = { path = "../cpp-linter-lib", version = "*" }
-clap = "4.5.16"
+clap = "4.5.17"
 mdbook = "0.4.40"
 semver = "1.0.23"
-serde_json = "1.0.127"
+serde_json = "1.0.128"
 
 [[bin]]
 name = "cli-gen"
