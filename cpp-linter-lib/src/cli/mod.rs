@@ -2,7 +2,7 @@
 use std::path::PathBuf;
 
 // non-std crates
-use clap::builder::{ArgPredicate, FalseyValueParser};
+use clap::builder::{ArgPredicate, BoolishValueParser, FalseyValueParser};
 use clap::{value_parser, Arg, ArgAction, ArgGroup, ArgMatches, Command};
 
 mod structs;
@@ -25,7 +25,7 @@ pub fn get_arg_parser() -> Command {
                     "This controls the action's verbosity in the workflow's logs.
 This option does not affect the verbosity of resulting
 thread comments or file annotations.\n\n",
-                ),
+            ),
         )
         .arg(
             Arg::new("database")
@@ -41,7 +41,8 @@ When no build path is specified, a search for compile_commands.json will be
 attempted through all parent paths of the first input file. See [LLVM docs about
 setup tooling](https://clang.llvm.org/docs/HowToSetupToolingForLLVM.html)
 for an example of setting up Clang Tooling on a source tree.",
-        ))
+            )
+        )
         .arg(
             Arg::new("style")
                 .short('s')
@@ -54,8 +55,14 @@ for an example of setting up Clang Tooling on a source tree.",
 - Set this to `file` to have clang-format use the closest relative
   .clang-format file.
 - Set this to a blank string (`''`) to disable using clang-format
-  entirely.\n\n",
-                ),
+  entirely.
+
+> [!note]
+> If this is not a blank string, then it is also passed to clang-tidy
+> (if [`--tidy_checks`](#-c---tidy-checks) is not `-*`).
+> This is done to ensure suggestions from both clang-tidy and
+> clang-format are consistent.\n\n",
+            ),
         )
         .arg(
             Arg::new("tidy-checks")
@@ -79,7 +86,7 @@ option in a .clang-tidy file (if any).
   specifying this option as a blank string (`''`).
 
 See also clang-tidy docs for more info.\n\n",
-                ),
+            ),
         )
         .arg(
             Arg::new("version")
@@ -98,7 +105,7 @@ strings which can be 8, 9, 10, 11, 12, 13, 14, 15, 16, 17.
 - This value can also be a path to where the clang tools are
   installed (if using a custom install location). All paths specified
   here are converted to absolute.\n\n",
-                ),
+            ),
         )
         .arg(
             Arg::new("extensions")
@@ -119,7 +126,7 @@ strings which can be 8, 9, 10, 11, 12, 13, 14, 15, 16, 17.
                     "The relative path to the repository root directory. This path is
 relative to the runner's `GITHUB_WORKSPACE` environment variable (or
 the current working directory if not using a CI runner).\n\n",
-                ),
+            ),
         )
         .arg(
             Arg::new("ignore")
@@ -142,7 +149,7 @@ the current working directory if not using a CI runner).\n\n",
   applied to a submodule's path (if desired) but not hidden directories.
 - Glob patterns are supported here. Path separators in glob patterns should
   use `/` because `\\` represents an escaped literal.\n\n",
-                ),
+            ),
         )
         .arg(
             Arg::new("ignore-tidy")
@@ -153,7 +160,7 @@ the current working directory if not using a CI runner).\n\n",
                 .help(
                     "Similar to [`--ignore`](#-i---ignore) but applied
 exclusively to files analyzed by clang-tidy.\n\n",
-                ),
+            ),
         )
         .arg(
             Arg::new("ignore-format")
@@ -164,7 +171,7 @@ exclusively to files analyzed by clang-tidy.\n\n",
                 .help(
                     "Similar to [`--ignore`](#-i---ignore) but applied
 exclusively to files analyzed by clang-format.\n\n",
-                ),
+            ),
         )
         .arg(
             Arg::new("lines-changed-only")
@@ -181,7 +188,7 @@ The following values are accepted:
 - `true`: Only lines in the diff that contain additions are analyzed.
 - `diff`: All lines in the diff are analyzed (including unchanged
   lines but not subtractions).\n\n",
-                ),
+            ),
         )
         .arg(
             Arg::new("files-changed-only")
@@ -203,7 +210,7 @@ This is automatically enabled if
 >
 > See [Authenticating with the `GITHUB_TOKEN`](
 > https://docs.github.com/en/actions/reference/authentication-in-a-workflow).\n\n",
-                ),
+            ),
         )
         .arg(
             Arg::new("extra-arg")
@@ -220,7 +227,7 @@ avoid using spaces between name and value (use `=` instead):
 ```shell
 cpp-linter --extra-arg="-std=c++17" --extra-arg="-Wall"
 ```"#,
-                ),
+            ),
         )
         .arg(
             Arg::new("thread-comments")
@@ -241,7 +248,7 @@ the value 'true' will always delete an old comment and post a new one if necessa
 >
 > See [Authenticating with the `GITHUB_TOKEN`](
 > https://docs.github.com/en/actions/reference/authentication-in-a-workflow).\n\n",
-                ),
+            ),
         )
         .arg(
             Arg::new("no-lgtm")
@@ -257,7 +264,7 @@ thread comment that basically says 'Looks Good To Me' (when all checks pass).
 > [!important]
 > The [`--thread-comments`](#-g---thread-comments)
 > option also notes further implications.\n\n",
-                ),
+            ),
         )
         .arg(
             Arg::new("step-summary")
@@ -269,7 +276,7 @@ thread comment that basically says 'Looks Good To Me' (when all checks pass).
                 .help(
                     "Set this option to true or false to enable or disable the use of
 a workflow step summary when the run has concluded.\n\n",
-                ),
+            ),
         )
         .arg(
             Arg::new("file-annotations")
@@ -281,29 +288,63 @@ a workflow step summary when the run has concluded.\n\n",
                 .help(
                     "Set this option to false to disable the use of
 file annotations as feedback.\n\n",
-                ),
-            )
-            .arg(
-                Arg::new("files")
-                    .action(ArgAction::Append)
-                    .help(
-                        "An explicit path to a file.
+            ),
+        )
+        .arg(
+            Arg::new("tidy-review")
+                .long("tidy-review")
+                .short('d')
+                .value_parser(BoolishValueParser::new())
+                .default_value("false")
+                .help_heading("feedback options")
+                .help(
+                    "Set to `true` to enable Pull Request reviews from clang-tidy.\n\n",
+            ),
+        )
+        .arg(
+            Arg::new("format-review")
+                .long("format-review")
+                .short('m')
+                .value_parser(BoolishValueParser::new())
+                .default_value("false")
+                .help_heading("feedback options")
+                .help(
+                    "Set to `true` to enable Pull Request reviews from clang-format.\n\n",
+            ),
+        )
+        .arg(
+            Arg::new("passive-reviews")
+                .long("passive-reviews")
+                .short('R')
+                .value_parser(BoolishValueParser::new())
+                .default_value("false")
+                .help_heading("feedback options")
+                .help(
+                    "Set to `true` to prevent Pull Request reviews from
+approving or requesting changes.\n\n",
+            ),
+        )
+        .arg(
+            Arg::new("files")
+                .action(ArgAction::Append)
+                .help(
+                    "An explicit path to a file.
 This can be specified zero or more times, resulting in a list of files.
 The list of files is appended to the internal list of 'not ignored' files.
 Further filtering can still be applied (see [Source options](#source-options)).",
-                )
             )
-            .groups([
-                ArgGroup::new("Clang-tidy options")
-                    .args(["tidy-checks", "database", "extra-arg", "ignore-tidy"]).multiple(true),
-                ArgGroup::new("Clang-format options").args(["style", "ignore-format"]).multiple(true),
-                ArgGroup::new("General options").args(["verbosity", "version"]).multiple(true),
-                ArgGroup::new("Source options").args(["extensions", "repo-root", "ignore", "lines-changed-only", "files-changed-only"]).multiple(true),
-                ArgGroup::new("Feedback options").args([
-                    "thread-comments", "no-lgtm", "step-summary", "file-annotations"
-                ]).multiple(true),
-            ])
-            .next_line_help(true)
+        )
+        .groups([
+            ArgGroup::new("Clang-tidy options")
+                .args(["tidy-checks", "database", "extra-arg", "ignore-tidy"]).multiple(true),
+            ArgGroup::new("Clang-format options").args(["style", "ignore-format"]).multiple(true),
+            ArgGroup::new("General options").args(["verbosity", "version"]).multiple(true),
+            ArgGroup::new("Source options").args(["extensions", "repo-root", "ignore", "lines-changed-only", "files-changed-only"]).multiple(true),
+            ArgGroup::new("Feedback options").args([
+                "thread-comments", "no-lgtm", "step-summary", "file-annotations", "tidy-review", "format-review", "passive-reviews"
+            ]).multiple(true),
+        ])
+        .next_line_help(true)
 }
 
 /// Converts the parsed value of the `--extra-arg` option into an optional vector of strings.
@@ -328,7 +369,7 @@ Further filtering can still be applied (see [Source options](#source-options))."
 pub fn convert_extra_arg_val(args: &ArgMatches) -> Option<Vec<String>> {
     let raw_val = args
         .try_get_many::<String>("extra-arg")
-        .expect("parser failed in set a default for `--extra-arf`");
+        .expect("parser failed in set a default for `--extra-arg`");
     if let Some(mut val) = raw_val {
         if val.len() == 1 {
             // specified once; split and return result

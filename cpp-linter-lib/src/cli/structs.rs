@@ -6,9 +6,10 @@ use super::convert_extra_arg_val;
 use crate::{clang_tools::clang_tidy::CompilationUnit, common_fs::FileFilter};
 
 /// An enum to describe `--lines-changed-only` CLI option's behavior.
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Clone, Debug, Default)]
 pub enum LinesChangedOnly {
     /// All lines are scanned
+    #[default]
     Off,
     /// Only lines in the diff are scanned
     Diff,
@@ -36,8 +37,8 @@ pub struct Cli {
     pub files_changed_only: bool,
     pub ignore: Vec<String>,
     pub style: String,
-    pub ignore_format: Vec<String>,
-    pub ignore_tidy: Vec<String>,
+    pub ignore_format: Option<Vec<String>>,
+    pub ignore_tidy: Option<Vec<String>>,
     pub tidy_checks: String,
     pub database: Option<PathBuf>,
     pub extra_arg: Option<Vec<String>>,
@@ -46,6 +47,9 @@ pub struct Cli {
     pub step_summary: bool,
     pub file_annotations: bool,
     pub not_ignored: Option<Vec<String>>,
+    pub tidy_review: bool,
+    pub format_review: bool,
+    pub passive_reviews: bool,
 }
 
 impl From<&ArgMatches> for Cli {
@@ -56,16 +60,12 @@ impl From<&ArgMatches> for Cli {
             .unwrap()
             .map(|s| s.to_owned())
             .collect::<Vec<_>>();
-        let ignore_tidy = if let Some(val) = args.get_many::<String>("ignore-tidy") {
-            val.map(|s| s.to_owned()).collect::<Vec<_>>()
-        } else {
-            vec![]
-        };
-        let ignore_format = if let Some(val) = args.get_many::<String>("ignore-format") {
-            val.map(|s| s.to_owned()).collect::<Vec<_>>()
-        } else {
-            vec![]
-        };
+        let ignore_tidy = args
+            .get_many::<String>("ignore-tidy")
+            .map(|val| val.map(|s| s.to_owned()).collect::<Vec<_>>());
+        let ignore_format = args
+            .get_many::<String>("ignore-format")
+            .map(|val| val.map(|s| s.to_owned()).collect::<Vec<_>>());
         let extra_arg = convert_extra_arg_val(args);
 
         let lines_changed_only = LinesChangedOnly::from_string(
@@ -105,6 +105,9 @@ impl From<&ArgMatches> for Cli {
             not_ignored: args
                 .get_many::<String>("files")
                 .map(|files| Vec::from_iter(files.map(|v| v.to_owned()))),
+            tidy_review: args.get_flag("tidy-review"),
+            format_review: args.get_flag("format-review"),
+            passive_reviews: args.get_flag("passive-reviews"),
         }
     }
 }
@@ -133,7 +136,7 @@ impl ThreadComments {
 
 /// A data structure to contain CLI options that relate to
 /// clang-tidy or clang-format arguments.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ClangParams {
     pub tidy_checks: String,
     pub lines_changed_only: LinesChangedOnly,
@@ -143,8 +146,10 @@ pub struct ClangParams {
     pub style: String,
     pub clang_tidy_command: Option<PathBuf>,
     pub clang_format_command: Option<PathBuf>,
-    pub tidy_filter: FileFilter,
-    pub format_filter: FileFilter,
+    pub tidy_filter: Option<FileFilter>,
+    pub format_filter: Option<FileFilter>,
+    pub tidy_review: bool,
+    pub format_review: bool,
 }
 
 impl From<&Cli> for ClangParams {
@@ -159,8 +164,16 @@ impl From<&Cli> for ClangParams {
             style: args.style.clone(),
             clang_tidy_command: None,
             clang_format_command: None,
-            tidy_filter: FileFilter::new(&args.ignore_tidy, args.extensions.clone()),
-            format_filter: FileFilter::new(&args.ignore_format, args.extensions.clone()),
+            tidy_filter: args
+                .ignore_tidy
+                .as_ref()
+                .map(|ignore_tidy| FileFilter::new(ignore_tidy, args.extensions.clone())),
+            format_filter: args
+                .ignore_format
+                .as_ref()
+                .map(|ignore_format| FileFilter::new(ignore_format, args.extensions.clone())),
+            tidy_review: args.tidy_review,
+            format_review: args.format_review,
         }
     }
 }
@@ -173,6 +186,9 @@ pub struct FeedbackInput {
     pub step_summary: bool,
     pub file_annotations: bool,
     pub style: String,
+    pub tidy_review: bool,
+    pub format_review: bool,
+    pub passive_reviews: bool,
 }
 
 impl From<&Cli> for FeedbackInput {
@@ -184,6 +200,9 @@ impl From<&Cli> for FeedbackInput {
             step_summary: args.step_summary,
             thread_comments: args.thread_comments.clone(),
             file_annotations: args.file_annotations,
+            tidy_review: args.tidy_review,
+            format_review: args.format_review,
+            passive_reviews: args.passive_reviews,
         }
     }
 }
@@ -197,6 +216,9 @@ impl Default for FeedbackInput {
             step_summary: false,
             file_annotations: true,
             style: "llvm".to_string(),
+            tidy_review: false,
+            format_review: false,
+            passive_reviews: false,
         }
     }
 }

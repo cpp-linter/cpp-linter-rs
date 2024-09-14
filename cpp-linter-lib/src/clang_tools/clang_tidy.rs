@@ -3,9 +3,10 @@
 
 use std::{
     env::{consts::OS, current_dir},
+    fs,
     path::PathBuf,
     process::Command,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, MutexGuard},
 };
 
 // non-std crates
@@ -13,8 +14,9 @@ use regex::Regex;
 use serde::Deserialize;
 
 // project-specific modules/crates
+use super::MakeSuggestions;
 use crate::{
-    cli::LinesChangedOnly,
+    cli::{ClangParams, LinesChangedOnly},
     common_fs::{normalize_path, FileObj},
 };
 
@@ -64,6 +66,9 @@ pub struct TidyNotification {
     /// Sometimes, this code block doesn't exist. Sometimes, it contains suggested
     /// fixes/advice. This information is purely superfluous.
     pub suggestion: Vec<String>,
+
+    /// The list of line numbers that had fixes applied via `clang-tidy --fix-error`.
+    pub fixed_lines: Vec<u32>,
 }
 
 impl TidyNotification {
@@ -84,6 +89,33 @@ impl TidyNotification {
 pub struct TidyAdvice {
     /// A list of notifications parsed from clang-tidy stdout.
     pub notes: Vec<TidyNotification>,
+    pub patched: Option<Vec<u8>>,
+}
+
+impl MakeSuggestions for TidyAdvice {
+    fn get_suggestion_help(&self, start_line: u32, end_line: u32) -> String {
+        let mut diagnostics = vec![];
+        for note in &self.notes {
+            for fixed_line in &note.fixed_lines {
+                if (start_line..=end_line).contains(fixed_line) {
+                    diagnostics.push(format!("- {}\n", note.diagnostic_link()));
+                }
+            }
+        }
+        format!(
+            "### clang-tidy {}\n{}",
+            if diagnostics.is_empty() {
+                "suggestion"
+            } else {
+                "diagnostic(s)"
+            },
+            diagnostics.join("")
+        )
+    }
+
+    fn get_tool_name(&self) -> String {
+        "clang-tidy".to_string()
+    }
 }
 
 /// Parses clang-tidy stdout.
@@ -95,6 +127,9 @@ fn parse_tidy_output(
     database_json: &Option<Vec<CompilationUnit>>,
 ) -> Option<TidyAdvice> {
     let note_header = Regex::new(r"^(.+):(\d+):(\d+):\s(\w+):(.*)\[([a-zA-Z\d\-\.]+)\]$").unwrap();
+    let fixed_note =
+        Regex::new(r"^.+:(\d+):\d+:\snote: FIX-IT applied suggested code changes$").unwrap();
+    let mut found_fix = false;
     let mut notification = None;
     let mut result = Vec::new();
     let cur_dir = current_dir().unwrap();
@@ -148,11 +183,29 @@ fn parse_tidy_output(
                 rationale: String::from(&captured[5]).trim().to_string(),
                 diagnostic: String::from(&captured[6]),
                 suggestion: Vec::new(),
+                fixed_lines: Vec::new(),
             });
-        } else if let Some(note) = &mut notification {
-            // append lines of code that are part of
-            // the previous line's notification
-            note.suggestion.push(line.to_string());
+            // begin capturing subsequent lines as suggestions
+            found_fix = false;
+        } else if let Some(capture) = fixed_note.captures(line) {
+            let fixed_line = capture[1]
+                .parse()
+                .expect("Failed to parse fixed line number's string as integer");
+            if let Some(note) = &mut notification {
+                if !note.fixed_lines.contains(&fixed_line) {
+                    note.fixed_lines.push(fixed_line);
+                }
+            }
+            // Suspend capturing subsequent lines as suggestions until
+            // a new notification is constructed. If we found a note about applied fixes,
+            // then the lines of suggestions for that notification have already been parsed.
+            found_fix = true;
+        } else if !found_fix {
+            if let Some(note) = &mut notification {
+                // append lines of code that are part of
+                // the previous line's notification
+                note.suggestion.push(line.to_string());
+            }
         }
     }
     if let Some(note) = notification {
@@ -161,7 +214,10 @@ fn parse_tidy_output(
     if result.is_empty() {
         None
     } else {
-        Some(TidyAdvice { notes: result })
+        Some(TidyAdvice {
+            notes: result,
+            patched: None,
+        })
     }
 }
 
@@ -184,29 +240,24 @@ pub fn tally_tidy_advice(files: &[Arc<Mutex<FileObj>>]) -> u64 {
 
 /// Run clang-tidy, then parse and return it's output.
 pub fn run_clang_tidy(
-    cmd: &mut Command,
-    file: &mut Arc<Mutex<FileObj>>,
-    checks: &str,
-    lines_changed_only: &LinesChangedOnly,
-    database: &Option<PathBuf>,
-    extra_args: &Option<Vec<String>>,
-    database_json: &Option<Vec<CompilationUnit>>,
+    file: &mut MutexGuard<FileObj>,
+    clang_params: &ClangParams,
 ) -> Vec<(log::Level, std::string::String)> {
+    let mut cmd = Command::new(clang_params.clang_tidy_command.as_ref().unwrap());
     let mut logs = vec![];
-    let mut file = file.lock().unwrap();
-    if !checks.is_empty() {
-        cmd.args(["-checks", checks]);
+    if !clang_params.tidy_checks.is_empty() {
+        cmd.args(["-checks", &clang_params.tidy_checks]);
     }
-    if let Some(db) = database {
+    if let Some(db) = &clang_params.database {
         cmd.args(["-p", &db.to_string_lossy()]);
     }
-    if let Some(extras) = extra_args {
+    if let Some(extras) = &clang_params.extra_args {
         for arg in extras {
             cmd.args(["--extra-arg", format!("\"{}\"", arg).as_str()]);
         }
     }
-    if *lines_changed_only != LinesChangedOnly::Off {
-        let ranges = file.get_ranges(lines_changed_only);
+    if clang_params.lines_changed_only != LinesChangedOnly::Off {
+        let ranges = file.get_ranges(&clang_params.lines_changed_only);
         let filter = format!(
             "[{{\"name\":{:?},\"lines\":{:?}}}]",
             &file
@@ -219,6 +270,17 @@ pub fn run_clang_tidy(
                 .collect::<Vec<_>>()
         );
         cmd.args(["--line-filter", filter.as_str()]);
+    }
+    let mut original_content = None;
+    if clang_params.tidy_review {
+        cmd.arg("--fix-errors");
+        original_content =
+            Some(fs::read_to_string(&file.name).expect(
+                "Failed to cache file's original content before applying clang-tidy changes.",
+            ));
+    }
+    if !clang_params.style.is_empty() {
+        cmd.args(["--format-style", clang_params.style.as_str()]);
     }
     cmd.arg(file.name.to_string_lossy().as_ref());
     logs.push((
@@ -249,7 +311,20 @@ pub fn run_clang_tidy(
             ),
         ));
     }
-    file.tidy_advice = parse_tidy_output(&output.stdout, database_json);
+    file.tidy_advice = parse_tidy_output(&output.stdout, &clang_params.database_json);
+    if clang_params.tidy_review {
+        let file_name = &file.name.to_owned();
+        if let Some(tidy_advice) = &mut file.tidy_advice {
+            // cache file changes in a buffer and restore the original contents for further analysis by clang-format
+            tidy_advice.patched =
+                Some(fs::read(file_name).expect("Failed to read changes from clang-tidy"));
+        }
+        fs::write(
+            file_name,
+            original_content.expect("original content of file was not cached"),
+        )
+        .expect("failed to restore file's original content.");
+    }
     logs
 }
 
@@ -258,13 +333,16 @@ mod test {
     use std::{
         env,
         path::PathBuf,
-        process::Command,
         sync::{Arc, Mutex},
     };
 
     use regex::Regex;
 
-    use crate::{clang_tools::get_clang_tool_exe, cli::LinesChangedOnly, common_fs::FileObj};
+    use crate::{
+        clang_tools::get_clang_tool_exe,
+        cli::{ClangParams, LinesChangedOnly},
+        common_fs::FileObj,
+    };
 
     use super::run_clang_tidy;
 
@@ -297,33 +375,42 @@ mod test {
             env::var("CLANG_VERSION").unwrap_or("".to_string()).as_str(),
         )
         .unwrap();
-        let mut cmd = Command::new(exe_path);
         let file = FileObj::new(PathBuf::from("tests/demo/demo.cpp"));
-        let mut arc_ref = Arc::new(Mutex::new(file));
+        let arc_ref = Arc::new(Mutex::new(file));
         let extra_args = vec!["-std=c++17".to_string(), "-Wall".to_string()];
-        run_clang_tidy(
-            &mut cmd,
-            &mut arc_ref,
-            "",                     // use .clang-tidy config file
-            &LinesChangedOnly::Off, // check all lines
-            &None,                  // no database path
-            &Some(extra_args),      // <---- the reason for this test
-            &None,                  // no deserialized database
-        );
-        // since `cmd` was passed as a mutable reference, we can inspect the args that were added
-        let locked_file = arc_ref.lock().unwrap();
-        let mut args = cmd
-            .get_args()
-            .map(|arg| arg.to_str().unwrap())
+        let clang_params = ClangParams {
+            style: "".to_string(),
+            tidy_checks: "".to_string(), // use .clang-tidy config file
+            lines_changed_only: LinesChangedOnly::Off,
+            database: None,
+            extra_args: Some(extra_args.clone()), // <---- the reason for this test
+            database_json: None,
+            format_filter: None,
+            tidy_filter: None,
+            tidy_review: false,
+            format_review: false,
+            clang_tidy_command: Some(exe_path),
+            clang_format_command: None,
+        };
+        let mut file_lock = arc_ref.lock().unwrap();
+        let logs = run_clang_tidy(&mut file_lock, &clang_params)
+            .into_iter()
+            .filter_map(|(_lvl, msg)| {
+                if msg.contains("Running ") {
+                    Some(msg)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<String>>();
+        let args = &logs
+            .first()
+            .expect("expected a log message about invoked clang-tidy command")
+            .split(' ')
             .collect::<Vec<&str>>();
-        assert_eq!(locked_file.name.to_string_lossy(), args.pop().unwrap());
-        assert_eq!(
-            vec!["--extra-arg", "\"-std=c++17\"", "--extra-arg", "\"-Wall\""],
-            args
-        );
-        assert!(!locked_file
-            .tidy_advice
-            .as_ref()
-            .is_some_and(|advice| advice.notes.is_empty()));
+        for arg in &extra_args {
+            let extra_arg = format!("\"{arg}\"");
+            assert!(args.contains(&extra_arg.as_str()));
+        }
     }
 }

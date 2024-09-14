@@ -455,7 +455,7 @@ mod test {
             sha,
             &extensions.clone(),
             &tmp,
-            Some("tests/capture_tools_output/cpp-linter/cpp-linter/test_git_lib.patch"),
+            Some("tests/git_status_test_assets/cpp-linter/cpp-linter/test_git_lib.patch"),
         )
         .await;
         println!("files = {:?}", files);

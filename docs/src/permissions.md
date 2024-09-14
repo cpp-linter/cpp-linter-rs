@@ -47,7 +47,7 @@ the repository is not checked out before running cpp-linter.
 * Specifying `write` to the `pull-requests` permission is also sufficient as that is
   required for
   * posting [thread comments](#thread-comments) on pull requests
-  <!-- * posting [pull request reviews](#pull-request-reviews) -->
+  * posting [pull request reviews](#pull-request-reviews)
 
 ## Thread Comments
 
@@ -76,13 +76,11 @@ For [`pull_request` events][pr-events].
       pull-requests: write
 ```
 
-<!--
 ## Pull Request Reviews
 
-The [`tidy-review`](cli.md#-t---tidy-review), [`format-review`](cli.md#-f---format-review), and [`passive-reviews`](cli.md#-p---passive-reviews) features require the following permissions:
+The [`tidy-review`](cli.md#-d---tidy-review), [`format-review`](cli.md#-m---format-review), and [`passive-reviews`](cli.md#-r---passive-reviews) features require the following permissions:
 
 ```yaml
     permissions:
       pull-requests: write
 ```
--->

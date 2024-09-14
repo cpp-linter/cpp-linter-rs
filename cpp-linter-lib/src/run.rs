@@ -103,7 +103,22 @@ pub async fn run_main(args: Vec<String>) -> i32 {
             .await
     } else {
         // walk the folder and look for files with specified extensions according to ignore values.
-        file_filter.list_source_files(".")
+        let mut all_files = file_filter.list_source_files(".");
+        if rest_api_client.event_name == "pull_request" && (cli.tidy_review || cli.format_review) {
+            let changed_files = rest_api_client
+                .get_list_of_changed_files(&file_filter)
+                .await;
+            for changed_file in changed_files {
+                for file in &mut all_files {
+                    if changed_file.name == file.name {
+                        file.diff_chunks = changed_file.diff_chunks.clone();
+                        file.added_lines = changed_file.added_lines.clone();
+                        file.added_ranges = changed_file.added_ranges.clone();
+                    }
+                }
+            }
+        }
+        all_files
     };
     let mut arc_files = vec![];
     log::info!("Giving attention to the following files:");

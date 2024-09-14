@@ -1,15 +1,11 @@
 use chrono::Utc;
 use cpp_linter_lib::run::run_main;
 use mockito::{Matcher, Server, ServerGuard};
-use std::{
-    env,
-    fmt::Display,
-    fs,
-    io::{self, BufRead, Write},
-    path::Path,
-    process::Command,
-};
-use tempfile::{NamedTempFile, TempDir};
+use std::{env, fmt::Display, io::Write, path::Path};
+use tempfile::NamedTempFile;
+
+mod common;
+use common::create_test_space;
 
 const SHA: &str = "8d68756375e0483c7ac2b4d6bbbece420dbbb495";
 const REPO: &str = "cpp-linter/test-cpp-linter-action";
@@ -20,7 +16,6 @@ const EVENT_PAYLOAD: &str = "{\"number\": 22}";
 
 const RESET_RATE_LIMIT_HEADER: &str = "x-ratelimit-reset";
 const REMAINING_RATE_LIMIT_HEADER: &str = "x-ratelimit-remaining";
-// const RETRY_RATE_LIMIT_HEADER: &str = "retry-after";
 
 async fn mock_server() -> ServerGuard {
     Server::new_async().await
@@ -46,7 +41,7 @@ async fn setup(
     lib_root: &Path,
     lines_changed_only: &str,
     thread_comments: &str,
-    no_lgtm: &str,
+    no_lgtm: bool,
 ) {
     env::set_var("GITHUB_EVENT_NAME", event_t.to_string().as_str());
     env::set_var("GITHUB_REPOSITORY", REPO);
@@ -71,8 +66,8 @@ async fn setup(
         format!("push_{SHA}")
     };
     let reset_timestamp = (Utc::now().timestamp() + 60).to_string();
-    let is_lgtm = no_lgtm == "true"
-        || (("false", "update", "false") == (lines_changed_only, thread_comments, no_lgtm));
+    let is_lgtm =
+        no_lgtm || (("false", "update", false) == (lines_changed_only, thread_comments, no_lgtm));
 
     let asset_path = format!("{}/{MOCK_ASSETS_PATH}", lib_root.to_str().unwrap());
     let mut server = mock_server().await;
@@ -172,63 +167,11 @@ async fn setup(
     assert_eq!(result, 0);
 }
 
-fn create_test_space() -> TempDir {
-    let tmp = TempDir::new().unwrap();
-    fs::create_dir(tmp.path().join("src")).unwrap();
-    let src = fs::read_dir("tests/demo").unwrap();
-    for file in src {
-        let file = file.unwrap();
-        if file.path().is_file() {
-            let new_file = tmp.path().join("src").join(file.file_name());
-            fs::copy(file.path(), new_file.to_str().unwrap()).unwrap();
-        }
-    }
-
-    // generate compilation database with meson (& ninja)
-    let test_dir = tmp.path().join("src");
-    let mut cmd = Command::new("meson");
-    cmd.args([
-        "init",
-        "-C",
-        test_dir.to_str().unwrap(),
-        "--name",
-        "demo",
-        "demo.cpp",
-        "demo.hpp",
-    ]);
-    let output = cmd.output().expect("Failed to run 'meson init'");
-    println!(
-        "meson init stdout:\n{}",
-        String::from_utf8(output.stdout.to_vec()).unwrap()
-    );
-    let meson_build_dir = tmp.path().join("build");
-    let mut cmd = Command::new("meson");
-    cmd.args([
-        "setup",
-        "--backend=ninja",
-        meson_build_dir.as_path().to_str().unwrap(),
-        test_dir.to_str().unwrap(),
-    ]);
-    let output = cmd
-        .output()
-        .expect("Failed to generate build assets with 'meson setup'");
-    println!(
-        "meson setup stdout:\n{}",
-        String::from_utf8(output.stdout.to_vec()).unwrap()
-    );
-    let db = fs::File::open(meson_build_dir.join("compile_commands.json"))
-        .expect("Failed to open compilation database");
-    for line in io::BufReader::new(db).lines().map_while(Result::ok) {
-        println!("{line}");
-    }
-    tmp
-}
-
 async fn test_comment(
     event_t: EventType,
     lines_changed_only: &str,
     thread_comments: &str,
-    no_lgtm: &str,
+    no_lgtm: bool,
 ) {
     let tmp_dir = create_test_space();
     let lib_root = env::current_dir().unwrap();
@@ -251,7 +194,7 @@ async fn new_push_all_lines() {
         EventType::Push, // event_t
         "false",         // lines_changed_only
         "true",          // thread_comments
-        "false",         // no_lgtm
+        false,           // no_lgtm
     )
     .await;
 }
@@ -262,7 +205,7 @@ async fn new_push_changed_lines() {
         EventType::Push, // event_t
         "true",          // lines_changed_only
         "true",          // thread_comments
-        "false",         // no_lgtm
+        false,           // no_lgtm
     )
     .await;
 }
@@ -273,7 +216,7 @@ async fn new_pr_all_lines() {
         EventType::PullRequest, // event_t
         "false",                // lines_changed_only
         "true",                 // thread_comments
-        "false",                // no_lgtm
+        false,                  // no_lgtm
     )
     .await;
 }
@@ -284,7 +227,7 @@ async fn new_pr_changed_lines() {
         EventType::PullRequest, // event_t
         "true",                 // lines_changed_only
         "true",                 // thread_comments
-        "false",                // no_lgtm
+        false,                  // no_lgtm
     )
     .await;
 }
@@ -295,7 +238,7 @@ async fn update_push_all_lines() {
         EventType::Push, // event_t
         "false",         // lines_changed_only
         "update",        // thread_comments
-        "false",         // no_lgtm
+        false,           // no_lgtm
     )
     .await;
 }
@@ -306,7 +249,7 @@ async fn update_push_changed_lines() {
         EventType::Push, // event_t
         "true",          // lines_changed_only
         "update",        // thread_comments
-        "false",         // no_lgtm
+        false,           // no_lgtm
     )
     .await;
 }
@@ -317,7 +260,7 @@ async fn update_pr_all_lines() {
         EventType::PullRequest, // event_t
         "false",                // lines_changed_only
         "update",               // thread_comments
-        "false",                // no_lgtm
+        false,                  // no_lgtm
     )
     .await;
 }
@@ -328,7 +271,7 @@ async fn update_pr_changed_lines() {
         EventType::PullRequest, // event_t
         "true",                 // lines_changed_only
         "update",               // thread_comments
-        "false",                // no_lgtm
+        false,                  // no_lgtm
     )
     .await;
 }
@@ -339,7 +282,7 @@ async fn new_push_no_lgtm() {
         EventType::Push, // event_t
         "false",         // lines_changed_only
         "true",          // thread_comments
-        "true",          // no_lgtm
+        true,            // no_lgtm
     )
     .await;
 }
@@ -350,7 +293,7 @@ async fn update_push_no_lgtm() {
         EventType::Push, // event_t
         "false",         // lines_changed_only
         "update",        // thread_comments
-        "true",          // no_lgtm
+        true,            // no_lgtm
     )
     .await;
 }
@@ -361,7 +304,7 @@ async fn new_pr_no_lgtm() {
         EventType::PullRequest, // event_t
         "false",                // lines_changed_only
         "true",                 // thread_comments
-        "true",                 // no_lgtm
+        true,                   // no_lgtm
     )
     .await;
 }
@@ -372,7 +315,7 @@ async fn update_pr_no_lgtm() {
         EventType::PullRequest, // event_t
         "false",                // lines_changed_only
         "update",               // thread_comments
-        "true",                 // no_lgtm
+        true,                   // no_lgtm
     )
     .await;
 }

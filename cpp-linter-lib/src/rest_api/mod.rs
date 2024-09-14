@@ -3,7 +3,6 @@
 //!
 //! Currently, only Github is supported.
 
-use std::collections::HashMap;
 use std::future::Future;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -77,7 +76,7 @@ pub trait RestApiClient {
         client: &Client,
         url: impl IntoUrl,
         method: Method,
-        data: Option<HashMap<&str, String>>,
+        data: Option<String>,
         headers: Option<HeaderMap>,
     ) -> Request {
         let mut req = client.request(method, url);
@@ -85,7 +84,7 @@ pub trait RestApiClient {
             req = req.headers(h);
         }
         if let Some(d) = data {
-            req = req.json(&d);
+            req = req.body(d);
         }
         req.build().expect("Failed to create a HTTP request")
     }
