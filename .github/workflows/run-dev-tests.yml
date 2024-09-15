@@ -22,30 +22,11 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
-  cache-deps:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-latest, ubuntu-latest]
-    steps:
-      - run: rustup update --no-self-update
-      - uses: actions/checkout@v4
-      - name: Cache .cargo locked resources
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo
-          key: ${{ runner.os }}-test-cargo-${{ hashFiles('Cargo.lock') }}
-      - run: cargo fetch
-
   test:
-    needs: [cache-deps]
-    name: test ${{ matrix.os }} w/ clang v${{ matrix.version }}
     strategy:
       fail-fast: false
       matrix:
         os: ['windows-latest', ubuntu-latest]
-        version: ['17', '16', '15', '14', '13', '12', '11', '10', '9', '8', '7']
 
     runs-on: ${{ matrix.os }}
     steps:
@@ -87,59 +68,161 @@ jobs:
         if: runner.os == 'Windows'
         run: choco install ninja
 
-      - name: Install Linux clang dependencies
-        if: runner.os == 'Linux'
-        shell: bash
-        run: |
-          sudo apt-get update
-          # First try installing from default Ubuntu repositories before trying LLVM script
-          if ! sudo apt-get install -y clang-format-${{ matrix.version }} clang-tidy-${{ matrix.version }}; then
-            # This LLVM script will add the relevant LLVM PPA: https://apt.llvm.org/
-            wget https://apt.llvm.org/llvm.sh -O ${{ runner.temp }}/llvm_install.sh
-            chmod +x ${{ runner.temp }}/llvm_install.sh
-            if sudo ${{ runner.temp }}/llvm_install.sh ${{ matrix.version }}; then
-              sudo apt-get install -y clang-format-${{ matrix.version }} clang-tidy-${{ matrix.version }}
-            fi
-          fi
+      - name: Fetch .cargo locked resources
+        run: cargo fetch
 
-      - name: Install clang-tools
-        run: |
-          python -m pip install clang-tools
-          clang-tools --install ${{ matrix.version }}
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update
 
-      - name: Cache .cargo locked resources
-        uses: actions/cache/restore@v4
+      - name: Install clang v7
+        uses: cpp-linter/cpp_linter_rs/install-clang-action@pr-reviews
         with:
-          path: ~/.cargo
-          key: ${{ runner.os }}-test-cargo-${{ hashFiles('Cargo.lock') }}
+          version: '7'
 
-      - name: Collect Coverage
+      - name: Collect Coverage for clang v7
         working-directory: cpp-linter-lib
         env:
-          CLANG_VERSION: ${{ matrix.version }}
+          CLANG_VERSION: '7'
         run: just test
+
+      - name: Install clang v8
+        uses: cpp-linter/cpp_linter_rs/install-clang-action@pr-reviews
+        with:
+          version: '8'
+
+      - name: Collect Coverage for clang v8
+        working-directory: cpp-linter-lib
+        env:
+          CLANG_VERSION: '8'
+        run: just test
+
+      - name: Install clang v9
+        uses: cpp-linter/cpp_linter_rs/install-clang-action@pr-reviews
+        with:
+          version: '9'
+
+      - name: Collect Coverage for clang v9
+        working-directory: cpp-linter-lib
+        env:
+          CLANG_VERSION: '9'
+        run: just test
+
+      - name: Install clang v10
+        uses: cpp-linter/cpp_linter_rs/install-clang-action@pr-reviews
+        with:
+          version: '10'
+
+      - name: Collect Coverage for clang v10
+        working-directory: cpp-linter-lib
+        env:
+          CLANG_VERSION: '10'
+        run: just test
+
+      - name: Install clang 11
+        uses: cpp-linter/cpp_linter_rs/install-clang-action@pr-reviews
+        with:
+          version: '11'
+
+      - name: Collect Coverage for clang v11
+        working-directory: cpp-linter-lib
+        env:
+          CLANG_VERSION: '11'
+        run: just test
+
+      - name: Install clang 12
+        uses: cpp-linter/cpp_linter_rs/install-clang-action@pr-reviews
+        with:
+          version: '12'
+
+      - name: Collect Coverage for clang v12
+        working-directory: cpp-linter-lib
+        env:
+          CLANG_VERSION: '12'
+        run: just test
+
+      - name: Install clang 13
+        uses: cpp-linter/cpp_linter_rs/install-clang-action@pr-reviews
+        with:
+          version: '13'
+
+      - name: Collect Coverage for clang v13
+        working-directory: cpp-linter-lib
+        env:
+          CLANG_VERSION: '13'
+        run: just test
+
+      - name: Install clang 14
+        uses: cpp-linter/cpp_linter_rs/install-clang-action@pr-reviews
+        with:
+          version: '14'
+
+      - name: Collect Coverage for clang v14
+        working-directory: cpp-linter-lib
+        env:
+          CLANG_VERSION: '14'
+        run: just test
+
+      - name: Install clang 15
+        uses: cpp-linter/cpp_linter_rs/install-clang-action@pr-reviews
+        with:
+          version: '15'
+
+      - name: Collect Coverage for clang v15
+        working-directory: cpp-linter-lib
+        env:
+          CLANG_VERSION: '15'
+        run: just test
+
+      - name: Install clang 16
+        uses: cpp-linter/cpp_linter_rs/install-clang-action@pr-reviews
+        with:
+          version: '16'
+
+      - name: Collect Coverage for clang v16
+        working-directory: cpp-linter-lib
+        env:
+          CLANG_VERSION: '16'
+        run: just test
+
+      - name: Install clang 17
+        uses: cpp-linter/cpp_linter_rs/install-clang-action@pr-reviews
+        with:
+          version: '17'
+
+      - name: Collect Coverage for clang v17
+        working-directory: cpp-linter-lib
+        env:
+          CLANG_VERSION: '17'
+        run: just test
+
+      - name: Install clang 18
+        uses: cpp-linter/cpp_linter_rs/install-clang-action@pr-reviews
+        with:
+          version: '18'
+
+      - name: Collect Coverage for clang v18
+        working-directory: cpp-linter-lib
+        env:
+          CLANG_VERSION: '18'
+        run: just test --run-ignored=all
 
       - name: Generate Coverage HTML report
         working-directory: cpp-linter-lib
-        env:
-          CLANG_VERSION: ${{ matrix.version }}
         run: just pretty-cov
 
       - name: Upload coverage data
         uses: actions/upload-artifact@v4
         with:
-          name: HTML_report-${{ runner.os }}-clang_v${{ matrix.version }}
+          name: HTML_report-${{ runner.os }}
           path: target/llvm-cov-pretty
 
       - name: Generate Coverage lcov report
-        if: matrix.version == '16' && runner.os == 'Linux'
+        if: runner.os == 'Linux'
         working-directory: cpp-linter-lib
-        env:
-          CLANG_VERSION: ${{ matrix.version }}
         run: just lcov
 
       - uses: codecov/codecov-action@v4
-        if: matrix.version == '16' && runner.os == 'Linux'
+        if: runner.os == 'Linux'
         with:
           token: ${{secrets.CODECOV_TOKEN}}
           files: cpp-linter-lib/lcov.info

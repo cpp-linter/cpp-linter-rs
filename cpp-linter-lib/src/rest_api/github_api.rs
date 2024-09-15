@@ -899,12 +899,14 @@ mod test {
     }
 
     #[tokio::test]
+    #[ignore]
     #[should_panic(expected = "REST API secondary rate limit exceeded")]
     async fn secondary_rate_limit() {
         simulate_rate_limit(true).await;
     }
 
     #[tokio::test]
+    #[ignore]
     #[should_panic(expected = "REST API rate limit exceeded!")]
     async fn primary_rate_limit() {
         simulate_rate_limit(false).await;
