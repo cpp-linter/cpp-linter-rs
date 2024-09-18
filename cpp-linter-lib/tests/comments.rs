@@ -230,7 +230,7 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
 }
 
 async fn test_comment(test_params: &TestParams) {
-    let tmp_dir = create_test_space();
+    let tmp_dir = create_test_space(true);
     let lib_root = env::current_dir().unwrap();
     env::set_current_dir(tmp_dir.path()).unwrap();
     setup(&lib_root, test_params).await;
