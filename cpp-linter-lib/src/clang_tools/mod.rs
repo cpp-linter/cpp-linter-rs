@@ -4,11 +4,12 @@
 use std::{
     env::current_dir,
     fs,
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::Command,
     sync::{Arc, Mutex},
 };
 
+use git2::{DiffOptions, Patch};
 // non-std crates
 use lenient_semver;
 use semver::Version;
@@ -20,6 +21,7 @@ use super::common_fs::FileObj;
 use crate::{
     cli::ClangParams,
     logger::{end_log_group, start_log_group},
+    rest_api::{COMMENT_MARKER, USER_OUTREACH},
 };
 pub mod clang_format;
 use clang_format::run_clang_format;
@@ -85,61 +87,50 @@ pub fn get_clang_tool_exe(name: &str, version: &str) -> Result<PathBuf, &'static
 ///    - log level
 ///    - messages
 fn analyze_single_file(
-    file: &mut Arc<Mutex<FileObj>>,
+    file: Arc<Mutex<FileObj>>,
     clang_params: Arc<ClangParams>,
 ) -> (PathBuf, Vec<(log::Level, String)>) {
-    let file_lock = file.lock().unwrap();
-    let file_name = file_lock.name.clone();
-    drop(file_lock);
+    let mut file = file.lock().unwrap();
     let mut logs = vec![];
-    if let Some(tidy_cmd) = &clang_params.clang_tidy_command {
+    if clang_params.clang_tidy_command.is_some() {
         if clang_params
             .tidy_filter
-            .is_source_or_ignored(file_name.as_path())
+            .as_ref()
+            .is_some_and(|f| f.is_source_or_ignored(file.name.as_path()))
+            || clang_params.tidy_filter.is_none()
         {
-            let tidy_result = run_clang_tidy(
-                &mut Command::new(tidy_cmd),
-                file,
-                clang_params.tidy_checks.as_str(),
-                &clang_params.lines_changed_only,
-                &clang_params.database,
-                &clang_params.extra_args,
-                &clang_params.database_json,
-            );
+            let tidy_result = run_clang_tidy(&mut file, &clang_params);
             logs.extend(tidy_result);
         } else {
             logs.push((
                 log::Level::Info,
                 format!(
-                    "{} not scanned due to `--ignore-tidy`",
-                    file_name.as_os_str().to_string_lossy()
+                    "{} not scanned by clang-tidy due to `--ignore-tidy`",
+                    file.name.as_os_str().to_string_lossy()
                 ),
             ))
         }
     }
-    if let Some(format_cmd) = &clang_params.clang_format_command {
+    if clang_params.clang_format_command.is_some() {
         if clang_params
             .format_filter
-            .is_source_or_ignored(file_name.as_path())
+            .as_ref()
+            .is_some_and(|f| f.is_source_or_ignored(file.name.as_path()))
+            || clang_params.format_filter.is_none()
         {
-            let format_result = run_clang_format(
-                &mut Command::new(format_cmd),
-                file,
-                clang_params.style.as_str(),
-                &clang_params.lines_changed_only,
-            );
+            let format_result = run_clang_format(&mut file, &clang_params);
             logs.extend(format_result);
         } else {
             logs.push((
                 log::Level::Info,
                 format!(
                     "{} not scanned by clang-format due to `--ignore-format`",
-                    file_name.as_os_str().to_string_lossy()
+                    file.name.as_os_str().to_string_lossy()
                 ),
             ));
         }
     }
-    (file_name, logs)
+    (file.name.clone(), logs)
 }
 
 /// Runs clang-tidy and/or clang-format and returns the parsed output from each.
@@ -196,8 +187,8 @@ pub async fn capture_clang_tools_output(
     // iterate over the discovered files and run the clang tools
     for file in files {
         let arc_params = Arc::new(clang_params.clone());
-        let mut arc_file = Arc::clone(file);
-        executors.spawn(async move { analyze_single_file(&mut arc_file, arc_params) });
+        let arc_file = Arc::clone(file);
+        executors.spawn(async move { analyze_single_file(arc_file, arc_params) });
     }
 
     while let Some(output) = executors.join_next().await {
@@ -209,6 +200,216 @@ pub async fn capture_clang_tools_output(
             }
             end_log_group();
         }
+    }
+}
+
+/// A struct to describe a single suggestion in a pull_request review.
+pub struct Suggestion {
+    /// The file's line number in the diff that begins the suggestion.
+    pub line_start: u32,
+    /// The file's line number in the diff that ends the suggestion.
+    pub line_end: u32,
+    /// The actual suggestion.
+    pub suggestion: String,
+    /// The file that this suggestion pertains to.
+    pub path: String,
+}
+
+/// A struct to describe the Pull Request review suggestions.
+#[derive(Default)]
+pub struct ReviewComments {
+    /// The total count of suggestions from clang-tidy and clang-format.
+    ///
+    /// This differs from `comments.len()` because some suggestions may
+    /// not fit within the file's diff.
+    pub tool_total: [u32; 2],
+    /// A list of comment suggestions to be posted.
+    ///
+    /// These suggestions are guaranteed to fit in the file's diff.
+    pub comments: Vec<Suggestion>,
+    /// The complete patch of changes to all files scanned.
+    ///
+    /// This includes changes from both clang-tidy and clang-format
+    /// (assembled in that order).
+    pub full_patch: [String; 2],
+}
+
+impl ReviewComments {
+    pub fn summarize(&self) -> String {
+        let mut body = format!("{COMMENT_MARKER}## Cpp-linter Review\n");
+        for t in 0u8..=1 {
+            let mut total = 0;
+            let tool_name = if t == 0 { "clang-format" } else { "clang-tidy" };
+            for comment in &self.comments {
+                if comment
+                    .suggestion
+                    .contains(format!("### {tool_name}").as_str())
+                {
+                    total += 1;
+                }
+            }
+
+            if total != self.tool_total[t as usize] {
+                body.push_str(
+                    format!(
+                        "\nOnly {} out of {} {tool_name} concerns fit within this pull request's diff.\n",
+                        self.tool_total[t as usize], total
+                    )
+                    .as_str(),
+                );
+            }
+            if !self.full_patch[t as usize].is_empty() {
+                body.push_str(
+                    format!(
+                        "\n<details><summary>Click here for the full {tool_name} patch</summary>\n\n```diff\n{}```\n\n</details>\n",
+                        self.full_patch[t as usize]
+                    ).as_str()
+                );
+            } else {
+                body.push_str(
+                    format!(
+                        "\nNo concerns reported by {}. Great job! :tada:\n",
+                        tool_name
+                    )
+                    .as_str(),
+                )
+            }
+        }
+        body.push_str(USER_OUTREACH);
+        body
+    }
+
+    pub fn is_comment_in_suggestions(&mut self, comment: &Suggestion) -> bool {
+        for s in &mut self.comments {
+            if s.path == comment.path
+                && s.line_end == comment.line_end
+                && s.line_start == comment.line_start
+            {
+                s.suggestion.push('\n');
+                s.suggestion.push_str(comment.suggestion.as_str());
+                return true;
+            }
+        }
+        false
+    }
+}
+
+pub fn make_patch<'buffer>(
+    path: &Path,
+    patched: &'buffer [u8],
+    original_content: &'buffer [u8],
+) -> Patch<'buffer> {
+    let mut diff_opts = &mut DiffOptions::new();
+    diff_opts = diff_opts.indent_heuristic(true);
+    diff_opts = diff_opts.context_lines(0);
+    let patch = Patch::from_buffers(
+        original_content,
+        Some(path),
+        patched,
+        Some(path),
+        Some(diff_opts),
+    )
+    .unwrap_or_else(|_| {
+        panic!(
+            "Failed to create patch for file {}.",
+            path.to_str()
+                .expect("Failed to convert file's path to string.")
+        )
+    });
+    patch
+}
+
+pub trait MakeSuggestions {
+    /// Create some user-facing helpful info about what the suggestion aims to resolve.
+    fn get_suggestion_help(&self, start_line: u32, end_line: u32) -> String;
+
+    /// Get the tool's name which generated the advice.
+    fn get_tool_name(&self) -> String;
+
+    /// Create a bunch of suggestions from a [`FileObj`]'s advice's generated `patched` buffer.
+    fn get_suggestions(
+        &self,
+        review_comments: &mut ReviewComments,
+        file_obj: &FileObj,
+        patch: &mut Patch,
+        summary_only: bool,
+    ) {
+        let tool_name = self.get_tool_name();
+        let is_tidy_tool = tool_name == "clang-tidy";
+        let hunks_total = patch.num_hunks();
+        let mut hunks_in_patch = 0u32;
+        let file_name = file_obj
+            .name
+            .to_str()
+            .expect("Failed to convert file path to string")
+            .replace("\\", "/")
+            .trim_start_matches("./")
+            .to_owned();
+        let patch_buf = &patch
+            .to_buf()
+            .expect("Failed to convert patch to byte array")
+            .to_vec();
+        review_comments.full_patch[is_tidy_tool as usize].push_str(
+            String::from_utf8(patch_buf.to_owned())
+                .expect("Failed to convert patch buffer to string")
+                .as_str(),
+        );
+        if summary_only {
+            return;
+        }
+        for hunk_id in 0..hunks_total {
+            let (hunk, line_count) = patch.hunk(hunk_id).expect("Failed to get hunk from patch");
+            hunks_in_patch += 1;
+            let hunk_range = file_obj.is_hunk_in_diff(&hunk);
+            if hunk_range.is_none() {
+                continue;
+            }
+            let (start_line, end_line) = hunk_range.unwrap();
+            let mut suggestion = String::new();
+            let suggestion_help = self.get_suggestion_help(start_line, end_line);
+            let mut removed = vec![];
+            for line_index in 0..line_count {
+                let diff_line = patch
+                    .line_in_hunk(hunk_id, line_index)
+                    .expect("Failed to get line in a hunk");
+                let line = String::from_utf8(diff_line.content().to_owned())
+                    .expect("Failed to convert line buffer to string");
+                if ['+', ' '].contains(&diff_line.origin()) {
+                    suggestion.push_str(line.as_str());
+                } else {
+                    removed.push(
+                        diff_line
+                            .old_lineno()
+                            .expect("Removed line has no line number?!"),
+                    );
+                }
+            }
+            if suggestion.is_empty() && !removed.is_empty() {
+                suggestion.push_str(
+                    format!(
+                        "Please remove the line(s)\n- {}",
+                        removed
+                            .iter()
+                            .map(|l| l.to_string())
+                            .collect::<Vec<String>>()
+                            .join("\n- ")
+                    )
+                    .as_str(),
+                )
+            } else {
+                suggestion = format!("```suggestion\n{suggestion}```",);
+            }
+            let comment = Suggestion {
+                line_start: start_line,
+                line_end: end_line,
+                suggestion: format!("{suggestion_help}\n{suggestion}"),
+                path: file_name.clone(),
+            };
+            if !review_comments.is_comment_in_suggestions(&comment) {
+                review_comments.comments.push(comment);
+            }
+        }
+        review_comments.tool_total[is_tidy_tool as usize] += hunks_in_patch;
     }
 }
 
@@ -260,5 +461,18 @@ mod tests {
             .to_string_lossy()
             .to_string()
             .contains(TOOL_NAME)));
+    }
+
+    #[test]
+    fn get_exe_by_invalid_path() {
+        let tool_exe = get_clang_tool_exe(TOOL_NAME, "non-existent-path");
+        assert!(tool_exe.is_err());
+    }
+
+    #[test]
+    fn get_exe_by_invalid_name() {
+        let clang_version = env::var("CLANG_VERSION").unwrap_or("16".to_string());
+        let tool_exe = get_clang_tool_exe("not-a-clang-tool", &clang_version);
+        assert!(tool_exe.is_err());
     }
 }

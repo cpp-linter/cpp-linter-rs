@@ -1,5 +1,6 @@
 //! A module to hold all common file system functionality.
 
+use std::fmt::Debug;
 use std::fs;
 use std::io::Read;
 use std::path::{Component, Path};
@@ -7,9 +8,11 @@ use std::{ops::RangeInclusive, path::PathBuf};
 
 use crate::clang_tools::clang_format::FormatAdvice;
 use crate::clang_tools::clang_tidy::TidyAdvice;
+use crate::clang_tools::{make_patch, MakeSuggestions, ReviewComments, Suggestion};
 use crate::cli::LinesChangedOnly;
 mod file_filter;
 pub use file_filter::FileFilter;
+use git2::DiffHunk;
 
 /// A structure to represent a file's path and line changes.
 #[derive(Debug, Clone)]
@@ -36,7 +39,7 @@ pub struct FileObj {
 impl FileObj {
     /// Instantiate a rudimentary object with only file name information.
     ///
-    /// To instantiate an object with line information, use [FileObj::from].
+    /// To instantiate an object with line information, use [`FileObj::from`].
     pub fn new(name: PathBuf) -> Self {
         FileObj {
             name,
@@ -90,6 +93,112 @@ impl FileObj {
             LinesChangedOnly::Diff => self.diff_chunks.to_vec(),
             LinesChangedOnly::On => self.added_ranges.to_vec(),
             _ => Vec::new(),
+        }
+    }
+
+    /// Is the range from `start_line` to `end_line` contained in a single item of
+    /// [`FileObj::diff_chunks`]?
+    pub fn is_hunk_in_diff(&self, hunk: &DiffHunk) -> Option<(u32, u32)> {
+        let (start_line, end_line) = if hunk.old_lines() > 0 {
+            // if old hunk's total lines is > 0
+            let start = hunk.old_start();
+            (start, start + hunk.old_lines() - 1)
+        } else {
+            // old hunk's total lines is 0, meaning changes were only added
+            let start = hunk.new_start();
+            // make old hunk's range span 1 line
+            (start, start)
+        };
+        for range in &self.diff_chunks {
+            if range.contains(&start_line) && range.contains(&end_line) {
+                return Some((start_line, end_line));
+            }
+        }
+        None
+    }
+
+    /// Create a list of [`Suggestion`](struct@crate::clang_tools::Suggestion) from a
+    /// generated [`Patch`](struct@git2::Patch) and store them in the given
+    /// [`ReviewComments`](struct@crate::clang_tools::ReviewComments).
+    ///
+    /// The suggestions will also include diagnostics from clang-tidy that
+    /// did not have a fix applied in the patch.
+    pub fn make_suggestions_from_patch(
+        &self,
+        review_comments: &mut ReviewComments,
+        summary_only: bool,
+    ) {
+        let original_content =
+            fs::read(&self.name).expect("Failed to read original contents of file");
+        let file_name = self
+            .name
+            .to_str()
+            .expect("Failed to convert file extension to string")
+            .replace("\\", "/");
+        let file_path = Path::new(&file_name);
+        if let Some(advice) = &self.format_advice {
+            if let Some(patched) = &advice.patched {
+                let mut patch = make_patch(file_path, patched, &original_content);
+                advice.get_suggestions(review_comments, self, &mut patch, summary_only);
+            }
+        }
+
+        if let Some(advice) = &self.tidy_advice {
+            if let Some(patched) = &advice.patched {
+                let mut patch = make_patch(file_path, patched, &original_content);
+                advice.get_suggestions(review_comments, self, &mut patch, summary_only);
+            }
+
+            if summary_only {
+                return;
+            }
+
+            // now check for clang-tidy warnings with no fixes applied
+            let file_ext = self
+                .name
+                .extension()
+                .unwrap_or_default()
+                .to_str()
+                .expect("Failed to convert file extension to string");
+            for note in &advice.notes {
+                if note.fixed_lines.is_empty() {
+                    // notification had no suggestion applied in `patched`
+                    let mut suggestion = format!(
+                        "### clang-tidy diagnostic\n**{}:{}:{}** {}: [{}]\n> {}",
+                        file_name,
+                        &note.line,
+                        &note.cols,
+                        &note.severity,
+                        note.diagnostic_link(),
+                        &note.rationale
+                    );
+                    if !note.suggestion.is_empty() {
+                        suggestion.push_str(
+                            format!("```{}\n{}```", file_ext, &note.suggestion.join("\n")).as_str(),
+                        );
+                    }
+                    review_comments.tool_total[1] += 1;
+                    let mut is_merged = false;
+                    for s in &mut review_comments.comments {
+                        if s.path == file_name
+                            && s.line_end >= note.line
+                            && s.line_start <= note.line
+                        {
+                            s.suggestion.push_str(suggestion.as_str());
+                            is_merged = true;
+                            break;
+                        }
+                    }
+                    if !is_merged {
+                        review_comments.comments.push(Suggestion {
+                            line_start: note.line,
+                            line_end: note.line,
+                            suggestion,
+                            path: file_name.to_owned(),
+                        });
+                    }
+                }
+            }
         }
     }
 }

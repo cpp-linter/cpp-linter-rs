@@ -3,7 +3,6 @@
 //!
 //! Currently, only Github is supported.
 
-use std::collections::HashMap;
 use std::future::Future;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -13,7 +12,7 @@ use std::time::Duration;
 use chrono::DateTime;
 use futures::future::{BoxFuture, FutureExt};
 use reqwest::header::{HeaderMap, HeaderValue};
-use reqwest::{Client, IntoUrl, Method, Request, Response, Url};
+use reqwest::{Client, IntoUrl, Method, Request, Response, StatusCode, Url};
 
 // project specific modules/crates
 pub mod github_api;
@@ -33,6 +32,28 @@ pub struct RestApiRateLimitHeaders {
     pub remaining: String,
     /// The header key of the rate limit's "backoff" time interval.
     pub retry: String,
+}
+
+pub struct CachedResponse {
+    pub text: String,
+    pub headers: HeaderMap,
+    pub status: StatusCode,
+}
+
+impl CachedResponse {
+    async fn from(response: Response) -> Self {
+        let headers = response.headers().to_owned();
+        let status = response.status();
+        let text = response
+            .text()
+            .await
+            .expect("Failed to decode response body to text.");
+        Self {
+            text,
+            headers,
+            status,
+        }
+    }
 }
 
 /// A custom trait that templates necessary functionality with a Git server's REST API.
@@ -77,7 +98,7 @@ pub trait RestApiClient {
         client: &Client,
         url: impl IntoUrl,
         method: Method,
-        data: Option<HashMap<&str, String>>,
+        data: Option<String>,
         headers: Option<HeaderMap>,
     ) -> Request {
         let mut req = client.request(method, url);
@@ -85,7 +106,7 @@ pub trait RestApiClient {
             req = req.headers(h);
         }
         if let Some(d) = data {
-            req = req.json(&d);
+            req = req.body(d);
         }
         req.build().expect("Failed to create a HTTP request")
     }
@@ -108,7 +129,7 @@ pub trait RestApiClient {
         strict: bool,
         rate_limit_headers: RestApiRateLimitHeaders,
         retries: u64,
-    ) -> BoxFuture<'static, Option<Response>> {
+    ) -> BoxFuture<'static, Option<CachedResponse>> {
         async move {
             match client
                 .execute(
@@ -173,22 +194,22 @@ pub trait RestApiClient {
                             .await;
                         }
                     }
-                    if !response.status().is_success() {
+                    let cached_response = CachedResponse::from(response).await;
+                    if !cached_response.status.is_success() {
                         let summary = format!(
-                            "Got {} response from {}ing to {}",
-                            response.status().as_u16(),
+                            "Got {} response from {} request to {}:\n{}",
+                            cached_response.status.as_u16(),
                             request.method().as_str(),
                             request.url().as_str(),
+                            cached_response.text,
                         );
                         if strict {
-                            panic!(
-                                "{summary}: {}",
-                                response.text().await.unwrap_or("".to_string())
-                            );
+                            panic!("{summary}");
+                        } else {
+                            log::error!("{summary}");
                         }
-                        log::error!("{summary}");
                     }
-                    Some(response)
+                    Some(cached_response)
                 }
                 Err(e) => {
                     if strict {

@@ -3,16 +3,18 @@
 
 use std::{
     process::Command,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, MutexGuard},
 };
 
+use log::Level;
 // non-std crates
 use serde::Deserialize;
 use serde_xml_rs::de::Deserializer;
 
 // project-specific crates/modules
+use super::MakeSuggestions;
 use crate::{
-    cli::LinesChangedOnly,
+    cli::ClangParams,
     common_fs::{get_line_cols_from_offset, FileObj},
 };
 
@@ -23,6 +25,18 @@ pub struct FormatAdvice {
     /// A list of [`Replacement`]s that clang-tidy wants to make.
     #[serde(rename = "$value")]
     pub replacements: Vec<Replacement>,
+
+    pub patched: Option<Vec<u8>>,
+}
+
+impl MakeSuggestions for FormatAdvice {
+    fn get_suggestion_help(&self, _start_line: u32, _end_line: u32) -> String {
+        String::from("### clang-format suggestions\n")
+    }
+
+    fn get_tool_name(&self) -> String {
+        "clang-format".to_string()
+    }
 }
 
 /// A single replacement that clang-format wants to make.
@@ -63,6 +77,20 @@ impl Clone for Replacement {
     }
 }
 
+/// Get a string that summarizes the given `--style`
+pub fn summarize_style(style: &str) -> String {
+    if ["google", "chromium", "microsoft", "mozilla", "webkit"].contains(&style) {
+        // capitalize the first letter
+        let mut char_iter = style.chars();
+        let first_char = char_iter.next().unwrap();
+        first_char.to_uppercase().collect::<String>() + char_iter.as_str()
+    } else if style == "llvm" || style == "gnu" {
+        style.to_ascii_uppercase()
+    } else {
+        String::from("Custom")
+    }
+}
+
 /// Get a total count of clang-format advice from the given list of [FileObj]s.
 pub fn tally_format_advice(files: &[Arc<Mutex<FileObj>>]) -> u64 {
     let mut total = 0;
@@ -79,24 +107,52 @@ pub fn tally_format_advice(files: &[Arc<Mutex<FileObj>>]) -> u64 {
 
 /// Run clang-tidy for a specific `file`, then parse and return it's XML output.
 pub fn run_clang_format(
-    cmd: &mut Command,
-    file: &mut Arc<Mutex<FileObj>>,
-    style: &str,
-    lines_changed_only: &LinesChangedOnly,
+    file: &mut MutexGuard<FileObj>,
+    clang_params: &ClangParams,
 ) -> Vec<(log::Level, String)> {
+    let mut cmd = Command::new(clang_params.clang_format_command.as_ref().unwrap());
     let mut logs = vec![];
-    let mut file = file.lock().unwrap();
-    cmd.args(["--style", style, "--output-replacements-xml"]);
-    let ranges = file.get_ranges(lines_changed_only);
+    cmd.args(["--style", &clang_params.style]);
+    let ranges = file.get_ranges(&clang_params.lines_changed_only);
     for range in &ranges {
         cmd.arg(format!("--lines={}:{}", range.start(), range.end()));
     }
     cmd.arg(file.name.to_string_lossy().as_ref());
+    let mut patched = None;
+    if clang_params.format_review {
+        logs.push((
+            Level::Info,
+            format!(
+                "Getting format fixes with \"{} {}\"",
+                clang_params
+                    .clang_format_command
+                    .as_ref()
+                    .unwrap()
+                    .to_str()
+                    .unwrap(),
+                cmd.get_args()
+                    .map(|a| a.to_str().unwrap())
+                    .collect::<Vec<&str>>()
+                    .join(" ")
+            ),
+        ));
+        patched = Some(
+            cmd.output()
+                .expect("Failed to get fixes from clang-format")
+                .stdout,
+        );
+    }
+    cmd.arg("--output-replacements-xml");
     logs.push((
         log::Level::Info,
         format!(
             "Running \"{} {}\"",
-            cmd.get_program().to_string_lossy(),
+            clang_params
+                .clang_format_command
+                .as_ref()
+                .unwrap()
+                .to_str()
+                .unwrap(),
             cmd.get_args()
                 .map(|x| x.to_str().unwrap())
                 .collect::<Vec<&str>>()
@@ -129,7 +185,9 @@ pub fn run_clang_format(
     let mut format_advice = FormatAdvice::deserialize(&mut Deserializer::new(event_reader))
         .unwrap_or(FormatAdvice {
             replacements: vec![],
+            patched: None,
         });
+    format_advice.patched = patched;
     if !format_advice.replacements.is_empty() {
         let mut filtered_replacements = Vec::new();
         for replacement in &mut format_advice.replacements {
@@ -155,7 +213,7 @@ pub fn run_clang_format(
 
 #[cfg(test)]
 mod tests {
-    use super::{FormatAdvice, Replacement};
+    use super::{summarize_style, FormatAdvice, Replacement};
     use serde::Deserialize;
 
     #[test]
@@ -201,6 +259,7 @@ mod tests {
                     cols: None,
                 },
             ],
+            patched: None,
         };
         let config = serde_xml_rs::ParserConfig::new()
             .trim_whitespace(false)
@@ -211,5 +270,24 @@ mod tests {
             FormatAdvice::deserialize(&mut serde_xml_rs::de::Deserializer::new(event_reader))
                 .unwrap();
         assert_eq!(expected, document);
+    }
+
+    fn formalize_style(style: &str, expected: &str) {
+        assert_eq!(summarize_style(style), expected);
+    }
+
+    #[test]
+    fn formalize_llvm_style() {
+        formalize_style("llvm", "LLVM");
+    }
+
+    #[test]
+    fn formalize_google_style() {
+        formalize_style("google", "Google");
+    }
+
+    #[test]
+    fn formalize_custom_style() {
+        formalize_style("file", "Custom");
     }
 }

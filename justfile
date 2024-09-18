@@ -19,10 +19,15 @@ py-dev:
 
 # run the test suite
 [group("code coverage")]
-test:
+test arg='':
     cargo llvm-cov --no-report \
     nextest --manifest-path cpp-linter-lib/Cargo.toml \
-    --lib --tests --color always
+    --lib --tests --color always {{ arg }}
+
+# Clear previous test build artifacts
+[group("code coverage")]
+test-clean:
+    cargo llvm-cov clean
 
 # generate and open pretty coverage report
 [group("code coverage")]

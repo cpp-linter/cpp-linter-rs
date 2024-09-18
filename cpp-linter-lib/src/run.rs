@@ -103,7 +103,22 @@ pub async fn run_main(args: Vec<String>) -> i32 {
             .await
     } else {
         // walk the folder and look for files with specified extensions according to ignore values.
-        file_filter.list_source_files(".")
+        let mut all_files = file_filter.list_source_files(".");
+        if rest_api_client.event_name == "pull_request" && (cli.tidy_review || cli.format_review) {
+            let changed_files = rest_api_client
+                .get_list_of_changed_files(&file_filter)
+                .await;
+            for changed_file in changed_files {
+                for file in &mut all_files {
+                    if changed_file.name == file.name {
+                        file.diff_chunks = changed_file.diff_chunks.clone();
+                        file.added_lines = changed_file.added_lines.clone();
+                        file.added_ranges = changed_file.added_ranges.clone();
+                    }
+                }
+            }
+        }
+        all_files
     };
     let mut arc_files = vec![];
     log::info!("Giving attention to the following files:");
@@ -128,9 +143,11 @@ pub async fn run_main(args: Vec<String>) -> i32 {
 #[cfg(test)]
 mod test {
     use super::run_main;
+    use std::env;
 
     #[tokio::test]
     async fn run() {
+        env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
         assert_eq!(
             run_main(vec![
                 "cpp-linter".to_string(),
@@ -147,6 +164,7 @@ mod test {
 
     #[tokio::test]
     async fn run_version_command() {
+        env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
         assert_eq!(
             run_main(vec!["cpp-linter".to_string(), "version".to_string()]).await,
             0
@@ -155,6 +173,7 @@ mod test {
 
     #[tokio::test]
     async fn run_force_debug_output() {
+        env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
         assert_eq!(
             run_main(vec![
                 "cpp-linter".to_string(),
@@ -170,6 +189,7 @@ mod test {
 
     #[tokio::test]
     async fn run_bad_version_input() {
+        env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
         assert_eq!(
             run_main(vec![
                 "cpp-linter".to_string(),
