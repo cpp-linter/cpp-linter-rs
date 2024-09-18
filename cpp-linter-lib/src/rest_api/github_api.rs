@@ -222,7 +222,9 @@ impl RestApiClient for GithubApiClient {
                             .await
                     }
                 }
-                None => panic!("Failed to get list of changed files."),
+                None => {
+                    panic!("Failed to connect with GitHub server to get list of changed files.")
+                }
             }
         } else {
             // get diff from libgit2 API
