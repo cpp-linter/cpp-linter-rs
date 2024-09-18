@@ -76,7 +76,14 @@ impl TidyNotification {
         if self.diagnostic.starts_with("clang-diagnostic") {
             return self.diagnostic.clone();
         }
-        let (category, name) = self.diagnostic.split_once('-').unwrap();
+        let (category, name) = if self.diagnostic.starts_with("clang-analyzer-") {
+            (
+                "clang-analyzer",
+                self.diagnostic.strip_prefix("clang-analyzer-").unwrap(),
+            )
+        } else {
+            self.diagnostic.split_once('-').unwrap()
+        };
         format!(
             "[{}](https://clang.llvm.org/extra/clang-tidy/checks/{category}/{name}.html)",
             self.diagnostic
@@ -345,6 +352,43 @@ mod test {
     };
 
     use super::run_clang_tidy;
+    use super::TidyNotification;
+
+    #[test]
+    fn clang_diagnostic_link() {
+        let note = TidyNotification {
+            filename: String::from("some_src.cpp"),
+            line: 1504,
+            cols: 9,
+            rationale: String::from("file not found"),
+            severity: String::from("error"),
+            diagnostic: String::from("clang-diagnostic-error"),
+            suggestion: vec![],
+            fixed_lines: vec![],
+        };
+        assert_eq!(note.diagnostic_link(), note.diagnostic);
+    }
+
+    #[test]
+    fn clang_analyzer_link() {
+        let note = TidyNotification {
+            filename: String::from("some_src.cpp"),
+            line: 1504,
+            cols: 9,
+            rationale: String::from(
+                "Dereference of null pointer (loaded from variable 'pipe_num')",
+            ),
+            severity: String::from("warning"),
+            diagnostic: String::from("clang-analyzer-core.NullDereference"),
+            suggestion: vec![],
+            fixed_lines: vec![],
+        };
+        let expected = format!(
+            "[{}](https://clang.llvm.org/extra/clang-tidy/checks/{}/{}.html)",
+            note.diagnostic, "clang-analyzer", "core.NullDereference",
+        );
+        assert_eq!(note.diagnostic_link(), expected);
+    }
 
     // ***************** test for regex parsing of clang-tidy stdout
 
