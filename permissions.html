@@ -88,7 +88,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="cli.html"><strong aria-hidden="true">2.</strong> Command Line Interface</a></li><li class="chapter-item expanded "><a href="permissions.html" class="active"><strong aria-hidden="true">3.</strong> Token Permissions</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="cli.html"><strong aria-hidden="true">2.</strong> Command Line Interface</a></li><li class="chapter-item expanded "><a href="permissions.html" class="active"><strong aria-hidden="true">3.</strong> Token Permissions</a></li><li class="chapter-item expanded "><a href="pr-review-caveats.html"><strong aria-hidden="true">4.</strong> Pull Request Review Caveats</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle">
                 <div class="sidebar-resize-indicator"></div>
@@ -279,8 +279,8 @@ the repository is not checked out before running cpp-linter.</p>
 required for
 <ul>
 <li>posting <a href="#thread-comments">thread comments</a> on pull requests</li>
+<li>posting <a href="#pull-request-reviews">pull request reviews</a></li>
 </ul>
-<!-- * posting [pull request reviews](#pull-request-reviews) -->
 </li>
 </ul>
 <h2 id="thread-comments"><a class="header" href="#thread-comments">Thread Comments</a></h2>
@@ -301,16 +301,11 @@ This also allows us to delete an outdated comment if needed.</li>
 <pre><code class="language-yaml">    permissions:
       pull-requests: write
 </code></pre>
-<!--
-## Pull Request Reviews
-
-The [`tidy-review`](cli.md#-t---tidy-review), [`format-review`](cli.md#-f---format-review), and [`passive-reviews`](cli.md#-p---passive-reviews) features require the following permissions:
-
-```yaml
-    permissions:
+<h2 id="pull-request-reviews"><a class="header" href="#pull-request-reviews">Pull Request Reviews</a></h2>
+<p>The <a href="cli.html#-d---tidy-review"><code>tidy-review</code></a>, <a href="cli.html#-m---format-review"><code>format-review</code></a>, and <a href="cli.html#-r---passive-reviews"><code>passive-reviews</code></a> features require the following permissions:</p>
+<pre><code class="language-yaml">    permissions:
       pull-requests: write
-```
--->
+</code></pre>
 
                     </main>
 
@@ -320,6 +315,9 @@ The [`tidy-review`](cli.md#-t---tidy-review), [`format-review`](cli.md#-f---form
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
+                            <a rel="next prefetch" href="pr-review-caveats.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
 
                         <div style="clear: both"></div>
                     </nav>
@@ -331,6 +329,9 @@ The [`tidy-review`](cli.md#-t---tidy-review), [`format-review`](cli.md#-f---form
                         <i class="fa fa-angle-left"></i>
                     </a>
 
+                    <a rel="next prefetch" href="pr-review-caveats.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
             </nav>
 
         </div>

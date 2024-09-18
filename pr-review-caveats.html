@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Command Line Interface - cpp-linter</title>
+        <title>Pull Request Review Caveats - cpp-linter</title>
 
 
         <!-- Custom HTML head -->
@@ -88,7 +88,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="cli.html" class="active"><strong aria-hidden="true">2.</strong> Command Line Interface</a></li><li class="chapter-item expanded "><a href="permissions.html"><strong aria-hidden="true">3.</strong> Token Permissions</a></li><li class="chapter-item expanded "><a href="pr-review-caveats.html"><strong aria-hidden="true">4.</strong> Pull Request Review Caveats</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="cli.html"><strong aria-hidden="true">2.</strong> Command Line Interface</a></li><li class="chapter-item expanded "><a href="permissions.html"><strong aria-hidden="true">3.</strong> Token Permissions</a></li><li class="chapter-item expanded "><a href="pr-review-caveats.html" class="active"><strong aria-hidden="true">4.</strong> Pull Request Review Caveats</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle">
                 <div class="sidebar-resize-indicator"></div>
@@ -243,199 +243,101 @@
 }
 
 </style>
-<h1 id="command-line-interface"><a class="header" href="#command-line-interface">Command Line Interface</a></h1>
-<!-- markdownlint-disable MD033 MD028 -->
-<h2 id="commands"><a class="header" href="#commands">Commands</a></h2>
-<h3 id="version"><a class="header" href="#version"><code>version</code></a></h3>
-<p>Display the cpp-linter version and exit.</p>
-<h2 id="arguments"><a class="header" href="#arguments">Arguments</a></h2>
-<h3 id="files"><a class="header" href="#files"><code>files</code></a></h3>
-<p>An explicit path to a file.
-This can be specified zero or more times, resulting in a list of files.
-The list of files is appended to the internal list of 'not ignored' files.
-Further filtering can still be applied (see <a href="#source-options">Source options</a>).</p>
-<h2 id="general-options"><a class="header" href="#general-options">General options</a></h2>
-<h3 id="-v---verbosity"><a class="header" href="#-v---verbosity"><code>-v, --verbosity</code></a></h3>
-<dt>Default</dt><dd><code>"info"</code></dd>
-<p>This controls the action's verbosity in the workflow's logs.
-This option does not affect the verbosity of resulting
-thread comments or file annotations.</p>
-<h3 id="-v---version"><a class="header" href="#-v---version"><code>-V, --version</code></a></h3>
-<dt>Default</dt><dd><code>""</code></dd>
-<p>The desired version of the clang tools to use. Accepted options are
-strings which can be 8, 9, 10, 11, 12, 13, 14, 15, 16, 17.</p>
-<ul>
-<li>Set this option to a blank string (<code>''</code>) to use the
-platform's default installed version.</li>
-<li>This value can also be a path to where the clang tools are
-installed (if using a custom install location). All paths specified
-here are converted to absolute.</li>
-</ul>
-<h2 id="source-options"><a class="header" href="#source-options">Source options</a></h2>
-<h3 id="-e---extensions"><a class="header" href="#-e---extensions"><code>-e, --extensions</code></a></h3>
-<dt>Default</dt><dd><code>"c,h,C,H,cpp,hpp,cc,hh,c++,h++,cxx,hxx"</code></dd>
-<p>A comma-separated list of file extensions to analyze.</p>
-<h3 id="-r---repo-root"><a class="header" href="#-r---repo-root"><code>-r, --repo-root</code></a></h3>
-<dt>Default</dt><dd><code>"."</code></dd>
-<p>The relative path to the repository root directory. This path is
-relative to the runner's <code>GITHUB_WORKSPACE</code> environment variable (or
-the current working directory if not using a CI runner).</p>
-<h3 id="-i---ignore"><a class="header" href="#-i---ignore"><code>-i, --ignore</code></a></h3>
-<dt>Default</dt><dd><code>".github|target"</code></dd>
-<p>Set this option with path(s) to ignore (or not ignore).</p>
-<ul>
-<li>In the case of multiple paths, you can use <code>|</code> to separate each path.</li>
-<li>There is no need to use <code>./</code> for each entry; a blank string (<code>''</code>)
-represents the repo-root path.</li>
-<li>This can also have files, but the file's path (relative to
-the <a href="#-r---repo-root"><code>--repo-root</code></a>) has to be specified with the filename.</li>
-<li>Submodules are automatically ignored. Hidden directories (beginning
-with a <code>.</code>) are also ignored automatically.</li>
-<li>Prefix a path with <code>!</code> to explicitly not ignore it. This can be
-applied to a submodule's path (if desired) but not hidden directories.</li>
-<li>Glob patterns are supported here. Path separators in glob patterns should
-use <code>/</code> because <code>\</code> represents an escaped literal.</li>
-</ul>
-<h3 id="-l---lines-changed-only"><a class="header" href="#-l---lines-changed-only"><code>-l, --lines-changed-only</code></a></h3>
-<dt>Default</dt><dd><code>"true"</code></dd>
-<p>This controls what part of the files are analyzed.
-The following values are accepted:</p>
-<ul>
-<li><code>false</code>: All lines in a file are analyzed.</li>
-<li><code>true</code>: Only lines in the diff that contain additions are analyzed.</li>
-<li><code>diff</code>: All lines in the diff are analyzed (including unchanged
-lines but not subtractions).</li>
-</ul>
-<h3 id="-f---files-changed-only"><a class="header" href="#-f---files-changed-only"><code>-f, --files-changed-only</code></a></h3>
-<dt>Default</dt><dd><code>"false"</code></dd>
-<p>Set this option to false to analyze any source files in the repo.
-This is automatically enabled if
-<a href="#-l---lines-changed-only"><code>--lines-changed-only</code></a> is enabled.</p>
+<h1 id="pull-request-review-caveats"><a class="header" href="#pull-request-review-caveats">Pull Request Review Caveats</a></h1>
 <div class="mdbook-alerts mdbook-alerts-note">
 <p class="mdbook-alerts-title">
   <span class="mdbook-alerts-icon"></span>
   note
 </p>
-<p>The <code>GITHUB_TOKEN</code> should be supplied when running on a
-private repository with this option enabled, otherwise the runner
-does not not have the privilege to list the changed files for an event.</p>
-<p>See <a href="https://docs.github.com/en/actions/reference/authentication-in-a-workflow">Authenticating with the <code>GITHUB_TOKEN</code></a>.</p>
+<p>This information is specific to GitHub Pull Requests (often abbreviated as "PR").</p>
 </div>
-<h2 id="clang-format-options"><a class="header" href="#clang-format-options">Clang-format options</a></h2>
-<h3 id="-s---style"><a class="header" href="#-s---style"><code>-s, --style</code></a></h3>
-<dt>Default</dt><dd><code>"llvm"</code></dd>
-<p>The style rules to use.</p>
-<ul>
-<li>Set this to <code>file</code> to have clang-format use the closest relative
-.clang-format file.</li>
-<li>Set this to a blank string (<code>''</code>) to disable using clang-format
-entirely.</li>
-</ul>
-<div class="mdbook-alerts mdbook-alerts-note">
-<p class="mdbook-alerts-title">
-  <span class="mdbook-alerts-icon"></span>
-  note
-</p>
-<p>If this is not a blank string, then it is also passed to clang-tidy
-(if <a href="#-c---tidy-checks"><code>--tidy_checks</code></a> is not <code>-*</code>).
-This is done to ensure suggestions from both clang-tidy and
-clang-format are consistent.</p>
-</div>
-<h3 id="-m---ignore-format"><a class="header" href="#-m---ignore-format"><code>-M, --ignore-format</code></a></h3>
-<p>Similar to <a href="#-i---ignore"><code>--ignore</code></a> but applied
-exclusively to files analyzed by clang-format.</p>
-<h2 id="clang-tidy-options"><a class="header" href="#clang-tidy-options">Clang-tidy options</a></h2>
-<h3 id="-c---tidy-checks"><a class="header" href="#-c---tidy-checks"><code>-c, --tidy-checks</code></a></h3>
-<dt>Default</dt><dd><code>"boost-*,bugprone-*,performance-*,readability-*,portability-*,modernize-*,clang-analyzer-*,cppcoreguidelines-*"</code></dd>
-<p>A comma-separated list of globs with optional <code>-</code> prefix.
-Globs are processed in order of appearance in the list.
-Globs without <code>-</code> prefix add checks with matching names to the set,
-globs with the <code>-</code> prefix remove checks with matching names from the set of
-enabled checks. This option's value is appended to the value of the 'Checks'
-option in a .clang-tidy file (if any).</p>
-<ul>
-<li>It is possible to disable clang-tidy entirely by setting this option to
-<code>'-*'</code>.</li>
-<li>It is also possible to rely solely on a .clang-tidy config file by
-specifying this option as a blank string (<code>''</code>).</li>
-</ul>
-<p>See also clang-tidy docs for more info.</p>
-<h3 id="-p---database"><a class="header" href="#-p---database"><code>-p, --database</code></a></h3>
-<p>The path that is used to read a compile command database.
-For example, it can be a CMake build directory in which a file named
-compile_commands.json exists (set <code>CMAKE_EXPORT_COMPILE_COMMANDS</code> to <code>ON</code>).
-When no build path is specified, a search for compile_commands.json will be
-attempted through all parent paths of the first input file. See <a href="https://clang.llvm.org/docs/HowToSetupToolingForLLVM.html">LLVM docs about
-setup tooling</a>
-for an example of setting up Clang Tooling on a source tree.</p>
-<h3 id="-x---extra-arg"><a class="header" href="#-x---extra-arg"><code>-x, --extra-arg</code></a></h3>
-<p>A string of extra arguments passed to clang-tidy for use as
-compiler arguments. This can be specified more than once for each
-additional argument. Recommend using quotes around the value and
-avoid using spaces between name and value (use <code>=</code> instead):</p>
-<pre><code class="language-shell">cpp-linter --extra-arg="-std=c++17" --extra-arg="-Wall"
-</code></pre>
-<h3 id="-d---ignore-tidy"><a class="header" href="#-d---ignore-tidy"><code>-D, --ignore-tidy</code></a></h3>
-<p>Similar to <a href="#-i---ignore"><code>--ignore</code></a> but applied
-exclusively to files analyzed by clang-tidy.</p>
-<h2 id="feedback-options"><a class="header" href="#feedback-options">Feedback options</a></h2>
-<h3 id="-g---thread-comments"><a class="header" href="#-g---thread-comments"><code>-g, --thread-comments</code></a></h3>
-<dt>Default</dt><dd><code>"false"</code></dd>
-<p>Set this option to true to enable the use of thread comments as feedback.
-Set this to <code>update</code> to update an existing comment if one exists;
-the value 'true' will always delete an old comment and post a new one if necessary.</p>
-<div class="mdbook-alerts mdbook-alerts-note">
-<p class="mdbook-alerts-title">
-  <span class="mdbook-alerts-icon"></span>
-  note
-</p>
-<p>To use thread comments, the <code>GITHUB_TOKEN</code> (provided by
-Github to each repository) must be declared as an environment
-variable.</p>
-<p>See <a href="https://docs.github.com/en/actions/reference/authentication-in-a-workflow">Authenticating with the <code>GITHUB_TOKEN</code></a>.</p>
-</div>
-<h3 id="-t---no-lgtm"><a class="header" href="#-t---no-lgtm"><code>-t, --no-lgtm</code></a></h3>
-<dt>Default</dt><dd><code>"true"</code></dd>
-<p>Set this option to true or false to enable or disable the use of a
-thread comment that basically says 'Looks Good To Me' (when all checks pass).</p>
+<p>While the Pull Request review feature has been diligently tested, there are still some caveats to
+beware of when using Pull Request reviews.</p>
+<h2 id="bot-permissions-required"><a class="header" href="#bot-permissions-required">Bot Permissions required</a></h2>
+<p>The "GitHub Actions" bot may need to be allowed to approve Pull Requests.
+By default, the bot cannot approve Pull Request changes, only request more changes.
+This will show as a warning in the workflow logs if the given token (set to the
+environment variable <code>GITHUB_TOKEN</code>) isn't configured with the proper permissions.</p>
 <div class="mdbook-alerts mdbook-alerts-important">
 <p class="mdbook-alerts-title">
   <span class="mdbook-alerts-icon"></span>
   important
 </p>
-<p>The <a href="#-g---thread-comments"><code>--thread-comments</code></a>
-option also notes further implications.</p>
+<p>Refer to the GitHub documentation for <a href="https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository#preventing-github-actions-from-creating-or-approving-pull-requests">repository settings</a> or <a href="https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository#preventing-github-actions-from-creating-or-approving-pull-requests">organization settings</a>
+about adjusting the required permissions for GitHub Actions's <code>secrets.GITHUB_TOKEN</code>.</p>
+<p>See our <a href="permissions.html#pull-request-reviews">documented permissions</a>.</p>
 </div>
-<h3 id="-w---step-summary"><a class="header" href="#-w---step-summary"><code>-w, --step-summary</code></a></h3>
-<dt>Default</dt><dd><code>"false"</code></dd>
-<p>Set this option to true or false to enable or disable the use of
-a workflow step summary when the run has concluded.</p>
-<h3 id="-a---file-annotations"><a class="header" href="#-a---file-annotations"><code>-a, --file-annotations</code></a></h3>
-<dt>Default</dt><dd><code>"true"</code></dd>
-<p>Set this option to false to disable the use of
-file annotations as feedback.</p>
-<h3 id="-d---tidy-review"><a class="header" href="#-d---tidy-review"><code>-d, --tidy-review</code></a></h3>
-<dt>Default</dt><dd><code>"false"</code></dd>
-<p>Set to <code>true</code> to enable Pull Request reviews from clang-tidy.</p>
-<h3 id="-m---format-review"><a class="header" href="#-m---format-review"><code>-m, --format-review</code></a></h3>
-<dt>Default</dt><dd><code>"false"</code></dd>
-<p>Set to <code>true</code> to enable Pull Request reviews from clang-format.</p>
-<h3 id="-r---passive-reviews"><a class="header" href="#-r---passive-reviews"><code>-R, --passive-reviews</code></a></h3>
-<dt>Default</dt><dd><code>"false"</code></dd>
-<p>Set to <code>true</code> to prevent Pull Request reviews from
-approving or requesting changes.</p>
+<h2 id="auto-disabled-for-certain-event-types"><a class="header" href="#auto-disabled-for-certain-event-types">Auto-disabled for certain event types</a></h2>
+<p>The feature is auto-disabled for</p>
+<ul>
+<li>closed Pull Requests</li>
+<li>Pull Requests marked as "draft"</li>
+<li>push events</li>
+</ul>
+<h2 id="posts-a-new-review-on-each-run"><a class="header" href="#posts-a-new-review-on-each-run">Posts a new review on each run</a></h2>
+<p>Clang-tidy and clang-format suggestions are shown in 1 Pull Request review.</p>
+<ul>
+<li>Users are encouraged to choose either <a href="cli.html#-d---tidy-review"><code>tidy-review</code></a> or <a href="cli.html#-m---format-review"><code>format-review</code></a>.
+Enabling both will likely show duplicate or similar suggestions.
+Remember, clang-tidy can be configured to use the same <a href="cli.html#-s---style"><code>style</code></a> that clang-format accepts.</li>
+<li>Each generated review is specific to the commit that triggered the Continuous Integration
+workflow.</li>
+<li>Outdated reviews are dismissed but not marked as resolved.
+Also, the outdated review's summary comment is not automatically hidden.
+To reduce the Pull Request's thread noise, users interaction is required.</li>
+</ul>
+<div class="mdbook-alerts mdbook-alerts-important">
+<p class="mdbook-alerts-title">
+  <span class="mdbook-alerts-icon"></span>
+  important
+</p>
+<p>Refer to GitHub's documentation about <a href="https://docs.github.com/en/communities/moderating-comments-and-conversations/managing-disruptive-comments#hiding-a-comment">hiding a comment</a>.
+Hiding a Pull Request review's summary comment will not resolve the suggestions in the diff.
+Please also refer to <a href="https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/commenting-on-a-pull-request#resolving-conversations">resolve a conversation</a> to collapse outdated or duplicate suggestions
+in the diff.</p>
+</div>
+<p>GitHub REST API does not provide a way to hide comments or mark review suggestions as resolved.</p>
+<div class="mdbook-alerts mdbook-alerts-tip">
+<p class="mdbook-alerts-title">
+  <span class="mdbook-alerts-icon"></span>
+  tip
+</p>
+<p>We do support an environment variable named <code>CPP_LINTER_PR_REVIEW_SUMMARY_ONLY</code>.
+If the variable is set to <code>true</code>, then the review only contains a summary comment
+with no suggestions posted in the diff.</p>
+</div>
+<h2 id="probable-non-exhaustive-reviews"><a class="header" href="#probable-non-exhaustive-reviews">Probable non-exhaustive reviews</a></h2>
+<p>If any suggestions did not fit within the Pull Request diff, then the review's summary comment will
+indicate how many suggestions were left out.
+The full patch of suggestions is always included as a collapsed code block in the review summary
+comment. This isn't a problem we can fix.
+GitHub won't allow review comments/suggestions to target lines that are not shown in the Pull
+Request diff (the summation of file differences in a Pull Request).</p>
+<ul>
+<li>Users are encouraged to set <a href="cli.html#-l---lines-changed-only"><code>lines-changed-only</code></a> to <code>true</code>.
+This will <em>help</em> us keep the suggestions limited to lines that are shown within the Pull
+Request diff.
+However, there are still some cases where clang-format or clang-tidy will apply fixes to lines
+that are not within the diff.
+This can't be avoided because the <code>--line-filter</code> passed to the clang-tidy (and <code>--lines</code>
+passed to clang-format) only applies to analysis, not fixes.</li>
+<li>Not every diagnostic from clang-tidy can be automatically fixed.
+Some diagnostics require user interaction/decision to properly address.
+If any diagnostic reported by clang-tidy falls within the Pull Request's diff,
+then it will be noted in the Pull Request review comments (without a suggested fix).</li>
+<li>Some fixes provided might depend on what compiler is used.
+We have made it so clang-tidy takes advantage of any fixes provided by the compiler.
+Compilation errors may still prevent clang-tidy from reporting all concerns.</li>
+</ul>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="index.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="permissions.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next prefetch" href="permissions.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
-                                <i class="fa fa-angle-right"></i>
-                            </a>
 
                         <div style="clear: both"></div>
                     </nav>
@@ -443,13 +345,10 @@ approving or requesting changes.</p>
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="index.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="permissions.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next prefetch" href="permissions.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
-                        <i class="fa fa-angle-right"></i>
-                    </a>
             </nav>
 
         </div>
