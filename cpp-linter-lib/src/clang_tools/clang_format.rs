@@ -77,6 +77,20 @@ impl Clone for Replacement {
     }
 }
 
+/// Get a string that summarizes the given `--style`
+pub fn summarize_style(style: &str) -> String {
+    if ["google", "chromium", "microsoft", "mozilla", "webkit"].contains(&style) {
+        // capitalize the first letter
+        let mut char_iter = style.chars();
+        let first_char = char_iter.next().unwrap();
+        first_char.to_uppercase().collect::<String>() + char_iter.as_str()
+    } else if style == "llvm" || style == "gnu" {
+        style.to_ascii_uppercase()
+    } else {
+        String::from("Custom")
+    }
+}
+
 /// Get a total count of clang-format advice from the given list of [FileObj]s.
 pub fn tally_format_advice(files: &[Arc<Mutex<FileObj>>]) -> u64 {
     let mut total = 0;
@@ -199,7 +213,7 @@ pub fn run_clang_format(
 
 #[cfg(test)]
 mod tests {
-    use super::{FormatAdvice, Replacement};
+    use super::{summarize_style, FormatAdvice, Replacement};
     use serde::Deserialize;
 
     #[test]
@@ -256,5 +270,24 @@ mod tests {
             FormatAdvice::deserialize(&mut serde_xml_rs::de::Deserializer::new(event_reader))
                 .unwrap();
         assert_eq!(expected, document);
+    }
+
+    fn formalize_style(style: &str, expected: &str) {
+        assert_eq!(summarize_style(style), expected);
+    }
+
+    #[test]
+    fn formalize_llvm_style() {
+        formalize_style("llvm", "LLVM");
+    }
+
+    #[test]
+    fn formalize_google_style() {
+        formalize_style("google", "Google");
+    }
+
+    #[test]
+    fn formalize_custom_style() {
+        formalize_style("file", "Custom");
     }
 }

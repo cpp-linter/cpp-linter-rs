@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{fmt::Display, path::PathBuf};
 
 use clap::ArgMatches;
 
@@ -23,6 +23,16 @@ impl LinesChangedOnly {
             "true" | "on" | "1" => LinesChangedOnly::On,
             "diff" => LinesChangedOnly::Diff,
             _ => LinesChangedOnly::Off,
+        }
+    }
+}
+
+impl Display for LinesChangedOnly {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LinesChangedOnly::Off => write!(f, "false"),
+            LinesChangedOnly::Diff => write!(f, "diff"),
+            LinesChangedOnly::On => write!(f, "true"),
         }
     }
 }
@@ -134,6 +144,16 @@ impl ThreadComments {
     }
 }
 
+impl Display for ThreadComments {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ThreadComments::On => write!(f, "true"),
+            ThreadComments::Off => write!(f, "false"),
+            ThreadComments::Update => write!(f, "update"),
+        }
+    }
+}
+
 /// A data structure to contain CLI options that relate to
 /// clang-tidy or clang-format arguments.
 #[derive(Debug, Clone, Default)]
@@ -227,7 +247,7 @@ impl Default for FeedbackInput {
 mod test {
     use crate::cli::get_arg_parser;
 
-    use super::Cli;
+    use super::{Cli, LinesChangedOnly, ThreadComments};
 
     #[test]
     fn parse_positional() {
@@ -238,5 +258,22 @@ mod test {
         assert!(!not_ignored.is_empty());
         assert!(not_ignored.contains(&String::from("file1.c")));
         assert!(not_ignored.contains(&String::from("file2.h")));
+    }
+
+    #[test]
+    fn display_lines_changed_only_enum() {
+        let input = "diff".to_string();
+        assert_eq!(
+            LinesChangedOnly::from_string(&input),
+            LinesChangedOnly::Diff
+        );
+        assert_eq!(format!("{}", LinesChangedOnly::Diff), input);
+    }
+
+    #[test]
+    fn display_thread_comments_enum() {
+        let input = "false".to_string();
+        assert_eq!(ThreadComments::from_string(&input), ThreadComments::Off);
+        assert_eq!(format!("{}", ThreadComments::Off), input);
     }
 }

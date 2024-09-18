@@ -258,7 +258,7 @@ impl ReviewComments {
                     .as_str(),
                 );
             }
-            if total > 0 {
+            if !self.full_patch[t as usize].is_empty() {
                 body.push_str(
                     format!(
                         "\n<details><summary>Click here for the full {tool_name} patch</summary>\n\n```diff\n{}```\n\n</details>\n",
@@ -267,7 +267,11 @@ impl ReviewComments {
                 );
             } else {
                 body.push_str(
-                    format!("\nNo concerns reported by {}. Great job! :tada:", tool_name).as_str(),
+                    format!(
+                        "\nNo concerns reported by {}. Great job! :tada:\n",
+                        tool_name
+                    )
+                    .as_str(),
                 )
             }
         }
@@ -350,6 +354,9 @@ pub trait MakeSuggestions {
                 .expect("Failed to convert patch buffer to string")
                 .as_str(),
         );
+        if summary_only {
+            return;
+        }
         for hunk_id in 0..hunks_total {
             let (hunk, line_count) = patch.hunk(hunk_id).expect("Failed to get hunk from patch");
             hunks_in_patch += 1;
@@ -359,11 +366,7 @@ pub trait MakeSuggestions {
             }
             let (start_line, end_line) = hunk_range.unwrap();
             let mut suggestion = String::new();
-            let suggestion_help = if !summary_only {
-                Some(self.get_suggestion_help(start_line, end_line))
-            } else {
-                None
-            };
+            let suggestion_help = self.get_suggestion_help(start_line, end_line);
             let mut removed = vec![];
             for line_index in 0..line_count {
                 let diff_line = patch
@@ -371,39 +374,35 @@ pub trait MakeSuggestions {
                     .expect("Failed to get line in a hunk");
                 let line = String::from_utf8(diff_line.content().to_owned())
                     .expect("Failed to convert line buffer to string");
-                if !summary_only {
-                    if ['+', ' '].contains(&diff_line.origin()) {
-                        suggestion.push_str(line.as_str());
-                    } else {
-                        removed.push(
-                            diff_line
-                                .old_lineno()
-                                .expect("Removed line has no line number?!"),
-                        );
-                    }
+                if ['+', ' '].contains(&diff_line.origin()) {
+                    suggestion.push_str(line.as_str());
+                } else {
+                    removed.push(
+                        diff_line
+                            .old_lineno()
+                            .expect("Removed line has no line number?!"),
+                    );
                 }
             }
-            if !summary_only {
-                if suggestion.is_empty() && !removed.is_empty() {
-                    suggestion.push_str(
-                        format!(
-                            "Please remove the line(s)\n- {}",
-                            removed
-                                .iter()
-                                .map(|l| l.to_string())
-                                .collect::<Vec<String>>()
-                                .join("\n- ")
-                        )
-                        .as_str(),
+            if suggestion.is_empty() && !removed.is_empty() {
+                suggestion.push_str(
+                    format!(
+                        "Please remove the line(s)\n- {}",
+                        removed
+                            .iter()
+                            .map(|l| l.to_string())
+                            .collect::<Vec<String>>()
+                            .join("\n- ")
                     )
-                } else {
-                    suggestion = format!("```suggestion\n{suggestion}```",);
-                }
+                    .as_str(),
+                )
+            } else {
+                suggestion = format!("```suggestion\n{suggestion}```",);
             }
             let comment = Suggestion {
                 line_start: start_line,
                 line_end: end_line,
-                suggestion: format!("{}\n{suggestion}", suggestion_help.unwrap_or_default()),
+                suggestion: format!("{suggestion_help}\n{suggestion}"),
                 path: file_name.clone(),
             };
             if !review_comments.is_comment_in_suggestions(&comment) {
@@ -462,5 +461,18 @@ mod tests {
             .to_string_lossy()
             .to_string()
             .contains(TOOL_NAME)));
+    }
+
+    #[test]
+    fn get_exe_by_invalid_path() {
+        let tool_exe = get_clang_tool_exe(TOOL_NAME, "non-existent-path");
+        assert!(tool_exe.is_err());
+    }
+
+    #[test]
+    fn get_exe_by_invalid_name() {
+        let clang_version = env::var("CLANG_VERSION").unwrap_or("16".to_string());
+        let tool_exe = get_clang_tool_exe("not-a-clang-tool", &clang_version);
+        assert!(tool_exe.is_err());
     }
 }

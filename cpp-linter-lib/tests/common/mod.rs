@@ -6,6 +6,7 @@ use std::{
     process::Command,
 };
 
+use mockito::{Server, ServerGuard};
 use tempfile::TempDir;
 
 /// Create a temporary folder to run tests.
@@ -69,4 +70,11 @@ pub fn create_test_space() -> TempDir {
         println!("{line}");
     }
     tmp
+}
+
+/// Creates a mock server for use in tests.
+///
+/// It is the test's responsibility to create the mock responses.
+pub async fn mock_server() -> ServerGuard {
+    Server::new_async().await
 }

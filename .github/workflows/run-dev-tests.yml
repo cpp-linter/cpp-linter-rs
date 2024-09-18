@@ -75,23 +75,25 @@ jobs:
         run: sudo apt-get update
 
       - name: Install clang v7
+        if: matrix.os == 'Linux'
         uses: cpp-linter/cpp_linter_rs/install-clang-action@pr-reviews
         with:
           version: '7'
 
       - name: Collect Coverage for clang v7
-        working-directory: cpp-linter-lib
+        if: matrix.os == 'Linux'
         env:
           CLANG_VERSION: '7'
         run: just test
 
       - name: Install clang v8
+        if: matrix.os == 'Linux'
         uses: cpp-linter/cpp_linter_rs/install-clang-action@pr-reviews
         with:
           version: '8'
 
       - name: Collect Coverage for clang v8
-        working-directory: cpp-linter-lib
+        if: matrix.os == 'Linux'
         env:
           CLANG_VERSION: '8'
         run: just test
@@ -102,7 +104,6 @@ jobs:
           version: '9'
 
       - name: Collect Coverage for clang v9
-        working-directory: cpp-linter-lib
         env:
           CLANG_VERSION: '9'
         run: just test
@@ -113,7 +114,6 @@ jobs:
           version: '10'
 
       - name: Collect Coverage for clang v10
-        working-directory: cpp-linter-lib
         env:
           CLANG_VERSION: '10'
         run: just test
@@ -124,7 +124,6 @@ jobs:
           version: '11'
 
       - name: Collect Coverage for clang v11
-        working-directory: cpp-linter-lib
         env:
           CLANG_VERSION: '11'
         run: just test
@@ -135,7 +134,6 @@ jobs:
           version: '12'
 
       - name: Collect Coverage for clang v12
-        working-directory: cpp-linter-lib
         env:
           CLANG_VERSION: '12'
         run: just test
@@ -146,7 +144,6 @@ jobs:
           version: '13'
 
       - name: Collect Coverage for clang v13
-        working-directory: cpp-linter-lib
         env:
           CLANG_VERSION: '13'
         run: just test
@@ -157,7 +154,6 @@ jobs:
           version: '14'
 
       - name: Collect Coverage for clang v14
-        working-directory: cpp-linter-lib
         env:
           CLANG_VERSION: '14'
         run: just test
@@ -168,7 +164,6 @@ jobs:
           version: '15'
 
       - name: Collect Coverage for clang v15
-        working-directory: cpp-linter-lib
         env:
           CLANG_VERSION: '15'
         run: just test
@@ -179,7 +174,6 @@ jobs:
           version: '16'
 
       - name: Collect Coverage for clang v16
-        working-directory: cpp-linter-lib
         env:
           CLANG_VERSION: '16'
         run: just test
@@ -190,7 +184,6 @@ jobs:
           version: '17'
 
       - name: Collect Coverage for clang v17
-        working-directory: cpp-linter-lib
         env:
           CLANG_VERSION: '17'
         run: just test
@@ -201,13 +194,11 @@ jobs:
           version: '18'
 
       - name: Collect Coverage for clang v18
-        working-directory: cpp-linter-lib
         env:
           CLANG_VERSION: '18'
         run: just test --run-ignored=all
 
       - name: Generate Coverage HTML report
-        working-directory: cpp-linter-lib
         run: just pretty-cov
 
       - name: Upload coverage data
@@ -218,12 +209,11 @@ jobs:
 
       - name: Generate Coverage lcov report
         if: runner.os == 'Linux'
-        working-directory: cpp-linter-lib
         run: just lcov
 
       - uses: codecov/codecov-action@v4
         if: runner.os == 'Linux'
         with:
           token: ${{secrets.CODECOV_TOKEN}}
-          files: cpp-linter-lib/lcov.info
+          files: lcov.info
           fail_ci_if_error: true # optional (default = false)

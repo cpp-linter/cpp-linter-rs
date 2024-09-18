@@ -130,26 +130,30 @@ impl FileObj {
     ) {
         let original_content =
             fs::read(&self.name).expect("Failed to read original contents of file");
-
+        let file_name = self
+            .name
+            .to_str()
+            .expect("Failed to convert file extension to string")
+            .replace("\\", "/");
+        let file_path = Path::new(&file_name);
         if let Some(advice) = &self.format_advice {
             if let Some(patched) = &advice.patched {
-                let mut patch = make_patch(&self.name, patched, &original_content);
+                let mut patch = make_patch(file_path, patched, &original_content);
                 advice.get_suggestions(review_comments, self, &mut patch, summary_only);
             }
         }
 
         if let Some(advice) = &self.tidy_advice {
             if let Some(patched) = &advice.patched {
-                let mut patch = make_patch(&self.name, patched, &original_content);
+                let mut patch = make_patch(file_path, patched, &original_content);
                 advice.get_suggestions(review_comments, self, &mut patch, summary_only);
             }
 
+            if summary_only {
+                return;
+            }
+
             // now check for clang-tidy warnings with no fixes applied
-            let file_name = self
-                .name
-                .to_str()
-                .expect("Failed to convert file extension to string")
-                .replace("\\", "/");
             let file_ext = self
                 .name
                 .extension()

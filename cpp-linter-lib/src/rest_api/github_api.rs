@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use serde_json;
 
 // project specific modules/crates
-use crate::clang_tools::clang_format::tally_format_advice;
+use crate::clang_tools::clang_format::{summarize_style, tally_format_advice};
 use crate::clang_tools::clang_tidy::tally_tidy_advice;
 use crate::clang_tools::{ReviewComments, Suggestion};
 use crate::cli::{FeedbackInput, ThreadComments};
@@ -128,15 +128,19 @@ impl RestApiClient for GithubApiClient {
                 .append(true)
                 .open(gh_out)
                 .expect("GITHUB_OUTPUT file could not be opened");
-            if let Err(e) = writeln!(
-                gh_out_file,
-                "checks-failed={}\nformat-checks-failed={}\ntidy-checks-failed={}",
-                checks_failed,
-                format_checks_failed.unwrap_or(0),
-                tidy_checks_failed.unwrap_or(0),
-            ) {
-                panic!("Could not write to GITHUB_OUTPUT file: {}", e);
+            for (prompt, value) in [
+                ("checks-failed", Some(checks_failed)),
+                ("format-checks-failed", format_checks_failed),
+                ("tidy-checks-failed", tidy_checks_failed),
+            ] {
+                if let Err(e) = writeln!(gh_out_file, "{prompt}={}", value.unwrap_or(0),) {
+                    log::error!("Could not write to GITHUB_OUTPUT file: {}", e);
+                    break;
+                }
             }
+            gh_out_file
+                .flush()
+                .expect("Failed to flush buffer to GITHUB_OUTPUT file");
         }
         log::info!(
             "{} clang-format-checks-failed",
@@ -199,11 +203,9 @@ impl RestApiClient for GithubApiClient {
             )
             .await
             .unwrap()
-            .bytes()
-            .await
-            .unwrap();
+            .text;
 
-            parse_diff_from_buf(&response, file_filter)
+            parse_diff_from_buf(response.as_bytes(), file_filter)
         } else {
             // get diff from libgit2 API
             let repo = open_repo(".")
@@ -290,26 +292,13 @@ impl GithubApiClient {
                 .open(gh_out)
                 .expect("GITHUB_STEP_SUMMARY file could not be opened");
             if let Err(e) = writeln!(gh_out_file, "\n{}\n", comment) {
-                panic!("Could not write to GITHUB_STEP_SUMMARY file: {}", e);
+                log::error!("Could not write to GITHUB_STEP_SUMMARY file: {}", e);
             }
         }
     }
 
     fn post_annotations(&self, files: &[Arc<Mutex<FileObj>>], style: &str) {
-        // formalize the style guide name
-        let style_guide =
-            if ["google", "chromium", "microsoft", "mozilla", "webkit"].contains(&style) {
-                // capitalize the first letter
-                let mut char_iter = style.chars();
-                match char_iter.next() {
-                    None => String::new(),
-                    Some(f) => f.to_uppercase().collect::<String>() + char_iter.as_str(),
-                }
-            } else if style == "llvm" || style == "gnu" {
-                style.to_ascii_uppercase()
-            } else {
-                String::from("Custom")
-            };
+        let style_guide = summarize_style(style);
 
         // iterate over clang-format advice and post annotations
         for file in files {
@@ -370,7 +359,7 @@ impl GithubApiClient {
         #[allow(clippy::nonminimal_bool)] // an inaccurate assessment
         if (is_lgtm && !no_lgtm) || !is_lgtm {
             let payload = HashMap::from([("body", comment.to_owned())]);
-            log::debug!("payload body:\n{:?}", payload);
+            // log::debug!("payload body:\n{:?}", payload);
             let req_meth = if comment_url.is_some() {
                 Method::PATCH
             } else {
@@ -415,93 +404,66 @@ impl GithubApiClient {
         while let Some(ref endpoint) = comments_url {
             let request =
                 Self::make_api_request(&self.client, endpoint.as_str(), Method::GET, None, None);
-            match Self::send_api_request(
+            let response = Self::send_api_request(
                 self.client.clone(),
                 request,
                 false,
                 self.rate_limit_headers.to_owned(),
                 0,
             )
-            .await
-            {
-                None => {
-                    log::error!("Failed to get list of existing comments from {}", endpoint);
-                    return comment_url;
-                }
-                Some(response) => {
-                    if !response.status().is_success() {
-                        log::error!("Failed to get list of existing comments from {}", endpoint);
-                        return comment_url;
-                    }
-                    comments_url = Self::try_next_page(response.headers());
-                    let payload: Vec<ThreadComment> = serde_json::from_str(
-                        &response
-                            .text()
-                            .await
-                            .expect("Unable to deserialize malformed JSON about thread comments"),
-                    )
-                    .expect("Failed to serialize response's text");
-                    for comment in payload {
-                        if comment.body.starts_with(COMMENT_MARKER) {
-                            log::debug!(
-                                "comment id {} from user {} ({})",
-                                comment.id,
-                                comment.user.login,
-                                comment.user.id,
-                            );
-                            #[allow(clippy::nonminimal_bool)] // an inaccurate assessment
-                            if delete || (!delete && comment_url.is_none()) {
-                                // if not updating: remove all outdated comments
-                                // if updating: remove all outdated comments except the last one
+            .await;
+            if response.is_none() || response.as_ref().is_some_and(|r| !r.status.is_success()) {
+                log::error!("Failed to get list of existing comments from {}", endpoint);
+                return comment_url;
+            }
+            comments_url = Self::try_next_page(&response.as_ref().unwrap().headers);
+            let payload: Vec<ThreadComment> = serde_json::from_str(&response.unwrap().text)
+                .expect("Failed to serialize response's text");
+            for comment in payload {
+                if comment.body.starts_with(COMMENT_MARKER) {
+                    log::debug!(
+                        "comment id {} from user {} ({})",
+                        comment.id,
+                        comment.user.login,
+                        comment.user.id,
+                    );
+                    #[allow(clippy::nonminimal_bool)] // an inaccurate assessment
+                    if delete || (!delete && comment_url.is_some()) {
+                        // if not updating: remove all outdated comments
+                        // if updating: remove all outdated comments except the last one
 
-                                // use last saved comment_url (if not None) or current comment url
-                                let del_url = if let Some(last_url) = &comment_url {
-                                    last_url
-                                } else {
-                                    let comment_id = comment.id.to_string();
-                                    &base_comment_url
-                                        .join(&comment_id)
-                                        .expect("Failed to parse URL from JSON comment.url")
-                                };
-                                let req = Self::make_api_request(
-                                    &self.client,
-                                    del_url.clone(),
-                                    Method::DELETE,
-                                    None,
-                                    None,
-                                );
-                                match Self::send_api_request(
-                                    self.client.clone(),
-                                    req,
-                                    false,
-                                    self.rate_limit_headers.to_owned(),
-                                    0,
-                                )
-                                .await
-                                {
-                                    Some(res) => {
-                                        log::info!(
-                                            "Got {} from DELETE {}",
-                                            res.status(),
-                                            del_url.path(),
-                                        )
-                                    }
-                                    None => {
-                                        log::error!("Unable to remove old bot comment");
-                                        // exit early as this is most likely due to rate limit.
-                                        return comment_url;
-                                    }
-                                }
-                            }
-                            if !delete {
-                                let comment_id = comment.id.to_string();
-                                comment_url = Some(
-                                    base_comment_url
-                                        .join(&comment_id)
-                                        .expect("Failed to parse URL from JSON comment.url"),
-                                )
-                            }
-                        }
+                        // use last saved comment_url (if not None) or current comment url
+                        let del_url = if let Some(last_url) = &comment_url {
+                            last_url
+                        } else {
+                            let comment_id = comment.id.to_string();
+                            &base_comment_url
+                                .join(&comment_id)
+                                .expect("Failed to parse URL from JSON comment.url")
+                        };
+                        let req = Self::make_api_request(
+                            &self.client,
+                            del_url.clone(),
+                            Method::DELETE,
+                            None,
+                            None,
+                        );
+                        Self::send_api_request(
+                            self.client.clone(),
+                            req,
+                            false,
+                            self.rate_limit_headers.to_owned(),
+                            0,
+                        )
+                        .await;
+                    }
+                    if !delete {
+                        let comment_id = comment.id.to_string();
+                        comment_url = Some(
+                            base_comment_url
+                                .join(&comment_id)
+                                .expect("Failed to parse URL from JSON comment.url"),
+                        )
                     }
                 }
             }
@@ -537,23 +499,20 @@ impl GithubApiClient {
             0,
         )
         .await;
-        let pr_info: PullRequestInfo = serde_json::from_str(
-            &response
-                .expect("Failed to get PR info")
-                .text()
-                .await
-                .expect("Failed to convert response's bytes to text"),
-        )
-        .expect("Failed to deserialize PR info");
-        if pr_info.draft || pr_info.state != "open" {
-            return;
-        }
+        let pr_info: PullRequestInfo =
+            serde_json::from_str(&response.expect("Failed to get PR info").text)
+                .expect("Failed to deserialize PR info");
 
         let url = Url::parse(format!("{}/", url.as_str()).as_str())
             .unwrap()
             .join("reviews")
             .expect("Failed to parse URL endpoint for PR reviews");
         let dismissal = self.dismiss_outdated_reviews(&url);
+
+        if pr_info.draft || pr_info.state != "open" {
+            dismissal.await;
+            return;
+        }
 
         let summary_only =
             env::var("CPP_LINTER_PR_REVIEW_SUMMARY_ONLY").unwrap_or("false".to_string()) == "true";
@@ -563,8 +522,9 @@ impl GithubApiClient {
             let file = file.lock().unwrap();
             file.make_suggestions_from_patch(&mut review_comments, summary_only);
         }
-        let total = review_comments.tool_total.iter().sum::<u32>();
-        if total == 0 && feedback_input.no_lgtm {
+        let has_no_changes =
+            review_comments.full_patch[0].is_empty() && review_comments.full_patch[1].is_empty();
+        if has_no_changes && feedback_input.no_lgtm {
             log::debug!("Not posting an approved review because `no-lgtm` is true");
             dismissal.await;
             return;
@@ -572,22 +532,24 @@ impl GithubApiClient {
         let mut payload = FullReview {
             event: if feedback_input.passive_reviews {
                 String::from("COMMENT")
-            } else if total > 0 {
-                String::from("REQUEST_CHANGES")
-            } else {
+            } else if has_no_changes {
                 String::from("APPROVE")
+            } else {
+                String::from("REQUEST_CHANGES")
             },
             body: String::new(),
             comments: vec![],
         };
         payload.body = review_comments.summarize();
-        payload.comments = {
-            let mut comments = vec![];
-            for comment in review_comments.comments {
-                comments.push(ReviewDiffComment::from(comment));
-            }
-            comments
-        };
+        if !summary_only {
+            payload.comments = {
+                let mut comments = vec![];
+                for comment in review_comments.comments {
+                    comments.push(ReviewDiffComment::from(comment));
+                }
+                comments
+            };
+        }
         dismissal.await; // free up the `url` variable
         let request = Self::make_api_request(
             &self.client,
@@ -607,7 +569,7 @@ impl GithubApiClient {
             0,
         )
         .await;
-        if response.is_none() || response.is_some_and(|r| !r.status().is_success()) {
+        if response.is_none() || response.is_some_and(|r| !r.status.is_success()) {
             log::error!("Failed to post a new PR review");
         }
     }
@@ -621,70 +583,58 @@ impl GithubApiClient {
         while let Some(ref endpoint) = url_ {
             let request =
                 Self::make_api_request(&self.client, endpoint.as_str(), Method::GET, None, None);
-            match Self::send_api_request(
+            let response = Self::send_api_request(
                 self.client.clone(),
                 request,
                 false,
                 self.rate_limit_headers.clone(),
                 0,
             )
-            .await
-            {
-                Some(response) => {
-                    url_ = Self::try_next_page(response.headers());
-                    let payload: Vec<ReviewComment> = serde_json::from_str(
-                        &response
-                            .text()
-                            .await
-                            .expect("failed to convert response's bytes to text"),
-                    )
-                    .expect("Unable to deserialize malformed JSON about review comments");
-                    for review in payload {
-                        if let Some(body) = &review.body {
-                            if body.starts_with(COMMENT_MARKER)
-                                && !(["PENDING", "DISMISSED"].contains(&review.state.as_str()))
-                            {
-                                // dismiss outdated review
-                                let req = Self::make_api_request(
-                                    &self.client,
-                                    url.join("reviews/")
-                                        .unwrap()
-                                        .join(review.id.to_string().as_str())
-                                        .expect(
-                                            "Failed to parse URL for dismissing outdated review.",
-                                        ),
-                                    Method::PUT,
-                                    Some(
-                                        serde_json::json!(
-                                            {
-                                                "message": "outdated suggestion",
-                                                "event": "DISMISS"
-                                            }
-                                        )
-                                        .to_string(),
-                                    ),
-                                    None,
-                                );
-                                let result = Self::send_api_request(
-                                    self.client.clone(),
-                                    req,
-                                    false,
-                                    self.rate_limit_headers.clone(),
-                                    0,
+            .await;
+            if response.is_none() || response.as_ref().is_some_and(|r| !r.status.is_success()) {
+                log::error!("Failed to get a list of existing PR reviews");
+                return;
+            }
+            let response = response.unwrap();
+            url_ = Self::try_next_page(&response.headers);
+            let payload: Vec<ReviewComment> = serde_json::from_str(&response.text)
+                .expect("Unable to deserialize malformed JSON about review comments");
+            for review in payload {
+                if let Some(body) = &review.body {
+                    if body.starts_with(COMMENT_MARKER)
+                        && !(["PENDING", "DISMISSED"].contains(&review.state.as_str()))
+                    {
+                        // dismiss outdated review
+                        let req = Self::make_api_request(
+                            &self.client,
+                            url.join("reviews/")
+                                .unwrap()
+                                .join(review.id.to_string().as_str())
+                                .expect("Failed to parse URL for dismissing outdated review."),
+                            Method::PUT,
+                            Some(
+                                serde_json::json!(
+                                    {
+                                        "message": "outdated suggestion",
+                                        "event": "DISMISS"
+                                    }
                                 )
-                                .await;
-                                if result.is_none()
-                                    || result.is_some_and(|r| !r.status().is_success())
-                                {
-                                    log::error!("Failed to dismiss outdated review");
-                                }
-                            }
+                                .to_string(),
+                            ),
+                            None,
+                        );
+                        let result = Self::send_api_request(
+                            self.client.clone(),
+                            req,
+                            false,
+                            self.rate_limit_headers.clone(),
+                            0,
+                        )
+                        .await;
+                        if result.is_none() || result.is_some_and(|r| !r.status.is_success()) {
+                            log::error!("Failed to dismiss outdated review");
                         }
                     }
-                }
-                None => {
-                    log::error!("Failed to get a list of existing PR reviews");
-                    return;
                 }
             }
         }
@@ -873,7 +823,9 @@ mod test {
         let reset_timestamp = (Utc::now().timestamp() + 60).to_string();
         let mock = server
             .mock("GET", "/")
-            .match_query(Matcher::Any)
+            .match_body(Matcher::Any)
+            .expect_at_least(1)
+            .expect_at_most(5)
             .with_status(429)
             .with_header(
                 &client.rate_limit_headers.remaining,
