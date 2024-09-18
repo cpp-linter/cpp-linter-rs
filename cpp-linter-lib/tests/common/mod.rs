@@ -20,7 +20,7 @@ use tempfile::TempDir;
 ///
 /// The returned directory object will automatically delete the
 /// temporary folder when it is dropped out of scope.
-pub fn create_test_space() -> TempDir {
+pub fn create_test_space(setup_meson: bool) -> TempDir {
     let tmp = TempDir::new().unwrap();
     fs::create_dir(tmp.path().join("src")).unwrap();
     let src = fs::read_dir("tests/demo").unwrap();
@@ -30,6 +30,10 @@ pub fn create_test_space() -> TempDir {
             let new_file = tmp.path().join("src").join(file.file_name());
             fs::copy(file.path(), new_file.to_str().unwrap()).unwrap();
         }
+    }
+
+    if !setup_meson {
+        return tmp;
     }
 
     // generate compilation database with meson (& ninja)

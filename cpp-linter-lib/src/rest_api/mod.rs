@@ -233,6 +233,16 @@ pub trait RestApiClient {
         file_filter: &FileFilter,
     ) -> impl Future<Output = Vec<FileObj>>;
 
+    /// A way to get the list of changed files using REST API calls that employ a paginated response.
+    ///
+    /// This is a helper to [`RestApiClient::get_list_of_changed_files()`] but takes a formulated URL
+    /// endpoint based on the context of the triggering CI event.
+    fn get_changed_files_paginated(
+        &self,
+        url: Url,
+        file_filter: &FileFilter,
+    ) -> impl Future<Output = Vec<FileObj>>;
+
     /// Makes a comment in MarkDown syntax based on the concerns in `format_advice` and
     /// `tidy_advice` about the given set of `files`.
     ///

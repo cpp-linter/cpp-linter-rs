@@ -192,20 +192,40 @@ impl RestApiClient for GithubApiClient {
                 .unwrap();
             let mut diff_header = HeaderMap::new();
             diff_header.insert("Accept", "application/vnd.github.diff".parse().unwrap());
-            let request =
-                Self::make_api_request(&self.client, url, Method::GET, None, Some(diff_header));
+            let request = Self::make_api_request(
+                &self.client,
+                url.as_str(),
+                Method::GET,
+                None,
+                Some(diff_header),
+            );
             let response = Self::send_api_request(
                 self.client.clone(),
                 request,
-                true,
+                false,
                 self.rate_limit_headers.to_owned(),
                 0,
             )
-            .await
-            .unwrap()
-            .text;
-
-            parse_diff_from_buf(response.as_bytes(), file_filter)
+            .await;
+            match response {
+                Some(response) => {
+                    if response.status.is_success() {
+                        return parse_diff_from_buf(response.text.as_bytes(), file_filter);
+                    } else {
+                        let endpoint = if is_pr {
+                            Url::parse(format!("{}/files", url.as_str()).as_str())
+                                .expect("failed to parse URL endpoint")
+                        } else {
+                            url
+                        };
+                        self.get_changed_files_paginated(endpoint, file_filter)
+                            .await
+                    }
+                }
+                None => {
+                    panic!("Failed to connect with GitHub server to get list of changed files.")
+                }
+            }
         } else {
             // get diff from libgit2 API
             let repo = open_repo(".")
@@ -213,6 +233,54 @@ impl RestApiClient for GithubApiClient {
             let list = parse_diff(&get_diff(&repo), file_filter);
             list
         }
+    }
+
+    async fn get_changed_files_paginated(
+        &self,
+        url: Url,
+        file_filter: &FileFilter,
+    ) -> Vec<FileObj> {
+        let mut url = Some(Url::parse_with_params(url.as_str(), &[("page", "1")]).unwrap());
+        let mut files = vec![];
+        while let Some(ref endpoint) = url {
+            let request =
+                Self::make_api_request(&self.client, endpoint.as_str(), Method::GET, None, None);
+            let response = Self::send_api_request(
+                self.client.clone(),
+                request,
+                true,
+                self.rate_limit_headers.clone(),
+                0,
+            )
+            .await;
+            if let Some(response) = response {
+                url = Self::try_next_page(&response.headers);
+                let files_list = if self.event_name != "pull_request" {
+                    let json_value: PushEventFiles = serde_json::from_str(&response.text)
+                        .expect("Failed to deserialize list of changed files from json response");
+                    json_value.files
+                } else {
+                    serde_json::from_str::<Vec<GithubChangedFile>>(&response.text).expect(
+                        "Failed to deserialize list of file changes from Pull Request event.",
+                    )
+                };
+                for file in files_list {
+                    if let Some(patch) = file.patch {
+                        let diff = format!(
+                            "diff --git a/{old} b/{new}\n--- a/{old}\n+++ b/{new}\n{patch}",
+                            old = file.previous_filename.unwrap_or(file.filename.clone()),
+                            new = file.filename,
+                        );
+                        if let Some(file_obj) =
+                            parse_diff_from_buf(diff.as_bytes(), file_filter).first()
+                        {
+                            files.push(file_obj.to_owned());
+                        }
+                    }
+                }
+            }
+        }
+        files
     }
 
     async fn post_feedback(
@@ -671,6 +739,24 @@ impl From<Suggestion> for ReviewDiffComment {
     }
 }
 
+/// A structure for deserializing a single changed file in a CI event.
+#[derive(Debug, Deserialize, PartialEq, Clone)]
+struct GithubChangedFile {
+    /// The file's name (including relative path to repo root)
+    pub filename: String,
+    /// If renamed, this will be the file's old name as a [`Some`], otherwise [`None`].
+    pub previous_filename: Option<String>,
+    /// The individual patch that describes the file's changes.
+    pub patch: Option<String>,
+}
+
+/// A structure for deserializing a Push event's changed files.
+#[derive(Debug, Deserialize, PartialEq, Clone)]
+struct PushEventFiles {
+    /// The list of changed files.
+    pub files: Vec<GithubChangedFile>,
+}
+
 /// A structure for deserializing a comment from a response's json.
 #[derive(Debug, Deserialize, PartialEq, Clone)]
 struct PullRequestInfo {
@@ -840,7 +926,7 @@ mod test {
         }
         let request =
             GithubApiClient::make_api_request(&client.client, url, Method::GET, None, None);
-        let _response = GithubApiClient::send_api_request(
+        GithubApiClient::send_api_request(
             client.client.clone(),
             request,
             true,
