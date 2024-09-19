@@ -5,10 +5,11 @@ members = ["cpp-linter-lib", "cpp-linter-py", "docs"]
 resolver = "2"
 
 [workspace.package]
-version = "2.0.0" # auto
+version = "2.0.0-rc1" # auto
 authors = [
     "Brendan Doherty",
     "Peter Shen",
 ]
 description = "Run clang-format and clang-tidy on a batch of files."
-documentation = "https://cpp-linter.github.io/cpp_linter_rs"
+homepage = "https://cpp-linter.github.io/cpp_linter_rs"
+license = "MIT"

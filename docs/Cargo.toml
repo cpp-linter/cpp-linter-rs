@@ -2,13 +2,14 @@
 [package]
 name = "cli-gen"
 edition = "2021"
-version.workspace = true
+version = "0.1.0"
+description = "A mdbook pre-processor that generates a CLI doc from source code."
 authors.workspace = true
-description.workspace = true
-documentation.workspace = true
+homepage.workspace = true
+license.workspace = true
 
 [dependencies]
-cpp-linter-lib = { path = "../cpp-linter-lib", version = "*" }
+cpp-linter-lib = { path = "../cpp-linter-lib" }
 clap = "4.5.17"
 mdbook = "0.4.40"
 semver = "1.0.23"

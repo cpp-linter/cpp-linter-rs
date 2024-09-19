@@ -150,7 +150,9 @@ jobs:
       - name: Publish to PyPI
         uses: PyO3/maturin-action@v1
         env:
-          MATURIN_PYPI_TOKEN: ${{ contains(github.ref_name, 'rc') && secrets.TEST_PYPI_API_TOKEN || secrets.PYPI_API_TOKEN }}
+          # This workflow id registered as a trusted publisher (for test-pypi and pypi).
+          # A token should not be required (and actually is discouraged with trusted publishers).
+          # MATURIN_PYPI_TOKEN: ${{ contains(github.ref_name, 'rc') && secrets.TEST_PYPI_API_TOKEN || secrets.PYPI_API_TOKEN }}
           MATURIN_REPOSITORY: ${{ contains(github.ref_name, 'rc') && 'test-pypi' || 'pypi' }}
         with:
           command: upload

@@ -10,7 +10,7 @@ This crate contains the the library used as a backend for the
   - [x] step summary
   - [x] thread comments
   - [x] file annotation
-  - [ ] pull request review suggestions
+  - [x] pull request review suggestions
 
 Since the [cpp-linter python package][pypi-org] now uses this library
 as a binding, the native binary's `main()` behavior is also present in this
