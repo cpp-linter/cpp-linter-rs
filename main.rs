@@ -1,5 +1,5 @@
 //! This is a preprocessor for mdbook that generates the CLI document.
-//! For actual library/binary source code look in cpp-linter-lib or cpp-linter-py folders
+//! For actual library/binary source code look in cpp-linter folder.
 
 extern crate clap;
 use clap::{Arg, ArgMatches, Command};
