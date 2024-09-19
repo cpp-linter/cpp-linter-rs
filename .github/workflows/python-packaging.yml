@@ -86,9 +86,6 @@ jobs:
         with:
           python-version: '3.x'
           architecture: ${{ matrix.target }}
-      - name: Increment version
-        if: startsWith(github.ref, 'refs/tags/')
-        run: python .github/workflows/replace_version_spec.py --new-version=${{ github.ref_name }}
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -150,7 +147,7 @@ jobs:
       - name: Publish to PyPI
         uses: PyO3/maturin-action@v1
         env:
-          # This workflow id registered as a trusted publisher (for test-pypi and pypi).
+          # This workflow is registered as a trusted publisher (for test-pypi and pypi).
           # A token should not be required (and actually is discouraged with trusted publishers).
           # MATURIN_PYPI_TOKEN: ${{ contains(github.ref_name, 'rc') && secrets.TEST_PYPI_API_TOKEN || secrets.PYPI_API_TOKEN }}
           MATURIN_REPOSITORY: ${{ contains(github.ref_name, 'rc') && 'test-pypi' || 'pypi' }}
