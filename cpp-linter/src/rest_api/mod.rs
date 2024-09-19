@@ -1,4 +1,4 @@
-//! This crate is the home of functionality that uses the REST API of various git-based
+//! This module is the home of functionality that uses the REST API of various git-based
 //! servers.
 //!
 //! Currently, only Github is supported.
@@ -14,8 +14,8 @@ use futures::future::{BoxFuture, FutureExt};
 use reqwest::header::{HeaderMap, HeaderValue};
 use reqwest::{Client, IntoUrl, Method, Request, Response, StatusCode, Url};
 
-// project specific modules/crates
-pub mod github_api;
+// project specific modules
+pub mod github;
 use crate::cli::FeedbackInput;
 use crate::common_fs::{FileFilter, FileObj};
 

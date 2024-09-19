@@ -380,7 +380,7 @@ mod test {
 
     use crate::{
         common_fs::FileFilter,
-        rest_api::{github_api::GithubApiClient, RestApiClient},
+        rest_api::{github::GithubApiClient, RestApiClient},
     };
 
     fn get_temp_dir() -> TempDir {

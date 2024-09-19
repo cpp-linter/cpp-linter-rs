@@ -6,7 +6,7 @@ use tempfile::{NamedTempFile, TempDir};
 
 use cpp_linter::{
     common_fs::FileFilter,
-    rest_api::{github_api::GithubApiClient, RestApiClient},
+    rest_api::{github::GithubApiClient, RestApiClient},
 };
 use std::{env, io::Write, path::Path};
 
