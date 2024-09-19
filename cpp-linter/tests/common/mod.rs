@@ -16,7 +16,7 @@ use tempfile::TempDir;
 ///
 /// The meson build system generator and the ninja build system are
 /// third-party dependencies of these tests. They are used to generate
-/// a compilation database for clang-tidy (and cpp-linter-lib) to utilize.
+/// a compilation database for clang-tidy (and cpp-linter) to utilize.
 ///
 /// The returned directory object will automatically delete the
 /// temporary folder when it is dropped out of scope.

@@ -14,7 +14,7 @@ updates:
         patterns:
           - "*"
   - package-ecosystem: pip
-    directory: cpp-linter-py/
+    directory: py-binding/
     schedule:
       interval: "weekly"
     groups:
@@ -26,7 +26,7 @@ updates:
     schedule:
       interval: "weekly"
     ignore:
-      - dependency-name: cpp-linter-lib
+      - dependency-name: cpp-linter
     groups:
       cargo:
         patterns:

@@ -3,9 +3,11 @@ from pathlib import Path
 import sys
 import re
 
-VER_PATTERN = re.compile(r'^version = "(\d+)\.(\d+)\.(\d+)[^"]*" # auto', re.MULTILINE)
-VER_REPLACE = 'version = "%d.%d.%d" # auto'
-COMPONENTS = ("major", "minor", "patch")
+VER_PATTERN = re.compile(
+    r'^version = "(\d+)\.(\d+)\.(\d+)(?:\-rc)?(\d*)[^"]*" # auto', re.MULTILINE
+)
+VER_REPLACE = 'version = "%d.%d.%d%s" # auto'
+COMPONENTS = ("major", "minor", "patch", "rc")
 
 
 class Updater:
@@ -13,16 +15,27 @@ class Updater:
 
     @staticmethod
     def replace(match: re.Match[str]) -> str:
-        ver = [int(x) for x in match.groups()[: len(COMPONENTS)]]
-        for _ in range(len(ver) - 1, len(COMPONENTS)):
-            ver.append(0)
-        print("old version:", ".".join([str(x) for x in ver]))
+        ver = []
+        for v in match.groups():
+            try:
+                ver.append(int(v))
+            except ValueError:
+                ver.append(0)
+        old_version = ".".join([str(x) for x in ver[:3]])
+        rc_str = ""
+        if ver[3] > 0:
+            rc_str = f"-rc{ver[3]}"
+        old_version += rc_str
+        print("old version:", old_version)
         index = COMPONENTS.index(Updater.component)
         ver[index] += 1
-        for i in range(index + 1, 3):
+        for i in range(index + 1, len(COMPONENTS)):
             ver[i] = 0
-        print("new version:", ".".join([str(x) for x in ver]))
-        return VER_REPLACE % tuple(ver)
+        new_version = ".".join([str(x) for x in ver[:3]])
+        rc_str = f"-rc{ver[3]}" if ver[3] > 0 else ""
+        new_version += rc_str
+        print("new version:", new_version)
+        return VER_REPLACE % (tuple(ver[:3]) + (rc_str,))
 
 
 def main():
