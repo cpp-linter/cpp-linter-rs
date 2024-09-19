@@ -71,7 +71,7 @@ jobs:
         with:
           target: ${{ matrix.platform.target }}
           args: --release --out dist --find-interpreter --manifest-path py-binding/Cargo.toml ${{ steps.is-openssl-vendored.outputs.enabled }}
-          sccache: 'true'
+          # sccache: 'true'
           manylinux: auto
           before-script-linux: |
             case "${{ matrix.platform.target }}" in
@@ -170,13 +170,15 @@ jobs:
       id-token: write
     steps:
       - uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-*
+          path: dist
+          merge-multiple: true
       - name: Publish to PyPI
-        uses: PyO3/maturin-action@v1
-        env:
+        uses: pypa/gh-action-pypi-publish@0ab0b79471669eb3a4d647e625009c62f9f3b241
+        with:
+          attestations: true
+          skip-existing: true
           # This workflow is registered as a trusted publisher (for test-pypi and pypi).
           # A token should not be required (and actually is discouraged with trusted publishers).
-          # MATURIN_PYPI_TOKEN: ${{ contains(github.ref_name, 'rc') && secrets.TEST_PYPI_API_TOKEN || secrets.PYPI_API_TOKEN }}
-          MATURIN_REPOSITORY_URL: ${{ contains(github.ref_name, 'rc') && 'https://test.pypi.org/legacy' || 'https://upload.pypi.org/legacy' }}
-        with:
-          command: upload
-          args: --non-interactive --skip-existing wheels-*/*
+          repository-url: ${{ contains(github.ref_name, 'rc') && 'https://test.pypi.org/legacy/' || 'https://upload.pypi.org/legacy/' }}
