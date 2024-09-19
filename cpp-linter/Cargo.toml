@@ -1,8 +1,10 @@
 [package]
 name = "cpp-linter"
 edition = "2021"
-repository = "https://github.com/cpp-linter/cpp_linter_rs/tree/main/cpp-linter"
 readme = "README.md"
+keywords = ["clang-tidy", "clang-format", "linter"]
+categories = ["command-line-utilities", "development-tools", "filesystem"]
+respository.workspace = true
 version.workspace = true
 authors.workspace = true
 description.workspace = true

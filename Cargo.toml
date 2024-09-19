@@ -12,4 +12,5 @@ authors = [
 ]
 description = "Run clang-format and clang-tidy on a batch of files."
 homepage = "https://cpp-linter.github.io/cpp_linter_rs"
+repository = "https://github.com/cpp-linter/cpp_linter_rs"
 license = "MIT"

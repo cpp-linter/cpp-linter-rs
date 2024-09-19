@@ -36,8 +36,8 @@ dynamic = ["version"]
 cpp-linter = "cpp_linter:main"
 
 [project.urls]
-source =  "https://github.com/cpp-linter/cpp-linter"
-tracker = "https://github.com/cpp-linter/cpp-linter/issues"
+source =  "https://github.com/cpp-linter/cpp_linter_rs"
+tracker = "https://github.com/cpp-linter/cpp_linter_rs/issues"
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
