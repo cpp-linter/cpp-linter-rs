@@ -9,7 +9,7 @@ homepage.workspace = true
 license.workspace = true
 
 [dependencies]
-cpp-linter-lib = { path = "../cpp-linter-lib" }
+cpp-linter = { path = "../cpp-linter" }
 clap = "4.5.17"
 mdbook = "0.4.40"
 semver = "1.0.23"

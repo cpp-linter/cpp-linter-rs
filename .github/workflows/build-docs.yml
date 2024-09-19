@@ -34,11 +34,11 @@ jobs:
       - name: Install mdbook
         uses: taiki-e/install-action@v2
         with:
-          tool: mdbook,cargo-binstall
+          tool: mdbook,cargo-binstall,just
       - name: Install mdbook plugins
         run: cargo binstall -y mdbook-alerts
       - name: Build book
-        run: mdbook build docs
+        run: just docs-build
       - name: Upload docs build as artifact
         uses: actions/upload-artifact@v4
         with:
@@ -63,7 +63,11 @@ jobs:
         with:
           path: ~/.cargo
           key: ${{ runner.os }}-docs-cargo-${{ hashFiles('Cargo.lock') }}
-      - run: cargo doc --no-deps --manifest-path cpp-linter-lib/Cargo.toml
+      - name: Install mdbook
+        uses: taiki-e/install-action@v2
+        with:
+          tool: just
+      - run: just docs-rs
       - name: upload rustdoc build as artifact
         uses: actions/upload-artifact@v4
         with:

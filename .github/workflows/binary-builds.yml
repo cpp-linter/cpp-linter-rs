@@ -109,7 +109,7 @@ jobs:
         run: >-
           ${{ matrix.cross && 'cross' || 'cargo '}}
           build
-          --manifest-path cpp-linter-lib/Cargo.toml
+          --manifest-path cpp-linter/Cargo.toml
           --bin cpp-linter
           --release
           --target ${{ matrix.target }}

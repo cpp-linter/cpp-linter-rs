@@ -1,5 +1,5 @@
 use chrono::Utc;
-use cpp_linter_lib::{
+use cpp_linter::{
     cli::LinesChangedOnly,
     rest_api::{COMMENT_MARKER, USER_OUTREACH},
     run::run_main,

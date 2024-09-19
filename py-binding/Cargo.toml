@@ -2,7 +2,7 @@
 name = "cpp-linter-py"
 edition = "2021"
 readme = "README.md"
-repository = "https://github.com/cpp-linter/cpp_linter_rs/tree/main/cpp-linter-py"
+repository = "https://github.com/cpp-linter/cpp_linter_rs/tree/main/py-binding"
 version.workspace = true
 authors.workspace = true
 description.workspace = true
@@ -17,8 +17,8 @@ crate-type = ["cdylib"]
 
 [dependencies]
 pyo3 = { version = "0.22.3", features = ["extension-module"] }
-cpp-linter-lib = { path = "../cpp-linter-lib" }
+cpp-linter = { path = "../cpp-linter" }
 tokio = "1.40.0"
 
 [features]
-openssl-vendored = ["cpp-linter-lib/openssl-vendored"]
+openssl-vendored = ["cpp-linter/openssl-vendored"]

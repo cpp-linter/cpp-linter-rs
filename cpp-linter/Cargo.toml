@@ -1,7 +1,7 @@
 [package]
-name = "cpp-linter-lib"
+name = "cpp-linter"
 edition = "2021"
-repository = "https://github.com/cpp-linter/cpp_linter_rs/tree/main/cpp-linter-lib"
+repository = "https://github.com/cpp-linter/cpp_linter_rs/tree/main/cpp-linter"
 readme = "README.md"
 version.workspace = true
 authors.workspace = true

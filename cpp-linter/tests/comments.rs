@@ -1,6 +1,6 @@
 use chrono::Utc;
-use cpp_linter_lib::cli::{LinesChangedOnly, ThreadComments};
-use cpp_linter_lib::run::run_main;
+use cpp_linter::cli::{LinesChangedOnly, ThreadComments};
+use cpp_linter::run::run_main;
 use mockito::Matcher;
 use std::{env, fmt::Display, io::Write, path::Path};
 use tempfile::NamedTempFile;
