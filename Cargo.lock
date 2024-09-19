@@ -279,7 +279,7 @@ name = "cli-gen"
 version = "0.1.0"
 dependencies = [
  "clap",
- "cpp-linter-lib",
+ "cpp-linter",
  "mdbook",
  "semver",
  "serde_json",
@@ -318,7 +318,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06ea2b9bc92be3c2baa9334a323ebca2d6f074ff852cd1d7b11064035cd3868f"
 
 [[package]]
-name = "cpp-linter-lib"
+name = "cpp-linter"
 version = "2.0.0-rc1"
 dependencies = [
  "chrono",
@@ -348,7 +348,7 @@ dependencies = [
 name = "cpp-linter-py"
 version = "2.0.0-rc1"
 dependencies = [
- "cpp-linter-lib",
+ "cpp-linter",
  "pyo3",
  "tokio",
 ]

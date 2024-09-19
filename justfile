@@ -1,27 +1,10 @@
 set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
 
-# activate python venv
-[group("python")]
-[windows]
-venv:
-    ./.env/Scripts/activate
-
-# activate python venv
-[group("python")]
-[linux]
-venv:
-    . ./.env/bin/activate
-
-# install python bindings
-[group("python")]
-py-dev:
-    maturin dev --manifest-path cpp-linter-py/Cargo.toml
-
 # run the test suite
 [group("code coverage")]
 test arg='':
     cargo llvm-cov --no-report \
-    nextest --manifest-path cpp-linter-lib/Cargo.toml \
+    nextest --manifest-path cpp-linter/Cargo.toml \
     --lib --tests --color always {{ arg }}
 
 # Clear previous test build artifacts
@@ -60,17 +43,17 @@ docs-build open='':
 # rust docs
 [group("docs")]
 docs-rs open='':
-    cargo doc --no-deps --lib --manifest-path cpp-linter-lib/Cargo.toml {{ open }}
+    cargo doc --no-deps --lib --manifest-path cpp-linter/Cargo.toml {{ open }}
 
 # run cpp-linter native binary
 [group("bin")]
 run *args:
-    cargo run --bin cpp-linter --manifest-path cpp-linter-lib/Cargo.toml -- {{ args }}
+    cargo run --bin cpp-linter --manifest-path cpp-linter/Cargo.toml -- {{ args }}
 
 # build the native binary
 [group("bin")]
 build *args='':
-    cargo build --bin cpp-linter --manifest-path cpp-linter-lib/Cargo.toml {{ args }}
+    cargo build --bin cpp-linter --manifest-path cpp-linter/Cargo.toml {{ args }}
 
 # run clippy and rustfmt
 lint:

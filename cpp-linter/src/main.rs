@@ -2,7 +2,7 @@
 /// This crate is the binary executable's entrypoint.
 use std::env;
 
-use cpp_linter_lib::run::run_main;
+use ::cpp_linter::run::run_main;
 
 /// This function simply forwards CLI args to [`run_main()`].
 #[tokio::main]

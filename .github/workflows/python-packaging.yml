@@ -53,7 +53,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
-          args: --manifest-path cpp-linter-py/Cargo.toml --release --out dist --find-interpreter ${{ steps.is-openssl-vendored.outputs.enabled }}
+          args: --manifest-path py-binding/Cargo.toml --release --out dist --find-interpreter ${{ steps.is-openssl-vendored.outputs.enabled }}
           manylinux: auto
           before-script-linux: |
             case "${{ matrix.target }}" in
@@ -90,7 +90,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
-          args: --manifest-path cpp-linter-py/Cargo.toml --release --out dist --find-interpreter
+          args: --manifest-path py-binding/Cargo.toml --release --out dist --find-interpreter
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
@@ -112,7 +112,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
-          args: --manifest-path cpp-linter-py/Cargo.toml --release --out dist --find-interpreter --features openssl-vendored
+          args: --manifest-path py-binding/Cargo.toml --release --out dist --find-interpreter --features openssl-vendored
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
@@ -127,7 +127,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           command: sdist
-          args: --manifest-path cpp-linter-py/Cargo.toml --out dist
+          args: --manifest-path py-binding/Cargo.toml --out dist
       - name: Upload sdist
         uses: actions/upload-artifact@v4
         with:

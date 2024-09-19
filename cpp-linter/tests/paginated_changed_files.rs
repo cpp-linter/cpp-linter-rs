@@ -4,9 +4,9 @@ use common::{create_test_space, mock_server};
 use mockito::Matcher;
 use tempfile::{NamedTempFile, TempDir};
 
-use cpp_linter_lib::{
+use cpp_linter::{
     common_fs::FileFilter,
-    rest_api::{github_api::GithubApiClient, RestApiClient},
+    rest_api::{github::GithubApiClient, RestApiClient},
 };
 use std::{env, io::Write, path::Path};
 

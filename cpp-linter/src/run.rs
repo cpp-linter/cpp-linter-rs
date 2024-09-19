@@ -17,7 +17,7 @@ use crate::clang_tools::capture_clang_tools_output;
 use crate::cli::{get_arg_parser, ClangParams, Cli, FeedbackInput, LinesChangedOnly};
 use crate::common_fs::FileFilter;
 use crate::logger::{self, end_log_group, start_log_group};
-use crate::rest_api::{github_api::GithubApiClient, RestApiClient};
+use crate::rest_api::{github::GithubApiClient, RestApiClient};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 

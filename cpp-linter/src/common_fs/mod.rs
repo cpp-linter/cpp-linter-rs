@@ -279,7 +279,7 @@ mod test {
 
     #[test]
     fn normalize_no_root() {
-        let src = PathBuf::from("../cpp-linter-lib");
+        let src = PathBuf::from("../cpp-linter");
         let mut cur_dir = current_dir().unwrap();
         cur_dir = cur_dir
             .strip_prefix(current_dir().unwrap().parent().unwrap())

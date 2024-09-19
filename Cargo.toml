@@ -1,7 +1,7 @@
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [workspace]
-members = ["cpp-linter-lib", "cpp-linter-py", "docs"]
+members = ["cpp-linter", "py-binding", "docs"]
 resolver = "2"
 
 [workspace.package]
