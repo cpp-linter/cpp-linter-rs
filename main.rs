@@ -12,7 +12,7 @@ use semver::{Version, VersionReq};
 use std::io;
 use std::process;
 
-extern crate cpp_linter_lib;
+extern crate cpp_linter;
 
 use cli_gen_lib::CliGen;
 
@@ -82,7 +82,7 @@ mod cli_gen_lib {
     use mdbook::book::Book;
     use mdbook::preprocess::{Preprocessor, PreprocessorContext};
 
-    use cpp_linter_lib::cli;
+    use cpp_linter::cli;
 
     pub struct CliGen;
 
