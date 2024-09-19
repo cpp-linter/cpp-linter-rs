@@ -1,5 +1,5 @@
 
-# cpp-linter-lib
+# cpp-linter
 
 This crate contains the the library used as a backend for the
 `cpp-linter` binary executable. The main focus of `cpp-linter` is as follows:

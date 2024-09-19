@@ -5,6 +5,8 @@
 [![Docs][docs-ci-badge]][docs-site]
 [![Pre-commit-ci][pre-commit-badge]][pre-commit-ci]
 [![codecov-status][codecov-badge]][codecov-project]
+[![docs.rs][docs-rs-badge]][docs-rs]
+[![Crates.io Version][crates-io-badge]][crates-io-pkg]
 
 [py-build-ci]: https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/python-packaging.yml
 [py-build-badge]: https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/python-packaging.yml/badge.svg
@@ -18,6 +20,10 @@
 [pre-commit-ci]: https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/pre-commit-hooks.yml
 [codecov-badge]: https://codecov.io/gh/cpp-linter/cpp_linter_rs/graph/badge.svg?token=7ibzERx2AD
 [codecov-project]: https://codecov.io/gh/cpp-linter/cpp_linter_rs
+[docs-rs-badge]: https://img.shields.io/docsrs/cpp-linter?label=docs.rs
+[docs-rs]: https://docs.rs/cpp-linter
+[crates-io-badge]: https://img.shields.io/crates/v/cpp-linter
+[crates-io-pkg]: https://crates.io/crates/cpp-linter
 
 # C/C++ Linting Package
 
