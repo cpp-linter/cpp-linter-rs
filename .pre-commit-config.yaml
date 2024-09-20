@@ -5,6 +5,7 @@ repos:
       - id: trailing-whitespace
         exclude: cpp-linter/tests/.*\.(?:patch|diff)
       - id: end-of-file-fixer
+        exclude: node-binding/.*package\.json
       - id: check-docstring-first
       - id: check-added-large-files
         args: [--maxkb=9000]

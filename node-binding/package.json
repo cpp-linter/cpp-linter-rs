@@ -1,0 +1,38 @@
+{
+  "name": "@cpp-linter/cpp-linter",
+  "version": "2.0.0-rc1",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "napi": {
+    "name": "cpp-linter",
+    "triples": {}
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@napi-rs/cli": "^2.18.4",
+    "ava": "^6.0.1"
+  },
+  "ava": {
+    "timeout": "3m"
+  },
+  "engines": {
+    "node": ">= 10"
+  },
+  "scripts": {
+    "artifacts": "napi artifacts",
+    "build": "napi build --platform --release",
+    "build:debug": "napi build --platform",
+    "test": "ava"
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e",
+  "description": "Node.js binding for the cpp-linter Rust source.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cpp-linter/cpp_linter_rs.git"
+  },
+  "author": "Brendan Doherty",
+  "bugs": {
+    "url": "https://github.com/cpp-linter/cpp_linter_rs/issues"
+  },
+  "homepage": "https://github.com/cpp-linter/cpp_linter_rs#readme"
+}
