@@ -31,3 +31,11 @@ updates:
       cargo:
         patterns:
           - "*"
+  - package-ecosystem: "npm"  # also supports yarn
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      npm:
+        patterns:
+          - "*"
