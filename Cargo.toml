@@ -1,7 +1,7 @@
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [workspace]
-members = ["cpp-linter", "py-binding", "docs"]
+members = ["cpp-linter", "py-binding", "node-binding", "docs"]
 resolver = "2"
 
 [workspace.package]
@@ -13,3 +13,7 @@ authors = [
 description = "Run clang-format and clang-tidy on a batch of files."
 homepage = "https://cpp-linter.github.io/cpp_linter_rs"
 license = "MIT"
+
+[profile.release]
+lto = true
+strip = "symbols"

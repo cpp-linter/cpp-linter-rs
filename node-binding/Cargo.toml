@@ -1,0 +1,27 @@
+[package]
+name = "cpp-linter-js"
+edition = "2021"
+readme = "README.md"
+keywords = ["clang-tidy", "clang-format", "linter"]
+categories = ["command-line-utilities", "development-tools", "filesystem"]
+repository = "https://github.com/cpp-linter/cpp_linter_rs"
+version.workspace = true
+authors.workspace = true
+description.workspace = true
+homepage.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# Default enable napi4 feature, see https://nodejs.org/api/n-api.html#node-api-version-matrix
+napi = { version = "2.12.2", default-features = false, features = ["napi4", "async"] }
+napi-derive = "2.12.2"
+cpp-linter = { path = "../cpp-linter" }
+
+[features]
+openssl-vendored = ["cpp-linter/openssl-vendored"]
+
+[build-dependencies]
+napi-build = "2.0.1"
