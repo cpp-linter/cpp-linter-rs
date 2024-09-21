@@ -1,17 +1,23 @@
 <!-- markdownlint-disable MD041 -->
 [![Python packaging][py-build-badge]][py-build-ci]
 [![Binary executable builds][bin-build-badge]][bin-build-ci]
+[![node-js builds][node-ci-badge]][node-ci]
 [![Test CI][test-ci-badge]][test-ci]
 [![Docs][docs-ci-badge]][docs-site]
 [![Pre-commit-ci][pre-commit-badge]][pre-commit-ci]
+
 [![codecov-status][codecov-badge]][codecov-project]
 [![docs.rs][docs-rs-badge]][docs-rs]
+[![PyPI - Version][pypi-badge]][pypi-pkg]
 [![Crates.io Version][crates-io-badge]][crates-io-pkg]
+[![NPM Version][npm-badge]][npm-pkg]
 
 [py-build-ci]: https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/python-packaging.yml
 [py-build-badge]: https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/python-packaging.yml/badge.svg
 [bin-build-badge]: https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/binary-builds.yml/badge.svg
 [bin-build-ci]: https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/binary-builds.yml
+[node-ci-badge]: https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/node-js-packaging.yml/badge.svg
+[node-ci]: https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/node-js-packaging.yml
 [test-ci-badge]: https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/run-dev-tests.yml/badge.svg
 [test-ci]: https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/run-dev-tests.yml
 [docs-ci-badge]: https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/build-docs.yml/badge.svg
@@ -22,8 +28,12 @@
 [codecov-project]: https://codecov.io/gh/cpp-linter/cpp_linter_rs
 [docs-rs-badge]: https://img.shields.io/docsrs/cpp-linter?label=docs.rs
 [docs-rs]: https://docs.rs/cpp-linter
+[pypi-badge]: https://img.shields.io/pypi/v/cpp-linter
+[pypi-pkg]: https://pypi.org/project/cpp-linter/
 [crates-io-badge]: https://img.shields.io/crates/v/cpp-linter
 [crates-io-pkg]: https://crates.io/crates/cpp-linter
+[npm-badge]: https://img.shields.io/npm/v/%40cpp-linter%2Fcpp-linter
+[npm-pkg]: https://www.npmjs.com/package/@cpp-linter/cpp-linter
 
 # C/C++ Linting Package
 

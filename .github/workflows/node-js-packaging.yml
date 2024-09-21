@@ -1,4 +1,4 @@
-name: node-js builds
+name: Node.js builds
 env:
   DEBUG: napi:*
   APP_NAME: cpp-linter
