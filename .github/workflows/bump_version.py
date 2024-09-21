@@ -1,6 +1,6 @@
 import argparse
 from pathlib import Path
-import sys
+import subprocess
 import re
 
 VER_PATTERN = re.compile(
@@ -12,6 +12,7 @@ COMPONENTS = ("major", "minor", "patch", "rc")
 
 class Updater:
     component: str = "patch"
+    new_version: str = "0.0.0"
 
     @staticmethod
     def replace(match: re.Match[str]) -> str:
@@ -35,6 +36,7 @@ class Updater:
         rc_str = f"-rc{ver[3]}" if ver[3] > 0 else ""
         new_version += rc_str
         print("new version:", new_version)
+        Updater.new_version = new_version
         return VER_REPLACE % (tuple(ver[:3]) + (rc_str,))
 
 
@@ -46,9 +48,35 @@ def main():
     doc = cargo_path.read_text(encoding="utf-8")
     doc = VER_PATTERN.sub(Updater.replace, doc)
     cargo_path.write_text(doc, encoding="utf-8", newline="\n")
+    subprocess.run(["cargo", "update", "--workspace"], check=True)
     print("Updated version in Cargo.toml")
-    return 0
+    subprocess.run(
+        [
+            "yarn",
+            "version",
+            "--new-version",
+            Updater.new_version,
+            "--no-git-tag-version",
+        ],
+        cwd="node-binding",
+        check=True,
+    )
+    print("Updated version in node-binding/**package.json")
+    tag = "v" + Updater.new_version
+    subprocess.run(["git", "add", "--all"], check=True)
+    subprocess.run(["git", "commit", "-m", f"bump version to {tag}"], check=True)
+    try:
+        subprocess.run(["git", "push"], check=True)
+    except subprocess.CalledProcessError as exc:
+        raise RuntimeError("Failed to push commit for version bump") from exc
+    print("Pushed commit to 'bump version to", tag, "'")
+    try:
+        subprocess.run(["git", "tag", tag], check=True)
+    except subprocess.CalledProcessError as exc:
+        raise RuntimeError("Failed to create tag for commit") from exc
+    print("Created tag", tag)
+    print(f"Use 'git push origin refs/tags/{tag}' to publish a release")
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()
