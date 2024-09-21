@@ -18,6 +18,9 @@
   "engines": {
     "node": ">= 10"
   },
+  "bin": {
+    "cpp-linter": "cli.js"
+  },
   "scripts": {
     "artifacts": "napi artifacts",
     "build": "napi build --platform --release",
