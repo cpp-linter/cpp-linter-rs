@@ -61,6 +61,7 @@ def main():
         cwd="node-binding",
         check=True,
     )
+    subprocess.run(["napi", "version"], cwd="node-binding", check=True)
     print("Updated version in node-binding/**package.json")
     tag = "v" + Updater.new_version
     subprocess.run(["git", "add", "--all"], check=True)
