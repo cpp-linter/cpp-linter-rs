@@ -1,6 +1,6 @@
 # cpp-linter
 
-The node.js binding binding for the [cpp_linter_rs][this] rust project
+The node.js binding for the [cpp_linter_rs][this] rust project
 (built using [napi-rs](https://napi.rs) and [yarn](https://yarnpkg.com)).
 
 [this]: https://github.com/cpp-linter/cpp_linter_rs
