@@ -19,7 +19,7 @@
     "timeout": "3m"
   },
   "engines": {
-    "node": ">= 10"
+    "node": ">=12.5.0"
   },
   "bin": {
     "cpp-linter": "cli.js"
