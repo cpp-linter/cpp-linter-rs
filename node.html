@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Token Permissions - cpp-linter</title>
+        <title>Node.js Binding - cpp-linter</title>
 
 
         <!-- Custom HTML head -->
@@ -88,7 +88,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="cli.html"><strong aria-hidden="true">2.</strong> Command Line Interface</a></li><li class="chapter-item expanded "><a href="permissions.html" class="active"><strong aria-hidden="true">3.</strong> Token Permissions</a></li><li class="chapter-item expanded "><a href="pr-review-caveats.html"><strong aria-hidden="true">4.</strong> Pull Request Review Caveats</a></li><li class="chapter-item expanded "><a href="python.html"><strong aria-hidden="true">5.</strong> Python Binding</a></li><li class="chapter-item expanded "><a href="node.html"><strong aria-hidden="true">6.</strong> Node.js Binding</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="cli.html"><strong aria-hidden="true">2.</strong> Command Line Interface</a></li><li class="chapter-item expanded "><a href="permissions.html"><strong aria-hidden="true">3.</strong> Token Permissions</a></li><li class="chapter-item expanded "><a href="pr-review-caveats.html"><strong aria-hidden="true">4.</strong> Pull Request Review Caveats</a></li><li class="chapter-item expanded "><a href="python.html"><strong aria-hidden="true">5.</strong> Python Binding</a></li><li class="chapter-item expanded "><a href="node.html" class="active"><strong aria-hidden="true">6.</strong> Node.js Binding</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle">
                 <div class="sidebar-resize-indicator"></div>
@@ -243,81 +243,58 @@
 }
 
 </style>
-<!-- markdownlint-disable MD024 -->
-<h1 id="token-permissions"><a class="header" href="#token-permissions">Token Permissions</a></h1>
-<p>This is an exhaustive list of required permissions organized by features.</p>
-<div class="mdbook-alerts mdbook-alerts-important">
-<p class="mdbook-alerts-title">
-  <span class="mdbook-alerts-icon"></span>
-  important
-</p>
-<p>The <code>GITHUB_TOKEN</code> environment variable should be supplied when running on a private repository.
-Otherwise the runner does not not have the privileges needed for the features mentioned here.</p>
-<p>See also <a href="https://docs.github.com/en/actions/reference/authentication-in-a-workflow">Authenticating with the <code>GITHUB_TOKEN</code></a></p>
+<h1 id="nodejs-binding"><a class="header" href="#nodejs-binding">Node.js Binding</a></h1>
+<p>The node.js binding binding for the <a href="https://github.com/cpp-linter/cpp_linter_rs">cpp_linter_rs</a> rust project
+(built using <a href="https://napi.rs">napi-rs</a> and <a href="https://yarnpkg.com">yarn</a>).</p>
+<h2 id="install"><a class="header" href="#install">Install</a></h2>
+<p>Install with <code>npm</code>:</p>
+<pre><code class="language-text">npm -g install @cpp-linter/cpp-linter
+</code></pre>
+<h2 id="usage"><a class="header" href="#usage">Usage</a></h2>
+<p>For usage in a CI workflow, see
+<a href="https://github.com/cpp-linter/cpp-linter-action">the cpp-linter/cpp-linter-action repository</a>.</p>
+<p>For the description of supported Command Line Interface options, see
+<a href="https://cpp-linter.github.io/cpp_linter_rs/cli.html">the CLI documentation</a>.</p>
+<h2 id="development"><a class="header" href="#development">Development</a></h2>
+<p>After the native module is built using <a href="#yarn-builddebug"><code>yarn build:debug</code></a>, you can
+invoke the executable script as a normal CLI app:</p>
+<pre><code class="language-text">npx cpp-linter --help
+</code></pre>
+<h3 id="scripts"><a class="header" href="#scripts">Scripts</a></h3>
+<p>If an available script is not described below, it should be considered a convenience
+tool for the CI/CD workflow.</p>
+<h4 id="yarn-build"><a class="header" href="#yarn-build"><code>yarn build</code></a></h4>
+<p>This script builds the native module for distribution (with release profile optimizations).</p>
+<h5 id="yarn-builddebug"><a class="header" href="#yarn-builddebug"><code>yarn build:debug</code></a></h5>
+<p>Same as <code>yarn build</code> but does not use the release profile optimizations.
+You should use this script when testing locally.</p>
+<h4 id="yarn-test"><a class="header" href="#yarn-test"><code>yarn test</code></a></h4>
+<p>This script runs a simple test to ensure the native module was built correctly.</p>
+<h3 id="folder-structure"><a class="header" href="#folder-structure">Folder structure</a></h3>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: right">Name</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: right"><code>__test__</code></td><td style="text-align: left">The location of the unit test(s).</td></tr>
+<tr><td style="text-align: right"><code>npm</code></td><td style="text-align: left">The required metadata for publishing platform-specific packages to npm.</td></tr>
+<tr><td style="text-align: right"><code>src</code></td><td style="text-align: left">The location for all rust sources related to binding the cpp-linter library.</td></tr>
+<tr><td style="text-align: right"><code>build.rs</code></td><td style="text-align: left">The cargo-specific build script used when compiling the binding.</td></tr>
+<tr><td style="text-align: right"><code>Cargo.toml</code></td><td style="text-align: left">Metadata about the binding's rust package (which <em>is not</em> intended to be published to crates.io).</td></tr>
+<tr><td style="text-align: right"><code>package.json</code></td><td style="text-align: left">Metadata about the npm package (platform agnostic).</td></tr>
+<tr><td style="text-align: right"><code>index.d.ts</code></td><td style="text-align: left">The generated TypeScript typing info the describes the exposing functionality in the built native module.</td></tr>
+<tr><td style="text-align: right"><code>index.js</code></td><td style="text-align: left">The generated script that delegates which platform-specific package to import.</td></tr>
+<tr><td style="text-align: right"><code>cpp-linter.x-y-z.node</code></td><td style="text-align: left">Then native module built for a specific platform (where <code>x-y-z</code> denotes the platform's name using compilation target).</td></tr>
+</tbody></table>
 </div>
-<h2 id="file-changes"><a class="header" href="#file-changes">File Changes</a></h2>
-<p>When using <a href="cli.html#-f---files-changed-only"><code>--files-changed-only</code></a> or
-<a href="cli.html#-l---lines-changed-only"><code>--lines-changed-only</code></a> to get the list
-of file changes for a CI event, the following permissions are needed:</p>
-<h3 id="push"><a class="header" href="#push">Push</a></h3>
-<p>For <a href="https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#push"><code>push</code> events</a>.</p>
-<pre><code class="language-yaml">    permissions:
-        contents: read
-</code></pre>
-<p>The <code>contents</code> permission is also needed to download files if the repository is not
-checked out before running cpp-linter.</p>
-<h3 id="pull-request"><a class="header" href="#pull-request">Pull Request</a></h3>
-<p>For <a href="https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#pull_request"><code>pull_request</code> events</a>.</p>
-<pre><code class="language-yaml">    permissions:
-        contents: read
-        pull-requests: read
-</code></pre>
-<p>For pull requests, the <code>contents</code> permission is only needed to download files if
-the repository is not checked out before running cpp-linter.</p>
-<ul>
-<li>Specifying <code>write</code> to the <code>pull-requests</code> permission is also sufficient as that is
-required for
-<ul>
-<li>posting <a href="#thread-comments">thread comments</a> on pull requests</li>
-<li>posting <a href="#pull-request-reviews">pull request reviews</a></li>
-</ul>
-</li>
-</ul>
-<h2 id="thread-comments"><a class="header" href="#thread-comments">Thread Comments</a></h2>
-<p>The <a href="cli.html#-g---thread-comments"><code>--thread-comments</code></a> feature requires the following permissions:</p>
-<h3 id="push-1"><a class="header" href="#push-1">Push</a></h3>
-<p>For <a href="https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#push"><code>push</code> events</a>.</p>
-<pre><code class="language-yaml">    permissions:
-      metadata: read
-      contents: write
-</code></pre>
-<ul>
-<li>The <code>metadata</code> permission is needed to fetch existing comments.</li>
-<li>The <code>contents</code> permission is needed to post or update a commit comment.
-This also allows us to delete an outdated comment if needed.</li>
-</ul>
-<h3 id="pull-request-1"><a class="header" href="#pull-request-1">Pull Request</a></h3>
-<p>For <a href="https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#pull_request"><code>pull_request</code> events</a>.</p>
-<pre><code class="language-yaml">    permissions:
-      pull-requests: write
-</code></pre>
-<h2 id="pull-request-reviews"><a class="header" href="#pull-request-reviews">Pull Request Reviews</a></h2>
-<p>The <a href="cli.html#-d---tidy-review"><code>tidy-review</code></a>, <a href="cli.html#-m---format-review"><code>format-review</code></a>, and <a href="cli.html#-r---passive-reviews"><code>passive-reviews</code></a> features require the following permissions:</p>
-<pre><code class="language-yaml">    permissions:
-      pull-requests: write
-</code></pre>
+<p>Hidden files and folders are not described in the table above.
+If they are not ignored by a gitignore specification, then they should be considered
+important for maintenance or distribution.</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="cli.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="python.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next prefetch" href="pr-review-caveats.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
-                                <i class="fa fa-angle-right"></i>
-                            </a>
 
                         <div style="clear: both"></div>
                     </nav>
@@ -325,13 +302,10 @@ This also allows us to delete an outdated comment if needed.</li>
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="cli.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="python.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next prefetch" href="pr-review-caveats.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
-                        <i class="fa fa-angle-right"></i>
-                    </a>
             </nav>
 
         </div>

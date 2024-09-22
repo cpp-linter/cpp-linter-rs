@@ -88,7 +88,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html" class="active"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="cli.html"><strong aria-hidden="true">2.</strong> Command Line Interface</a></li><li class="chapter-item expanded "><a href="permissions.html"><strong aria-hidden="true">3.</strong> Token Permissions</a></li><li class="chapter-item expanded "><a href="pr-review-caveats.html"><strong aria-hidden="true">4.</strong> Pull Request Review Caveats</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html" class="active"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="cli.html"><strong aria-hidden="true">2.</strong> Command Line Interface</a></li><li class="chapter-item expanded "><a href="permissions.html"><strong aria-hidden="true">3.</strong> Token Permissions</a></li><li class="chapter-item expanded "><a href="pr-review-caveats.html"><strong aria-hidden="true">4.</strong> Pull Request Review Caveats</a></li><li class="chapter-item expanded "><a href="python.html"><strong aria-hidden="true">5.</strong> Python Binding</a></li><li class="chapter-item expanded "><a href="node.html"><strong aria-hidden="true">6.</strong> Node.js Binding</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle">
                 <div class="sidebar-resize-indicator"></div>
@@ -243,35 +243,87 @@
 }
 
 </style>
-<!-- markdownlint-disable MD041 -->
-<!-- markdownlint-disable MD041 -->
+<!-- markdownlint-disable MD041 MD053 -->
 <p><a href="https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/python-packaging.yml"><img src="https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/python-packaging.yml/badge.svg" alt="Python packaging" /></a>
 <a href="https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/binary-builds.yml"><img src="https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/binary-builds.yml/badge.svg" alt="Binary executable builds" /></a>
 <a href="https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/node-js-packaging.yml"><img src="https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/node-js-packaging.yml/badge.svg" alt="node-js builds" /></a>
 <a href="https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/run-dev-tests.yml"><img src="https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/run-dev-tests.yml/badge.svg" alt="Test CI" /></a>
 <a href="https://cpp-linter.github.io/cpp_linter_rs"><img src="https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/build-docs.yml/badge.svg" alt="Docs" /></a>
-<a href="https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/pre-commit-hooks.yml"><img src="https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/pre-commit-hooks.yml/badge.svg" alt="Pre-commit-ci" /></a></p>
-<p><a href="https://codecov.io/gh/cpp-linter/cpp_linter_rs"><img src="https://codecov.io/gh/cpp-linter/cpp_linter_rs/graph/badge.svg?token=7ibzERx2AD" alt="codecov-status" /></a>
-<a href="https://docs.rs/cpp-linter"><img src="https://img.shields.io/docsrs/cpp-linter?label=docs.rs" alt="docs.rs" /></a>
-<a href="https://pypi.org/project/cpp-linter/"><img src="https://img.shields.io/pypi/v/cpp-linter" alt="PyPI - Version" /></a>
-<a href="https://crates.io/crates/cpp-linter"><img src="https://img.shields.io/crates/v/cpp-linter" alt="Crates.io Version" /></a>
-<a href="https://www.npmjs.com/package/@cpp-linter/cpp-linter"><img src="https://img.shields.io/npm/v/%40cpp-linter%2Fcpp-linter" alt="NPM Version" /></a></p>
+<a href="https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/pre-commit-hooks.yml"><img src="https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/pre-commit-hooks.yml/badge.svg" alt="Pre-commit-ci" /></a>
+<a href="https://codecov.io/gh/cpp-linter/cpp_linter_rs"><img src="https://codecov.io/gh/cpp-linter/cpp_linter_rs/graph/badge.svg?token=7ibzERx2AD" alt="codecov-status" /></a></p>
 <h1 id="cc-linting-package"><a class="header" href="#cc-linting-package">C/C++ Linting Package</a></h1>
-<p>A Python and Rust package for linting C/C++ code with clang-tidy and/or clang-format to collect feedback provided in the form of thread comments, step summary, or file annotations.</p>
+<p>A package for linting C/C++ code with clang-tidy and/or clang-format to collect feedback provided in the form of</p>
+<ul>
+<li><input disabled="" type="checkbox" checked=""/>
+<a href="#thread-comment">thread-comments</a></li>
+<li><input disabled="" type="checkbox" checked=""/>
+<a href="#step-summary">step-summary</a></li>
+<li><input disabled="" type="checkbox" checked=""/>
+<a href="#annotations">file-annotations</a></li>
+<li><input disabled="" type="checkbox" checked=""/>
+<a href="#pull-request-review">Pull Request Review</a> suggestions</li>
+</ul>
 <div class="mdbook-alerts mdbook-alerts-caution">
 <p class="mdbook-alerts-title">
   <span class="mdbook-alerts-icon"></span>
   caution
 </p>
 <p>This project is still experimental and subject to drastic changes.
-Please use the pure python <a href="https://github.com/cpp-linter/cpp-linter">cpp-linter</a>
+Please use the <a href="https://github.com/cpp-linter/cpp-linter">pure python cpp-linter</a>
 package until this project is ready for deployment.</p>
 </div>
+<h2 id="install"><a class="header" href="#install">Install</a></h2>
+<p>This package is available in several programming languages (through their respective package managers).</p>
+<h3 id="rust"><a class="header" href="#rust">Rust</a></h3>
+<p><a href="https://crates.io/crates/cpp-linter"><img src="https://img.shields.io/crates/v/cpp-linter" alt="Crates.io Version" /></a>
+<a href="https://docs.rs/cpp-linter"><img src="https://img.shields.io/docsrs/cpp-linter?label=docs.rs" alt="docs.rs" /></a></p>
+<p>Install from source code hosted at crates.io:</p>
+<pre><code class="language-text">cargo install cpp-linter
+</code></pre>
+<p>Install a pre-compiled binary from GitHub releases:</p>
+<p>First <a href="https://github.com/cargo-bins/cargo-binstall?tab=readme-ov-file#installation">install <code>cargo-binstall</code></a>.</p>
+<pre><code class="language-text">cargo binstall cpp-linter
+</code></pre>
+<h3 id="python"><a class="header" href="#python">Python</a></h3>
+<p><a href="https://pypi.org/project/cpp-linter/"><img src="https://img.shields.io/pypi/v/cpp-linter" alt="PyPI - Version" /></a></p>
+<p>Install the python package:</p>
+<pre><code class="language-text">pip install cpp-linter
+</code></pre>
+<p><a href="https://test.pypi.org/project/cpp-linter/"><img src="https://img.shields.io/pypi/v/cpp-linter?pypiBaseUrl=https%3A%2F%2Ftest.pypi.org&amp;label=test-pypi" alt="testPyPI - Version" /></a></p>
+<p>Pre-releases are uploaded to test-pypi:</p>
+<pre><code class="language-text">pip install -i https://test.pypi.org/simple/ cpp-linter
+</code></pre>
+<h3 id="nodejs"><a class="header" href="#nodejs">Node.js</a></h3>
+<p><a href="https://www.npmjs.com/package/@cpp-linter/cpp-linter"><img src="https://img.shields.io/npm/v/%40cpp-linter%2Fcpp-linter" alt="NPM Version" /></a></p>
+<p>Install the Node.js binding:</p>
+<pre><code class="language-text">npm -g install @cpp-linter/cpp-linter
+</code></pre>
 <h2 id="usage"><a class="header" href="#usage">Usage</a></h2>
 <p>For usage in a CI workflow, see
 <a href="https://github.com/cpp-linter/cpp-linter-action">the cpp-linter/cpp-linter-action repository</a>.</p>
 <p>For the description of supported Command Line Interface options, see
 <a href="https://cpp-linter.github.io/cpp_linter_rs/cli.html">the CLI documentation</a>.</p>
+<h2 id="example"><a class="header" href="#example">Example</a></h2>
+<h3 id="annotations"><a class="header" href="#annotations">Annotations</a></h3>
+<p>Using <a href="cli.html#-a---file-annotations"><code>--file-annotations</code></a>:</p>
+<h4 id="clang-format-annotations"><a class="header" href="#clang-format-annotations">clang-format annotations</a></h4>
+<p><img src="images/annotations-clang-format.png" alt="clang-format annotations" /></p>
+<h4 id="clang-tidy-annotations"><a class="header" href="#clang-tidy-annotations">clang-tidy annotations</a></h4>
+<p><img src="images/annotations-clang-tidy.png" alt="clang-tidy annotations" /></p>
+<h3 id="thread-comment"><a class="header" href="#thread-comment">Thread Comment</a></h3>
+<p>Using <a href="cli.html#-g---thread-comments"><code>--thread-comments</code></a>:</p>
+<p><img src="images/comment.png" alt="sample thread-comment" /></p>
+<h3 id="step-summary"><a class="header" href="#step-summary">Step Summary</a></h3>
+<p>Using <a href="cli.html#-w---step-summary"><code>--step-summary</code></a>:</p>
+<p><img src="images/step-summary.png" alt="step summary" /></p>
+<h3 id="pull-request-review"><a class="header" href="#pull-request-review">Pull Request Review</a></h3>
+<h4 id="only-clang-tidy"><a class="header" href="#only-clang-tidy">Only clang-tidy</a></h4>
+<p>Using <a href="cli.html#-d---tidy-review"><code>--tidy-review</code></a>:</p>
+<p><img src="images/tidy-review.png" alt="sample tidy-review" /></p>
+<h4 id="only-clang-format"><a class="header" href="#only-clang-format">Only clang-format</a></h4>
+<p>Using <a href="cli.html#-m---format-review"><code>--format-review</code></a>:</p>
+<p><img src="images/format-review.png" alt="sample format-review" /></p>
+<p><img src="images/format-suggestion.png" alt="sample format-suggestion" /></p>
 <h2 id="have-question-or-feedback"><a class="header" href="#have-question-or-feedback">Have question or feedback?</a></h2>
 <p>To provide feedback (requesting a feature or reporting a bug) please post to
 <a href="https://github.com/cpp-linter/cpp_linter_rs/issues">issues</a>.</p>
@@ -345,6 +397,11 @@ Dual-licensed under <a href="https://choosealicense.com/licenses/apache-2.0/">Ap
 <ul>
 <li><a href="https://crates.io/crates/pyo3">pyo3</a>:
 Dual-licensed under <a href="https://choosealicense.com/licenses/apache-2.0/">Apache 2.0</a> or <a href="https://choosealicense.com/licenses/mit">MIT</a>.</li>
+</ul>
+<p>The node binding uses</p>
+<ul>
+<li><a href="https://crates.io/crates/napi">napi</a>: Licensed under <a href="https://choosealicense.com/licenses/mit">MIT</a></li>
+<li><a href="https://crates.io/crates/napi-derive">napi-derive</a>: Licensed under <a href="https://choosealicense.com/licenses/mit">MIT</a></li>
 </ul>
 
                     </main>
