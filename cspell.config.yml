@@ -1,6 +1,7 @@
 version: "0.2"
 language: en
 words:
+  - binstall
   - Boolish
   - bugprone
   - chrono
@@ -15,6 +16,7 @@ words:
   - iomanip
   - libgit
   - markdownlint
+  - maturin
   - mdbook
   - msvc
   - napi
@@ -25,6 +27,8 @@ words:
   - pybind
   - pyfunction
   - pymodule
+  - pypi
+  - pyproject
   - ratelimit
   - reqwest
   - revparse

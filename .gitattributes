@@ -8,6 +8,8 @@
 *.css text eol=lf
 *.md text eol=lf
 *.rs text eol=lf
+*.js text eol=lf
+*.ts text eol=lf
 *.yaml text eol=lf
 *.toml text eol=lf
 *.lock text eol=lf

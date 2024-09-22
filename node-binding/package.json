@@ -9,14 +9,20 @@
   },
   "license": "MIT",
   "devDependencies": {
+    "@eslint/js": "^9.11.0",
     "@napi-rs/cli": "^2.18.4",
-    "ava": "^6.0.1"
+    "ava": "^6.0.1",
+    "eslint": "^9.11.0",
+    "globals": "^15.9.0"
   },
   "ava": {
     "timeout": "3m"
   },
   "engines": {
-    "node": ">= 10"
+    "node": ">=12.5.0"
+  },
+  "bin": {
+    "cpp-linter": "cli.js"
   },
   "scripts": {
     "artifacts": "napi artifacts",

@@ -1,16 +1,26 @@
 <!-- markdownlint-disable MD041 -->
+
+[file-annotations]: https://cpp-linter.github.io/cpp_linter_rs/cli#-a---file-annotations
+[thread-comments]: https://cpp-linter.github.io/cpp_linter_rs/cli#-g---thread-comments
+[step-summary]: https://cpp-linter.github.io/cpp_linter_rs/cli#-w---step-summary
+[tidy-review]: https://cpp-linter.github.io/cpp_linter_rs/cli#-d---tidy-review
+[format-review]: https://cpp-linter.github.io/cpp_linter_rs/cli#-m---format-review
+
+[format-annotations-preview]: docs/src/images/annotations-clang-format.png
+[tidy-annotations-preview]: docs/src/images/annotations-clang-tidy.png
+[step-summary-preview]: docs/src/images/step-summary.png
+[thread-comment-preview]: docs/src/images/comment.png
+[tidy-review-preview]: docs/src/images/tidy-review.png
+[format-review-preview]: docs/src/images/format-review.png
+[format-suggestion-preview]: docs/src/images/format-suggestion.png
+
 [![Python packaging][py-build-badge]][py-build-ci]
 [![Binary executable builds][bin-build-badge]][bin-build-ci]
 [![node-js builds][node-ci-badge]][node-ci]
 [![Test CI][test-ci-badge]][test-ci]
 [![Docs][docs-ci-badge]][docs-site]
 [![Pre-commit-ci][pre-commit-badge]][pre-commit-ci]
-
 [![codecov-status][codecov-badge]][codecov-project]
-[![docs.rs][docs-rs-badge]][docs-rs]
-[![PyPI - Version][pypi-badge]][pypi-pkg]
-[![Crates.io Version][crates-io-badge]][crates-io-pkg]
-[![NPM Version][npm-badge]][npm-pkg]
 
 [py-build-ci]: https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/python-packaging.yml
 [py-build-badge]: https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/python-packaging.yml/badge.svg
@@ -30,6 +40,8 @@
 [docs-rs]: https://docs.rs/cpp-linter
 [pypi-badge]: https://img.shields.io/pypi/v/cpp-linter
 [pypi-pkg]: https://pypi.org/project/cpp-linter/
+[test-pypi-badge]: https://img.shields.io/pypi/v/cpp-linter?pypiBaseUrl=https%3A%2F%2Ftest.pypi.org&label=test-pypi
+[test-pypi-pkg]: https://test.pypi.org/project/cpp-linter/
 [crates-io-badge]: https://img.shields.io/crates/v/cpp-linter
 [crates-io-pkg]: https://crates.io/crates/cpp-linter
 [npm-badge]: https://img.shields.io/npm/v/%40cpp-linter%2Fcpp-linter
@@ -37,12 +49,68 @@
 
 # C/C++ Linting Package
 
-A Python and Rust package for linting C/C++ code with clang-tidy and/or clang-format to collect feedback provided in the form of thread comments, step summary, or file annotations.
+A package for linting C/C++ code with clang-tidy and/or clang-format to collect feedback provided in the form of
+
+- [x] [thread-comments](#thread-comment)
+- [x] [step-summary](#step-summary)
+- [x] [file-annotations](#annotations)
+- [x] [Pull Request Review](#pull-request-review) suggestions
 
 > [!CAUTION]
 > This project is still experimental and subject to drastic changes.
-> Please use the pure python [cpp-linter](https://github.com/cpp-linter/cpp-linter)
+> Please use the [pure python cpp-linter](https://github.com/cpp-linter/cpp-linter)
 > package until this project is ready for deployment.
+
+## Install
+
+This package is available in several programming languages (through their respective package managers).
+
+### Rust
+
+[![Crates.io Version][crates-io-badge]][crates-io-pkg]
+[![docs.rs][docs-rs-badge]][docs-rs]
+
+Install from source code hosted at crates.io:
+
+```text
+cargo install cpp-linter
+```
+
+Install a pre-compiled binary from GitHub releases:
+
+First [install `cargo-binstall`](https://github.com/cargo-bins/cargo-binstall?tab=readme-ov-file#installation).
+
+```text
+cargo binstall cpp-linter
+```
+
+### Python
+
+[![PyPI - Version][pypi-badge]][pypi-pkg]
+
+Install the python package:
+
+```text
+pip install cpp-linter
+```
+
+[![testPyPI - Version][test-pypi-badge]][test-pypi-pkg]
+
+Pre-releases are uploaded to test-pypi:
+
+```text
+pip install -i https://test.pypi.org/simple/ cpp-linter
+```
+
+### Node.js
+
+[![NPM Version][npm-badge]][npm-pkg]
+
+Install the Node.js binding:
+
+```text
+npm -g install @cpp-linter/cpp-linter
+```
 
 ## Usage
 
@@ -52,6 +120,48 @@ For usage in a CI workflow, see
 For the description of supported Command Line Interface options, see
 [the CLI documentation](https://cpp-linter.github.io/cpp_linter_rs/cli.html).
 
+## Example
+
+### Annotations
+
+Using [`--file-annotations`][file-annotations]:
+
+#### clang-format annotations
+
+![clang-format annotations][format-annotations-preview]
+
+#### clang-tidy annotations
+
+![clang-tidy annotations][tidy-annotations-preview]
+
+### Thread Comment
+
+Using [`--thread-comments`][thread-comments]:
+
+![sample thread-comment][thread-comment-preview]
+
+### Step Summary
+
+Using [`--step-summary`][step-summary]:
+
+![step summary][step-summary-preview]
+
+### Pull Request Review
+
+#### Only clang-tidy
+
+Using [`--tidy-review`][tidy-review]:
+
+![sample tidy-review][tidy-review-preview]
+
+#### Only clang-format
+
+Using [`--format-review`][format-review]:
+
+![sample format-review][format-review-preview]
+
+![sample format-suggestion][format-suggestion-preview]
+
 ## Have question or feedback?
 
 To provide feedback (requesting a feature or reporting a bug) please post to
@@ -59,49 +169,54 @@ To provide feedback (requesting a feature or reporting a bug) please post to
 
 ## License
 
-The scripts and documentation in this project are released under the [MIT][MIT].
+The scripts and documentation in this project are released under the [MIT].
 
 Dependencies (that are redistributed by us in binary form) have the following
 license agreements:
 
 - [clap](https://crates.io/crates/clap):
-  Dual-licensed under [Apache 2.0][Apache2] or [MIT][MIT].
+  Dual-licensed under [Apache 2.0][Apache2] or [MIT].
 - [git2](https://crates.io/crates/git2):
-  Dual-licensed under [Apache 2.0][Apache2] or [MIT][MIT].
+  Dual-licensed under [Apache 2.0][Apache2] or [MIT].
 
   The following are conditionally included in binaries (using the `openssl-vendored` feature on a
   case-by-case basis) because it is a dependency of git2:
 
   - [openssl](https://crates.io/crates/openssl): Licensed under [Apache 2.0][Apache2]
   - [openssl-probe](https://crates.io/crates/openssl-probe):
-    Dual-licensed under [Apache 2.0][Apache2] or [MIT][MIT].
+    Dual-licensed under [Apache 2.0][Apache2] or [MIT].
 
 - [lenient_semver](https://crates.io/crates/lenient_semver):
-  Dual-licensed under [Apache 2.0][Apache2] or [MIT][MIT].
+  Dual-licensed under [Apache 2.0][Apache2] or [MIT].
 - [log](https://crates.io/crates/log):
-  Dual-licensed under [Apache 2.0][Apache2] or [MIT][MIT].
+  Dual-licensed under [Apache 2.0][Apache2] or [MIT].
 - [regex](https://crates.io/crates/regex):
-  Dual-licensed under [Apache 2.0][Apache2] or [MIT][MIT].
+  Dual-licensed under [Apache 2.0][Apache2] or [MIT].
 - [reqwest](https://crates.io/crates/reqwest):
-  Dual-licensed under [Apache 2.0][Apache2] or [MIT][MIT].
+  Dual-licensed under [Apache 2.0][Apache2] or [MIT].
 - [semver](https://crates.io/crates/semver):
-  Dual-licensed under [Apache 2.0][Apache2] or [MIT][MIT].
+  Dual-licensed under [Apache 2.0][Apache2] or [MIT].
 - [serde](https://crates.io/crates/serde):
-  Dual-licensed under [Apache 2.0][Apache2] or [MIT][MIT].
-- [serde-xml-rs](https://crates.io/crates/serde-xml-rs): Licensed under [MIT][MIT].
+  Dual-licensed under [Apache 2.0][Apache2] or [MIT].
+- [serde-xml-rs](https://crates.io/crates/serde-xml-rs): Licensed under [MIT].
 - [serde_json](https://crates.io/crates/serde_json):
-  Dual-licensed under [Apache 2.0][Apache2] or [MIT][MIT].
-- [which](https://crates.io/crates/which): Licensed under [MIT][MIT].
-- [tokio](https://crates.io/crates/tokio): Licensed under [MIT][MIT].
+  Dual-licensed under [Apache 2.0][Apache2] or [MIT].
+- [which](https://crates.io/crates/which): Licensed under [MIT].
+- [tokio](https://crates.io/crates/tokio): Licensed under [MIT].
 - [futures](https://crates.io/crates/futures):
-  Dual-licensed under [Apache 2.0][Apache2] or [MIT][MIT].
+  Dual-licensed under [Apache 2.0][Apache2] or [MIT].
 - [chrono](https://crates.io/crates/chrono):
-  Dual-licensed under [Apache 2.0][Apache2] or [MIT][MIT].
+  Dual-licensed under [Apache 2.0][Apache2] or [MIT].
 
 The python binding uses
 
 - [pyo3](https://crates.io/crates/pyo3):
-  Dual-licensed under [Apache 2.0][Apache2] or [MIT][MIT].
+  Dual-licensed under [Apache 2.0][Apache2] or [MIT].
+
+The node binding uses
+
+- [napi](https://crates.io/crates/napi): Licensed under [MIT]
+- [napi-derive](https://crates.io/crates/napi-derive): Licensed under [MIT]
 
 [MIT]: https://choosealicense.com/licenses/mit
 [Apache2]: https://choosealicense.com/licenses/apache-2.0/
