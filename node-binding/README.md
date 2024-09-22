@@ -1,47 +1,54 @@
-# cpp-linter node binding
+# cpp-linter
 
-The node.js binding generated from rust source code.
+The node.js binding binding for the [cpp_linter_rs][this] rust project
+(built using [napi-rs](https://napi.rs) and [yarn](https://yarnpkg.com)).
 
-This project must use yarn because [napi-rs] uses [yarn] to get platform-specific information.
+[this]: https://github.com/cpp-linter/cpp_linter_rs
 
-[yarn]: https://yarnpkg.com/
-[napi-rs]: https://napi.rs/
+## Install
 
-This repo also doubles as a yarn workspace. So, the lock file exists in repo root folder.
-Furthermore, most scripts that can be executed in this project are available to run from repo root folder (using the same script name).
+Install with `npm`:
+
+```text
+npm -g install @cpp-linter/cpp-linter
+```
 
 ## Usage
 
-After the native module is built using [`yarn-build`](#yarn-build), you can import the binding via the generated `index.js` file (using the `node` console):
+For usage in a CI workflow, see
+[the cpp-linter/cpp-linter-action repository](https://github.com/cpp-linter/cpp-linter-action).
 
-```sh
-cppLinter = require('./index.js')
-await cppLinter.main(['cpp-linter', '--help'])
+For the description of supported Command Line Interface options, see
+[the CLI documentation](https://cpp-linter.github.io/cpp_linter_rs/cli.html).
+
+## Development
+
+After the native module is built using [`yarn build:debug`](#yarn-builddebug), you can
+invoke the executable script as a normal CLI app:
+
+```text
+npx cpp-linter --help
 ```
 
-All CLI arguments are passed as a array of strings to the binding's `main()` function.
-Notice the name of the CLI app (`'cpp-linter'`) is required because the rust argument parsing
-mechanism (`clap` crate) needs to know the name of the program invoked.
+### Scripts
 
-## Scripts
+If an available script is not described below, it should be considered a convenience
+tool for the CI/CD workflow.
 
-> [!note]
-> If an available script is not described below, it should be considered a convenience tool for the CI workflow.
+#### `yarn build`
 
-### `yarn build`
+This script builds the native module for distribution (with release profile optimizations).
 
-This script builds the native module for distribution.
+##### `yarn build:debug`
 
-#### `yarn build:debug`
-
-Same as `yarn build` but does not use the release optimizations.
+Same as `yarn build` but does not use the release profile optimizations.
 You should use this script when testing locally.
 
-### `yarn test`
+#### `yarn test`
 
 This script runs a simple test to ensure the native module was built correctly.
 
-## Folder structure
+### Folder structure
 
 | Name | Description |
 |-----:|:------------|
@@ -49,8 +56,8 @@ This script runs a simple test to ensure the native module was built correctly.
 | `npm` | The required metadata for publishing platform-specific packages to npm. |
 | `src` | The location for all rust sources related to binding the cpp-linter library. |
 | `build.rs` | The cargo-specific build script used when compiling the binding. |
-| `Cargo.toml` | Metadata about the rust package (which _is not_ intended to be published to crates.io). |
-| `package.json` | Metadata about the node.js binding (which _is_ meant to be published to npm). |
+| `Cargo.toml` | Metadata about the binding's rust package (which _is not_ intended to be published to crates.io). |
+| `package.json` | Metadata about the npm package (platform agnostic). |
 | `index.d.ts` | The generated TypeScript typing info the describes the exposing functionality in the built native module. |
 | `index.js` | The generated script that delegates which platform-specific package to import. |
 | `cpp-linter.x-y-z.node` | Then native module built for a specific platform (where `x-y-z` denotes the platform's name using compilation target). |

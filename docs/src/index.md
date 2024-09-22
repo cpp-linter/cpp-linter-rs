@@ -1,4 +1,17 @@
+<!-- markdownlint-disable MD041 MD053 -->
 
-<!-- markdownlint-disable MD041 -->
+[file-annotations]: cli.md#-a---file-annotations
+[thread-comments]: cli.md#-g---thread-comments
+[step-summary]: cli.md#-w---step-summary
+[tidy-review]: cli.md#-d---tidy-review
+[format-review]: cli.md#-m---format-review
 
-{{#include ../../README.md}}
+[format-annotations-preview]: images/annotations-clang-format.png
+[tidy-annotations-preview]: images/annotations-clang-tidy.png
+[step-summary-preview]: images/step-summary.png
+[thread-comment-preview]: images/comment.png
+[tidy-review-preview]: images/tidy-review.png
+[format-review-preview]: images/format-review.png
+[format-suggestion-preview]: images/format-suggestion.png
+
+{{#include ../../README.md:16:}}
