@@ -65,8 +65,16 @@ const onLoad = () => {
   var headers = [...document.getElementsByClassName("header")];
   headers.shift();
   headers.forEach((header) => {
+    var text = header.textContent;
+    if (text === "") {
+      sibling = header.nextSibling
+      while (sibling != null) {
+        text += sibling.textContent;
+        sibling = sibling.nextSibling
+      }
+    }
     const link = Object.assign(document.createElement("a"), {
-      textContent: header.text,
+      textContent: text,
       href: header.href,
       className: `pagetoc-${header.parentElement.tagName}`,
     });
