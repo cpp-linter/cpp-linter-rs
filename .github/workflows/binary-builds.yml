@@ -160,7 +160,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           files=$(ls dist/cpp-linter*)
-          gh release upload ${{ github.ref_name }} $files
+          gh release upload "${{ github.ref_name }}" $files
       - run: cargo publish -p cpp-linter
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}

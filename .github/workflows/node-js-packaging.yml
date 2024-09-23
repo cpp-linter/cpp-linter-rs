@@ -234,4 +234,4 @@ jobs:
       #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       #   run:
       #     files=$(ls ./npm/**cpp-linter.*.node)
-      #     gh release upload ${{ github.ref_name }} $files
+      #     gh release upload "${{ github.ref_name }}" $files

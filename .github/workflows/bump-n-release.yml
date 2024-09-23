@@ -1,5 +1,7 @@
 name: Bump-n-Release
 
+# NOTE: The change log is only updated in the remote upon release (in `bump-release` job)
+
 on:
   push:
     branches:
@@ -58,5 +60,4 @@ jobs:
           OUTPUT: ${{ runner.temp }}/changes.md
           GITHUB_REPO: ${{ github.repository }}
           GITHUB_TOKEN: ${{ secrets.BUMP_N_RELEASE }}
-      - run: cat ${{ runner.temp }}/changes.md >> $GITHUB_STEP_SUMMARY
-  # NOTE: The change log is updated upon release in `bump-release` job above
+      - run: cat "${{ runner.temp }}/changes.md" >> "$GITHUB_STEP_SUMMARY"
