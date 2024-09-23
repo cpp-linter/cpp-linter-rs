@@ -6,15 +6,17 @@ on:
     paths:
       - docs/**
       - .github/workflows/build-docs.yml
-      - cpp-linter**.rs
-      - '**.md'
+      - cpp-linter/src/**
+      - '*.md'
+      - '*/*.md'
   pull_request:
     branches: [main]
     paths:
       - docs/**
       - .github/workflows/build-docs.yml
-      - cpp-linter**.rs
-      - '**.md'
+      - cpp-linter/src/**
+      - '*.md'
+      - '*/*.md'
   workflow_dispatch:
 
 env:

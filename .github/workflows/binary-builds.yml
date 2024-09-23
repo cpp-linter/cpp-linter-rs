@@ -7,15 +7,19 @@ on:
   push:
     branches: [main]
     paths:
-      - cpp-linter/**
-      - Cargo.{toml,lock}
+      - cpp-linter/src/**
+      - cpp-linter/Cargo.toml
+      - Cargo.toml
+      - Cargo.lock
     tags:
       - v*
   pull_request:
     branches: [main]
     paths:
-      - cpp-linter/**
-      - Cargo.{toml,lock}
+      - cpp-linter/src/**
+      - cpp-linter/Cargo.toml
+      - Cargo.toml
+      - Cargo.lock
 
 env:
   CARGO_TERM_COLOR: always
