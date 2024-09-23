@@ -1,15 +1,15 @@
-"""This script automated the release process for all of the packages in this repository.
+"""This script automates the release process for all of the packages in this repository.
 In order, this script does the following:
 
 1. Bump version number in manifest files according to given required arg (see `--help`).
    This alters the Cargo.toml in repo root and the package.json files in node-binding.
 
-   Requires `yarn` (see https://yarnpkg.com) and `napi` (see https://napi.rs) installed
-   to bump node-binding versions.
+   Requires `yarn` (see https://yarnpkg.com) and `napi` (see https://napi.rs) to be
+   installed to bump node-binding versions.
 
 2. Updates the CHANGELOG.md
 
-   Requires `git-cliff` installed (see https://git-cliff.org)
+   Requires `git-cliff` (see https://git-cliff.org) to be installed
    to regenerate the change logs from git history.
 
    NOTE: `git cliff` uses GITHUB_TOKEN env var to access GitHub's REST API for
@@ -20,14 +20,14 @@ In order, this script does the following:
 4. Creates a GitHub Release and uses the section from the CHANGELOG about the new tag
    as a release description.
 
-   Requires `gh-cli` installed (see https://cli.github.com) to create the release and
-   push the tag.
+   Requires `gh-cli` (see https://cli.github.com) to be installed to create the release
+   and push the tag.
 
    NOTE: This step also tags the commit from step 3.
    When a tag is pushed to the remote, the CI builds are triggered and
 
    - release assets are uploaded to the Github Release corresponding to the new tag
-   - packages are published for npm, pip and cargo
+   - packages are published for npm, pip, and cargo
 
    NOTE: In a CI run, the GH_TOKEN env var to authenticate access.
    Locally, you can use `gh login` to interactively authenticate the user account.
@@ -43,7 +43,7 @@ VER_PATTERN = re.compile(
 )
 VER_REPLACE = 'version = "%d.%d.%d%s" # auto'
 COMPONENTS = ("major", "minor", "patch", "rc")
-VERSION_LOG = re.compile(rb"^## \[\d+\.\d+\.\d+(?:\-rc)?\d*\]")
+VERSION_LOG = re.compile(r"^## \[\d+\.\d+\.\d+(?:\-rc)?\d*\]")
 
 
 class Updater:
@@ -77,25 +77,25 @@ class Updater:
 
 
 def get_release_notes(tag: str = Updater.new_version):
-    title, buf = ("", b"")
+    title, buf = "", ""
     log_file = Path(__file__).parent.parent.parent / "CHANGELOG.md"
-    tag_buf = f"[{tag}]".encode(encoding="utf-8")
-    with open(str(log_file), "rb") as log:
+    tag_pattern = f"[{tag}]"
+    with open(str(log_file), "r", encoding="utf-8") as logs:
         found_notes = False
-        for line in log.readlines():
+        for line in logs:
             matched = VERSION_LOG.match(line)
             if matched is not None:
-                if tag_buf in matched.group(0):
-                    title = tag + line[matched.end() :].decode(encoding="utf-8")
+                if tag_pattern in matched.group(0):
+                    title = tag + line[matched.end() :]
                     found_notes = True
                 else:
                     found_notes = False
-            elif line.startswith(b"[unreleased]: ") and found_notes:
+            elif line.startswith("[unreleased]: ") and found_notes:
                 found_notes = False
             elif found_notes:
                 buf += line
-            elif line.startswith(tag_buf + b": "):
-                buf += line.replace(tag_buf, b"Full commit diff", 1)
+            elif line.startswith(tag_pattern + ": "):
+                buf += line.replace(tag_pattern, "Full commit diff", 1)
     return title.rstrip(), buf.strip()
 
 
@@ -133,8 +133,11 @@ def main():
     try:
         subprocess.run(["git", "push"], check=True)
     except subprocess.CalledProcessError as exc:
-        raise RuntimeError("Failed to push commit for version bump") from exc
-
+        raise RuntimeError(
+            """Failed to push commit for version bump. Please ensure that
+- You have the necessary permissions and are authenticated properly.
+- All other commits on the branch have ben pushed already."""
+        ) from exc
     title, notes = get_release_notes()
     print("Pushed commit to 'Bump version to", tag, "'")
     gh_cmd = [
@@ -145,7 +148,7 @@ def main():
         "--title",
         title,
         "--notes",
-        notes.decode("utf-8"),
+        notes,
     ]
     if Updater.component == "rc":
         gh_cmd.append("--prerelease")
