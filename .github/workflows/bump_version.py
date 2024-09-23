@@ -140,20 +140,14 @@ def main():
         ) from exc
     title, notes = get_release_notes()
     print("Pushed commit to 'Bump version to", tag, "'")
-    gh_cmd = [
-        "gh",
-        "release",
-        "create",
-        tag,
-        "--title",
-        title,
-        "--notes",
-        notes,
-    ]
+    gh_cmd = ["gh", "release", "create", tag, "--title", title, "--notes", notes]
     if Updater.component == "rc":
         gh_cmd.append("--prerelease")
-    subprocess.run(gh_cmd, check=True)
-    print("Created tag", tag, "and corresponding GitHub Release")
+    try:
+        subprocess.run(gh_cmd, check=True)
+        print("Created tag", tag, "and corresponding GitHub Release")
+    except subprocess.CalledProcessError as exc:
+        raise RuntimeError("Failed to create GitHub Release") from exc
 
 
 if __name__ == "__main__":
