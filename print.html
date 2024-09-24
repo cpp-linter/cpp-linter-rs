@@ -89,7 +89,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="cli.html"><strong aria-hidden="true">2.</strong> Command Line Interface</a></li><li class="chapter-item expanded "><a href="permissions.html"><strong aria-hidden="true">3.</strong> Token Permissions</a></li><li class="chapter-item expanded "><a href="pr-review-caveats.html"><strong aria-hidden="true">4.</strong> Pull Request Review Caveats</a></li><li class="chapter-item expanded "><a href="python.html"><strong aria-hidden="true">5.</strong> Python Binding</a></li><li class="chapter-item expanded "><a href="node.html"><strong aria-hidden="true">6.</strong> Node.js Binding</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="cli.html"><strong aria-hidden="true">2.</strong> Command Line Interface</a></li><li class="chapter-item expanded "><a href="permissions.html"><strong aria-hidden="true">3.</strong> Token Permissions</a></li><li class="chapter-item expanded "><a href="pr-review-caveats.html"><strong aria-hidden="true">4.</strong> Pull Request Review Caveats</a></li><li class="chapter-item expanded "><a href="python.html"><strong aria-hidden="true">5.</strong> Python Binding</a></li><li class="chapter-item expanded "><a href="node.html"><strong aria-hidden="true">6.</strong> Node.js Binding</a></li><li class="chapter-item expanded "><a href="CHANGELOG.html"><strong aria-hidden="true">7.</strong> Change Log</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle">
                 <div class="sidebar-resize-indicator"></div>
@@ -1146,6 +1146,183 @@ You should use this script when testing locally.</p>
 <p>Hidden files and folders are not described in the table above.
 If they are not ignored by a gitignore specification, then they should be considered
 important for maintenance or distribution.</p>
+<div style="break-before: page; page-break-before: always;"></div><style>
+.mdbook-alerts {
+  padding: 8px 16px;
+  margin-bottom: 16px;
+  border-left: 0.25em solid var(--mdbook-alerts-color);
+}
+
+.mdbook-alerts > *:first-child {
+  margin-top: 0;
+}
+
+.mdbook-alerts > *:last-child {
+  margin-bottom: 0;
+}
+
+.mdbook-alerts-title {
+  display: flex;
+  font-weight: 600;
+  align-items: center;
+  line-height: 1;
+  color: var(--mdbook-alerts-color);
+  text-transform: capitalize;
+}
+
+.mdbook-alerts-icon {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  margin-right: 0.2em;
+  background-color: currentColor;
+  -webkit-mask: no-repeat center / 100%;
+  mask: no-repeat center / 100%;
+  -webkit-mask-image: var(--mdbook-alerts-icon);
+  mask-image: var(--mdbook-alerts-icon);
+}
+
+.mdbook-alerts-note {
+  --mdbook-alerts-color: rgb(9, 105, 218);
+  /* https://icon-sets.iconify.design/material-symbols/info-outline-rounded/ */
+  --mdbook-alerts-icon: url('data:image/svg+xml,%3Csvg xmlns="http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg" width="24" height="24" viewBox="0 0 24 24"%3E%3Cpath fill="currentColor" d="M12 17q.425 0 .713-.288T13 16v-4q0-.425-.288-.712T12 11q-.425 0-.712.288T11 12v4q0 .425.288.713T12 17m0-8q.425 0 .713-.288T13 8q0-.425-.288-.712T12 7q-.425 0-.712.288T11 8q0 .425.288.713T12 9m0 13q-2.075 0-3.9-.788t-3.175-2.137q-1.35-1.35-2.137-3.175T2 12q0-2.075.788-3.9t2.137-3.175q1.35-1.35 3.175-2.137T12 2q2.075 0 3.9.788t3.175 2.137q1.35 1.35 2.138 3.175T22 12q0 2.075-.788 3.9t-2.137 3.175q-1.35 1.35-3.175 2.138T12 22m0-2q3.35 0 5.675-2.325T20 12q0-3.35-2.325-5.675T12 4Q8.65 4 6.325 6.325T4 12q0 3.35 2.325 5.675T12 20m0-8"%2F%3E%3C%2Fsvg%3E');
+}
+
+.mdbook-alerts-tip {
+  --mdbook-alerts-color: rgb(26, 127, 55);
+  /* https://icon-sets.iconify.design/material-symbols/lightbulb-outline-rounded/ */
+  --mdbook-alerts-icon: url('data:image/svg+xml,%3Csvg xmlns="http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg" width="24" height="24" viewBox="0 0 24 24"%3E%3Cpath fill="currentColor" d="M12 22q-.825 0-1.412-.587T10 20h4q0 .825-.587 1.413T12 22m-3-3q-.425 0-.712-.288T8 18q0-.425.288-.712T9 17h6q.425 0 .713.288T16 18q0 .425-.288.713T15 19zm-.75-3q-1.725-1.025-2.738-2.75T4.5 9.5q0-3.125 2.188-5.312T12 2q3.125 0 5.313 2.188T19.5 9.5q0 2.025-1.012 3.75T15.75 16zm.6-2h6.3q1.125-.8 1.738-1.975T17.5 9.5q0-2.3-1.6-3.9T12 4Q9.7 4 8.1 5.6T6.5 9.5q0 1.35.613 2.525T8.85 14M12 14"%2F%3E%3C%2Fsvg%3E');
+}
+
+.mdbook-alerts-important {
+  --mdbook-alerts-color: rgb(130, 80, 223);
+  /* https://icon-sets.iconify.design/material-symbols/chat-info-outline-rounded/ */
+  --mdbook-alerts-icon: url('data:image/svg+xml,%3Csvg xmlns="http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg" width="24" height="24" viewBox="0 0 24 24"%3E%3Cpath fill="currentColor" d="M12 7q.425 0 .713-.288T13 6q0-.425-.288-.712T12 5q-.425 0-.712.288T11 6q0 .425.288.713T12 7m0 8q.425 0 .713-.288T13 14v-4q0-.425-.288-.712T12 9q-.425 0-.712.288T11 10v4q0 .425.288.713T12 15m-6 3l-2.3 2.3q-.475.475-1.088.213T2 19.575V4q0-.825.588-1.412T4 2h16q.825 0 1.413.588T22 4v12q0 .825-.587 1.413T20 18zm-.85-2H20V4H4v13.125zM4 16V4z"%2F%3E%3C%2Fsvg%3E');
+}
+
+.mdbook-alerts-warning {
+  --mdbook-alerts-color: rgb(154, 103, 0);
+  /* https://icon-sets.iconify.design/material-symbols/warning-outline-rounded/ */
+  --mdbook-alerts-icon: url('data:image/svg+xml,%3Csvg xmlns="http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg" width="24" height="24" viewBox="0 0 24 24"%3E%3Cpath fill="currentColor" d="M2.725 21q-.275 0-.5-.137t-.35-.363q-.125-.225-.137-.488t.137-.512l9.25-16q.15-.25.388-.375T12 3q.25 0 .488.125t.387.375l9.25 16q.15.25.138.513t-.138.487q-.125.225-.35.363t-.5.137zm1.725-2h15.1L12 6zM12 18q.425 0 .713-.288T13 17q0-.425-.288-.712T12 16q-.425 0-.712.288T11 17q0 .425.288.713T12 18m0-3q.425 0 .713-.288T13 14v-3q0-.425-.288-.712T12 10q-.425 0-.712.288T11 11v3q0 .425.288.713T12 15m0-2.5"%2F%3E%3C%2Fsvg%3E');
+}
+
+.mdbook-alerts-caution {
+  --mdbook-alerts-color: rgb(207, 34, 46);
+  /* https://icon-sets.iconify.design/material-symbols/brightness-alert-outline-rounded/ */
+  --mdbook-alerts-icon: url('data:image/svg+xml,%3Csvg xmlns="http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg" width="24" height="24" viewBox="0 0 24 24"%3E%3Cpath fill="currentColor" d="M12 17q.425 0 .713-.288T13 16q0-.425-.288-.712T12 15q-.425 0-.712.288T11 16q0 .425.288.713T12 17m0-4q.425 0 .713-.288T13 12V8q0-.425-.288-.712T12 7q-.425 0-.712.288T11 8v4q0 .425.288.713T12 13m-3.35 7H6q-.825 0-1.412-.587T4 18v-2.65L2.075 13.4q-.275-.3-.425-.662T1.5 12q0-.375.15-.737t.425-.663L4 8.65V6q0-.825.588-1.412T6 4h2.65l1.95-1.925q.3-.275.663-.425T12 1.5q.375 0 .738.15t.662.425L15.35 4H18q.825 0 1.413.588T20 6v2.65l1.925 1.95q.275.3.425.663t.15.737q0 .375-.15.738t-.425.662L20 15.35V18q0 .825-.587 1.413T18 20h-2.65l-1.95 1.925q-.3.275-.662.425T12 22.5q-.375 0-.737-.15t-.663-.425zm.85-2l2.5 2.5l2.5-2.5H18v-3.5l2.5-2.5L18 9.5V6h-3.5L12 3.5L9.5 6H6v3.5L3.5 12L6 14.5V18zm2.5-6"%2F%3E%3C%2Fsvg%3E');
+}
+
+</style>
+<!-- markdownlint-disable MD041 -->
+<h1 id="changelog"><a class="header" href="#changelog">Changelog</a></h1>
+<p>All notable changes to this project will be documented in this file.</p>
+<p>The format is based on <a href="https://keepachangelog.com/en/1.0.0/">Keep a Changelog</a>,
+and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
+<!-- markdownlint-disable MD024 -->
+<h2 id="unreleased"><a class="header" href="#unreleased"><a href="https://github.com/cpp-linter/cpp_linter_rs/compare/v2.0.0-rc4...HEAD">Unreleased</a></a></h2>
+<h3 id="-added"><a class="header" href="#-added"><!-- 1 --> 🚀 Added</a></h3>
+<ul>
+<li>Add a change log in <a href="https://github.com/cpp-linter/cpp_linter_rs/commit/9bfab318394814d2515f3959f744d60a12d415f1"><code>9bfab31</code></a></li>
+</ul>
+<h3 id="-fixed"><a class="header" href="#-fixed"><!-- 4 --> 🛠️ Fixed</a></h3>
+<ul>
+<li>Fix typo in node-binding/README by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/commit/7732676e03941a37a4fb5b474d319c640689985a"><code>7732676</code></a></li>
+</ul>
+<h3 id="-documentation"><a class="header" href="#-documentation"><!-- 8 --> 📝 Documentation</a></h3>
+<ul>
+<li>Release trial follow up by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/pull/41">#41</a></li>
+</ul>
+<h3 id="-changed"><a class="header" href="#-changed"><!-- 9 --> 🗨️ Changed</a></h3>
+<ul>
+<li>Gimme them badges by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/commit/c0f1ea516ee6efdf1137884cbc2e99e4ce1d4a11"><code>c0f1ea5</code></a></li>
+</ul>
+<h2 id="200-rc4---2024-09-21"><a class="header" href="#200-rc4---2024-09-21"><a href="https://github.com/cpp-linter/cpp_linter_rs/compare/v2.0.0-rc3...v2.0.0-rc4">2.0.0-rc4</a> - 2024-09-21</a></h2>
+<h3 id="-fixed-1"><a class="header" href="#-fixed-1"><!-- 4 --> 🛠️ Fixed</a></h3>
+<ul>
+<li>Fix metadata in platform-specific node pkgs by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/commit/1dbb1de3abdb231646a33ac2721e6a8778ca4ece"><code>1dbb1de</code></a></li>
+</ul>
+<h3 id="-changed-1"><a class="header" href="#-changed-1"><!-- 9 --> 🗨️ Changed</a></h3>
+<ul>
+<li>Bump version to v2.0.0-rc4 by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/commit/3e98e20d2405b909b038ff87911dc0d5457613cc"><code>3e98e20</code></a></li>
+</ul>
+<h2 id="200-rc3---2024-09-21"><a class="header" href="#200-rc3---2024-09-21"><a href="https://github.com/cpp-linter/cpp_linter_rs/compare/v2.0.0-rc2...v2.0.0-rc3">2.0.0-rc3</a> - 2024-09-21</a></h2>
+<h3 id="-changed-2"><a class="header" href="#-changed-2"><!-- 9 --> 🗨️ Changed</a></h3>
+<ul>
+<li>[node] add life cycle script prepublishOnly by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/commit/55650ea96aac628023acb120525d674bcf17a529"><code>55650ea</code></a></li>
+<li>Bump version to v2.0.0-rc3 by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/commit/070c5f75f15d0190ee0204992165673c8f16c47d"><code>070c5f7</code></a></li>
+</ul>
+<h2 id="200-rc2---2024-09-21"><a class="header" href="#200-rc2---2024-09-21"><a href="https://github.com/cpp-linter/cpp_linter_rs/compare/v2.0.0-rc1...v2.0.0-rc2">2.0.0-rc2</a> - 2024-09-21</a></h2>
+<h3 id="-added-1"><a class="header" href="#-added-1"><!-- 1 --> 🚀 Added</a></h3>
+<ul>
+<li>Use napi-rs by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/pull/39">#39</a></li>
+<li>Add <code>napi version</code> cmd to <code>just bump</code> script by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/commit/a6a8bf2f8f02c8d1a7b4047dae7bb13b537c370a"><code>a6a8bf2</code></a></li>
+</ul>
+<h3 id="-dependency-updates"><a class="header" href="#-dependency-updates"><!-- 6 --> 📦 Dependency updates</a></h3>
+<ul>
+<li>Bump pypa/gh-action-pypi-publish in the actions group by @dependabot[bot] in <a href="https://github.com/cpp-linter/cpp_linter_rs/pull/40">#40</a></li>
+</ul>
+<h3 id="-changed-3"><a class="header" href="#-changed-3"><!-- 9 --> 🗨️ Changed</a></h3>
+<ul>
+<li>Update READMEs by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/commit/3e9c12846c0eb96f8cdd68fc7435bd8965e7ce6a"><code>3e9c128</code></a></li>
+<li>Some cleanup from release trials by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/commit/25c3951b0ecef9e078ea71932c9401ad8abc2a28"><code>25c3951</code></a></li>
+<li>Bump version to v2.0.0-rc2 by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/commit/ebcb6c4941fbaa8147c768252d6d7d9adcfa3bb3"><code>ebcb6c4</code></a></li>
+</ul>
+<h2 id="200-rc1---2024-09-19"><a class="header" href="#200-rc1---2024-09-19"><a href="https://github.com/cpp-linter/cpp_linter_rs/compare/2e25fec0a447df24d0bcc1b80f6624040bab755e...v2.0.0-rc1">2.0.0-rc1</a> - 2024-09-19</a></h2>
+<h3 id="-added-2"><a class="header" href="#-added-2"><!-- 1 --> 🚀 Added</a></h3>
+<ul>
+<li>Add more testing and various improvements by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/pull/4">#4</a></li>
+<li>Support file paths in CLI positional argument by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/pull/16">#16</a></li>
+<li>Support glob patterns by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/pull/25">#25</a></li>
+<li>Resort to paginated requests for changed files by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/pull/37">#37</a></li>
+</ul>
+<h3 id="-fixed-2"><a class="header" href="#-fixed-2"><!-- 4 --> 🛠️ Fixed</a></h3>
+<ul>
+<li>Fix parsing of <code>--extra-arg</code> by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/commit/03f3de5232e29446d57de00d8ac6deb2fc17d9a5"><code>03f3de5</code></a></li>
+<li>Fix CI docs workflow by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/commit/ae33a6d81da82d8f6c1b2b438e748dd276e4f61f"><code>ae33a6d</code></a></li>
+<li>Fix GithubApiClient init for non-PR events by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/commit/5b60ab8af020f81fc986cdf86568263b5e5f8e50"><code>5b60ab8</code></a></li>
+<li>Fix typo in README by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/commit/afa1312af05f3920e9750dd1371fcad09643bc3f"><code>afa1312</code></a></li>
+<li>Fix dependabot config by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/commit/3957be228662faa3ab0c7241a88ac3b9d3bd09f8"><code>3957be2</code></a></li>
+<li>Fix links to clang-analyzer diagnostic's help site by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/pull/36">#36</a></li>
+<li>Fix CI workflows for publishing releases by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/commit/4f9b91234bf05fd14afc60d7c87768d7ca0d7bb0"><code>4f9b912</code></a></li>
+<li>Fix release CI by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/commit/49b3487c6d0804c075c7e8863be921c8ba3fdaea"><code>49b3487</code></a></li>
+<li>Fix release CI steps by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/commit/23efee50413ae6b6d1b51d147dcdc832d213de94"><code>23efee5</code></a></li>
+<li>Fix metadata and switch to pypa-publish action by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/commit/092e0c20cf66747b59bab4bdf60be29f7f02dcc6"><code>092e0c2</code></a></li>
+</ul>
+<h3 id="-dependency-updates-1"><a class="header" href="#-dependency-updates-1"><!-- 6 --> 📦 Dependency updates</a></h3>
+<ul>
+<li>Bump openssl from 0.10.62 to 0.10.66 by @dependabot[bot] in <a href="https://github.com/cpp-linter/cpp_linter_rs/pull/6">#6</a></li>
+<li>Bump the cargo group with 5 updates by @dependabot[bot] in <a href="https://github.com/cpp-linter/cpp_linter_rs/pull/7">#7</a></li>
+<li>Bump the cargo group with 3 updates by @dependabot[bot] in <a href="https://github.com/cpp-linter/cpp_linter_rs/pull/15">#15</a></li>
+<li>Bump serde_json from 1.0.125 to 1.0.127 in the cargo group by @dependabot[bot] in <a href="https://github.com/cpp-linter/cpp_linter_rs/pull/19">#19</a></li>
+<li>Bump serde from 1.0.208 to 1.0.209 in the cargo group by @dependabot[bot] in <a href="https://github.com/cpp-linter/cpp_linter_rs/pull/23">#23</a></li>
+<li>Bump tempfile from 3.9.0 to 3.12.0 in the cargo group by @dependabot[bot] in <a href="https://github.com/cpp-linter/cpp_linter_rs/pull/26">#26</a></li>
+<li>Bump the cargo group across 1 directory with 6 updates by @dependabot[bot] in <a href="https://github.com/cpp-linter/cpp_linter_rs/pull/34">#34</a></li>
+</ul>
+<h3 id="-tests"><a class="header" href="#-tests"><!-- 7 -->🚦 Tests</a></h3>
+<ul>
+<li>Refactor line filters; minor metadata updates by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/commit/19d5517dc1c95c8269c0beb583387df6197b1ec7"><code>19d5517</code></a></li>
+<li>Mock REST API calls in tests by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/pull/21">#21</a></li>
+<li>PR review suggestions by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/commit/bd049d06c48b4dc40da958a478873ac30183ee46"><code>bd049d0</code></a></li>
+</ul>
+<h3 id="-documentation-1"><a class="header" href="#-documentation-1"><!-- 8 --> 📝 Documentation</a></h3>
+<ul>
+<li>Switch to mdbook for docs by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/pull/13">#13</a></li>
+<li>Begin documenting permissions by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/pull/22">#22</a></li>
+</ul>
+<h3 id="-changed-4"><a class="header" href="#-changed-4"><!-- 9 --> 🗨️ Changed</a></h3>
+<ul>
+<li>Init commit by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/commit/2e25fec0a447df24d0bcc1b80f6624040bab755e"><code>2e25fec</code></a></li>
+<li>Use separate crates for different entry points by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/pull/2">#2</a></li>
+<li>Update README.md by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/commit/ff4a735ec5a74cc9a2e835e58dc76696233ad688"><code>ff4a735</code></a></li>
+<li>Some updates from py codebase by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/pull/5">#5</a></li>
+<li>Rename test CI; add badges to README by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/commit/b77058f166f1062abe8193ab6fc4bc671793a7c8"><code>b77058f</code></a></li>
+<li>Use task runner <code>just</code> (or VSCode "tasks") by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/pull/14">#14</a></li>
+<li>Update README by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/commit/215485c3f5032b7253e2d13f6726e3bfe70a16d0"><code>215485c</code></a></li>
+<li>Prepare for v2.0.0-rc1 by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/commit/9189e86da499606439f6b65b62df5603f57d9da7"><code>9189e86</code></a></li>
+<li>Refactor files by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/pull/38">#38</a></li>
+<li>Metadata changes by @2bndy5 in <a href="https://github.com/cpp-linter/cpp_linter_rs/commit/f4237ae593e468eca0e63169c9360e97bd6e1f26"><code>f4237ae</code></a></li>
+</ul>
+<!-- generated by git-cliff -->
 
                     </main>
 
