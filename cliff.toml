@@ -116,7 +116,6 @@ commit_parsers = [
     { message = "[r|R]emove", group = "<!-- 3 --> 🗑️ Removed" },
     { message = "^.*: remove", group = "<!-- 3 --> 🗑️ Removed" },
     { message = "^.*: delete", group = "<!-- 3 --> 🗑️ Removed" },
-    { message = "^[t|T]est", group = "<!-- 4 --> 🛠️ Fixed" },
     { message = "^[f|F]ix", group = "<!-- 4 --> 🛠️ Fixed" },
     { message = "^.*: fix", group = "<!-- 4 --> 🛠️ Fixed" },
     { message = "^.*: secure", group = "<!-- 5 --> 🔐 Security" },
@@ -135,8 +134,8 @@ filter_commits = true
 # sort the tags topologically
 topo_order = false
 # sort the commits inside sections by oldest/newest order
-sort_commits = "newest"
+sort_commits = "oldest"
 
-[remote.github]
-owner = "cpp-linter"
-repo = "cpp_linter_rs"
+# [remote.github]
+# owner = "cpp-linter"
+# repo = "cpp_linter_rs"
