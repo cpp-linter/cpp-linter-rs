@@ -14,14 +14,21 @@ name: Python builds
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
+    paths:
+      - cpp-linter/**.{rs,toml}
+      - py-binding/**
+      - Cargo.{toml,lock}
+      - .github/workflows/python-packaging.yml
     tags:
       - '*'
   pull_request:
-    branches:
-      - main
-  workflow_dispatch:
+    branches: [main]
+    paths:
+      - cpp-linter/**.{rs,toml}
+      - py-binding/**
+      - Cargo.{toml,lock}
+      - .github/workflows/python-packaging.yml
 
 permissions:
   contents: read
@@ -180,3 +187,9 @@ jobs:
           # This workflow is registered as a trusted publisher (for test-pypi and pypi).
           # A token should not be required (and actually is discouraged with trusted publishers).
           repository-url: ${{ contains(github.ref_name, 'rc') && 'https://test.pypi.org/legacy/' || 'https://upload.pypi.org/legacy/' }}
+      # - name: Upload release assets
+      #   env:
+      #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   run:
+      #     files=$(ls ./dist/cpp-linter*.{whl,atr.gz})
+      #     gh release upload "${{ github.ref_name }}" $files

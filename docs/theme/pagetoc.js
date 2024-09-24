@@ -59,14 +59,33 @@ const updateFunction = () => {
     if (activeLink) activeLink.classList.add("active");
   }
 };
+function getHeaderText(header) {
+  let text = header.textContent;
+  if (text === "") {
+    let sibling = header.nextSibling;
+    let maxIterations = 100;
+    while (sibling != null && maxIterations > 0) {
+      text += sibling.textContent;
+      sibling = sibling.nextSibling;
+      maxIterations--;
+    }
+    if (maxIterations === 0) {
+      console.warn(
+        "Possible circular reference in DOM when extracting header text"
+      );
+    }
+  }
+  return text;
+}
 
 const onLoad = () => {
   const pagetoc = getPagetoc();
   var headers = [...document.getElementsByClassName("header")];
   headers.shift();
   headers.forEach((header) => {
+    const text = getHeaderText(header);
     const link = Object.assign(document.createElement("a"), {
-      textContent: header.text,
+      textContent: text,
       href: header.href,
       className: `pagetoc-${header.parentElement.tagName}`,
     });

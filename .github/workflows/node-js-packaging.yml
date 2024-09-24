@@ -8,19 +8,30 @@ permissions:
   id-token: write
 on:
   push:
-    branches:
-      - main
+    branches: [main]
+    paths:
+      - cpp-linter/src/**
+      - cpp-linter/Cargo.toml
+      - Cargo.toml
+      - Cargo.lock
+      - node-binding/**
+      - package.json
+      - yarn.lock
+      - .github/workflows/node-js-packaging.yml
     tags:
       - '*'
-    paths-ignore:
-      - '**/*.md'
-      - LICENSE
-      - '**/*.gitignore'
-      - .editorconfig
-      - docs/**
   pull_request:
-    branches:
-      - main
+    branches: [main]
+    paths:
+      - cpp-linter/src/**
+      - cpp-linter/Cargo.toml
+      - Cargo.toml
+      - Cargo.lock
+      - node-binding/**
+      - package.json
+      - yarn.lock
+      - .github/workflows/node-js-packaging.yml
+
 jobs:
   build:
     strategy:
@@ -218,3 +229,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # - name: Upload release assets
+      #   env:
+      #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   run:
+      #     files=$(ls ./npm/**cpp-linter.*.node)
+      #     gh release upload "${{ github.ref_name }}" $files

@@ -8,3 +8,4 @@
 - [Pull Request Review Caveats](./pr-review-caveats.md)
 - [Python Binding](./python.md)
 - [Node.js Binding](./node.md)
+- [Change Log](./CHANGELOG.md)

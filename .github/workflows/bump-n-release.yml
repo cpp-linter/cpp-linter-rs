@@ -1,0 +1,63 @@
+name: Bump-n-Release
+
+# NOTE: The change log is only updated in the remote upon release (in `bump-release` job)
+
+on:
+  push:
+    branches:
+      - "main"
+  pull_request:
+    branches:
+      - "main"
+  workflow_dispatch:
+    inputs:
+      component:
+        type: choice
+        required: true
+        default: patch
+        options:
+          - major
+          - minor
+          - patch
+          - rc
+
+jobs:
+  bump-release:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.BUMP_N_RELEASE }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: 3.x
+      - uses: cargo-bins/cargo-binstall@main
+      - run: cargo binstall -y git-cliff
+      - name: Bump ${{ inputs.component }} verion
+        env:
+          GITHUB_TOKEN: ${{ secrets.BUMP_N_RELEASE }}
+          GH_TOKEN: ${{ secrets.BUMP_N_RELEASE }}
+        run: python .github/workflows/bump_version.py ${{ inputs.component }}
+        id: tagged
+
+  update-changelog:
+    if: github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.BUMP_N_RELEASE }}
+          fetch-depth: 0
+      - name: Generate a changelog
+        uses: orhun/git-cliff-action@v4
+        id: git-cliff
+        with:
+          config: cliff.toml
+          args: --unreleased
+        env:
+          OUTPUT: ${{ runner.temp }}/changes.md
+          GITHUB_REPO: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ secrets.BUMP_N_RELEASE }}
+      - run: cat "${{ runner.temp }}/changes.md" >> "$GITHUB_STEP_SUMMARY"
