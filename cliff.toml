@@ -17,8 +17,9 @@ body = """
 {%- macro remote_url() -%}
   https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}
 {%- endmacro -%}
+{%- set UNRELEASED = "Unreleased" -%}
 {%- set init_commit = "2e25fec0a447df24d0bcc1b80f6624040bab755e" -%}
-{%- set this_version = "Unreleased" -%}
+{%- set this_version = UNRELEASED -%}
 
 {% if version -%}
     {%- set this_version = version | trim_start_matches(pat="v") -%}
@@ -28,7 +29,7 @@ body = """
         > {{ message }}
     {%- endif %}
 {% else -%}
-    ## [Unreleased]
+    ## [{{ UNRELEASED }}] - {{ previous.timestamp | date(format="%Y-%m-%d") }} to present
 {% endif -%}
 
 {% for group, commits in commits | group_by(attribute="group") %}
@@ -49,6 +50,7 @@ body = """
 {% if version -%}
     {%- set last_commit = version -%}
     {%- if not previous.version -%}
+        {#- If this is the first versioned release, use the initial commit -#}
         {%- set first_commit = init_commit -%}
     {%- endif -%}
 {%- endif %}

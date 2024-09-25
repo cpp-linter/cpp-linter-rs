@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
-## [Unreleased]
+## [Unreleased] - 2024-09-21 to present
 
 ### <!-- 1 --> 🚀 Added
 
@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fix typo in node-binding/README by @2bndy5 in [`7732676`](https://github.com/cpp-linter/cpp_linter_rs/commit/7732676e03941a37a4fb5b474d319c640689985a)
 
+### <!-- 6 --> 📦 Dependency updates
+
+- Bump the npm group with 2 updates by @dependabot[bot] in [#43](https://github.com/cpp-linter/cpp_linter_rs/pull/43)
+
 ### <!-- 8 --> 📝 Documentation
 
 - Release trial follow up by @2bndy5 in [#41](https://github.com/cpp-linter/cpp_linter_rs/pull/41)
@@ -23,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### <!-- 9 --> 🗨️ Changed
 
 - Gimme them badges by @2bndy5 in [`c0f1ea5`](https://github.com/cpp-linter/cpp_linter_rs/commit/c0f1ea516ee6efdf1137884cbc2e99e4ce1d4a11)
+- Move logic from py script to jinja template (release CI) in [`bc05419`](https://github.com/cpp-linter/cpp_linter_rs/commit/bc05419920e15704352d344a4fa7da67824cc776)
 
 [Unreleased]: https://github.com/cpp-linter/cpp_linter_rs/compare/v2.0.0-rc4...HEAD
 
