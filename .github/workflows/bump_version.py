@@ -90,12 +90,8 @@ def get_release_notes(tag: str = Updater.new_version):
                     found_notes = True
                 else:
                     found_notes = False
-            elif line.startswith("[unreleased]: ") and found_notes:
-                found_notes = False
             elif found_notes:
                 buf += line
-            elif line.startswith(tag_pattern + ": "):
-                buf += line.replace(tag_pattern, "Full commit diff", 1)
     return title.rstrip(), buf.strip()
 
 
