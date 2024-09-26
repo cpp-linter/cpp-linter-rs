@@ -3,16 +3,18 @@
 //!
 //! Currently, only Github is supported.
 
+use std::fmt::Debug;
 use std::future::Future;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 // non-std crates
+use anyhow::{anyhow, Context, Error, Result};
 use chrono::DateTime;
 use futures::future::{BoxFuture, FutureExt};
 use reqwest::header::{HeaderMap, HeaderValue};
-use reqwest::{Client, IntoUrl, Method, Request, Response, StatusCode, Url};
+use reqwest::{Client, IntoUrl, Method, Request, Response, Url};
 
 // project specific modules
 pub mod github;
@@ -34,28 +36,6 @@ pub struct RestApiRateLimitHeaders {
     pub retry: String,
 }
 
-pub struct CachedResponse {
-    pub text: String,
-    pub headers: HeaderMap,
-    pub status: StatusCode,
-}
-
-impl CachedResponse {
-    async fn from(response: Response) -> Self {
-        let headers = response.headers().to_owned();
-        let status = response.status();
-        let text = response
-            .text()
-            .await
-            .expect("Failed to decode response body to text.");
-        Self {
-            text,
-            headers,
-            status,
-        }
-    }
-}
-
 /// A custom trait that templates necessary functionality with a Git server's REST API.
 pub trait RestApiClient {
     /// A way to set output variables specific to cpp_linter executions in CI.
@@ -70,7 +50,7 @@ pub trait RestApiClient {
     ///
     /// If an authentication token is provided (via environment variable),
     /// this method shall include the relative information.
-    fn make_headers() -> HeaderMap<HeaderValue>;
+    fn make_headers() -> Result<HeaderMap<HeaderValue>>;
 
     /// Construct a HTTP request to be sent.
     ///
@@ -100,7 +80,8 @@ pub trait RestApiClient {
         method: Method,
         data: Option<String>,
         headers: Option<HeaderMap>,
-    ) -> Request {
+    ) -> Result<Request> {
+        let url_str = url.as_str().to_string();
         let mut req = client.request(method, url);
         if let Some(h) = headers {
             req = req.headers(h);
@@ -108,7 +89,8 @@ pub trait RestApiClient {
         if let Some(d) = data {
             req = req.body(d);
         }
-        req.build().expect("Failed to create a HTTP request")
+        req.build()
+            .with_context(|| format!("Failed to build request to {url_str}"))
     }
 
     /// A convenience function to send HTTP requests and respect a REST API rate limits.
@@ -116,109 +98,93 @@ pub trait RestApiClient {
     /// This method must own all the data passed to it because asynchronous recursion is used.
     /// Recursion is needed when a secondary rate limit is hit. The server tells the client that
     /// it should back off and retry after a specified time interval.
-    ///
-    /// Setting the `strict` parameter to true will panic when the HTTP request fails to send or
-    /// the HTTP response's status code does not describe success. This should only be used for
-    /// requests that are vital to the app operation.
-    /// With `strict` as true, the returned type is guaranteed to be a [`Some`] value.
-    /// If `strict` is false, then a failure to send the request is returned as a [`None`] value,
-    /// and a [`Some`] value could also indicate if the server failed to process the request.
     fn send_api_request(
         client: Client,
         request: Request,
-        strict: bool,
         rate_limit_headers: RestApiRateLimitHeaders,
         retries: u64,
-    ) -> BoxFuture<'static, Option<CachedResponse>> {
+    ) -> BoxFuture<'static, Result<Response>> {
         async move {
-            match client
-                .execute(
-                    request
-                        .try_clone()
-                        .expect("Could not clone HTTP request object"),
-                )
-                .await
-            {
-                Ok(response) => {
-                    if [403u16, 429u16].contains(&response.status().as_u16()) {
-                        // rate limit exceeded
+            let result = client
+                .execute(request.try_clone().ok_or(anyhow!(
+                    "Failed to clone request object for recursive behavior"
+                ))?)
+                .await;
+            if let Ok(response) = &result {
+                if [403u16, 429u16].contains(&response.status().as_u16()) {
+                    // rate limit exceeded
 
-                        // check if primary rate limit was violated; panic if so.
-                        let remaining = response
-                            .headers()
-                            .get(&rate_limit_headers.remaining)
-                            .expect("Response headers do not include remaining API usage count")
-                            .to_str()
-                            .expect("Failed to extract remaining attempts about rate limit")
-                            .parse::<i64>()
-                            .expect("Failed to parse i64 from remaining attempts about rate limit");
-                        if remaining <= 0 {
-                            let reset = DateTime::from_timestamp(
-                                response
-                                    .headers()
-                                    .get(&rate_limit_headers.reset)
-                                    .expect("response headers does not include a reset timestamp")
-                                    .to_str()
-                                    .expect("Failed to extract reset info about rate limit")
-                                    .parse::<i64>()
-                                    .expect("Failed to parse i64 from reset time about rate limit"),
-                                0,
-                            )
-                            .expect("rate limit reset UTC timestamp is an invalid");
-                            panic!("REST API rate limit exceeded! Resets at {}", reset);
-                        }
-
-                        // check if secondary rate limit is violated; backoff and try again.
-                        if retries > 4 {
-                            panic!("REST API secondary rate limit exceeded");
-                        }
-                        if let Some(retry) = response.headers().get(&rate_limit_headers.retry) {
-                            let interval = Duration::from_secs(
-                                retry
-                                    .to_str()
-                                    .expect("Failed to extract retry interval about rate limit")
-                                    .parse::<u64>()
-                                    .expect(
-                                        "Failed to parse u64 from retry interval about rate limit",
-                                    )
-                                    + retries.pow(2),
-                            );
-                            tokio::time::sleep(interval).await;
-                            return Self::send_api_request(
-                                client,
-                                request,
-                                strict,
-                                rate_limit_headers,
-                                retries + 1,
-                            )
-                            .await;
-                        }
-                    }
-                    let cached_response = CachedResponse::from(response).await;
-                    if !cached_response.status.is_success() {
-                        let summary = format!(
-                            "Got {} response from {} request to {}:\n{}",
-                            cached_response.status.as_u16(),
-                            request.method().as_str(),
-                            request.url().as_str(),
-                            cached_response.text,
-                        );
-                        if strict {
-                            panic!("{summary}");
+                    // check if primary rate limit was violated; panic if so.
+                    let mut requests_remaining = None;
+                    if let Some(remaining) = response.headers().get(&rate_limit_headers.remaining) {
+                        if let Ok(count) = remaining.to_str() {
+                            if let Ok(value) = count.parse::<i64>() {
+                                requests_remaining = Some(value);
+                            } else {
+                                log::debug!(
+                                    "Failed to parse i64 from remaining attempts about rate limit: {count}"
+                                );
+                            }
                         } else {
-                            log::error!("{summary}");
+                            log::debug!("Failed to extract remaining attempts about rate limit: {remaining:?}");
+                        }
+                    } else {
+                        log::debug!("Response headers do not include remaining API usage count");
+                    }
+                    if requests_remaining.is_some_and(|v| v <= 0) {
+                        if let Some(reset_value) = response.headers().get(&rate_limit_headers.reset)
+                        {
+                            if let Ok(epoch) = reset_value.to_str() {
+                                if let Ok(value) = epoch.parse::<i64>() {
+                                    if let Some(reset) = DateTime::from_timestamp(value, 0) {
+                                        return Err(anyhow!(
+                                            "REST API rate limit exceeded! Resets at {}",
+                                            reset
+                                        ));
+                                    } else {
+                                        log::debug!("Rate limit reset UTC timestamp is an invalid: {value}");
+                                    }
+                                } else {
+                                    log::debug!(
+                                        "Failed to parse i64 from reset time about rate limit: {epoch}"
+                                    );
+                                }
+                            } else {
+                                log::debug!("Failed to extract reset info about rate limit: {reset_value:?}");
+                            }
+                        } else {
+                            log::debug!("Response headers does not include a reset timestamp");
                         }
                     }
-                    Some(cached_response)
-                }
-                Err(e) => {
-                    if strict {
-                        panic!("Failed to complete the HTTP request.\n{}", e);
-                    } else {
-                        None
+
+                    // check if secondary rate limit is violated; backoff and try again.
+                    if retries > 4 {
+                        return Err(anyhow!("REST API secondary rate limit exceeded"));
+                    }
+                    if let Some(retry_value) = response.headers().get(&rate_limit_headers.retry) {
+                        if let Ok(retry_str) = retry_value.to_str() {
+                            if let Ok(retry) = retry_str.parse::<u64>() {
+                                let interval = Duration::from_secs(retry + retries.pow(2));
+                                tokio::time::sleep(interval).await;
+                            } else {
+                                log::debug!(
+                                    "Failed to parse u64 from retry interval about rate limit: {retry_str}"
+                                );
+                            }
+                        } else {
+                            log::debug!("Failed to extract retry interval about rate limit: {retry_value:?}");
+                        }
+                        return Self::send_api_request(
+                            client,
+                            request,
+                            rate_limit_headers,
+                            retries + 1,
+                        )
+                        .await;
                     }
                 }
             }
+            result.map_err(Error::from)
         }
         .boxed()
     }
@@ -231,7 +197,7 @@ pub trait RestApiClient {
     fn get_list_of_changed_files(
         &self,
         file_filter: &FileFilter,
-    ) -> impl Future<Output = Vec<FileObj>>;
+    ) -> impl Future<Output = Result<Vec<FileObj>>>;
 
     /// A way to get the list of changed files using REST API calls that employ a paginated response.
     ///
@@ -241,7 +207,7 @@ pub trait RestApiClient {
         &self,
         url: Url,
         file_filter: &FileFilter,
-    ) -> impl Future<Output = Vec<FileObj>>;
+    ) -> impl Future<Output = Result<Vec<FileObj>>>;
 
     /// Makes a comment in MarkDown syntax based on the concerns in `format_advice` and
     /// `tidy_advice` about the given set of `files`.
@@ -303,30 +269,31 @@ pub trait RestApiClient {
         &self,
         files: &[Arc<Mutex<FileObj>>],
         user_inputs: FeedbackInput,
-    ) -> impl Future<Output = u64>;
+    ) -> impl Future<Output = Result<u64>>;
 
     /// Gets the URL for the next page in a paginated response.
     ///
     /// Returns [`None`] if current response is the last page.
     fn try_next_page(headers: &HeaderMap) -> Option<Url> {
-        if headers.contains_key("link") {
-            let pages = headers["link"]
-                .to_str()
-                .expect("Failed to convert header value of links to a str")
-                .split(", ");
-            for page in pages {
-                if page.ends_with("; rel=\"next\"") {
-                    let url = page
-                        .split_once(">;")
-                        .expect("header link for pagination is malformed")
-                        .0
-                        .trim_start_matches("<")
-                        .to_string();
-                    return Some(
-                        Url::parse(&url)
-                            .expect("Failed to parse next page link from response header"),
-                    );
+        if let Some(links) = headers.get("link") {
+            if let Ok(pg_str) = links.to_str() {
+                let pages = pg_str.split(", ");
+                for page in pages {
+                    if page.ends_with("; rel=\"next\"") {
+                        if let Some(link) = page.split_once(">;") {
+                            let url = link.0.trim_start_matches("<").to_string();
+                            if let Ok(next) = Url::parse(&url) {
+                                return Some(next);
+                            } else {
+                                log::debug!("Failed to parse next page link from response header");
+                            }
+                        } else {
+                            log::debug!("Response header link for pagination is malformed");
+                        }
+                    }
                 }
+            } else {
+                log::debug!("Failed to convert header value of links to a str");
             }
         }
         None
@@ -390,7 +357,7 @@ fn make_tidy_comment(
                         rationale = tidy_note.rationale,
                         concerned_code = if tidy_note.suggestion.is_empty() {String::from("")} else {
                             format!("\n   ```{ext}\n   {suggestion}\n   ```\n",
-                                ext = file_path.extension().expect("file extension was not determined").to_string_lossy(),
+                                ext = file_path.extension().unwrap_or_default().to_string_lossy(),
                                 suggestion = tidy_note.suggestion.join("\n   "),
                             ).to_string()
                         },

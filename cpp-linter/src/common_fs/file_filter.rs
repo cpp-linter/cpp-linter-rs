@@ -1,9 +1,9 @@
+use anyhow::{anyhow, Context, Result};
+use fast_glob::glob_match;
 use std::{
     fs,
     path::{Path, PathBuf},
 };
-
-use fast_glob::glob_match;
 
 use super::FileObj;
 
@@ -150,21 +150,23 @@ impl FileFilter {
     /// - uses at least 1 of the given `extensions`
     /// - is not specified in the internal list of `ignored` paths
     /// - is specified in the internal list `not_ignored` paths (which supersedes `ignored` paths)
-    pub fn list_source_files(&self, root_path: &str) -> Vec<FileObj> {
+    pub fn list_source_files(&self, root_path: &str) -> Result<Vec<FileObj>> {
         let mut files: Vec<FileObj> = Vec::new();
-        let entries = fs::read_dir(root_path).expect("repo root-path should exist");
+        let entries = fs::read_dir(root_path)
+            .with_context(|| format!("Failed to read directory contents: {root_path}"))?;
         for entry in entries.filter_map(|p| p.ok()) {
             let path = entry.path();
             if path.is_dir() {
                 let mut is_hidden = false;
-                let parent = path.components().last().expect("parent not known");
+                let parent = path
+                    .components()
+                    .last()
+                    .ok_or(anyhow!("parent directory not known for {path:?}"))?;
                 if parent.as_os_str().to_str().unwrap().starts_with('.') {
                     is_hidden = true;
                 }
                 if !is_hidden {
-                    files.extend(
-                        self.list_source_files(&path.into_os_string().into_string().unwrap()),
-                    );
+                    files.extend(self.list_source_files(&path.to_string_lossy())?);
                 }
             } else {
                 let is_valid_src = self.is_source_or_ignored(&path);
@@ -175,7 +177,7 @@ impl FileFilter {
                 }
             }
         }
-        files
+        Ok(files)
     }
 }
 
@@ -255,7 +257,7 @@ mod tests {
     fn walk_dir_recursively() {
         let extensions = vec!["cpp".to_string(), "hpp".to_string()];
         let file_filter = setup_ignore("target", extensions.clone());
-        let files = file_filter.list_source_files(".");
+        let files = file_filter.list_source_files(".").unwrap();
         assert!(!files.is_empty());
         for file in files {
             assert!(extensions.contains(

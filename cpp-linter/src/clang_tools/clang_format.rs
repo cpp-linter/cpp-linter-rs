@@ -6,6 +6,7 @@ use std::{
     sync::{Arc, Mutex, MutexGuard},
 };
 
+use anyhow::{Context, Result};
 use log::Level;
 // non-std crates
 use serde::Deserialize;
@@ -109,7 +110,7 @@ pub fn tally_format_advice(files: &[Arc<Mutex<FileObj>>]) -> u64 {
 pub fn run_clang_format(
     file: &mut MutexGuard<FileObj>,
     clang_params: &ClangParams,
-) -> Vec<(log::Level, String)> {
+) -> Result<Vec<(log::Level, String)>> {
     let mut cmd = Command::new(clang_params.clang_format_command.as_ref().unwrap());
     let mut logs = vec![];
     cmd.args(["--style", &clang_params.style]);
@@ -117,7 +118,8 @@ pub fn run_clang_format(
     for range in &ranges {
         cmd.arg(format!("--lines={}:{}", range.start(), range.end()));
     }
-    cmd.arg(file.name.to_string_lossy().as_ref());
+    let file_name = file.name.to_string_lossy().to_string();
+    cmd.arg(file.name.to_path_buf().as_os_str());
     let mut patched = None;
     if clang_params.format_review {
         logs.push((
@@ -129,7 +131,7 @@ pub fn run_clang_format(
                     .as_ref()
                     .unwrap()
                     .to_str()
-                    .unwrap(),
+                    .unwrap_or_default(),
                 cmd.get_args()
                     .map(|a| a.to_str().unwrap())
                     .collect::<Vec<&str>>()
@@ -138,7 +140,7 @@ pub fn run_clang_format(
         ));
         patched = Some(
             cmd.output()
-                .expect("Failed to get fixes from clang-format")
+                .with_context(|| format!("Failed to get fixes from clang-format: {file_name}"))?
                 .stdout,
         );
     }
@@ -147,33 +149,34 @@ pub fn run_clang_format(
         log::Level::Info,
         format!(
             "Running \"{} {}\"",
-            clang_params
-                .clang_format_command
-                .as_ref()
-                .unwrap()
-                .to_str()
-                .unwrap(),
+            cmd.get_program().to_string_lossy(),
             cmd.get_args()
                 .map(|x| x.to_str().unwrap())
                 .collect::<Vec<&str>>()
                 .join(" ")
         ),
     ));
-    let output = cmd.output().unwrap();
+    let output = cmd
+        .output()
+        .with_context(|| format!("Failed to get replacements from clang-format: {file_name}"))?;
     if !output.stderr.is_empty() || !output.status.success() {
-        logs.push((
-            log::Level::Debug,
-            format!(
-                "clang-format raised the follow errors:\n{}",
-                String::from_utf8(output.stderr).unwrap()
-            ),
-        ));
+        if let Ok(stderr) = String::from_utf8(output.stderr) {
+            logs.push((
+                log::Level::Debug,
+                format!("clang-format raised the follow errors:\n{}", stderr),
+            ));
+        } else {
+            logs.push((
+                log::Level::Error,
+                "stderr from clang-format was not UTF-8 encoded".to_string(),
+            ));
+        }
     }
     if output.stdout.is_empty() {
-        return logs;
+        return Ok(logs);
     }
     let xml = String::from_utf8(output.stdout)
-        .unwrap()
+        .with_context(|| format!("stdout from clang-format was not UTF-8 encoded: {file_name}"))?
         .lines()
         .collect::<Vec<&str>>()
         .join("");
@@ -208,7 +211,7 @@ pub fn run_clang_format(
         format_advice.replacements = filtered_replacements;
     }
     file.format_advice = Some(format_advice);
-    logs
+    Ok(logs)
 }
 
 #[cfg(test)]

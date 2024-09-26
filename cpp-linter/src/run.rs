@@ -8,6 +8,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 // non-std crates
+use anyhow::Result;
 use log::{set_max_level, LevelFilter};
 #[cfg(feature = "openssl-vendored")]
 use openssl_probe;
@@ -21,13 +22,10 @@ use crate::rest_api::{github::GithubApiClient, RestApiClient};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-#[cfg(feature = "openssl-vendored")]
 fn probe_ssl_certs() {
+    #[cfg(feature = "openssl-vendored")]
     openssl_probe::init_ssl_cert_env_vars();
 }
-
-#[cfg(not(feature = "openssl-vendored"))]
-fn probe_ssl_certs() {}
 
 /// This is the backend entry point for console applications.
 ///
@@ -43,7 +41,7 @@ fn probe_ssl_certs() {}
 /// is used instead of python's `sys.argv`, then the list of strings includes the entry point
 /// alias ("path/to/cpp-linter.exe"). Thus, the parser in [`crate::cli`] will halt on an error
 /// because it is not configured to handle positional arguments.
-pub async fn run_main(args: Vec<String>) -> i32 {
+pub async fn run_main(args: Vec<String>) -> Result<u8> {
     probe_ssl_certs();
 
     let arg_parser = get_arg_parser();
@@ -52,7 +50,7 @@ pub async fn run_main(args: Vec<String>) -> i32 {
 
     if args.subcommand_matches("version").is_some() {
         println!("cpp-linter v{}", VERSION);
-        return 0;
+        return Ok(0);
     }
 
     logger::init().unwrap();
@@ -60,7 +58,7 @@ pub async fn run_main(args: Vec<String>) -> i32 {
     if cli.version == "NO-VERSION" {
         log::error!("The `--version` arg is used to specify which version of clang to use.");
         log::error!("To get the cpp-linter version, use `cpp-linter version` sub-command.");
-        return 1;
+        return Ok(1);
     }
 
     if cli.repo_root != "." {
@@ -68,7 +66,7 @@ pub async fn run_main(args: Vec<String>) -> i32 {
             .unwrap_or_else(|_| panic!("'{}' is inaccessible or does not exist", cli.repo_root));
     }
 
-    let rest_api_client = GithubApiClient::new();
+    let rest_api_client = GithubApiClient::new()?;
     set_max_level(if cli.verbosity || rest_api_client.debug_enabled {
         LevelFilter::Debug
     } else {
@@ -100,14 +98,14 @@ pub async fn run_main(args: Vec<String>) -> i32 {
         // parse_diff(github_rest_api_payload)
         rest_api_client
             .get_list_of_changed_files(&file_filter)
-            .await
+            .await?
     } else {
         // walk the folder and look for files with specified extensions according to ignore values.
-        let mut all_files = file_filter.list_source_files(".");
+        let mut all_files = file_filter.list_source_files(".")?;
         if rest_api_client.event_name == "pull_request" && (cli.tidy_review || cli.format_review) {
             let changed_files = rest_api_client
                 .get_list_of_changed_files(&file_filter)
-                .await;
+                .await?;
             for changed_file in changed_files {
                 for file in &mut all_files {
                     if changed_file.name == file.name {
@@ -130,14 +128,16 @@ pub async fn run_main(args: Vec<String>) -> i32 {
 
     let mut clang_params = ClangParams::from(&cli);
     let user_inputs = FeedbackInput::from(&cli);
-    capture_clang_tools_output(&mut arc_files, cli.version.as_str(), &mut clang_params).await;
+    capture_clang_tools_output(&mut arc_files, cli.version.as_str(), &mut clang_params).await?;
     start_log_group(String::from("Posting feedback"));
-    let checks_failed = rest_api_client.post_feedback(&arc_files, user_inputs).await;
+    let checks_failed = rest_api_client
+        .post_feedback(&arc_files, user_inputs)
+        .await?;
     end_log_group();
     if env::var("PRE_COMMIT").is_ok_and(|v| v == "1") {
-        return (checks_failed > 1) as i32;
+        return Ok((checks_failed > 1) as u8);
     }
-    0
+    Ok(0)
 }
 
 #[cfg(test)]
@@ -148,57 +148,49 @@ mod test {
     #[tokio::test]
     async fn run() {
         env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
-        assert_eq!(
-            run_main(vec![
-                "cpp-linter".to_string(),
-                "-l".to_string(),
-                "false".to_string(),
-                "--repo-root".to_string(),
-                "tests".to_string(),
-                "demo/demo.cpp".to_string(),
-            ])
-            .await,
-            0
-        );
+        let result = run_main(vec![
+            "cpp-linter".to_string(),
+            "-l".to_string(),
+            "false".to_string(),
+            "--repo-root".to_string(),
+            "tests".to_string(),
+            "demo/demo.cpp".to_string(),
+        ])
+        .await;
+        assert!(result.is_ok_and(|v| v == 0));
     }
 
     #[tokio::test]
     async fn run_version_command() {
         env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
-        assert_eq!(
-            run_main(vec!["cpp-linter".to_string(), "version".to_string()]).await,
-            0
-        );
+        let result = run_main(vec!["cpp-linter".to_string(), "version".to_string()]).await;
+        assert!(result.is_ok_and(|v| v == 0));
     }
 
     #[tokio::test]
     async fn run_force_debug_output() {
         env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
-        assert_eq!(
-            run_main(vec![
-                "cpp-linter".to_string(),
-                "-l".to_string(),
-                "false".to_string(),
-                "-v".to_string(),
-                "debug".to_string(),
-            ])
-            .await,
-            0
-        );
+        let result = run_main(vec![
+            "cpp-linter".to_string(),
+            "-l".to_string(),
+            "false".to_string(),
+            "-v".to_string(),
+            "debug".to_string(),
+        ])
+        .await;
+        assert!(result.is_ok_and(|v| v == 0));
     }
 
     #[tokio::test]
     async fn run_bad_version_input() {
         env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
-        assert_eq!(
-            run_main(vec![
-                "cpp-linter".to_string(),
-                "-l".to_string(),
-                "false".to_string(),
-                "-V".to_string()
-            ])
-            .await,
-            1
-        );
+        let result = run_main(vec![
+            "cpp-linter".to_string(),
+            "-l".to_string(),
+            "false".to_string(),
+            "-V".to_string(),
+        ])
+        .await;
+        assert!(result.is_ok_and(|v| v == 1));
     }
 }

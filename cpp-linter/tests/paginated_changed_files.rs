@@ -55,7 +55,7 @@ async fn get_paginated_changes(lib_root: &Path, event_type: EventType) {
     let mut server = mock_server().await;
     env::set_var("GITHUB_API_URL", server.url());
     env::set_current_dir(tmp.path()).unwrap();
-    let gh_client = GithubApiClient::new();
+    let gh_client = GithubApiClient::new().unwrap();
 
     let mut mocks = vec![];
     let diff_end_point = format!(
@@ -109,7 +109,10 @@ async fn get_paginated_changes(lib_root: &Path, event_type: EventType) {
     }
 
     let file_filter = FileFilter::new(&[], vec!["cpp".to_string(), "hpp".to_string()]);
-    let files = gh_client.get_list_of_changed_files(&file_filter).await;
+    let files = gh_client
+        .get_list_of_changed_files(&file_filter)
+        .await
+        .unwrap();
     assert_eq!(files.len(), 2);
     for file in files {
         assert!(["src/demo.cpp", "src/demo.hpp"].contains(

@@ -10,6 +10,7 @@
 
 use std::{ops::RangeInclusive, path::PathBuf};
 
+use anyhow::{Context, Result};
 // non-std crates
 use git2::{Diff, Error, Patch, Repository};
 
@@ -45,7 +46,7 @@ fn get_sha(repo: &Repository, depth: Option<u32>) -> Result<git2::Object<'_>, Er
 /// If there are files staged for a commit, then the resulting [`Diff`] will describe
 /// the staged changes. However, if there are no staged changes, then the last commit's
 /// [`Diff`] is returned.
-pub fn get_diff(repo: &Repository) -> git2::Diff {
+pub fn get_diff(repo: &Repository) -> Result<git2::Diff> {
     let head = get_sha(repo, None).unwrap().peel_to_tree().unwrap();
     let mut has_staged_files = false;
     for entry in repo.statuses(None).unwrap().iter() {
@@ -63,12 +64,12 @@ pub fn get_diff(repo: &Repository) -> git2::Diff {
     if has_staged_files {
         // get diff for staged files only
         repo.diff_tree_to_index(Some(&head), None, None)
-            .expect("Could not get diff for current changes in local repo index")
+            .with_context(|| "Could not get diff for current changes in local repo index")
     } else {
         // get diff for last commit only
         let base = get_sha(repo, Some(1)).unwrap().peel_to_tree().unwrap();
         repo.diff_tree_to_tree(Some(&base), Some(&head), None)
-            .expect("could not get diff for last commit")
+            .with_context(|| "Could not get diff for last commit")
     }
 }
 
@@ -407,8 +408,10 @@ mod test {
         set_current_dir(tmp).unwrap();
         env::set_var("CI", "false"); // avoid use of REST API when testing in CI
         rest_api_client
+            .unwrap()
             .get_list_of_changed_files(&file_filter)
             .await
+            .unwrap()
     }
 
     #[tokio::test]

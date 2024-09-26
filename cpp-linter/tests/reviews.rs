@@ -203,7 +203,7 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
         args.push("-e=c".to_string());
     }
     let result = run_main(args).await;
-    assert_eq!(result, 0);
+    assert!(result.is_ok_and(|v| v == 0));
     for mock in mocks {
         mock.assert();
     }
