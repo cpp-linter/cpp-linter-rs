@@ -298,6 +298,17 @@ pub trait RestApiClient {
         }
         None
     }
+
+    fn log_response(response: Response, context: &str) -> impl Future<Output = ()> + Send {
+        async move {
+            if let Err(e) = response.error_for_status_ref() {
+                log::error!("{}: {e:?}", context.to_owned());
+                if let Ok(text) = response.text().await {
+                    log::error!("{text}");
+                }
+            }
+        }
+    }
 }
 
 fn make_format_comment(

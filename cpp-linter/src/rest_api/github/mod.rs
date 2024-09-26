@@ -126,6 +126,7 @@ impl RestApiClient for GithubApiClient {
                 .join(if is_pr { pr.as_str() } else { sha.as_str() })?;
             let mut diff_header = HeaderMap::new();
             diff_header.insert("Accept", "application/vnd.github.diff".parse()?);
+            log::debug!("Getting file changes from {}", url.as_str());
             let request = Self::make_api_request(
                 &self.client,
                 url.as_str(),
@@ -150,6 +151,8 @@ impl RestApiClient for GithubApiClient {
                         } else {
                             url
                         };
+                        Self::log_response(response, "Failed to get full diff for event").await;
+                        log::debug!("Trying paginated request to {}", endpoint.as_str());
                         self.get_changed_files_paginated(endpoint, file_filter)
                             .await
                     }

@@ -186,12 +186,7 @@ impl GithubApiClient {
             .await
             {
                 Ok(response) => {
-                    if let Err(e) = response.error_for_status_ref() {
-                        log::error!("Failed to post thread comment: {e:?}");
-                        if let Ok(text) = response.text().await {
-                            log::error!("{text}");
-                        }
-                    }
+                    Self::log_response(response, "Failed to post thread comment").await;
                 }
                 Err(e) => {
                     log::error!("Failed to post thread comment: {e:?}");
@@ -227,11 +222,12 @@ impl GithubApiClient {
             .await
             {
                 Ok(response) => {
-                    if let Err(e) = response.error_for_status_ref() {
-                        log::error!("Failed to get list of existing thread comments: {e:?}");
-                        if let Ok(text) = response.text().await {
-                            log::error!("{text}");
-                        }
+                    if !response.status().is_success() {
+                        Self::log_response(
+                            response,
+                            "Failed to get list of existing thread comments",
+                        )
+                        .await;
                         return Ok(comment_url);
                     }
                     comments_url = Self::try_next_page(response.headers());
@@ -264,7 +260,7 @@ impl GithubApiClient {
                                 };
                                 let req = Self::make_api_request(
                                     &self.client,
-                                    del_url.clone(),
+                                    del_url.as_str(),
                                     Method::DELETE,
                                     None,
                                     None,
@@ -278,13 +274,12 @@ impl GithubApiClient {
                                 .await
                                 {
                                     Ok(result) => {
-                                        if let Err(e) = result.error_for_status_ref() {
-                                            log::error!(
-                                                "Failed to delete old thread comment {e:?}"
-                                            );
-                                            if let Ok(text) = result.text().await {
-                                                log::error!("{text}");
-                                            }
+                                        if !result.status().is_success() {
+                                            Self::log_response(
+                                                result,
+                                                "Failed to delete old thread comment",
+                                            )
+                                            .await;
                                         }
                                     }
                                     Err(e) => {
@@ -336,7 +331,7 @@ impl GithubApiClient {
             0,
         )
         .await
-        .with_context(|| "Failed to get PR info")?;
+        .with_context(|| format!("Failed to get PR info from {}", url.as_str()))?;
         let pr_info: PullRequestInfo = serde_json::from_str(&response.text().await?)
             .with_context(|| "Failed to deserialize PR info")?;
 
@@ -390,7 +385,7 @@ impl GithubApiClient {
         dismissal.await?; // free up the `url` variable
         let request = Self::make_api_request(
             &self.client,
-            url,
+            url.clone(),
             Method::POST,
             Some(
                 serde_json::to_string(&payload)
@@ -407,11 +402,8 @@ impl GithubApiClient {
         .await
         {
             Ok(response) => {
-                if let Err(e) = response.error_for_status_ref() {
-                    log::error!("Failed to post a new PR review: {e:?}");
-                    if let Ok(text) = response.text().await {
-                        log::error!("{text}");
-                    }
+                if !response.status().is_success() {
+                    Self::log_response(response, "Failed to post a new PR review").await;
                 }
             }
             Err(e) => {
@@ -442,7 +434,10 @@ impl GithubApiClient {
             )
             .await;
             if response.is_err() || response.as_ref().is_ok_and(|r| !r.status().is_success()) {
-                log::error!("Failed to get a list of existing PR reviews");
+                log::error!(
+                    "Failed to get a list of existing PR reviews: {}",
+                    endpoint.as_str()
+                );
                 return Ok(());
             }
             let response = response.unwrap();
@@ -481,11 +476,12 @@ impl GithubApiClient {
                                             .await
                                             {
                                                 Ok(result) => {
-                                                    if let Err(e) = result.error_for_status_ref() {
-                                                        log::error!("Failed to dismiss outdated review: {e:?}");
-                                                        if let Ok(text) = result.text().await {
-                                                            log::error!("{text}");
-                                                        }
+                                                    if !result.status().is_success() {
+                                                        Self::log_response(
+                                                            result,
+                                                            "Failed to dismiss outdated review",
+                                                        )
+                                                        .await;
                                                     }
                                                 }
                                                 Err(e) => {

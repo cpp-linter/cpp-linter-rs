@@ -6,6 +6,7 @@ use tempfile::{NamedTempFile, TempDir};
 
 use cpp_linter::{
     common_fs::FileFilter,
+    logger,
     rest_api::{github::GithubApiClient, RestApiClient},
 };
 use std::{env, io::Write, path::Path};
@@ -56,6 +57,8 @@ async fn get_paginated_changes(lib_root: &Path, event_type: EventType) {
     env::set_var("GITHUB_API_URL", server.url());
     env::set_current_dir(tmp.path()).unwrap();
     let gh_client = GithubApiClient::new().unwrap();
+    logger::init().unwrap();
+    log::set_max_level(log::LevelFilter::Debug);
 
     let mut mocks = vec![];
     let diff_end_point = format!(
