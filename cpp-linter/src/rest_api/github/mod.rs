@@ -261,16 +261,11 @@ impl RestApiClient for GithubApiClient {
                 let sha = self.sha.clone().unwrap() + "/";
                 let comments_url = self
                     .api_url
-                    .join("repos/")
-                    .unwrap()
-                    .join(format!("{}/", repo).as_str())
-                    .unwrap()
-                    .join(if is_pr { "issues/" } else { "commits/" })
-                    .unwrap()
-                    .join(if is_pr { pr.as_str() } else { sha.as_str() })
-                    .unwrap()
-                    .join("comments/")
-                    .unwrap();
+                    .join("repos/")?
+                    .join(format!("{}/", repo).as_str())?
+                    .join(if is_pr { "issues/" } else { "commits/" })?
+                    .join(if is_pr { pr.as_str() } else { sha.as_str() })?
+                    .join("comments")?;
 
                 self.update_comment(
                     comments_url,

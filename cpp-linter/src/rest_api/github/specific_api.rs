@@ -205,7 +205,7 @@ impl GithubApiClient {
             })?,
         );
         let repo = format!(
-            "repos/{}/comments/",
+            "repos/{}/comments",
             // if we got here, then we know it is on a CI runner as self.repo should be known
             self.repo.as_ref().expect("Repo name unknown.")
         );
@@ -243,11 +243,14 @@ impl GithubApiClient {
                                 comment.user.login,
                                 comment.user.id,
                             );
-                            let this_comment_url = base_comment_url
-                                .join(&comment.id.to_string())
-                                .with_context(|| {
-                                format!("Failed to parse URL for JSON comment.id: {}", comment.id)
-                            })?;
+                            let this_comment_url =
+                                Url::parse(format!("{base_comment_url}/{}", &comment.id).as_str())
+                                    .with_context(|| {
+                                        format!(
+                                            "Failed to parse URL for JSON comment.id: {}",
+                                            comment.id
+                                        )
+                                    })?;
                             if delete || comment_url.is_some() {
                                 // if not updating: remove all outdated comments
                                 // if updating: remove all outdated comments except the last one

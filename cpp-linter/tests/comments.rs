@@ -106,7 +106,7 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
             server
                 .mock(
                     "GET",
-                    format!("/repos/{REPO}/commits/{SHA}/comments/").as_str(),
+                    format!("/repos/{REPO}/commits/{SHA}/comments").as_str(),
                 )
                 .match_header("Accept", "application/vnd.github.raw+json")
                 .match_header("Authorization", TOKEN)
@@ -123,7 +123,7 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
                 .create(),
         );
     } else {
-        let pr_endpoint = format!("/repos/{REPO}/issues/{PR}/comments/");
+        let pr_endpoint = format!("/repos/{REPO}/issues/{PR}/comments");
         for pg in ["1", "2"] {
             let link = if pg == "1" {
                 format!("<{}{pr_endpoint}?page=2>; rel=\"next\"", server.url())
@@ -190,7 +190,7 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
                 .mock(
                     "POST",
                     format!(
-                        "/repos/{REPO}/{}/comments/",
+                        "/repos/{REPO}/{}/comments",
                         if test_params.event_t == EventType::PullRequest {
                             format!("issues/{PR}")
                         } else {
