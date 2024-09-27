@@ -16,6 +16,7 @@ pub struct FullReview {
 pub struct ReviewDiffComment {
     pub body: String,
     pub line: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub start_line: Option<i64>,
     pub path: String,
 }
