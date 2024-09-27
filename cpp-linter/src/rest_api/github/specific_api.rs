@@ -19,7 +19,10 @@ use crate::{
 };
 
 use super::{
-    serde_structs::{FullReview, PullRequestInfo, ReviewComment, ReviewDiffComment, ThreadComment},
+    serde_structs::{
+        FullReview, PullRequestInfo, ReviewComment, ReviewDiffComment, ThreadComment,
+        REVIEW_DISMISSAL,
+    },
     GithubApiClient, RestApiClient,
 };
 
@@ -206,9 +209,14 @@ impl GithubApiClient {
             })?,
         );
         let repo = format!(
-            "repos/{}/comments",
+            "repos/{}{}/comments",
             // if we got here, then we know it is on a CI runner as self.repo should be known
-            self.repo.as_ref().expect("Repo name unknown.")
+            self.repo.as_ref().expect("Repo name unknown."),
+            if self.event_name == "pull_request" {
+                "/issues"
+            } else {
+                ""
+            },
         );
         let base_comment_url = self.api_url.join(&repo).unwrap();
         while let Some(ref endpoint) = comments_url {
@@ -454,50 +462,39 @@ impl GithubApiClient {
                                 && !(["PENDING", "DISMISSED"].contains(&review.state.as_str()))
                             {
                                 // dismiss outdated review
-                                match url.join("reviews/")?.join(review.id.to_string().as_str()) {
-                                    Ok(dismiss_url) => {
-                                        if let Ok(req) = Self::make_api_request(
-                                            &self.client,
-                                            dismiss_url,
-                                            Method::PUT,
-                                            Some(
-                                                serde_json::json!(
-                                                    {
-                                                        "message": "outdated suggestion",
-                                                        "event": "DISMISS"
-                                                    }
-                                                )
-                                                .to_string(),
-                                            ),
-                                            None,
-                                        ) {
-                                            match Self::send_api_request(
-                                                self.client.clone(),
-                                                req,
-                                                self.rate_limit_headers.clone(),
-                                                0,
-                                            )
-                                            .await
-                                            {
-                                                Ok(result) => {
-                                                    if !result.status().is_success() {
-                                                        Self::log_response(
-                                                            result,
-                                                            "Failed to dismiss outdated review",
-                                                        )
-                                                        .await;
-                                                    }
-                                                }
-                                                Err(e) => {
-                                                    log::error!(
-                                                        "Failed to dismiss outdated review: {e:}"
-                                                    );
+                                if let Ok(dismiss_url) =
+                                    url.join(format!("reviews/{}/dismissals", review.id).as_str())
+                                {
+                                    if let Ok(req) = Self::make_api_request(
+                                        &self.client,
+                                        dismiss_url,
+                                        Method::PUT,
+                                        Some(REVIEW_DISMISSAL.to_string()),
+                                        None,
+                                    ) {
+                                        match Self::send_api_request(
+                                            self.client.clone(),
+                                            req,
+                                            self.rate_limit_headers.clone(),
+                                            0,
+                                        )
+                                        .await
+                                        {
+                                            Ok(result) => {
+                                                if !result.status().is_success() {
+                                                    Self::log_response(
+                                                        result,
+                                                        "Failed to dismiss outdated review",
+                                                    )
+                                                    .await;
                                                 }
                                             }
+                                            Err(e) => {
+                                                log::error!(
+                                                    "Failed to dismiss outdated review: {e:}"
+                                                );
+                                            }
                                         }
-                                    }
-                                    Err(e) => {
-                                        log::error!("Failed to parse URL for dismissing outdated review: {e:?}");
                                     }
                                 }
                             }

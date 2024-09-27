@@ -36,6 +36,9 @@ impl From<Suggestion> for ReviewDiffComment {
     }
 }
 
+/// A constant string used as a payload to dismiss PR reviews.
+pub const REVIEW_DISMISSAL: &str = r#"{"event":"DISMISS","message":"outdated suggestion"}"#;
+
 /// A structure for deserializing a single changed file in a CI event.
 #[derive(Debug, Deserialize, PartialEq, Clone)]
 pub struct GithubChangedFile {

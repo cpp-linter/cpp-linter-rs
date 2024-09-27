@@ -125,7 +125,10 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
     if !test_params.fail_get_existing_reviews {
         mocks.push(
             server
-                .mock("PUT", format!("{reviews_endpoint}/1807607546").as_str())
+                .mock(
+                    "PUT",
+                    format!("{reviews_endpoint}/1807607546/dismissals").as_str(),
+                )
                 .match_body(r#"{"event":"DISMISS","message":"outdated suggestion"}"#)
                 .match_header("Authorization", format!("token {TOKEN}").as_str())
                 .with_header(REMAINING_RATE_LIMIT_HEADER, "50")

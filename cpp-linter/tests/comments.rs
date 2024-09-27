@@ -146,7 +146,14 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
             );
         }
     }
-    let comment_url = format!("/repos/{REPO}/comments/76453652");
+    let comment_url = format!(
+        "/repos/{REPO}{}/comments/76453652",
+        if test_params.event_t == EventType::PullRequest {
+            "/issues"
+        } else {
+            ""
+        }
+    );
 
     if !test_params.fail_get_existing_comments {
         mocks.push(
