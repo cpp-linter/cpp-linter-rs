@@ -94,7 +94,7 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
             server
                 .mock("GET", format!("/repos/{REPO}/{diff_end_point}").as_str())
                 .match_header("Accept", "application/vnd.github.diff")
-                .match_header("Authorization", TOKEN)
+                .match_header("Authorization", format!("token {TOKEN}").as_str())
                 .with_body_from_file(format!("{asset_path}patch.diff"))
                 .with_header(REMAINING_RATE_LIMIT_HEADER, "50")
                 .with_header(RESET_RATE_LIMIT_HEADER, reset_timestamp.as_str())
@@ -109,7 +109,7 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
                     format!("/repos/{REPO}/commits/{SHA}/comments").as_str(),
                 )
                 .match_header("Accept", "application/vnd.github.raw+json")
-                .match_header("Authorization", TOKEN)
+                .match_header("Authorization", format!("token {TOKEN}").as_str())
                 .match_body(Matcher::Any)
                 .match_query(Matcher::UrlEncoded("page".to_string(), "1".to_string()))
                 .with_body_from_file(format!("{asset_path}push_comments_{SHA}.json"))
@@ -134,7 +134,7 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
                 server
                     .mock("GET", pr_endpoint.as_str())
                     .match_header("Accept", "application/vnd.github.raw+json")
-                    .match_header("Authorization", TOKEN)
+                    .match_header("Authorization", format!("token {TOKEN}").as_str())
                     .match_body(Matcher::Any)
                     .match_query(Matcher::UrlEncoded("page".to_string(), pg.to_string()))
                     .with_body_from_file(format!("{asset_path}pr_comments_pg{pg}.json"))
@@ -153,6 +153,7 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
             server
                 .mock("DELETE", comment_url.as_str())
                 .match_body(Matcher::Any)
+                .match_header("Authorization", format!("token {TOKEN}").as_str())
                 .with_status(if test_params.fail_dismissal { 403 } else { 200 })
                 .with_header(REMAINING_RATE_LIMIT_HEADER, "50")
                 .with_header(RESET_RATE_LIMIT_HEADER, reset_timestamp.as_str())
@@ -177,6 +178,7 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
             server
                 .mock("PATCH", comment_url.as_str())
                 .match_body(new_comment_match.clone())
+                .match_header("Authorization", format!("token {TOKEN}").as_str())
                 .with_status(if test_params.fail_posting { 403 } else { 200 })
                 .with_header(REMAINING_RATE_LIMIT_HEADER, "50")
                 .with_header(RESET_RATE_LIMIT_HEADER, reset_timestamp.as_str())
@@ -200,6 +202,7 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
                     .as_str(),
                 )
                 .match_body(new_comment_match)
+                .match_header("Authorization", format!("token {TOKEN}").as_str())
                 .with_header(REMAINING_RATE_LIMIT_HEADER, "50")
                 .with_header(RESET_RATE_LIMIT_HEADER, reset_timestamp.as_str())
                 .with_status(if test_params.fail_posting { 403 } else { 200 })

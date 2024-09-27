@@ -22,7 +22,11 @@ use crate::cli::FeedbackInput;
 use crate::common_fs::{FileFilter, FileObj};
 
 pub static COMMENT_MARKER: &str = "<!-- cpp linter action -->\n";
-pub static USER_OUTREACH: &str = "\n\nHave any feedback or feature suggestions? [Share it here.](https://github.com/cpp-linter/cpp-linter-action/issues)";
+pub static USER_OUTREACH: &str = concat!(
+    "\n\nHave any feedback or feature suggestions? [Share it here.]",
+    "(https://github.com/cpp-linter/cpp-linter-action/issues)"
+);
+pub static USER_AGENT: &str = concat!("cpp-linter/", env!("CARGO_PKG_VERSION"));
 
 /// A structure to contain the different forms of headers that
 /// describe a REST API's rate limit status.

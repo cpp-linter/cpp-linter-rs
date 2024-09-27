@@ -100,9 +100,9 @@ impl RestApiClient for GithubApiClient {
             "Accept",
             HeaderValue::from_str("application/vnd.github.raw+json")?,
         );
-        // headers.insert("User-Agent", USER_AGENT.parse().unwrap());
         if let Ok(token) = env::var("GITHUB_TOKEN") {
-            let mut val = HeaderValue::from_str(token.as_str())?;
+            log::debug!("Using auth token from GITHUB_TOKEN environment variable");
+            let mut val = HeaderValue::from_str(format!("token {token}").as_str())?;
             val.set_sensitive(true);
             headers.insert(AUTHORIZATION, val);
         }

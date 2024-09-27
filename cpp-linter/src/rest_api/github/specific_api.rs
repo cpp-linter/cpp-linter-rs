@@ -15,7 +15,7 @@ use crate::{
     clang_tools::{clang_format::summarize_style, ReviewComments},
     cli::FeedbackInput,
     common_fs::FileObj,
-    rest_api::{RestApiRateLimitHeaders, COMMENT_MARKER},
+    rest_api::{RestApiRateLimitHeaders, COMMENT_MARKER, USER_AGENT},
 };
 
 use super::{
@@ -58,6 +58,7 @@ impl GithubApiClient {
         Ok(GithubApiClient {
             client: Client::builder()
                 .default_headers(Self::make_headers()?)
+                .user_agent(USER_AGENT)
                 .build()
                 .with_context(|| "Failed to create a session client for REST API calls")?,
             pull_request,

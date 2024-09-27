@@ -73,7 +73,7 @@ async fn get_paginated_changes(lib_root: &Path, event_type: EventType) {
         server
             .mock("GET", diff_end_point.as_str())
             .match_header("Accept", "application/vnd.github.diff")
-            .match_header("Authorization", TOKEN)
+            .match_header("Authorization", format!("token {TOKEN}").as_str())
             .with_header(REMAINING_RATE_LIMIT_HEADER, "50")
             .with_header(RESET_RATE_LIMIT_HEADER, reset_timestamp.as_str())
             .with_status(403)
@@ -94,7 +94,7 @@ async fn get_paginated_changes(lib_root: &Path, event_type: EventType) {
             server
                 .mock("GET", pg_end_point.as_str())
                 .match_header("Accept", "application/vnd.github.raw+json")
-                .match_header("Authorization", TOKEN)
+                .match_header("Authorization", format!("token {TOKEN}").as_str())
                 .match_query(Matcher::UrlEncoded("page".to_string(), pg.to_string()))
                 .with_header(REMAINING_RATE_LIMIT_HEADER, "50")
                 .with_header(RESET_RATE_LIMIT_HEADER, reset_timestamp.as_str())
