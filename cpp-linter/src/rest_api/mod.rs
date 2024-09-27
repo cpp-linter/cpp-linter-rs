@@ -129,10 +129,10 @@ pub trait RestApiClient {
                                     "Failed to parse i64 from remaining attempts about rate limit: {count}"
                                 );
                             }
-                        } else {
-                            log::debug!("Failed to extract remaining attempts about rate limit: {remaining:?}");
                         }
                     } else {
+                        // NOTE: I guess it is sometimes valid for a request to
+                        // not include remaining rate limit attempts
                         log::debug!("Response headers do not include remaining API usage count");
                     }
                     if requests_remaining.is_some_and(|v| v <= 0) {
@@ -145,20 +145,17 @@ pub trait RestApiClient {
                                             "REST API rate limit exceeded! Resets at {}",
                                             reset
                                         ));
-                                    } else {
-                                        log::debug!("Rate limit reset UTC timestamp is an invalid: {value}");
                                     }
                                 } else {
                                     log::debug!(
                                         "Failed to parse i64 from reset time about rate limit: {epoch}"
                                     );
                                 }
-                            } else {
-                                log::debug!("Failed to extract reset info about rate limit: {reset_value:?}");
                             }
                         } else {
                             log::debug!("Response headers does not include a reset timestamp");
                         }
+                        return Err(anyhow!("REST API rate limit exceeded!"));
                     }
 
                     // check if secondary rate limit is violated; backoff and try again.
@@ -175,8 +172,6 @@ pub trait RestApiClient {
                                     "Failed to parse u64 from retry interval about rate limit: {retry_str}"
                                 );
                             }
-                        } else {
-                            log::debug!("Failed to extract retry interval about rate limit: {retry_value:?}");
                         }
                         return Self::send_api_request(
                             client,
@@ -296,8 +291,6 @@ pub trait RestApiClient {
                         }
                     }
                 }
-            } else {
-                log::debug!("Failed to convert header value of links to a str");
             }
         }
         None
@@ -389,4 +382,266 @@ fn make_tidy_comment(
     comment.push_str(&opener);
     comment.push_str(&tidy_comment);
     comment.push_str(&closer);
+}
+
+/// This module tests the silent errors' debug logs
+/// from `try_next_page()` and `send_api_request()` functions.
+#[cfg(test)]
+mod test {
+    use std::sync::{Arc, Mutex};
+
+    use anyhow::{anyhow, Result};
+    use chrono::Utc;
+    use mockito::{Matcher, Server};
+    use reqwest::{
+        header::{HeaderMap, HeaderValue},
+        Client,
+    };
+    use reqwest::{Method, Url};
+
+    use crate::{
+        cli::FeedbackInput,
+        common_fs::{FileFilter, FileObj},
+        logger,
+    };
+
+    use super::{RestApiClient, RestApiRateLimitHeaders};
+
+    /// A dummy struct to impl RestApiClient
+    #[derive(Default)]
+    struct TestClient {}
+
+    impl RestApiClient for TestClient {
+        fn set_exit_code(
+            &self,
+            _checks_failed: u64,
+            _format_checks_failed: Option<u64>,
+            _tidy_checks_failed: Option<u64>,
+        ) -> u64 {
+            0
+        }
+
+        fn make_headers() -> Result<HeaderMap<HeaderValue>> {
+            Err(anyhow!("Not implemented"))
+        }
+
+        async fn get_list_of_changed_files(
+            &self,
+            _file_filter: &FileFilter,
+        ) -> Result<Vec<FileObj>> {
+            Err(anyhow!("Not implemented"))
+        }
+
+        async fn get_changed_files_paginated(
+            &self,
+            _url: reqwest::Url,
+            _file_filter: &FileFilter,
+        ) -> Result<Vec<FileObj>> {
+            Err(anyhow!("Not implemented"))
+        }
+
+        async fn post_feedback(
+            &self,
+            _files: &[Arc<Mutex<FileObj>>],
+            _user_inputs: FeedbackInput,
+        ) -> Result<u64> {
+            Err(anyhow!("Not implemented"))
+        }
+    }
+
+    #[tokio::test]
+    async fn dummy_coverage() {
+        assert!(TestClient::make_headers().is_err());
+        let dummy = TestClient::default();
+        assert_eq!(dummy.set_exit_code(1, None, None), 0);
+        assert!(dummy
+            .get_list_of_changed_files(&FileFilter::new(&[], vec![]))
+            .await
+            .is_err());
+        assert!(dummy
+            .get_changed_files_paginated(
+                Url::parse("https://example.net").unwrap(),
+                &FileFilter::new(&[], vec![])
+            )
+            .await
+            .is_err());
+        assert!(dummy
+            .post_feedback(&[], FeedbackInput::default())
+            .await
+            .is_err())
+    }
+
+    // ************************************************* try_next_page() tests
+
+    #[test]
+    fn bad_link_header() {
+        let mut headers = HeaderMap::with_capacity(1);
+        assert!(headers
+            .insert("link", HeaderValue::from_str("; rel=\"next\"").unwrap())
+            .is_none());
+        logger::init().unwrap();
+        log::set_max_level(log::LevelFilter::Debug);
+        let result = TestClient::try_next_page(&headers);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn bad_link_domain() {
+        let mut headers = HeaderMap::with_capacity(1);
+        assert!(headers
+            .insert(
+                "link",
+                HeaderValue::from_str("<not a domain>; rel=\"next\"").unwrap()
+            )
+            .is_none());
+        logger::init().unwrap();
+        log::set_max_level(log::LevelFilter::Debug);
+        let result = TestClient::try_next_page(&headers);
+        assert!(result.is_none());
+    }
+
+    // ************************************************* Rate Limit Tests
+
+    #[derive(Default)]
+    struct RateLimitTestParams {
+        secondary: bool,
+        has_remaining_count: bool,
+        bad_remaining_count: bool,
+        has_reset_timestamp: bool,
+        bad_reset_timestamp: bool,
+        has_retry_interval: bool,
+        bad_retry_interval: bool,
+    }
+
+    async fn simulate_rate_limit(test_params: &RateLimitTestParams) {
+        let rate_limit_headers = RestApiRateLimitHeaders {
+            reset: "reset".to_string(),
+            remaining: "remaining".to_string(),
+            retry: "retry".to_string(),
+        };
+        logger::init().unwrap();
+        log::set_max_level(log::LevelFilter::Debug);
+
+        let mut server = Server::new_async().await;
+        let client = Client::new();
+        let reset_timestamp = (Utc::now().timestamp() + 60).to_string();
+        let mut mock = server
+            .mock("GET", "/")
+            .match_body(Matcher::Any)
+            .expect_at_least(1)
+            .expect_at_most(5)
+            .with_status(429);
+        if test_params.has_remaining_count {
+            mock = mock.with_header(
+                &rate_limit_headers.remaining,
+                if test_params.secondary {
+                    "1"
+                } else if test_params.bad_remaining_count {
+                    "X"
+                } else {
+                    "0"
+                },
+            );
+        }
+        if test_params.has_reset_timestamp {
+            mock = mock.with_header(
+                &rate_limit_headers.reset,
+                if test_params.bad_reset_timestamp {
+                    "X"
+                } else {
+                    &reset_timestamp
+                },
+            );
+        }
+        if test_params.secondary && test_params.has_retry_interval {
+            mock.with_header(
+                &rate_limit_headers.retry,
+                if test_params.bad_retry_interval {
+                    "X"
+                } else {
+                    "0"
+                },
+            )
+            .create();
+        } else {
+            mock.create();
+        }
+        let request =
+            TestClient::make_api_request(&client, server.url(), Method::GET, None, None).unwrap();
+        TestClient::send_api_request(client.clone(), request, rate_limit_headers.clone(), 0)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    #[ignore]
+    #[should_panic(expected = "REST API secondary rate limit exceeded")]
+    async fn rate_limit_secondary() {
+        simulate_rate_limit(&RateLimitTestParams {
+            secondary: true,
+            has_retry_interval: true,
+            ..Default::default()
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    #[ignore]
+    #[should_panic(expected = "REST API secondary rate limit exceeded")]
+    async fn rate_limit_bad_retry() {
+        simulate_rate_limit(&RateLimitTestParams {
+            secondary: true,
+            has_retry_interval: true,
+            bad_retry_interval: true,
+            ..Default::default()
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    #[ignore]
+    #[should_panic(expected = "REST API rate limit exceeded!")]
+    async fn rate_limit_primary() {
+        simulate_rate_limit(&RateLimitTestParams {
+            has_remaining_count: true,
+            has_reset_timestamp: true,
+            ..Default::default()
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    #[ignore]
+    #[should_panic(expected = "REST API rate limit exceeded!")]
+    async fn rate_limit_no_reset() {
+        simulate_rate_limit(&RateLimitTestParams {
+            has_remaining_count: true,
+            ..Default::default()
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    #[ignore]
+    #[should_panic(expected = "REST API rate limit exceeded!")]
+    async fn rate_limit_bad_reset() {
+        simulate_rate_limit(&RateLimitTestParams {
+            has_remaining_count: true,
+            has_reset_timestamp: true,
+            bad_reset_timestamp: true,
+            ..Default::default()
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn rate_limit_bad_count() {
+        simulate_rate_limit(&RateLimitTestParams {
+            has_remaining_count: true,
+            bad_remaining_count: true,
+            ..Default::default()
+        })
+        .await;
+    }
 }

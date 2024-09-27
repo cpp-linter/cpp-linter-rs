@@ -304,21 +304,17 @@ pub fn run_clang_tidy(
         log::Level::Debug,
         format!(
             "Output from clang-tidy:\n{}",
-            String::from_utf8(output.stdout.to_vec()).unwrap()
+            String::from_utf8_lossy(&output.stdout)
         ),
     ));
     if !output.stderr.is_empty() {
-        if let Ok(stderr) = String::from_utf8(output.stderr) {
-            logs.push((
-                log::Level::Debug,
-                format!("clang-tidy made the following summary:\n{}", stderr),
-            ));
-        } else {
-            logs.push((
-                log::Level::Error,
-                "clang-tidy stderr is not UTF-8 encoded".to_string(),
-            ));
-        }
+        logs.push((
+            log::Level::Debug,
+            format!(
+                "clang-tidy made the following summary:\n{}",
+                String::from_utf8_lossy(&output.stderr)
+            ),
+        ));
     }
     file.tidy_advice = parse_tidy_output(&output.stdout, &clang_params.database_json)?;
     if clang_params.tidy_review {

@@ -30,9 +30,9 @@ impl GithubApiClient {
         let pull_request = {
             match event_name.as_str() {
                 "pull_request" => {
-                    let event_payload_path = env::var("GITHUB_EVENT_PATH").with_context(|| {
-                        "GITHUB_EVENT_NAME is set to 'pull_request', but GITHUB_EVENT_PATH is not set"
-                    })?;
+                    // GITHUB_*** env vars cannot be overwritten in CI runners on GitHub.
+                    let event_payload_path = env::var("GITHUB_EVENT_PATH")?;
+                    // event payload JSON file can be overwritten/removed in CI runners
                     let file_buf = &mut String::new();
                     OpenOptions::new()
                         .read(true)
@@ -51,16 +51,15 @@ impl GithubApiClient {
                 _ => None,
             }
         };
+        // GITHUB_*** env vars cannot be overwritten in CI runners on GitHub.
         let gh_api_url = env::var("GITHUB_API_URL").unwrap_or("https://api.github.com".to_string());
-        let api_url = Url::parse(gh_api_url.clone().as_str())
-            .with_context(|| format!("Failed to parse URL from GITHUB_API_URL: {}", gh_api_url))?;
+        let api_url = Url::parse(gh_api_url.as_str())?;
 
         Ok(GithubApiClient {
             client: Client::builder()
                 .default_headers(Self::make_headers()?)
                 .user_agent(USER_AGENT)
-                .build()
-                .with_context(|| "Failed to create a session client for REST API calls")?,
+                .build()?,
             pull_request,
             event_name,
             api_url,
@@ -87,6 +86,7 @@ impl GithubApiClient {
     /// Append step summary to CI workflow's summary page.
     pub fn post_step_summary(&self, comment: &String) {
         if let Ok(gh_out) = env::var("GITHUB_STEP_SUMMARY") {
+            // step summary MD file can be overwritten/removed in CI runners
             if let Ok(mut gh_out_file) = OpenOptions::new().append(true).open(gh_out) {
                 if let Err(e) = writeln!(gh_out_file, "\n{}\n", comment) {
                     log::error!("Could not write to GITHUB_STEP_SUMMARY file: {}", e);

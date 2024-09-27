@@ -292,31 +292,31 @@ mod test {
         default::Default,
         env,
         io::Read,
-        path::PathBuf,
+        path::{Path, PathBuf},
         sync::{Arc, Mutex},
     };
 
-    use chrono::Utc;
-    use mockito::{Matcher, Server};
     use regex::Regex;
-    use reqwest::{Method, Url};
     use tempfile::{tempdir, NamedTempFile};
 
     use super::GithubApiClient;
     use crate::{
         clang_tools::capture_clang_tools_output,
         cli::{ClangParams, FeedbackInput, LinesChangedOnly},
-        common_fs::FileObj,
+        common_fs::{FileFilter, FileObj},
+        logger,
         rest_api::{RestApiClient, USER_OUTREACH},
     };
 
     // ************************* tests for step-summary and output variables
 
-    async fn create_comment(tidy_checks: &str, style: &str) -> (String, String) {
+    async fn create_comment(tidy_checks: &str, style: &str, fail_gh_out: bool) -> (String, String) {
         let tmp_dir = tempdir().unwrap();
         let rest_api_client = GithubApiClient::new().unwrap();
+        logger::init().unwrap();
         if env::var("ACTIONS_STEP_DEBUG").is_ok_and(|var| var == "true") {
             assert!(rest_api_client.debug_enabled);
+            log::set_max_level(log::LevelFilter::Debug);
         }
         let mut files = vec![Arc::new(Mutex::new(FileObj::new(PathBuf::from(
             "tests/demo/demo.cpp",
@@ -342,7 +342,14 @@ mod test {
         let mut step_summary_path = NamedTempFile::new_in(tmp_dir.path()).unwrap();
         env::set_var("GITHUB_STEP_SUMMARY", step_summary_path.path());
         let mut gh_out_path = NamedTempFile::new_in(tmp_dir.path()).unwrap();
-        env::set_var("GITHUB_OUTPUT", gh_out_path.path());
+        env::set_var(
+            "GITHUB_OUTPUT",
+            if fail_gh_out {
+                Path::new("not-a-file.txt")
+            } else {
+                gh_out_path.path()
+            },
+        );
         rest_api_client
             .post_feedback(&files, feedback_inputs)
             .await
@@ -354,13 +361,15 @@ mod test {
         assert!(&step_summary_content.contains(USER_OUTREACH));
         let mut gh_out_content = String::new();
         gh_out_path.read_to_string(&mut gh_out_content).unwrap();
-        assert!(gh_out_content.starts_with("checks-failed="));
+        if !fail_gh_out {
+            assert!(gh_out_content.starts_with("checks-failed="));
+        }
         (step_summary_content, gh_out_content)
     }
 
     #[tokio::test]
     async fn check_comment_concerns() {
-        let (comment, gh_out) = create_comment("readability-*", "file").await;
+        let (comment, gh_out) = create_comment("readability-*", "file", false).await;
         assert!(&comment.contains(":warning:\nSome files did not pass the configured checks!\n"));
         let fmt_pattern = Regex::new(r"format-checks-failed=(\d+)\n").unwrap();
         let tidy_pattern = Regex::new(r"tidy-checks-failed=(\d+)\n").unwrap();
@@ -380,7 +389,7 @@ mod test {
     #[tokio::test]
     async fn check_comment_lgtm() {
         env::set_var("ACTIONS_STEP_DEBUG", "true");
-        let (comment, gh_out) = create_comment("-*", "").await;
+        let (comment, gh_out) = create_comment("-*", "", false).await;
         assert!(&comment.contains(":heavy_check_mark:\nNo problems need attention."));
         assert_eq!(
             &gh_out,
@@ -388,53 +397,23 @@ mod test {
         );
     }
 
-    async fn simulate_rate_limit(secondary: bool) {
-        let mut server = Server::new_async().await;
-        let url = Url::parse(server.url().as_str()).unwrap();
-        env::set_var("GITHUB_API_URL", server.url());
-        let client = GithubApiClient::new().unwrap();
-        let reset_timestamp = (Utc::now().timestamp() + 60).to_string();
-        let mock = server
-            .mock("GET", "/")
-            .match_body(Matcher::Any)
-            .expect_at_least(1)
-            .expect_at_most(5)
-            .with_status(429)
-            .with_header(
-                &client.rate_limit_headers.remaining,
-                if secondary { "1" } else { "0" },
-            )
-            .with_header(&client.rate_limit_headers.reset, &reset_timestamp);
-        if secondary {
-            mock.with_header(&client.rate_limit_headers.retry, "0")
-                .create();
-        } else {
-            mock.create();
-        }
-        let request =
-            GithubApiClient::make_api_request(&client.client, url, Method::GET, None, None)
-                .unwrap();
-        GithubApiClient::send_api_request(
-            client.client.clone(),
-            request,
-            client.rate_limit_headers.clone(),
-            0,
-        )
-        .await
-        .unwrap();
+    #[tokio::test]
+    async fn fail_gh_output() {
+        env::set_var("ACTIONS_STEP_DEBUG", "true");
+        let (comment, gh_out) = create_comment("-*", "", true).await;
+        assert!(&comment.contains(":heavy_check_mark:\nNo problems need attention."));
+        assert_eq!(&gh_out, "");
     }
 
     #[tokio::test]
-    #[ignore]
-    #[should_panic(expected = "REST API secondary rate limit exceeded")]
-    async fn secondary_rate_limit() {
-        simulate_rate_limit(true).await;
-    }
-
-    #[tokio::test]
-    #[ignore]
-    #[should_panic(expected = "REST API rate limit exceeded!")]
-    async fn primary_rate_limit() {
-        simulate_rate_limit(false).await;
+    async fn fail_get_local_diff() {
+        env::set_var("CI", "false");
+        let tmp_dir = tempdir().unwrap();
+        env::set_current_dir(tmp_dir.path()).unwrap();
+        let rest_client = GithubApiClient::new().unwrap();
+        let files = rest_client
+            .get_list_of_changed_files(&FileFilter::new(&[], vec![]))
+            .await;
+        assert!(files.is_err())
     }
 }

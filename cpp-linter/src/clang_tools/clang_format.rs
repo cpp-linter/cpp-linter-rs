@@ -160,17 +160,13 @@ pub fn run_clang_format(
         .output()
         .with_context(|| format!("Failed to get replacements from clang-format: {file_name}"))?;
     if !output.stderr.is_empty() || !output.status.success() {
-        if let Ok(stderr) = String::from_utf8(output.stderr) {
-            logs.push((
-                log::Level::Debug,
-                format!("clang-format raised the follow errors:\n{}", stderr),
-            ));
-        } else {
-            logs.push((
-                log::Level::Error,
-                "stderr from clang-format was not UTF-8 encoded".to_string(),
-            ));
-        }
+        logs.push((
+            log::Level::Debug,
+            format!(
+                "clang-format raised the follow errors:\n{}",
+                String::from_utf8_lossy(&output.stderr)
+            ),
+        ));
     }
     if output.stdout.is_empty() {
         return Ok(logs);

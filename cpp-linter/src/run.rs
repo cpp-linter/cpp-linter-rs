@@ -146,7 +146,7 @@ mod test {
     use std::env;
 
     #[tokio::test]
-    async fn run() {
+    async fn normal() {
         env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
         let result = run_main(vec![
             "cpp-linter".to_string(),
@@ -161,14 +161,14 @@ mod test {
     }
 
     #[tokio::test]
-    async fn run_version_command() {
+    async fn version_command() {
         env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
         let result = run_main(vec!["cpp-linter".to_string(), "version".to_string()]).await;
         assert!(result.is_ok_and(|v| v == 0));
     }
 
     #[tokio::test]
-    async fn run_force_debug_output() {
+    async fn force_debug_output() {
         env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
         let result = run_main(vec![
             "cpp-linter".to_string(),
@@ -182,13 +182,26 @@ mod test {
     }
 
     #[tokio::test]
-    async fn run_bad_version_input() {
+    async fn bad_version_input() {
         env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
         let result = run_main(vec![
             "cpp-linter".to_string(),
             "-l".to_string(),
             "false".to_string(),
             "-V".to_string(),
+        ])
+        .await;
+        assert!(result.is_ok_and(|v| v == 1));
+    }
+
+    #[tokio::test]
+    async fn pre_commit_env() {
+        env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
+        env::set_var("PRE_COMMIT", "1");
+        let result = run_main(vec![
+            "cpp-linter".to_string(),
+            "-l".to_string(),
+            "false".to_string(),
         ])
         .await;
         assert!(result.is_ok_and(|v| v == 1));
