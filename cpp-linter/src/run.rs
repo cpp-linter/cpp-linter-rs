@@ -8,7 +8,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 // non-std crates
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use log::{set_max_level, LevelFilter};
 #[cfg(feature = "openssl-vendored")]
 use openssl_probe;
@@ -41,7 +41,7 @@ fn probe_ssl_certs() {
 /// is used instead of python's `sys.argv`, then the list of strings includes the entry point
 /// alias ("path/to/cpp-linter.exe"). Thus, the parser in [`crate::cli`] will halt on an error
 /// because it is not configured to handle positional arguments.
-pub async fn run_main(args: Vec<String>) -> Result<u8> {
+pub async fn run_main(args: Vec<String>) -> Result<()> {
     probe_ssl_certs();
 
     let arg_parser = get_arg_parser();
@@ -50,7 +50,7 @@ pub async fn run_main(args: Vec<String>) -> Result<u8> {
 
     if args.subcommand_matches("version").is_some() {
         println!("cpp-linter v{}", VERSION);
-        return Ok(0);
+        return Ok(());
     }
 
     logger::init().unwrap();
@@ -58,7 +58,7 @@ pub async fn run_main(args: Vec<String>) -> Result<u8> {
     if cli.version == "NO-VERSION" {
         log::error!("The `--version` arg is used to specify which version of clang to use.");
         log::error!("To get the cpp-linter version, use `cpp-linter version` sub-command.");
-        return Ok(1);
+        return Err(anyhow!("Clang version not specified."));
     }
 
     if cli.repo_root != "." {
@@ -135,9 +135,13 @@ pub async fn run_main(args: Vec<String>) -> Result<u8> {
         .await?;
     end_log_group();
     if env::var("PRE_COMMIT").is_ok_and(|v| v == "1") {
-        return Ok((checks_failed > 1) as u8);
+        if checks_failed > 1 {
+            return Err(anyhow!("Some checks did not pass"));
+        } else {
+            return Ok(());
+        }
     }
-    Ok(0)
+    Ok(())
 }
 
 #[cfg(test)]
@@ -157,14 +161,14 @@ mod test {
             "demo/demo.cpp".to_string(),
         ])
         .await;
-        assert!(result.is_ok_and(|v| v == 0));
+        assert!(result.is_ok());
     }
 
     #[tokio::test]
     async fn version_command() {
         env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
         let result = run_main(vec!["cpp-linter".to_string(), "version".to_string()]).await;
-        assert!(result.is_ok_and(|v| v == 0));
+        assert!(result.is_ok());
     }
 
     #[tokio::test]
@@ -178,7 +182,7 @@ mod test {
             "debug".to_string(),
         ])
         .await;
-        assert!(result.is_ok_and(|v| v == 0));
+        assert!(result.is_ok());
     }
 
     #[tokio::test]
@@ -191,7 +195,7 @@ mod test {
             "-V".to_string(),
         ])
         .await;
-        assert!(result.is_ok_and(|v| v == 1));
+        assert!(result.is_err());
     }
 
     #[tokio::test]
@@ -204,6 +208,6 @@ mod test {
             "false".to_string(),
         ])
         .await;
-        assert!(result.is_ok_and(|v| v == 1));
+        assert!(result.is_err());
     }
 }

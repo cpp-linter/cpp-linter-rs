@@ -5,7 +5,7 @@ use ::cpp_linter::run::run_main;
 
 /// A wrapper for the ``::cpp_linter::run::run_main()```
 #[pyfunction]
-fn main(args: Vec<String>) -> PyResult<u8> {
+fn main(args: Vec<String>) -> PyResult<()> {
     Builder::new_multi_thread()
         .enable_all()
         .build()
