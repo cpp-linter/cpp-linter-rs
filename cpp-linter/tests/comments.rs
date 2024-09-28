@@ -121,12 +121,11 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
                 200
             });
         if test_params.bad_existing_comments {
-            mock = mock.with_body(String::new()).create();
+            mock = mock.with_body(String::new());
         } else {
-            mock = mock
-                .with_body_from_file(format!("{asset_path}push_comments_{SHA}.json"))
-                .create();
+            mock = mock.with_body_from_file(format!("{asset_path}push_comments_{SHA}.json"));
         }
+        mock = mock.create();
         mocks.push(mock);
     } else {
         let pr_endpoint = format!("/repos/{REPO}/issues/{PR}/comments");
