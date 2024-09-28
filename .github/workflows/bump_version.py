@@ -120,7 +120,16 @@ def main():
     subprocess.run(["napi", "version"], cwd="node-binding", check=True)
     print("Updated version in node-binding/**package.json")
 
-    subprocess.run(["git", "cliff", "--tag", Updater.new_version], check=True)
+    subprocess.run(
+        [
+            "git-cliff",
+            "--config",
+            ".config/cliff.toml",
+            "--tag",
+            Updater.new_version,
+        ],
+        check=True,
+    )
     print("Updated CHANGELOG.md")
 
     subprocess.run(["git", "add", "--all"], check=True)

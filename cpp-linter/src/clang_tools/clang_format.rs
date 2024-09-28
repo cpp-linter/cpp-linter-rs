@@ -57,13 +57,15 @@ pub struct Replacement {
     ///
     /// This value is not provided by the XML output, but we calculate it after
     /// deserialization.
-    pub line: Option<usize>,
+    #[serde(default)]
+    pub line: usize,
 
     /// The column number on the line described by the [`Replacement::offset`].
     ///
     /// This value is not provided by the XML output, but we calculate it after
     /// deserialization.
-    pub cols: Option<usize>,
+    #[serde(default)]
+    pub cols: usize,
 }
 
 impl Clone for Replacement {
@@ -188,11 +190,12 @@ pub fn run_clang_format(
         });
     format_advice.patched = patched;
     if !format_advice.replacements.is_empty() {
+        // get line and column numbers from format_advice.offset
         let mut filtered_replacements = Vec::new();
         for replacement in &mut format_advice.replacements {
             let (line_number, columns) = get_line_cols_from_offset(&file.name, replacement.offset);
-            replacement.line = Some(line_number);
-            replacement.cols = Some(columns);
+            replacement.line = line_number;
+            replacement.cols = columns;
             for range in &ranges {
                 if range.contains(&line_number.try_into().unwrap_or(0)) {
                     filtered_replacements.push(replacement.clone());
@@ -233,29 +236,29 @@ mod tests {
                     offset: 113,
                     length: 5,
                     value: Some(String::from("\n      ")),
-                    line: None,
-                    cols: None,
+                    line: 0,
+                    cols: 0,
                 },
                 Replacement {
                     offset: 147,
                     length: 0,
                     value: Some(String::from(" ")),
-                    line: None,
-                    cols: None,
+                    line: 0,
+                    cols: 0,
                 },
                 Replacement {
                     offset: 161,
                     length: 0,
                     value: None,
-                    line: None,
-                    cols: None,
+                    line: 0,
+                    cols: 0,
                 },
                 Replacement {
                     offset: 165,
                     length: 19,
                     value: Some(String::from("\n\n")),
-                    line: None,
-                    cols: None,
+                    line: 0,
+                    cols: 0,
                 },
             ],
             patched: None,

@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 // non-std crates
-use anyhow::{anyhow, Context, Error, Result};
+use anyhow::{anyhow, Error, Result};
 use chrono::DateTime;
 use futures::future::{BoxFuture, FutureExt};
 use reqwest::header::{HeaderMap, HeaderValue};
@@ -85,7 +85,6 @@ pub trait RestApiClient {
         data: Option<String>,
         headers: Option<HeaderMap>,
     ) -> Result<Request> {
-        let url_str = url.as_str().to_string();
         let mut req = client.request(method, url);
         if let Some(h) = headers {
             req = req.headers(h);
@@ -93,8 +92,9 @@ pub trait RestApiClient {
         if let Some(d) = data {
             req = req.body(d);
         }
-        req.build()
-            .with_context(|| format!("Failed to build request to {url_str}"))
+        // RequestBuilder only fails to `build()` if there is a malformed `url`. We
+        // should be safe here because of this function's `url` parameter type.
+        req.build().map_err(Error::from)
     }
 
     /// A convenience function to send HTTP requests and respect a REST API rate limits.
@@ -574,7 +574,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore]
     #[should_panic(expected = "REST API secondary rate limit exceeded")]
     async fn rate_limit_secondary() {
         simulate_rate_limit(&RateLimitTestParams {
@@ -586,7 +585,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore]
     #[should_panic(expected = "REST API secondary rate limit exceeded")]
     async fn rate_limit_bad_retry() {
         simulate_rate_limit(&RateLimitTestParams {
@@ -599,7 +597,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore]
     #[should_panic(expected = "REST API rate limit exceeded!")]
     async fn rate_limit_primary() {
         simulate_rate_limit(&RateLimitTestParams {
@@ -611,7 +608,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore]
     #[should_panic(expected = "REST API rate limit exceeded!")]
     async fn rate_limit_no_reset() {
         simulate_rate_limit(&RateLimitTestParams {
@@ -622,7 +618,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore]
     #[should_panic(expected = "REST API rate limit exceeded!")]
     async fn rate_limit_bad_reset() {
         simulate_rate_limit(&RateLimitTestParams {
@@ -635,7 +630,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn rate_limit_bad_count() {
         simulate_rate_limit(&RateLimitTestParams {
             has_remaining_count: true,

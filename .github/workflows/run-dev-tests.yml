@@ -88,7 +88,7 @@ jobs:
         if: runner.os == 'Linux'
         env:
           CLANG_VERSION: '7'
-        run: just test
+        run: just test ci
 
       - name: Install clang v8
         if: runner.os == 'Linux'
@@ -100,7 +100,7 @@ jobs:
         if: runner.os == 'Linux'
         env:
           CLANG_VERSION: '8'
-        run: just test
+        run: just test ci
 
       - name: Install clang v9
         uses: cpp-linter/cpp_linter_rs/install-clang-action@main
@@ -110,7 +110,7 @@ jobs:
       - name: Collect Coverage for clang v9
         env:
           CLANG_VERSION: '9'
-        run: just test
+        run: just test ci
 
       - name: Install clang v10
         uses: cpp-linter/cpp_linter_rs/install-clang-action@main
@@ -120,7 +120,7 @@ jobs:
       - name: Collect Coverage for clang v10
         env:
           CLANG_VERSION: '10'
-        run: just test
+        run: just test ci
 
       - name: Install clang 11
         uses: cpp-linter/cpp_linter_rs/install-clang-action@main
@@ -130,7 +130,7 @@ jobs:
       - name: Collect Coverage for clang v11
         env:
           CLANG_VERSION: '11'
-        run: just test
+        run: just test ci
 
       - name: Install clang 12
         uses: cpp-linter/cpp_linter_rs/install-clang-action@main
@@ -140,7 +140,7 @@ jobs:
       - name: Collect Coverage for clang v12
         env:
           CLANG_VERSION: '12'
-        run: just test
+        run: just test ci
 
       - name: Install clang 13
         uses: cpp-linter/cpp_linter_rs/install-clang-action@main
@@ -150,7 +150,7 @@ jobs:
       - name: Collect Coverage for clang v13
         env:
           CLANG_VERSION: '13'
-        run: just test
+        run: just test ci
 
       - name: Install clang 14
         uses: cpp-linter/cpp_linter_rs/install-clang-action@main
@@ -160,7 +160,7 @@ jobs:
       - name: Collect Coverage for clang v14
         env:
           CLANG_VERSION: '14'
-        run: just test
+        run: just test ci
 
       - name: Install clang 15
         uses: cpp-linter/cpp_linter_rs/install-clang-action@main
@@ -170,7 +170,7 @@ jobs:
       - name: Collect Coverage for clang v15
         env:
           CLANG_VERSION: '15'
-        run: just test
+        run: just test ci
 
       - name: Install clang 16
         uses: cpp-linter/cpp_linter_rs/install-clang-action@main
@@ -180,7 +180,7 @@ jobs:
       - name: Collect Coverage for clang v16
         env:
           CLANG_VERSION: '16'
-        run: just test
+        run: just test ci
 
       - name: Install clang 17
         uses: cpp-linter/cpp_linter_rs/install-clang-action@main
@@ -190,7 +190,7 @@ jobs:
       - name: Collect Coverage for clang v17
         env:
           CLANG_VERSION: '17'
-        run: just test
+        run: just test ci
 
       - name: Install clang 18
         uses: cpp-linter/cpp_linter_rs/install-clang-action@main
@@ -200,7 +200,7 @@ jobs:
       - name: Collect Coverage for clang v18
         env:
           CLANG_VERSION: '18'
-        run: just test --run-ignored=all
+        run: just test all
 
       - name: Generate Coverage HTML report
         run: just pretty-cov

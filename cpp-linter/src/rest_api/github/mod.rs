@@ -301,8 +301,11 @@ mod test {
 
     use super::GithubApiClient;
     use crate::{
-        clang_tools::capture_clang_tools_output,
-        cli::{ClangParams, FeedbackInput, LinesChangedOnly},
+        clang_tools::{
+            clang_format::{FormatAdvice, Replacement},
+            clang_tidy::{TidyAdvice, TidyNotification},
+        },
+        cli::FeedbackInput,
         common_fs::{FileFilter, FileObj},
         logger,
         rest_api::{RestApiClient, USER_OUTREACH},
@@ -310,7 +313,11 @@ mod test {
 
     // ************************* tests for step-summary and output variables
 
-    async fn create_comment(tidy_checks: &str, style: &str, fail_gh_out: bool) -> (String, String) {
+    async fn create_comment(
+        is_lgtm: bool,
+        fail_gh_out: bool,
+        fail_summary: bool,
+    ) -> (String, String) {
         let tmp_dir = tempdir().unwrap();
         let rest_api_client = GithubApiClient::new().unwrap();
         logger::init().unwrap();
@@ -318,29 +325,57 @@ mod test {
             assert!(rest_api_client.debug_enabled);
             log::set_max_level(log::LevelFilter::Debug);
         }
-        let mut files = vec![Arc::new(Mutex::new(FileObj::new(PathBuf::from(
-            "tests/demo/demo.cpp",
-        ))))];
-        let mut clang_params = ClangParams {
-            tidy_checks: tidy_checks.to_string(),
-            lines_changed_only: LinesChangedOnly::Off,
-            style: style.to_string(),
-            ..Default::default()
-        };
-        capture_clang_tools_output(
-            &mut files,
-            env::var("CLANG-VERSION").unwrap_or("".to_string()).as_str(),
-            &mut clang_params,
-        )
-        .await
-        .unwrap();
+        let mut files = vec![];
+        if !is_lgtm {
+            for _i in 0..65535 {
+                let filename = String::from("tests/demo/demo.cpp");
+                let mut file = FileObj::new(PathBuf::from(&filename));
+                let notes = vec![TidyNotification {
+                    filename,
+                    line: 0,
+                    cols: 0,
+                    severity: String::from("note"),
+                    rationale: String::from("A test dummy rationale"),
+                    diagnostic: String::from("clang-diagnostic-warning"),
+                    suggestion: vec![],
+                    fixed_lines: vec![],
+                }];
+                file.tidy_advice = Some(TidyAdvice {
+                    notes,
+                    patched: None,
+                });
+                let replacements = vec![Replacement {
+                    offset: 0,
+                    length: 0,
+                    value: Some(String::new()),
+                    line: 1,
+                    cols: 1,
+                }];
+                file.format_advice = Some(FormatAdvice {
+                    replacements,
+                    patched: None,
+                });
+                files.push(Arc::new(Mutex::new(file)));
+            }
+        }
         let feedback_inputs = FeedbackInput {
-            style: style.to_string(),
+            style: if is_lgtm {
+                String::new()
+            } else {
+                String::from("file")
+            },
             step_summary: true,
             ..Default::default()
         };
         let mut step_summary_path = NamedTempFile::new_in(tmp_dir.path()).unwrap();
-        env::set_var("GITHUB_STEP_SUMMARY", step_summary_path.path());
+        env::set_var(
+            "GITHUB_STEP_SUMMARY",
+            if fail_summary {
+                Path::new("not-a-file.txt")
+            } else {
+                step_summary_path.path()
+            },
+        );
         let mut gh_out_path = NamedTempFile::new_in(tmp_dir.path()).unwrap();
         env::set_var(
             "GITHUB_OUTPUT",
@@ -358,7 +393,9 @@ mod test {
         step_summary_path
             .read_to_string(&mut step_summary_content)
             .unwrap();
-        assert!(&step_summary_content.contains(USER_OUTREACH));
+        if !fail_summary {
+            assert!(&step_summary_content.contains(USER_OUTREACH));
+        }
         let mut gh_out_content = String::new();
         gh_out_path.read_to_string(&mut gh_out_content).unwrap();
         if !fail_gh_out {
@@ -369,7 +406,7 @@ mod test {
 
     #[tokio::test]
     async fn check_comment_concerns() {
-        let (comment, gh_out) = create_comment("readability-*", "file", false).await;
+        let (comment, gh_out) = create_comment(false, false, false).await;
         assert!(&comment.contains(":warning:\nSome files did not pass the configured checks!\n"));
         let fmt_pattern = Regex::new(r"format-checks-failed=(\d+)\n").unwrap();
         let tidy_pattern = Regex::new(r"tidy-checks-failed=(\d+)\n").unwrap();
@@ -389,10 +426,10 @@ mod test {
     #[tokio::test]
     async fn check_comment_lgtm() {
         env::set_var("ACTIONS_STEP_DEBUG", "true");
-        let (comment, gh_out) = create_comment("-*", "", false).await;
-        assert!(&comment.contains(":heavy_check_mark:\nNo problems need attention."));
+        let (comment, gh_out) = create_comment(true, false, false).await;
+        assert!(comment.contains(":heavy_check_mark:\nNo problems need attention."));
         assert_eq!(
-            &gh_out,
+            gh_out,
             "checks-failed=0\nformat-checks-failed=0\ntidy-checks-failed=0\n"
         );
     }
@@ -400,9 +437,20 @@ mod test {
     #[tokio::test]
     async fn fail_gh_output() {
         env::set_var("ACTIONS_STEP_DEBUG", "true");
-        let (comment, gh_out) = create_comment("-*", "", true).await;
+        let (comment, gh_out) = create_comment(true, true, false).await;
         assert!(&comment.contains(":heavy_check_mark:\nNo problems need attention."));
-        assert_eq!(&gh_out, "");
+        assert!(gh_out.is_empty());
+    }
+
+    #[tokio::test]
+    async fn fail_gh_summary() {
+        env::set_var("ACTIONS_STEP_DEBUG", "true");
+        let (comment, gh_out) = create_comment(true, false, true).await;
+        assert!(comment.is_empty());
+        assert_eq!(
+            gh_out,
+            "checks-failed=0\nformat-checks-failed=0\ntidy-checks-failed=0\n"
+        );
     }
 
     #[tokio::test]

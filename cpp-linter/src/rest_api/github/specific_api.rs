@@ -94,8 +94,9 @@ impl GithubApiClient {
                 if let Err(e) = writeln!(gh_out_file, "\n{}\n", comment) {
                     log::error!("Could not write to GITHUB_STEP_SUMMARY file: {}", e);
                 }
+            } else {
+                log::error!("GITHUB_STEP_SUMMARY file could not be opened");
             }
-            log::error!("GITHUB_STEP_SUMMARY file could not be opened");
         }
     }
 
@@ -110,10 +111,8 @@ impl GithubApiClient {
                 // assemble a list of line numbers
                 let mut lines: Vec<usize> = Vec::new();
                 for replacement in &format_advice.replacements {
-                    if let Some(line_int) = replacement.line {
-                        if !lines.contains(&line_int) {
-                            lines.push(line_int);
-                        }
+                    if !lines.contains(&replacement.line) {
+                        lines.push(replacement.line);
                     }
                 }
                 // post annotation if any applicable lines were formatted

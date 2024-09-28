@@ -415,7 +415,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn with_no_changed_sources() {
         // commit with no modified C/C++ sources
         let sha = "0c236809891000b16952576dc34de082d7a40bf3";
@@ -430,7 +429,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn with_changed_sources() {
         // commit with modified C/C++ sources
         let sha = "950ff0b690e1903797c303c5fc8d9f3b52f1d3c5";
@@ -450,7 +448,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn with_staged_changed_sources() {
         // commit with no modified C/C++ sources
         let sha = "0c236809891000b16952576dc34de082d7a40bf3";
