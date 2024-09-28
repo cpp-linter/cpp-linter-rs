@@ -1,6 +1,7 @@
 //! This submodule implements functionality exclusively specific to Github's REST API.
 
 use std::{
+    collections::HashMap,
     env,
     fs::OpenOptions,
     io::{Read, Write},
@@ -149,7 +150,8 @@ impl GithubApiClient {
             .remove_bot_comments(&url, !update_only || (is_lgtm && no_lgtm))
             .await?;
         if !is_lgtm || !no_lgtm {
-            // log::debug!("payload body:\n{:?}", comment);
+            let payload = HashMap::from([("body", comment)]);
+            // log::debug!("payload body:\n{:?}", payload);
             let req_meth = if comment_url.is_some() {
                 Method::PATCH
             } else {
@@ -159,7 +161,7 @@ impl GithubApiClient {
                 &self.client,
                 comment_url.unwrap_or(url),
                 req_meth,
-                Some(format!(r#"{{"body":"{comment}"}}"#)),
+                Some(serde_json::json!(&payload).to_string()),
                 None,
             )?;
             match Self::send_api_request(
