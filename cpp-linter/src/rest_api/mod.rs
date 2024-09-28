@@ -109,10 +109,11 @@ pub trait RestApiClient {
         client: Client,
         request: Request,
         rate_limit_headers: RestApiRateLimitHeaders,
-        retries: u64,
+        retries: u8,
     ) -> impl Future<Output = Result<Response>> + Send {
         async move {
-            for i in retries..5 {
+            static MAX_RETRIES: u8 = 5;
+            for i in retries..MAX_RETRIES {
                 let result = client
                     .execute(request.try_clone().ok_or(anyhow!(
                         "Failed to clone request object for recursive behavior"
@@ -168,14 +169,11 @@ pub trait RestApiClient {
                         }
 
                         // check if secondary rate limit is violated; backoff and try again.
-                        if i >= 4 {
-                            break;
-                        }
                         if let Some(retry_value) = response.headers().get(&rate_limit_headers.retry)
                         {
                             if let Ok(retry_str) = retry_value.to_str() {
                                 if let Ok(retry) = retry_str.parse::<u64>() {
-                                    let interval = Duration::from_secs(retry + i.pow(2));
+                                    let interval = Duration::from_secs(retry + (i as u64).pow(2));
                                     tokio::time::sleep(interval).await;
                                 } else {
                                     log::debug!(
@@ -190,7 +188,9 @@ pub trait RestApiClient {
                 }
                 return result.map_err(Error::from);
             }
-            Err(anyhow!("REST API secondary rate limit exceeded"))
+            Err(anyhow!(
+                "REST API secondary rate limit exceeded after {MAX_RETRIES} retries."
+            ))
         }
     }
 
