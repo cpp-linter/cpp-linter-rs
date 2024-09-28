@@ -93,7 +93,7 @@ fn analyze_single_file(
 ) -> Result<(PathBuf, Vec<(log::Level, String)>)> {
     let mut file = file
         .lock()
-        .map_err(|_| anyhow!("File mutex is already locked!"))?;
+        .map_err(|_| anyhow!("Failed to lock file mutex"))?;
     let mut logs = vec![];
     if clang_params.clang_tidy_command.is_some() {
         if clang_params
@@ -174,11 +174,9 @@ pub async fn capture_clang_tools_output(
     if let Some(db_path) = &clang_params.database {
         if let Ok(db_str) = fs::read(db_path.join("compile_commands.json")) {
             clang_params.database_json = Some(
-                serde_json::from_str::<Vec<CompilationUnit>>(
-                    // A compilation database should be UTF-8 encoded. Its safe to `unwrap()`
-                    String::from_utf8(db_str).unwrap().as_str(),
-                )
-                .with_context(|| "Failed to parse compile_commands.json")?,
+                // A compilation database should be UTF-8 encoded, but file paths are not; use lossy conversion.
+                serde_json::from_str::<Vec<CompilationUnit>>(&String::from_utf8_lossy(&db_str))
+                    .with_context(|| "Failed to parse compile_commands.json")?,
             )
         }
     };
