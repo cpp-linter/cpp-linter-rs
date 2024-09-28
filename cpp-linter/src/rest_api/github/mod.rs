@@ -9,7 +9,7 @@ use std::io::Write;
 use std::sync::{Arc, Mutex};
 
 // non-std crates
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use reqwest::{
     header::{HeaderMap, HeaderValue, AUTHORIZATION},
     Client, Method, Url,
@@ -35,7 +35,7 @@ pub struct GithubApiClient {
     client: Client,
 
     /// The CI run's event payload from the webhook that triggered the workflow.
-    pull_request: Option<i64>,
+    pull_request: i64,
 
     /// The name of the event that was triggered when running cpp_linter.
     pub event_name: String,
@@ -52,6 +52,7 @@ pub struct GithubApiClient {
     /// The value of the `ACTIONS_STEP_DEBUG` environment variable.
     pub debug_enabled: bool,
 
+    /// The response header names that describe the rate limit status.
     rate_limit_headers: RestApiRateLimitHeaders,
 }
 
@@ -116,7 +117,7 @@ impl RestApiClient for GithubApiClient {
         {
             // get diff from Github REST API
             let is_pr = self.event_name == "pull_request";
-            let pr = self.pull_request.unwrap_or(-1).to_string();
+            let pr = self.pull_request.to_string();
             let sha = self.sha.clone().unwrap();
             let url = self
                 .api_url
@@ -134,33 +135,26 @@ impl RestApiClient for GithubApiClient {
                 None,
                 Some(diff_header),
             )?;
-            match Self::send_api_request(
+            let response = Self::send_api_request(
                 self.client.clone(),
                 request,
                 self.rate_limit_headers.to_owned(),
                 0,
             )
             .await
-            {
-                Ok(response) => {
-                    if response.status().is_success() {
-                        Ok(parse_diff_from_buf(&response.bytes().await?, file_filter))
-                    } else {
-                        let endpoint = if is_pr {
-                            Url::parse(format!("{}/files", url.as_str()).as_str())?
-                        } else {
-                            url
-                        };
-                        Self::log_response(response, "Failed to get full diff for event").await;
-                        log::debug!("Trying paginated request to {}", endpoint.as_str());
-                        self.get_changed_files_paginated(endpoint, file_filter)
-                            .await
-                    }
-                }
-                Err(e) => Err(anyhow!(
-                    "Failed to connect with GitHub server to get list of changed files."
-                )
-                .context(e)),
+            .with_context(|| "Failed to get list of changed files from GitHub server.")?;
+            if response.status().is_success() {
+                Ok(parse_diff_from_buf(&response.bytes().await?, file_filter))
+            } else {
+                let endpoint = if is_pr {
+                    Url::parse(format!("{}/files", url.as_str()).as_str())?
+                } else {
+                    url
+                };
+                Self::log_response(response, "Failed to get full diff for event").await;
+                log::debug!("Trying paginated request to {}", endpoint.as_str());
+                self.get_changed_files_paginated(endpoint, file_filter)
+                    .await
             }
         } else {
             // get diff from libgit2 API
@@ -257,7 +251,7 @@ impl RestApiClient for GithubApiClient {
             }
             if let Some(repo) = &self.repo {
                 let is_pr = self.event_name == "pull_request";
-                let pr = self.pull_request.unwrap_or(-1).to_string() + "/";
+                let pr = self.pull_request.to_string() + "/";
                 let sha = self.sha.clone().unwrap() + "/";
                 let comments_url = self
                     .api_url

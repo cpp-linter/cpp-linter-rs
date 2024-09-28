@@ -70,8 +70,8 @@ pub trait RestApiClient {
     /// let response = Self::send_api_request(
     ///     self.client.clone(),
     ///     request,
-    ///     false, // false means don't panic
-    ///     0, // start recursion count at 0
+    ///     self.rest_api_headers.clone(),
+    ///     0, // start recursion count at 0 (max iterations is 4)
     /// );
     /// match response.await {
     ///     Some(res) => {/* handle response */}
@@ -102,6 +102,10 @@ pub trait RestApiClient {
     /// This method must own all the data passed to it because asynchronous recursion is used.
     /// Recursion is needed when a secondary rate limit is hit. The server tells the client that
     /// it should back off and retry after a specified time interval.
+    ///
+    /// Note, pass `0` to the `retries` parameter, which is used to count recursive iterations.
+    /// This function will recur a maximum of 4 times, and this only happens when the response's
+    /// headers includes a retry interval.
     fn send_api_request(
         client: Client,
         request: Request,

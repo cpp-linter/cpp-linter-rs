@@ -42,6 +42,7 @@ struct TestParams {
     pub fail_get_existing_comments: bool,
     pub fail_dismissal: bool,
     pub fail_posting: bool,
+    pub bad_existing_comments: bool,
 }
 
 impl Default for TestParams {
@@ -55,6 +56,7 @@ impl Default for TestParams {
             fail_get_existing_comments: false,
             fail_dismissal: false,
             fail_posting: false,
+            bad_existing_comments: false,
         }
     }
 }
@@ -102,26 +104,30 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
         );
     }
     if test_params.event_t == EventType::Push {
-        mocks.push(
-            server
-                .mock(
-                    "GET",
-                    format!("/repos/{REPO}/commits/{SHA}/comments").as_str(),
-                )
-                .match_header("Accept", "application/vnd.github.raw+json")
-                .match_header("Authorization", format!("token {TOKEN}").as_str())
-                .match_body(Matcher::Any)
-                .match_query(Matcher::UrlEncoded("page".to_string(), "1".to_string()))
+        let mut mock = server
+            .mock(
+                "GET",
+                format!("/repos/{REPO}/commits/{SHA}/comments").as_str(),
+            )
+            .match_header("Accept", "application/vnd.github.raw+json")
+            .match_header("Authorization", format!("token {TOKEN}").as_str())
+            .match_body(Matcher::Any)
+            .match_query(Matcher::UrlEncoded("page".to_string(), "1".to_string()))
+            .with_header(REMAINING_RATE_LIMIT_HEADER, "50")
+            .with_header(RESET_RATE_LIMIT_HEADER, reset_timestamp.as_str())
+            .with_status(if test_params.fail_get_existing_comments {
+                403
+            } else {
+                200
+            });
+        if test_params.bad_existing_comments {
+            mock = mock.with_body(String::new()).create();
+        } else {
+            mock = mock
                 .with_body_from_file(format!("{asset_path}push_comments_{SHA}.json"))
-                .with_header(REMAINING_RATE_LIMIT_HEADER, "50")
-                .with_header(RESET_RATE_LIMIT_HEADER, reset_timestamp.as_str())
-                .with_status(if test_params.fail_get_existing_comments {
-                    403
-                } else {
-                    200
-                })
-                .create(),
-        );
+                .create();
+        }
+        mocks.push(mock);
     } else {
         let pr_endpoint = format!("/repos/{REPO}/issues/{PR}/comments");
         for pg in ["1", "2"] {
@@ -155,7 +161,7 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
         }
     );
 
-    if !test_params.fail_get_existing_comments {
+    if !test_params.fail_get_existing_comments && !test_params.bad_existing_comments {
         mocks.push(
             server
                 .mock("DELETE", comment_url.as_str())
@@ -193,7 +199,10 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
         );
     }
 
-    if test_params.thread_comments == ThreadComments::On && lgtm_allowed {
+    if test_params.thread_comments == ThreadComments::On
+        && lgtm_allowed
+        && !test_params.bad_existing_comments
+    {
         mocks.push(
             server
                 .mock(
@@ -401,6 +410,16 @@ async fn fail_posting() {
     test_comment(&TestParams {
         lines_changed_only: LinesChangedOnly::Diff,
         fail_posting: true,
+        ..Default::default()
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn bad_existing_comments() {
+    test_comment(&TestParams {
+        bad_existing_comments: true,
+        force_lgtm: true,
         ..Default::default()
     })
     .await;
