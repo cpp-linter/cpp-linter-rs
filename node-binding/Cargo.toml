@@ -19,6 +19,7 @@ crate-type = ["cdylib"]
 napi = { version = "2.12.2", default-features = false, features = ["napi4", "async"] }
 napi-derive = "2.12.2"
 cpp-linter = { path = "../cpp-linter" }
+anyhow = "1.0.89"
 
 [features]
 openssl-vendored = ["cpp-linter/openssl-vendored"]

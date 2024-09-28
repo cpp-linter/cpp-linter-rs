@@ -360,6 +360,7 @@ dependencies = [
 name = "cpp-linter-js"
 version = "2.0.0-rc4"
 dependencies = [
+ "anyhow",
  "cpp-linter",
  "napi",
  "napi-build",
