@@ -212,13 +212,11 @@ jobs:
           path: target/llvm-cov-pretty
 
       - name: Generate Coverage lcov report
-        if: runner.os == 'Linux'
         run: |
           rm coverage.json
           just lcov
 
       - uses: codecov/codecov-action@v4
-        if: runner.os == 'Linux'
         with:
           token: ${{secrets.CODECOV_TOKEN}}
           files: lcov.info
