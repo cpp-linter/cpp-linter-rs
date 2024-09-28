@@ -11,16 +11,11 @@ use cpp_linter::{
 };
 use std::{env, io::Write, path::Path};
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Default)]
 enum EventType {
+    #[default]
     Push,
     PullRequest,
-}
-
-impl Default for EventType {
-    fn default() -> Self {
-        Self::Push
-    }
 }
 
 #[derive(Default)]
