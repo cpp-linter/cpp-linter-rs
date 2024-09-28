@@ -225,63 +225,70 @@ impl GithubApiClient {
                     comments_url = Self::try_next_page(response.headers());
                     let payload =
                         serde_json::from_str::<Vec<ThreadComment>>(&response.text().await?);
-                    if let Err(e) = payload {
-                        log::error!(
-                            "Failed to deserialize list of existing thread comments: {e:?}"
-                        );
-                        continue;
-                    }
-                    for comment in payload.unwrap() {
-                        if comment.body.starts_with(COMMENT_MARKER) {
-                            log::debug!(
-                                "Found cpp-linter comment id {} from user {} ({})",
-                                comment.id,
-                                comment.user.login,
-                                comment.user.id,
+                    match payload {
+                        Err(e) => {
+                            log::error!(
+                                "Failed to deserialize list of existing thread comments: {e:?}"
                             );
-                            let this_comment_url =
-                                Url::parse(format!("{base_comment_url}/{}", comment.id).as_str())?;
-                            if delete || comment_url.is_some() {
-                                // if not updating: remove all outdated comments
-                                // if updating: remove all outdated comments except the last one
+                            continue;
+                        }
+                        Ok(payload) => {
+                            for comment in payload {
+                                if comment.body.starts_with(COMMENT_MARKER) {
+                                    log::debug!(
+                                        "Found cpp-linter comment id {} from user {} ({})",
+                                        comment.id,
+                                        comment.user.login,
+                                        comment.user.id,
+                                    );
+                                    let this_comment_url = Url::parse(
+                                        format!("{base_comment_url}/{}", comment.id).as_str(),
+                                    )?;
+                                    if delete || comment_url.is_some() {
+                                        // if not updating: remove all outdated comments
+                                        // if updating: remove all outdated comments except the last one
 
-                                // use last saved comment_url (if not None) or current comment url
-                                let del_url = if let Some(last_url) = &comment_url {
-                                    last_url
-                                } else {
-                                    &this_comment_url
-                                };
-                                let req = Self::make_api_request(
-                                    &self.client,
-                                    del_url.as_str(),
-                                    Method::DELETE,
-                                    None,
-                                    None,
-                                )?;
-                                match Self::send_api_request(
-                                    self.client.clone(),
-                                    req,
-                                    self.rate_limit_headers.to_owned(),
-                                    0,
-                                )
-                                .await
-                                {
-                                    Ok(result) => {
-                                        if !result.status().is_success() {
-                                            Self::log_response(
-                                                result,
-                                                "Failed to delete old thread comment",
-                                            )
-                                            .await;
+                                        // use last saved comment_url (if not None) or current comment url
+                                        let del_url = if let Some(last_url) = &comment_url {
+                                            last_url
+                                        } else {
+                                            &this_comment_url
+                                        };
+                                        let req = Self::make_api_request(
+                                            &self.client,
+                                            del_url.as_str(),
+                                            Method::DELETE,
+                                            None,
+                                            None,
+                                        )?;
+                                        match Self::send_api_request(
+                                            self.client.clone(),
+                                            req,
+                                            self.rate_limit_headers.to_owned(),
+                                            0,
+                                        )
+                                        .await
+                                        {
+                                            Ok(result) => {
+                                                if !result.status().is_success() {
+                                                    Self::log_response(
+                                                        result,
+                                                        "Failed to delete old thread comment",
+                                                    )
+                                                    .await;
+                                                }
+                                            }
+                                            Err(e) => {
+                                                log::error!(
+                                                    "Failed to delete old thread comment: {e:?}"
+                                                )
+                                            }
                                         }
                                     }
-                                    Err(e) => {
-                                        log::error!("Failed to delete old thread comment: {e:?}")
+                                    if !delete {
+                                        comment_url = Some(this_comment_url)
                                     }
                                 }
-                            }
-                            if !delete {
-                                comment_url = Some(this_comment_url)
                             }
                         }
                     }
