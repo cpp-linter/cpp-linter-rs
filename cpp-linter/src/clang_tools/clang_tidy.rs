@@ -9,6 +9,7 @@ use std::{
     sync::{Arc, Mutex, MutexGuard},
 };
 
+use anyhow::{Context, Result};
 // non-std crates
 use regex::Regex;
 use serde::Deserialize;
@@ -132,7 +133,7 @@ impl MakeSuggestions for TidyAdvice {
 fn parse_tidy_output(
     tidy_stdout: &[u8],
     database_json: &Option<Vec<CompilationUnit>>,
-) -> Option<TidyAdvice> {
+) -> Result<Option<TidyAdvice>> {
     let note_header = Regex::new(r"^(.+):(\d+):(\d+):\s(\w+):(.*)\[([a-zA-Z\d\-\.]+)\]$").unwrap();
     let fixed_note =
         Regex::new(r"^.+:(\d+):\d+:\snote: FIX-IT applied suggested code changes$").unwrap();
@@ -178,14 +179,15 @@ fn parse_tidy_output(
                 // likely not a member of the project's sources (ie /usr/include/stdio.h)
                 filename = filename
                     .strip_prefix(&cur_dir)
-                    .expect("cannot determine filename by relative path.")
+                    // we already checked above that filename.starts_with(current_directory)
+                    .unwrap()
                     .to_path_buf();
             }
 
             notification = Some(TidyNotification {
                 filename: filename.to_string_lossy().to_string().replace('\\', "/"),
-                line: captured[2].parse::<u32>().unwrap(),
-                cols: captured[3].parse::<u32>().unwrap(),
+                line: captured[2].parse()?,
+                cols: captured[3].parse()?,
                 severity: String::from(&captured[4]),
                 rationale: String::from(&captured[5]).trim().to_string(),
                 diagnostic: String::from(&captured[6]),
@@ -195,9 +197,7 @@ fn parse_tidy_output(
             // begin capturing subsequent lines as suggestions
             found_fix = false;
         } else if let Some(capture) = fixed_note.captures(line) {
-            let fixed_line = capture[1]
-                .parse()
-                .expect("Failed to parse fixed line number's string as integer");
+            let fixed_line = capture[1].parse()?;
             if let Some(note) = &mut notification {
                 if !note.fixed_lines.contains(&fixed_line) {
                     note.fixed_lines.push(fixed_line);
@@ -219,12 +219,12 @@ fn parse_tidy_output(
         result.push(note);
     }
     if result.is_empty() {
-        None
+        Ok(None)
     } else {
-        Some(TidyAdvice {
+        Ok(Some(TidyAdvice {
             notes: result,
             patched: None,
-        })
+        }))
     }
 }
 
@@ -249,7 +249,7 @@ pub fn tally_tidy_advice(files: &[Arc<Mutex<FileObj>>]) -> u64 {
 pub fn run_clang_tidy(
     file: &mut MutexGuard<FileObj>,
     clang_params: &ClangParams,
-) -> Vec<(log::Level, std::string::String)> {
+) -> Result<Vec<(log::Level, std::string::String)>> {
     let mut cmd = Command::new(clang_params.clang_tidy_command.as_ref().unwrap());
     let mut logs = vec![];
     if !clang_params.tidy_checks.is_empty() {
@@ -258,19 +258,15 @@ pub fn run_clang_tidy(
     if let Some(db) = &clang_params.database {
         cmd.args(["-p", &db.to_string_lossy()]);
     }
-    if let Some(extras) = &clang_params.extra_args {
-        for arg in extras {
-            cmd.args(["--extra-arg", format!("\"{}\"", arg).as_str()]);
-        }
+    for arg in &clang_params.extra_args {
+        cmd.args(["--extra-arg", format!("\"{}\"", arg).as_str()]);
     }
+    let file_name = file.name.to_string_lossy().to_string();
     if clang_params.lines_changed_only != LinesChangedOnly::Off {
         let ranges = file.get_ranges(&clang_params.lines_changed_only);
         let filter = format!(
             "[{{\"name\":{:?},\"lines\":{:?}}}]",
-            &file
-                .name
-                .to_string_lossy()
-                .replace('/', if OS == "windows" { "\\" } else { "/" }),
+            &file_name.replace('/', if OS == "windows" { "\\" } else { "/" }),
             ranges
                 .iter()
                 .map(|r| [r.start(), r.end()])
@@ -281,10 +277,12 @@ pub fn run_clang_tidy(
     let mut original_content = None;
     if clang_params.tidy_review {
         cmd.arg("--fix-errors");
-        original_content =
-            Some(fs::read_to_string(&file.name).expect(
-                "Failed to cache file's original content before applying clang-tidy changes.",
-            ));
+        original_content = Some(fs::read_to_string(&file.name).with_context(|| {
+            format!(
+                "Failed to cache file's original content before applying clang-tidy changes: {}",
+                file_name.clone()
+            )
+        })?);
     }
     if !clang_params.style.is_empty() {
         cmd.args(["--format-style", clang_params.style.as_str()]);
@@ -306,7 +304,7 @@ pub fn run_clang_tidy(
         log::Level::Debug,
         format!(
             "Output from clang-tidy:\n{}",
-            String::from_utf8(output.stdout.to_vec()).unwrap()
+            String::from_utf8_lossy(&output.stdout)
         ),
     ));
     if !output.stderr.is_empty() {
@@ -314,25 +312,24 @@ pub fn run_clang_tidy(
             log::Level::Debug,
             format!(
                 "clang-tidy made the following summary:\n{}",
-                String::from_utf8(output.stderr).unwrap()
+                String::from_utf8_lossy(&output.stderr)
             ),
         ));
     }
-    file.tidy_advice = parse_tidy_output(&output.stdout, &clang_params.database_json);
+    file.tidy_advice = parse_tidy_output(&output.stdout, &clang_params.database_json)?;
     if clang_params.tidy_review {
-        let file_name = &file.name.to_owned();
         if let Some(tidy_advice) = &mut file.tidy_advice {
             // cache file changes in a buffer and restore the original contents for further analysis by clang-format
             tidy_advice.patched =
-                Some(fs::read(file_name).expect("Failed to read changes from clang-tidy"));
+                Some(fs::read(&file_name).with_context(|| {
+                    format!("Failed to read changes from clang-tidy: {file_name}")
+                })?);
         }
-        fs::write(
-            file_name,
-            original_content.expect("original content of file was not cached"),
-        )
-        .expect("failed to restore file's original content.");
+        // original_content is guaranteed to be Some() value at this point
+        fs::write(&file_name, original_content.unwrap())
+            .with_context(|| format!("Failed to restore file's original content: {file_name}"))?;
     }
-    logs
+    Ok(logs)
 }
 
 #[cfg(test)]
@@ -427,7 +424,7 @@ mod test {
             tidy_checks: "".to_string(), // use .clang-tidy config file
             lines_changed_only: LinesChangedOnly::Off,
             database: None,
-            extra_args: Some(extra_args.clone()), // <---- the reason for this test
+            extra_args: extra_args.clone(), // <---- the reason for this test
             database_json: None,
             format_filter: None,
             tidy_filter: None,
@@ -438,6 +435,7 @@ mod test {
         };
         let mut file_lock = arc_ref.lock().unwrap();
         let logs = run_clang_tidy(&mut file_lock, &clang_params)
+            .unwrap()
             .into_iter()
             .filter_map(|(_lvl, msg)| {
                 if msg.contains("Running ") {

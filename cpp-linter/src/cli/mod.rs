@@ -366,29 +366,21 @@ Further filtering can still be applied (see [Source options](#source-options))."
 /// ```
 /// The cpp-linter-action (for Github CI workflows) can only use 1 `extra-arg` input option, so
 /// the value will be split at spaces.
-pub fn convert_extra_arg_val(args: &ArgMatches) -> Option<Vec<String>> {
-    let raw_val = args
-        .try_get_many::<String>("extra-arg")
-        .expect("parser failed in set a default for `--extra-arg`");
-    if let Some(mut val) = raw_val {
-        if val.len() == 1 {
-            // specified once; split and return result
-            return Some(
-                val.next()
-                    .unwrap()
-                    .trim_matches('\'')
-                    .trim_matches('"')
-                    .split(' ')
-                    .map(|i| i.to_string())
-                    .collect(),
-            );
-        } else {
-            // specified multiple times; just return
-            Some(val.map(|i| i.to_string()).collect())
-        }
+pub fn convert_extra_arg_val(args: &ArgMatches) -> Vec<String> {
+    let mut val = args.get_many::<String>("extra-arg").unwrap_or_default();
+    if val.len() == 1 {
+        // specified once; split and return result
+        return val
+            .next()
+            .unwrap()
+            .trim_matches('\'')
+            .trim_matches('"')
+            .split(' ')
+            .map(|i| i.to_string())
+            .collect();
     } else {
-        // no value specified; just return
-        None
+        // specified multiple times; just return
+        val.map(|i| i.to_string()).collect()
     }
 }
 
@@ -407,14 +399,13 @@ mod test {
     fn extra_arg_0() {
         let args = parser_args(vec!["cpp-linter"]);
         let extras = convert_extra_arg_val(&args);
-        assert!(extras.is_none());
+        assert!(extras.is_empty());
     }
 
     #[test]
     fn extra_arg_1() {
         let args = parser_args(vec!["cpp-linter", "--extra-arg='-std=c++17 -Wall'"]);
-        let extras = convert_extra_arg_val(&args);
-        let extra_args = extras.expect("extra-arg not parsed properly");
+        let extra_args = convert_extra_arg_val(&args);
         assert_eq!(extra_args.len(), 2);
         assert_eq!(extra_args, ["-std=c++17", "-Wall"])
     }
@@ -426,9 +417,7 @@ mod test {
             "--extra-arg=-std=c++17",
             "--extra-arg=-Wall",
         ]);
-        let extras = convert_extra_arg_val(&args);
-        assert!(extras.is_some());
-        let extra_args = extras.expect("extra-arg not parsed properly");
+        let extra_args = convert_extra_arg_val(&args);
         assert_eq!(extra_args.len(), 2);
         assert_eq!(extra_args, ["-std=c++17", "-Wall"])
     }

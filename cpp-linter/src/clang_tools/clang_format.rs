@@ -6,6 +6,7 @@ use std::{
     sync::{Arc, Mutex, MutexGuard},
 };
 
+use anyhow::{Context, Result};
 use log::Level;
 // non-std crates
 use serde::Deserialize;
@@ -56,13 +57,15 @@ pub struct Replacement {
     ///
     /// This value is not provided by the XML output, but we calculate it after
     /// deserialization.
-    pub line: Option<usize>,
+    #[serde(default)]
+    pub line: usize,
 
     /// The column number on the line described by the [`Replacement::offset`].
     ///
     /// This value is not provided by the XML output, but we calculate it after
     /// deserialization.
-    pub cols: Option<usize>,
+    #[serde(default)]
+    pub cols: usize,
 }
 
 impl Clone for Replacement {
@@ -109,7 +112,7 @@ pub fn tally_format_advice(files: &[Arc<Mutex<FileObj>>]) -> u64 {
 pub fn run_clang_format(
     file: &mut MutexGuard<FileObj>,
     clang_params: &ClangParams,
-) -> Vec<(log::Level, String)> {
+) -> Result<Vec<(log::Level, String)>> {
     let mut cmd = Command::new(clang_params.clang_format_command.as_ref().unwrap());
     let mut logs = vec![];
     cmd.args(["--style", &clang_params.style]);
@@ -117,7 +120,8 @@ pub fn run_clang_format(
     for range in &ranges {
         cmd.arg(format!("--lines={}:{}", range.start(), range.end()));
     }
-    cmd.arg(file.name.to_string_lossy().as_ref());
+    let file_name = file.name.to_string_lossy().to_string();
+    cmd.arg(file.name.to_path_buf().as_os_str());
     let mut patched = None;
     if clang_params.format_review {
         logs.push((
@@ -129,7 +133,7 @@ pub fn run_clang_format(
                     .as_ref()
                     .unwrap()
                     .to_str()
-                    .unwrap(),
+                    .unwrap_or_default(),
                 cmd.get_args()
                     .map(|a| a.to_str().unwrap())
                     .collect::<Vec<&str>>()
@@ -138,7 +142,7 @@ pub fn run_clang_format(
         ));
         patched = Some(
             cmd.output()
-                .expect("Failed to get fixes from clang-format")
+                .with_context(|| format!("Failed to get fixes from clang-format: {file_name}"))?
                 .stdout,
         );
     }
@@ -147,33 +151,30 @@ pub fn run_clang_format(
         log::Level::Info,
         format!(
             "Running \"{} {}\"",
-            clang_params
-                .clang_format_command
-                .as_ref()
-                .unwrap()
-                .to_str()
-                .unwrap(),
+            cmd.get_program().to_string_lossy(),
             cmd.get_args()
                 .map(|x| x.to_str().unwrap())
                 .collect::<Vec<&str>>()
                 .join(" ")
         ),
     ));
-    let output = cmd.output().unwrap();
+    let output = cmd
+        .output()
+        .with_context(|| format!("Failed to get replacements from clang-format: {file_name}"))?;
     if !output.stderr.is_empty() || !output.status.success() {
         logs.push((
             log::Level::Debug,
             format!(
                 "clang-format raised the follow errors:\n{}",
-                String::from_utf8(output.stderr).unwrap()
+                String::from_utf8_lossy(&output.stderr)
             ),
         ));
     }
     if output.stdout.is_empty() {
-        return logs;
+        return Ok(logs);
     }
     let xml = String::from_utf8(output.stdout)
-        .unwrap()
+        .with_context(|| format!("stdout from clang-format was not UTF-8 encoded: {file_name}"))?
         .lines()
         .collect::<Vec<&str>>()
         .join("");
@@ -189,11 +190,12 @@ pub fn run_clang_format(
         });
     format_advice.patched = patched;
     if !format_advice.replacements.is_empty() {
+        // get line and column numbers from format_advice.offset
         let mut filtered_replacements = Vec::new();
         for replacement in &mut format_advice.replacements {
             let (line_number, columns) = get_line_cols_from_offset(&file.name, replacement.offset);
-            replacement.line = Some(line_number);
-            replacement.cols = Some(columns);
+            replacement.line = line_number;
+            replacement.cols = columns;
             for range in &ranges {
                 if range.contains(&line_number.try_into().unwrap_or(0)) {
                     filtered_replacements.push(replacement.clone());
@@ -208,7 +210,7 @@ pub fn run_clang_format(
         format_advice.replacements = filtered_replacements;
     }
     file.format_advice = Some(format_advice);
-    logs
+    Ok(logs)
 }
 
 #[cfg(test)]
@@ -234,29 +236,29 @@ mod tests {
                     offset: 113,
                     length: 5,
                     value: Some(String::from("\n      ")),
-                    line: None,
-                    cols: None,
+                    line: 0,
+                    cols: 0,
                 },
                 Replacement {
                     offset: 147,
                     length: 0,
                     value: Some(String::from(" ")),
-                    line: None,
-                    cols: None,
+                    line: 0,
+                    cols: 0,
                 },
                 Replacement {
                     offset: 161,
                     length: 0,
                     value: None,
-                    line: None,
-                    cols: None,
+                    line: 0,
+                    cols: 0,
                 },
                 Replacement {
                     offset: 165,
                     length: 19,
                     value: Some(String::from("\n\n")),
-                    line: None,
-                    cols: None,
+                    line: 0,
+                    cols: 0,
                 },
             ],
             patched: None,

@@ -332,6 +332,7 @@ checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 name = "cpp-linter"
 version = "2.0.0-rc4"
 dependencies = [
+ "anyhow",
  "chrono",
  "clap",
  "fast-glob",
@@ -359,6 +360,7 @@ dependencies = [
 name = "cpp-linter-js"
 version = "2.0.0-rc4"
 dependencies = [
+ "anyhow",
  "cpp-linter",
  "napi",
  "napi-build",

@@ -9,6 +9,7 @@ use std::io::Write;
 use std::sync::{Arc, Mutex};
 
 // non-std crates
+use anyhow::{Context, Result};
 use reqwest::{
     header::{HeaderMap, HeaderValue, AUTHORIZATION},
     Client, Method, Url,
@@ -34,7 +35,7 @@ pub struct GithubApiClient {
     client: Client,
 
     /// The CI run's event payload from the webhook that triggered the workflow.
-    pull_request: Option<i64>,
+    pull_request: i64,
 
     /// The name of the event that was triggered when running cpp_linter.
     pub event_name: String,
@@ -51,6 +52,7 @@ pub struct GithubApiClient {
     /// The value of the `ACTIONS_STEP_DEBUG` environment variable.
     pub debug_enabled: bool,
 
+    /// The response header names that describe the rate limit status.
     rate_limit_headers: RestApiRateLimitHeaders,
 }
 
@@ -63,23 +65,23 @@ impl RestApiClient for GithubApiClient {
         tidy_checks_failed: Option<u64>,
     ) -> u64 {
         if let Ok(gh_out) = env::var("GITHUB_OUTPUT") {
-            let mut gh_out_file = OpenOptions::new()
-                .append(true)
-                .open(gh_out)
-                .expect("GITHUB_OUTPUT file could not be opened");
-            for (prompt, value) in [
-                ("checks-failed", Some(checks_failed)),
-                ("format-checks-failed", format_checks_failed),
-                ("tidy-checks-failed", tidy_checks_failed),
-            ] {
-                if let Err(e) = writeln!(gh_out_file, "{prompt}={}", value.unwrap_or(0),) {
-                    log::error!("Could not write to GITHUB_OUTPUT file: {}", e);
-                    break;
+            if let Ok(mut gh_out_file) = OpenOptions::new().append(true).open(gh_out) {
+                for (prompt, value) in [
+                    ("checks-failed", Some(checks_failed)),
+                    ("format-checks-failed", format_checks_failed),
+                    ("tidy-checks-failed", tidy_checks_failed),
+                ] {
+                    if let Err(e) = writeln!(gh_out_file, "{prompt}={}", value.unwrap_or(0),) {
+                        log::error!("Could not write to GITHUB_OUTPUT file: {}", e);
+                        break;
+                    }
                 }
+                if let Err(e) = gh_out_file.flush() {
+                    log::debug!("Failed to flush buffer to GITHUB_OUTPUT file: {e:?}");
+                }
+            } else {
+                log::debug!("GITHUB_OUTPUT file could not be opened");
             }
-            gh_out_file
-                .flush()
-                .expect("Failed to flush buffer to GITHUB_OUTPUT file");
         }
         log::info!(
             "{} clang-format-checks-failed",
@@ -93,84 +95,74 @@ impl RestApiClient for GithubApiClient {
         checks_failed
     }
 
-    fn make_headers() -> HeaderMap<HeaderValue> {
+    fn make_headers() -> Result<HeaderMap<HeaderValue>> {
         let mut headers = HeaderMap::new();
         headers.insert(
             "Accept",
-            HeaderValue::from_str("application/vnd.github.raw+json")
-                .expect("Failed to create a header value for the API return data type"),
+            HeaderValue::from_str("application/vnd.github.raw+json")?,
         );
-        // headers.insert("User-Agent", USER_AGENT.parse().unwrap());
         if let Ok(token) = env::var("GITHUB_TOKEN") {
-            let mut val = HeaderValue::from_str(token.as_str())
-                .expect("Failed to create a secure header value for the API token.");
+            log::debug!("Using auth token from GITHUB_TOKEN environment variable");
+            let mut val = HeaderValue::from_str(format!("token {token}").as_str())?;
             val.set_sensitive(true);
             headers.insert(AUTHORIZATION, val);
         }
-        headers
+        Ok(headers)
     }
 
-    async fn get_list_of_changed_files(&self, file_filter: &FileFilter) -> Vec<FileObj> {
+    async fn get_list_of_changed_files(&self, file_filter: &FileFilter) -> Result<Vec<FileObj>> {
         if env::var("CI").is_ok_and(|val| val.as_str() == "true")
             && self.repo.is_some()
             && self.sha.is_some()
         {
             // get diff from Github REST API
             let is_pr = self.event_name == "pull_request";
-            let pr = self.pull_request.unwrap_or(-1).to_string();
+            let pr = self.pull_request.to_string();
             let sha = self.sha.clone().unwrap();
             let url = self
                 .api_url
-                .join("repos/")
-                .unwrap()
-                .join(format!("{}/", self.repo.as_ref().unwrap()).as_str())
-                .unwrap()
-                .join(if is_pr { "pulls/" } else { "commits/" })
-                .unwrap()
-                .join(if is_pr { pr.as_str() } else { sha.as_str() })
-                .unwrap();
+                .join("repos/")?
+                .join(format!("{}/", self.repo.as_ref().unwrap()).as_str())?
+                .join(if is_pr { "pulls/" } else { "commits/" })?
+                .join(if is_pr { pr.as_str() } else { sha.as_str() })?;
             let mut diff_header = HeaderMap::new();
-            diff_header.insert("Accept", "application/vnd.github.diff".parse().unwrap());
+            diff_header.insert("Accept", "application/vnd.github.diff".parse()?);
+            log::debug!("Getting file changes from {}", url.as_str());
             let request = Self::make_api_request(
                 &self.client,
                 url.as_str(),
                 Method::GET,
                 None,
                 Some(diff_header),
-            );
+            )?;
             let response = Self::send_api_request(
                 self.client.clone(),
                 request,
-                false,
                 self.rate_limit_headers.to_owned(),
                 0,
             )
-            .await;
-            match response {
-                Some(response) => {
-                    if response.status.is_success() {
-                        return parse_diff_from_buf(response.text.as_bytes(), file_filter);
-                    } else {
-                        let endpoint = if is_pr {
-                            Url::parse(format!("{}/files", url.as_str()).as_str())
-                                .expect("failed to parse URL endpoint")
-                        } else {
-                            url
-                        };
-                        self.get_changed_files_paginated(endpoint, file_filter)
-                            .await
-                    }
-                }
-                None => {
-                    panic!("Failed to connect with GitHub server to get list of changed files.")
-                }
+            .await
+            .with_context(|| "Failed to get list of changed files from GitHub server.")?;
+            if response.status().is_success() {
+                Ok(parse_diff_from_buf(&response.bytes().await?, file_filter))
+            } else {
+                let endpoint = if is_pr {
+                    Url::parse(format!("{}/files", url.as_str()).as_str())?
+                } else {
+                    url
+                };
+                Self::log_response(response, "Failed to get full diff for event").await;
+                log::debug!("Trying paginated request to {}", endpoint.as_str());
+                self.get_changed_files_paginated(endpoint, file_filter)
+                    .await
             }
         } else {
             // get diff from libgit2 API
-            let repo = open_repo(".")
-                .expect("Please ensure the repository is checked out before running cpp-linter.");
-            let list = parse_diff(&get_diff(&repo), file_filter);
-            list
+            let repo = open_repo(".").with_context(|| {
+                "Please ensure the repository is checked out before running cpp-linter."
+            })?;
+            let list = parse_diff(&get_diff(&repo)?, file_filter);
+            Ok(list)
         }
     }
 
@@ -178,30 +170,32 @@ impl RestApiClient for GithubApiClient {
         &self,
         url: Url,
         file_filter: &FileFilter,
-    ) -> Vec<FileObj> {
-        let mut url = Some(Url::parse_with_params(url.as_str(), &[("page", "1")]).unwrap());
+    ) -> Result<Vec<FileObj>> {
+        let mut url = Some(Url::parse_with_params(url.as_str(), &[("page", "1")])?);
         let mut files = vec![];
         while let Some(ref endpoint) = url {
             let request =
-                Self::make_api_request(&self.client, endpoint.as_str(), Method::GET, None, None);
+                Self::make_api_request(&self.client, endpoint.as_str(), Method::GET, None, None)?;
             let response = Self::send_api_request(
                 self.client.clone(),
                 request,
-                true,
                 self.rate_limit_headers.clone(),
                 0,
             )
             .await;
-            if let Some(response) = response {
-                url = Self::try_next_page(&response.headers);
+            if let Ok(response) = response {
+                url = Self::try_next_page(response.headers());
                 let files_list = if self.event_name != "pull_request" {
-                    let json_value: PushEventFiles = serde_json::from_str(&response.text)
-                        .expect("Failed to deserialize list of changed files from json response");
+                    let json_value: PushEventFiles = serde_json::from_str(&response.text().await?)
+                        .with_context(|| {
+                            "Failed to deserialize list of changed files from json response"
+                        })?;
                     json_value.files
                 } else {
-                    serde_json::from_str::<Vec<GithubChangedFile>>(&response.text).expect(
-                        "Failed to deserialize list of file changes from Pull Request event.",
-                    )
+                    serde_json::from_str::<Vec<GithubChangedFile>>(&response.text().await?)
+                        .with_context(|| {
+                            "Failed to deserialize list of file changes from Pull Request event."
+                        })?
                 };
                 for file in files_list {
                     if let Some(patch) = file.patch {
@@ -219,14 +213,14 @@ impl RestApiClient for GithubApiClient {
                 }
             }
         }
-        files
+        Ok(files)
     }
 
     async fn post_feedback(
         &self,
         files: &[Arc<Mutex<FileObj>>],
         feedback_inputs: FeedbackInput,
-    ) -> u64 {
+    ) -> Result<u64> {
         let tidy_checks_failed = tally_tidy_advice(files);
         let format_checks_failed = tally_format_advice(files);
         let mut comment = None;
@@ -257,20 +251,15 @@ impl RestApiClient for GithubApiClient {
             }
             if let Some(repo) = &self.repo {
                 let is_pr = self.event_name == "pull_request";
-                let pr = self.pull_request.unwrap_or(-1).to_string() + "/";
+                let pr = self.pull_request.to_string() + "/";
                 let sha = self.sha.clone().unwrap() + "/";
                 let comments_url = self
                     .api_url
-                    .join("repos/")
-                    .unwrap()
-                    .join(format!("{}/", repo).as_str())
-                    .unwrap()
-                    .join(if is_pr { "issues/" } else { "commits/" })
-                    .unwrap()
-                    .join(if is_pr { pr.as_str() } else { sha.as_str() })
-                    .unwrap()
-                    .join("comments/")
-                    .unwrap();
+                    .join("repos/")?
+                    .join(format!("{}/", repo).as_str())?
+                    .join(if is_pr { "issues/" } else { "commits/" })?
+                    .join(if is_pr { pr.as_str() } else { sha.as_str() })?
+                    .join("comments")?;
 
                 self.update_comment(
                     comments_url,
@@ -279,15 +268,15 @@ impl RestApiClient for GithubApiClient {
                     format_checks_failed + tidy_checks_failed == 0,
                     feedback_inputs.thread_comments == ThreadComments::Update,
                 )
-                .await;
+                .await?;
             }
         }
         if self.event_name == "pull_request"
             && (feedback_inputs.tidy_review || feedback_inputs.format_review)
         {
-            self.post_review(files, &feedback_inputs).await;
+            self.post_review(files, &feedback_inputs).await?;
         }
-        format_checks_failed + tidy_checks_failed
+        Ok(format_checks_failed + tidy_checks_failed)
     }
 }
 
@@ -297,71 +286,121 @@ mod test {
         default::Default,
         env,
         io::Read,
-        path::PathBuf,
+        path::{Path, PathBuf},
         sync::{Arc, Mutex},
     };
 
-    use chrono::Utc;
-    use mockito::{Matcher, Server};
     use regex::Regex;
-    use reqwest::{Method, Url};
     use tempfile::{tempdir, NamedTempFile};
 
     use super::GithubApiClient;
     use crate::{
-        clang_tools::capture_clang_tools_output,
-        cli::{ClangParams, FeedbackInput, LinesChangedOnly},
-        common_fs::FileObj,
+        clang_tools::{
+            clang_format::{FormatAdvice, Replacement},
+            clang_tidy::{TidyAdvice, TidyNotification},
+        },
+        cli::FeedbackInput,
+        common_fs::{FileFilter, FileObj},
+        logger,
         rest_api::{RestApiClient, USER_OUTREACH},
     };
 
     // ************************* tests for step-summary and output variables
 
-    async fn create_comment(tidy_checks: &str, style: &str) -> (String, String) {
+    async fn create_comment(
+        is_lgtm: bool,
+        fail_gh_out: bool,
+        fail_summary: bool,
+    ) -> (String, String) {
         let tmp_dir = tempdir().unwrap();
-        let rest_api_client = GithubApiClient::default();
+        let rest_api_client = GithubApiClient::new().unwrap();
+        logger::init().unwrap();
         if env::var("ACTIONS_STEP_DEBUG").is_ok_and(|var| var == "true") {
             assert!(rest_api_client.debug_enabled);
+            log::set_max_level(log::LevelFilter::Debug);
         }
-        let mut files = vec![Arc::new(Mutex::new(FileObj::new(PathBuf::from(
-            "tests/demo/demo.cpp",
-        ))))];
-        let mut clang_params = ClangParams {
-            tidy_checks: tidy_checks.to_string(),
-            lines_changed_only: LinesChangedOnly::Off,
-            style: style.to_string(),
-            ..Default::default()
-        };
-        capture_clang_tools_output(
-            &mut files,
-            env::var("CLANG-VERSION").unwrap_or("".to_string()).as_str(),
-            &mut clang_params,
-        )
-        .await;
+        let mut files = vec![];
+        if !is_lgtm {
+            for _i in 0..65535 {
+                let filename = String::from("tests/demo/demo.cpp");
+                let mut file = FileObj::new(PathBuf::from(&filename));
+                let notes = vec![TidyNotification {
+                    filename,
+                    line: 0,
+                    cols: 0,
+                    severity: String::from("note"),
+                    rationale: String::from("A test dummy rationale"),
+                    diagnostic: String::from("clang-diagnostic-warning"),
+                    suggestion: vec![],
+                    fixed_lines: vec![],
+                }];
+                file.tidy_advice = Some(TidyAdvice {
+                    notes,
+                    patched: None,
+                });
+                let replacements = vec![Replacement {
+                    offset: 0,
+                    length: 0,
+                    value: Some(String::new()),
+                    line: 1,
+                    cols: 1,
+                }];
+                file.format_advice = Some(FormatAdvice {
+                    replacements,
+                    patched: None,
+                });
+                files.push(Arc::new(Mutex::new(file)));
+            }
+        }
         let feedback_inputs = FeedbackInput {
-            style: style.to_string(),
+            style: if is_lgtm {
+                String::new()
+            } else {
+                String::from("file")
+            },
             step_summary: true,
             ..Default::default()
         };
         let mut step_summary_path = NamedTempFile::new_in(tmp_dir.path()).unwrap();
-        env::set_var("GITHUB_STEP_SUMMARY", step_summary_path.path());
+        env::set_var(
+            "GITHUB_STEP_SUMMARY",
+            if fail_summary {
+                Path::new("not-a-file.txt")
+            } else {
+                step_summary_path.path()
+            },
+        );
         let mut gh_out_path = NamedTempFile::new_in(tmp_dir.path()).unwrap();
-        env::set_var("GITHUB_OUTPUT", gh_out_path.path());
-        rest_api_client.post_feedback(&files, feedback_inputs).await;
+        env::set_var(
+            "GITHUB_OUTPUT",
+            if fail_gh_out {
+                Path::new("not-a-file.txt")
+            } else {
+                gh_out_path.path()
+            },
+        );
+        rest_api_client
+            .post_feedback(&files, feedback_inputs)
+            .await
+            .unwrap();
         let mut step_summary_content = String::new();
         step_summary_path
             .read_to_string(&mut step_summary_content)
             .unwrap();
-        assert!(&step_summary_content.contains(USER_OUTREACH));
+        if !fail_summary {
+            assert!(&step_summary_content.contains(USER_OUTREACH));
+        }
         let mut gh_out_content = String::new();
         gh_out_path.read_to_string(&mut gh_out_content).unwrap();
-        assert!(gh_out_content.starts_with("checks-failed="));
+        if !fail_gh_out {
+            assert!(gh_out_content.starts_with("checks-failed="));
+        }
         (step_summary_content, gh_out_content)
     }
 
     #[tokio::test]
     async fn check_comment_concerns() {
-        let (comment, gh_out) = create_comment("readability-*", "file").await;
+        let (comment, gh_out) = create_comment(false, false, false).await;
         assert!(&comment.contains(":warning:\nSome files did not pass the configured checks!\n"));
         let fmt_pattern = Regex::new(r"format-checks-failed=(\d+)\n").unwrap();
         let tidy_pattern = Regex::new(r"tidy-checks-failed=(\d+)\n").unwrap();
@@ -381,60 +420,42 @@ mod test {
     #[tokio::test]
     async fn check_comment_lgtm() {
         env::set_var("ACTIONS_STEP_DEBUG", "true");
-        let (comment, gh_out) = create_comment("-*", "").await;
-        assert!(&comment.contains(":heavy_check_mark:\nNo problems need attention."));
+        let (comment, gh_out) = create_comment(true, false, false).await;
+        assert!(comment.contains(":heavy_check_mark:\nNo problems need attention."));
         assert_eq!(
-            &gh_out,
+            gh_out,
             "checks-failed=0\nformat-checks-failed=0\ntidy-checks-failed=0\n"
         );
     }
 
-    async fn simulate_rate_limit(secondary: bool) {
-        let mut server = Server::new_async().await;
-        let url = Url::parse(server.url().as_str()).unwrap();
-        env::set_var("GITHUB_API_URL", server.url());
-        let client = GithubApiClient::default();
-        let reset_timestamp = (Utc::now().timestamp() + 60).to_string();
-        let mock = server
-            .mock("GET", "/")
-            .match_body(Matcher::Any)
-            .expect_at_least(1)
-            .expect_at_most(5)
-            .with_status(429)
-            .with_header(
-                &client.rate_limit_headers.remaining,
-                if secondary { "1" } else { "0" },
-            )
-            .with_header(&client.rate_limit_headers.reset, &reset_timestamp);
-        if secondary {
-            mock.with_header(&client.rate_limit_headers.retry, "0")
-                .create();
-        } else {
-            mock.create();
-        }
-        let request =
-            GithubApiClient::make_api_request(&client.client, url, Method::GET, None, None);
-        GithubApiClient::send_api_request(
-            client.client.clone(),
-            request,
-            true,
-            client.rate_limit_headers.clone(),
-            0,
-        )
-        .await;
+    #[tokio::test]
+    async fn fail_gh_output() {
+        env::set_var("ACTIONS_STEP_DEBUG", "true");
+        let (comment, gh_out) = create_comment(true, true, false).await;
+        assert!(&comment.contains(":heavy_check_mark:\nNo problems need attention."));
+        assert!(gh_out.is_empty());
     }
 
     #[tokio::test]
-    #[ignore]
-    #[should_panic(expected = "REST API secondary rate limit exceeded")]
-    async fn secondary_rate_limit() {
-        simulate_rate_limit(true).await;
+    async fn fail_gh_summary() {
+        env::set_var("ACTIONS_STEP_DEBUG", "true");
+        let (comment, gh_out) = create_comment(true, false, true).await;
+        assert!(comment.is_empty());
+        assert_eq!(
+            gh_out,
+            "checks-failed=0\nformat-checks-failed=0\ntidy-checks-failed=0\n"
+        );
     }
 
     #[tokio::test]
-    #[ignore]
-    #[should_panic(expected = "REST API rate limit exceeded!")]
-    async fn primary_rate_limit() {
-        simulate_rate_limit(false).await;
+    async fn fail_get_local_diff() {
+        env::set_var("CI", "false");
+        let tmp_dir = tempdir().unwrap();
+        env::set_current_dir(tmp_dir.path()).unwrap();
+        let rest_client = GithubApiClient::new().unwrap();
+        let files = rest_client
+            .get_list_of_changed_files(&FileFilter::new(&[], vec![]))
+            .await;
+        assert!(files.is_err())
     }
 }

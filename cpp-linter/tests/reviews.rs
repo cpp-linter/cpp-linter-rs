@@ -35,6 +35,8 @@ struct TestParams {
     pub fail_dismissal: bool,
     pub fail_get_existing_reviews: bool,
     pub fail_posting: bool,
+    pub bad_pr_info: bool,
+    pub bad_existing_reviews: bool,
 }
 
 impl Default for TestParams {
@@ -52,6 +54,8 @@ impl Default for TestParams {
             fail_dismissal: false,
             fail_get_existing_reviews: false,
             fail_posting: false,
+            bad_pr_info: false,
+            bad_existing_reviews: false,
         }
     }
 }
@@ -84,7 +88,7 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
         server
             .mock("GET", pr_endpoint.as_str())
             .match_header("Accept", "application/vnd.github.diff")
-            .match_header("Authorization", TOKEN)
+            .match_header("Authorization", format!("token {TOKEN}").as_str())
             .with_body_from_file(format!("{asset_path}pr_{PR}.diff"))
             .with_header(REMAINING_RATE_LIMIT_HEADER, "50")
             .with_header(RESET_RATE_LIMIT_HEADER, reset_timestamp.as_str())
@@ -94,10 +98,12 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
         server
             .mock("GET", pr_endpoint.as_str())
             .match_header("Accept", "application/vnd.github.raw+json")
-            .match_header("Authorization", TOKEN)
-            .with_body(
-                json!({"state": test_params.pr_state, "draft": test_params.pr_draft}).to_string(),
-            )
+            .match_header("Authorization", format!("token {TOKEN}").as_str())
+            .with_body(if test_params.bad_pr_info {
+                String::new()
+            } else {
+                json!({"state": test_params.pr_state, "draft": test_params.pr_draft}).to_string()
+            })
             .with_header(REMAINING_RATE_LIMIT_HEADER, "50")
             .with_header(RESET_RATE_LIMIT_HEADER, reset_timestamp.as_str())
             .create(),
@@ -105,28 +111,36 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
 
     let reviews_endpoint = format!("/repos/{REPO}/pulls/{PR}/reviews");
 
-    mocks.push(
-        server
-            .mock("GET", reviews_endpoint.as_str())
-            .match_header("Accept", "application/vnd.github.raw+json")
-            .match_header("Authorization", TOKEN)
-            .match_body(Matcher::Any)
-            .match_query(Matcher::UrlEncoded("page".to_string(), "1".to_string()))
+    let mut mock = server
+        .mock("GET", reviews_endpoint.as_str())
+        .match_header("Accept", "application/vnd.github.raw+json")
+        .match_header("Authorization", format!("token {TOKEN}").as_str())
+        .match_body(Matcher::Any)
+        .match_query(Matcher::UrlEncoded("page".to_string(), "1".to_string()))
+        .with_header(REMAINING_RATE_LIMIT_HEADER, "50")
+        .with_header(RESET_RATE_LIMIT_HEADER, reset_timestamp.as_str())
+        .with_status(if test_params.fail_get_existing_reviews {
+            403
+        } else {
+            200
+        });
+    if test_params.bad_existing_reviews {
+        mock = mock.with_body(String::new()).create();
+    } else {
+        mock = mock
             .with_body_from_file(format!("{asset_path}pr_reviews.json"))
-            .with_header(REMAINING_RATE_LIMIT_HEADER, "50")
-            .with_header(RESET_RATE_LIMIT_HEADER, reset_timestamp.as_str())
-            .with_status(if test_params.fail_get_existing_reviews {
-                403
-            } else {
-                200
-            })
-            .create(),
-    );
-    if !test_params.fail_get_existing_reviews {
+            .create()
+    }
+    mocks.push(mock);
+    if !test_params.fail_get_existing_reviews && !test_params.bad_existing_reviews {
         mocks.push(
             server
-                .mock("PUT", format!("{reviews_endpoint}/1807607546").as_str())
+                .mock(
+                    "PUT",
+                    format!("{reviews_endpoint}/1807607546/dismissals").as_str(),
+                )
                 .match_body(r#"{"event":"DISMISS","message":"outdated suggestion"}"#)
+                .match_header("Authorization", format!("token {TOKEN}").as_str())
                 .with_header(REMAINING_RATE_LIMIT_HEADER, "50")
                 .with_header(RESET_RATE_LIMIT_HEADER, reset_timestamp.as_str())
                 .with_status(if test_params.fail_dismissal { 403 } else { 200 })
@@ -135,7 +149,11 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
     }
 
     let lgtm_allowed = !test_params.force_lgtm || !test_params.no_lgtm;
-    if lgtm_allowed && !test_params.pr_draft && test_params.pr_state == "open" {
+    if lgtm_allowed
+        && !test_params.pr_draft
+        && test_params.pr_state == "open"
+        && !test_params.bad_pr_info
+    {
         let review_reaction = if test_params.passive_reviews {
             "COMMENT"
         } else if test_params.force_lgtm {
@@ -170,6 +188,7 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
             server
                 .mock("POST", reviews_endpoint.as_str())
                 .match_body(Matcher::Regex(expected_review_payload))
+                .match_header("Authorization", format!("token {TOKEN}").as_str())
                 .with_header(REMAINING_RATE_LIMIT_HEADER, "50")
                 .with_header(RESET_RATE_LIMIT_HEADER, reset_timestamp.as_str())
                 .with_status(if test_params.fail_posting { 403 } else { 200 })
@@ -203,7 +222,7 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
         args.push("-e=c".to_string());
     }
     let result = run_main(args).await;
-    assert_eq!(result, 0);
+    assert!(result.is_ok());
     for mock in mocks {
         mock.assert();
     }
@@ -337,6 +356,28 @@ async fn fail_get_existing_reviews() {
     test_review(&TestParams {
         lines_changed_only: LinesChangedOnly::Off,
         fail_get_existing_reviews: true,
+        ..Default::default()
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn bad_existing_reviews() {
+    test_review(&TestParams {
+        lines_changed_only: LinesChangedOnly::Off,
+        force_lgtm: true,
+        bad_existing_reviews: true,
+        ..Default::default()
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn bad_pr_info() {
+    test_review(&TestParams {
+        lines_changed_only: LinesChangedOnly::Off,
+        force_lgtm: true,
+        bad_pr_info: true,
         ..Default::default()
     })
     .await;

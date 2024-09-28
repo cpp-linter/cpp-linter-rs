@@ -16,6 +16,7 @@ pub struct FullReview {
 pub struct ReviewDiffComment {
     pub body: String,
     pub line: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub start_line: Option<i64>,
     pub path: String,
 }
@@ -34,6 +35,9 @@ impl From<Suggestion> for ReviewDiffComment {
         }
     }
 }
+
+/// A constant string used as a payload to dismiss PR reviews.
+pub const REVIEW_DISMISSAL: &str = r#"{"event":"DISMISS","message":"outdated suggestion"}"#;
 
 /// A structure for deserializing a single changed file in a CI event.
 #[derive(Debug, Deserialize, PartialEq, Clone)]

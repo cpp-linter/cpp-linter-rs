@@ -9,6 +9,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use anyhow::{anyhow, Context, Result};
 use git2::{DiffOptions, Patch};
 // non-std crates
 use lenient_semver;
@@ -41,14 +42,14 @@ use clang_tidy::{run_clang_tidy, CompilationUnit};
 ///
 /// The only reason this function would return an error is if the specified tool is not
 /// installed or present on the system (nor in the `$PATH` environment variable).
-pub fn get_clang_tool_exe(name: &str, version: &str) -> Result<PathBuf, &'static str> {
+pub fn get_clang_tool_exe(name: &str, version: &str) -> Result<PathBuf> {
     if version.is_empty() {
         // The default CLI value is an empty string.
         // Thus, we should use whatever is installed and added to $PATH.
         if let Ok(cmd) = which(name) {
             return Ok(cmd);
         } else {
-            return Err("Could not find clang tool by name");
+            return Err(anyhow!("Could not find clang tool by name"));
         }
     }
     if let Ok(semver) = lenient_semver::parse_into::<Version>(version) {
@@ -66,14 +67,14 @@ pub fn get_clang_tool_exe(name: &str, version: &str) -> Result<PathBuf, &'static
             // name.
             return Ok(cmd);
         } else {
-            return Err("Could not find clang tool by name and version");
+            return Err(anyhow!("Could not find clang tool by name and version"));
         }
     } else {
         // `version` specified is not a semantic version; treat as path/to/bin
         if let Ok(exe_path) = which_in(name, Some(version), current_dir().unwrap()) {
             Ok(exe_path)
         } else {
-            Err("Could not find clang tool by path")
+            Err(anyhow!("Could not find clang tool by path"))
         }
     }
 }
@@ -89,8 +90,10 @@ pub fn get_clang_tool_exe(name: &str, version: &str) -> Result<PathBuf, &'static
 fn analyze_single_file(
     file: Arc<Mutex<FileObj>>,
     clang_params: Arc<ClangParams>,
-) -> (PathBuf, Vec<(log::Level, String)>) {
-    let mut file = file.lock().unwrap();
+) -> Result<(PathBuf, Vec<(log::Level, String)>)> {
+    let mut file = file
+        .lock()
+        .map_err(|_| anyhow!("Failed to lock file mutex"))?;
     let mut logs = vec![];
     if clang_params.clang_tidy_command.is_some() {
         if clang_params
@@ -99,7 +102,7 @@ fn analyze_single_file(
             .is_some_and(|f| f.is_source_or_ignored(file.name.as_path()))
             || clang_params.tidy_filter.is_none()
         {
-            let tidy_result = run_clang_tidy(&mut file, &clang_params);
+            let tidy_result = run_clang_tidy(&mut file, &clang_params)?;
             logs.extend(tidy_result);
         } else {
             logs.push((
@@ -108,7 +111,7 @@ fn analyze_single_file(
                     "{} not scanned by clang-tidy due to `--ignore-tidy`",
                     file.name.as_os_str().to_string_lossy()
                 ),
-            ))
+            ));
         }
     }
     if clang_params.clang_format_command.is_some() {
@@ -118,7 +121,7 @@ fn analyze_single_file(
             .is_some_and(|f| f.is_source_or_ignored(file.name.as_path()))
             || clang_params.format_filter.is_none()
         {
-            let format_result = run_clang_format(&mut file, &clang_params);
+            let format_result = run_clang_format(&mut file, &clang_params)?;
             logs.extend(format_result);
         } else {
             logs.push((
@@ -130,7 +133,7 @@ fn analyze_single_file(
             ));
         }
     }
-    (file.name.clone(), logs)
+    Ok((file.name.clone(), logs))
 }
 
 /// Runs clang-tidy and/or clang-format and returns the parsed output from each.
@@ -141,31 +144,27 @@ pub async fn capture_clang_tools_output(
     files: &mut Vec<Arc<Mutex<FileObj>>>,
     version: &str,
     clang_params: &mut ClangParams,
-) {
+) -> Result<()> {
     // find the executable paths for clang-tidy and/or clang-format and show version
     // info as debugging output.
     if clang_params.tidy_checks != "-*" {
         clang_params.clang_tidy_command = {
-            let cmd = get_clang_tool_exe("clang-tidy", version).unwrap();
+            let cmd = get_clang_tool_exe("clang-tidy", version)?;
             log::debug!(
                 "{} --version\n{}",
                 &cmd.to_string_lossy(),
-                String::from_utf8_lossy(
-                    &Command::new(&cmd).arg("--version").output().unwrap().stdout
-                )
+                String::from_utf8_lossy(&Command::new(&cmd).arg("--version").output()?.stdout)
             );
             Some(cmd)
         }
     };
     if !clang_params.style.is_empty() {
         clang_params.clang_format_command = {
-            let cmd = get_clang_tool_exe("clang-format", version).unwrap();
+            let cmd = get_clang_tool_exe("clang-format", version)?;
             log::debug!(
                 "{} --version\n{}",
                 &cmd.to_string_lossy(),
-                String::from_utf8_lossy(
-                    &Command::new(&cmd).arg("--version").output().unwrap().stdout
-                )
+                String::from_utf8_lossy(&Command::new(&cmd).arg("--version").output()?.stdout)
             );
             Some(cmd)
         }
@@ -175,10 +174,9 @@ pub async fn capture_clang_tools_output(
     if let Some(db_path) = &clang_params.database {
         if let Ok(db_str) = fs::read(db_path.join("compile_commands.json")) {
             clang_params.database_json = Some(
-                serde_json::from_str::<Vec<CompilationUnit>>(
-                    String::from_utf8(db_str).unwrap().as_str(),
-                )
-                .expect("Failed to parse compile_commands.json"),
+                // A compilation database should be UTF-8 encoded, but file paths are not; use lossy conversion.
+                serde_json::from_str::<Vec<CompilationUnit>>(&String::from_utf8_lossy(&db_str))
+                    .with_context(|| "Failed to parse compile_commands.json")?,
             )
         }
     };
@@ -192,7 +190,7 @@ pub async fn capture_clang_tools_output(
     }
 
     while let Some(output) = executors.join_next().await {
-        if let Ok(out) = output {
+        if let Ok(out) = output? {
             let (file_name, logs) = out;
             start_log_group(format!("Analyzing {}", file_name.to_string_lossy()));
             for (level, msg) in logs {
@@ -201,6 +199,7 @@ pub async fn capture_clang_tools_output(
             end_log_group();
         }
     }
+    Ok(())
 }
 
 /// A struct to describe a single suggestion in a pull_request review.
@@ -298,7 +297,7 @@ pub fn make_patch<'buffer>(
     path: &Path,
     patched: &'buffer [u8],
     original_content: &'buffer [u8],
-) -> Patch<'buffer> {
+) -> Result<Patch<'buffer>> {
     let mut diff_opts = &mut DiffOptions::new();
     diff_opts = diff_opts.indent_heuristic(true);
     diff_opts = diff_opts.context_lines(0);
@@ -309,14 +308,13 @@ pub fn make_patch<'buffer>(
         Some(path),
         Some(diff_opts),
     )
-    .unwrap_or_else(|_| {
-        panic!(
+    .with_context(|| {
+        format!(
             "Failed to create patch for file {}.",
-            path.to_str()
-                .expect("Failed to convert file's path to string.")
+            path.to_string_lossy()
         )
-    });
-    patch
+    })?;
+    Ok(patch)
 }
 
 pub trait MakeSuggestions {
@@ -333,32 +331,33 @@ pub trait MakeSuggestions {
         file_obj: &FileObj,
         patch: &mut Patch,
         summary_only: bool,
-    ) {
+    ) -> Result<()> {
         let tool_name = self.get_tool_name();
         let is_tidy_tool = tool_name == "clang-tidy";
         let hunks_total = patch.num_hunks();
         let mut hunks_in_patch = 0u32;
         let file_name = file_obj
             .name
-            .to_str()
-            .expect("Failed to convert file path to string")
+            .to_string_lossy()
             .replace("\\", "/")
             .trim_start_matches("./")
             .to_owned();
         let patch_buf = &patch
             .to_buf()
-            .expect("Failed to convert patch to byte array")
+            .with_context(|| "Failed to convert patch to byte array")?
             .to_vec();
         review_comments.full_patch[is_tidy_tool as usize].push_str(
             String::from_utf8(patch_buf.to_owned())
-                .expect("Failed to convert patch buffer to string")
+                .with_context(|| format!("Failed to convert patch to string: {file_name}"))?
                 .as_str(),
         );
         if summary_only {
-            return;
+            return Ok(());
         }
         for hunk_id in 0..hunks_total {
-            let (hunk, line_count) = patch.hunk(hunk_id).expect("Failed to get hunk from patch");
+            let (hunk, line_count) = patch.hunk(hunk_id).with_context(|| {
+                format!("Failed to get hunk {hunk_id} from patch for {file_name}")
+            })?;
             hunks_in_patch += 1;
             let hunk_range = file_obj.is_hunk_in_diff(&hunk);
             if hunk_range.is_none() {
@@ -371,16 +370,16 @@ pub trait MakeSuggestions {
             for line_index in 0..line_count {
                 let diff_line = patch
                     .line_in_hunk(hunk_id, line_index)
-                    .expect("Failed to get line in a hunk");
+                    .with_context(|| format!("Failed to get line {line_index} in a hunk {hunk_id} of patch for {file_name}"))?;
                 let line = String::from_utf8(diff_line.content().to_owned())
-                    .expect("Failed to convert line buffer to string");
+                    .with_context(|| format!("Failed to convert line {line_index} buffer to string in hunk {hunk_id} of patch for {file_name}"))?;
                 if ['+', ' '].contains(&diff_line.origin()) {
                     suggestion.push_str(line.as_str());
                 } else {
                     removed.push(
                         diff_line
                             .old_lineno()
-                            .expect("Removed line has no line number?!"),
+                            .expect("Removed line should have a line number"),
                     );
                 }
             }
@@ -397,7 +396,7 @@ pub trait MakeSuggestions {
                     .as_str(),
                 )
             } else {
-                suggestion = format!("```suggestion\n{suggestion}```",);
+                suggestion = format!("```suggestion\n{suggestion}```");
             }
             let comment = Suggestion {
                 line_start: start_line,
@@ -410,6 +409,7 @@ pub trait MakeSuggestions {
             }
         }
         review_comments.tool_total[is_tidy_tool as usize] += hunks_in_patch;
+        Ok(())
     }
 }
 

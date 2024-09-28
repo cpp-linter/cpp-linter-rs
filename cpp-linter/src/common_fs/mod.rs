@@ -6,6 +6,8 @@ use std::io::Read;
 use std::path::{Component, Path};
 use std::{ops::RangeInclusive, path::PathBuf};
 
+use anyhow::{Context, Result};
+
 use crate::clang_tools::clang_format::FormatAdvice;
 use crate::clang_tools::clang_tidy::TidyAdvice;
 use crate::clang_tools::{make_patch, MakeSuggestions, ReviewComments, Suggestion};
@@ -127,30 +129,26 @@ impl FileObj {
         &self,
         review_comments: &mut ReviewComments,
         summary_only: bool,
-    ) {
+    ) -> Result<()> {
         let original_content =
-            fs::read(&self.name).expect("Failed to read original contents of file");
-        let file_name = self
-            .name
-            .to_str()
-            .expect("Failed to convert file extension to string")
-            .replace("\\", "/");
+            fs::read(&self.name).with_context(|| "Failed to read original contents of file")?;
+        let file_name = self.name.to_str().unwrap_or_default().replace("\\", "/");
         let file_path = Path::new(&file_name);
         if let Some(advice) = &self.format_advice {
             if let Some(patched) = &advice.patched {
-                let mut patch = make_patch(file_path, patched, &original_content);
-                advice.get_suggestions(review_comments, self, &mut patch, summary_only);
+                let mut patch = make_patch(file_path, patched, &original_content)?;
+                advice.get_suggestions(review_comments, self, &mut patch, summary_only)?;
             }
         }
 
         if let Some(advice) = &self.tidy_advice {
             if let Some(patched) = &advice.patched {
-                let mut patch = make_patch(file_path, patched, &original_content);
-                advice.get_suggestions(review_comments, self, &mut patch, summary_only);
+                let mut patch = make_patch(file_path, patched, &original_content)?;
+                advice.get_suggestions(review_comments, self, &mut patch, summary_only)?;
             }
 
             if summary_only {
-                return;
+                return Ok(());
             }
 
             // now check for clang-tidy warnings with no fixes applied
@@ -159,7 +157,7 @@ impl FileObj {
                 .extension()
                 .unwrap_or_default()
                 .to_str()
-                .expect("Failed to convert file extension to string");
+                .unwrap_or_default();
             for note in &advice.notes {
                 if note.fixed_lines.is_empty() {
                     // notification had no suggestion applied in `patched`
@@ -200,6 +198,7 @@ impl FileObj {
                 }
             }
         }
+        Ok(())
     }
 }
 

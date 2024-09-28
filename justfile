@@ -1,11 +1,12 @@
 set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
 
+
 # run the test suite
 [group("code coverage")]
-test arg='':
+test profile='default':
     cargo llvm-cov --no-report \
     nextest --manifest-path cpp-linter/Cargo.toml \
-    --lib --tests --color always {{ arg }}
+    --lib --tests --color always --profile {{ profile }}
 
 # Clear previous test build artifacts
 [group("code coverage")]

@@ -1,16 +1,17 @@
-use pyo3::prelude::*;
+use pyo3::{exceptions::PyOSError, prelude::*};
 use tokio::runtime::Builder;
 
 use ::cpp_linter::run::run_main;
 
 /// A wrapper for the ``::cpp_linter::run::run_main()```
 #[pyfunction]
-fn main(args: Vec<String>) -> PyResult<i32> {
+fn main(args: Vec<String>) -> PyResult<()> {
     Builder::new_multi_thread()
         .enable_all()
         .build()
         .unwrap()
-        .block_on(async { Ok(run_main(args).await) })
+        .block_on(async { run_main(args).await })
+        .map_err(|e| PyOSError::new_err(e.to_string()))
 }
 
 /// The python binding for the cpp_linter package. It only exposes a ``main()`` function
