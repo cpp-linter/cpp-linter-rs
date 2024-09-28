@@ -12,7 +12,6 @@ use std::time::Duration;
 // non-std crates
 use anyhow::{anyhow, Error, Result};
 use chrono::DateTime;
-use futures::future::{BoxFuture, FutureExt};
 use reqwest::header::{HeaderMap, HeaderValue};
 use reqwest::{Client, IntoUrl, Method, Request, Response, Url};
 
@@ -111,85 +110,88 @@ pub trait RestApiClient {
         request: Request,
         rate_limit_headers: RestApiRateLimitHeaders,
         retries: u64,
-    ) -> BoxFuture<'static, Result<Response>> {
+    ) -> impl Future<Output = Result<Response>> + Send {
         async move {
-            let result = client
-                .execute(request.try_clone().ok_or(anyhow!(
-                    "Failed to clone request object for recursive behavior"
-                ))?)
-                .await;
-            if let Ok(response) = &result {
-                if [403u16, 429u16].contains(&response.status().as_u16()) {
-                    // rate limit exceeded
+            for i in retries..5 {
+                let result = client
+                    .execute(request.try_clone().ok_or(anyhow!(
+                        "Failed to clone request object for recursive behavior"
+                    ))?)
+                    .await;
+                if let Ok(response) = &result {
+                    if [403u16, 429u16].contains(&response.status().as_u16()) {
+                        // rate limit may have been exceeded
 
-                    // check if primary rate limit was violated; panic if so.
-                    let mut requests_remaining = None;
-                    if let Some(remaining) = response.headers().get(&rate_limit_headers.remaining) {
-                        if let Ok(count) = remaining.to_str() {
-                            if let Ok(value) = count.parse::<i64>() {
-                                requests_remaining = Some(value);
-                            } else {
-                                log::debug!(
-                                    "Failed to parse i64 from remaining attempts about rate limit: {count}"
-                                );
-                            }
-                        }
-                    } else {
-                        // NOTE: I guess it is sometimes valid for a request to
-                        // not include remaining rate limit attempts
-                        log::debug!("Response headers do not include remaining API usage count");
-                    }
-                    if requests_remaining.is_some_and(|v| v <= 0) {
-                        if let Some(reset_value) = response.headers().get(&rate_limit_headers.reset)
+                        // check if primary rate limit was violated; panic if so.
+                        let mut requests_remaining = None;
+                        if let Some(remaining) =
+                            response.headers().get(&rate_limit_headers.remaining)
                         {
-                            if let Ok(epoch) = reset_value.to_str() {
-                                if let Ok(value) = epoch.parse::<i64>() {
-                                    if let Some(reset) = DateTime::from_timestamp(value, 0) {
-                                        return Err(anyhow!(
-                                            "REST API rate limit exceeded! Resets at {}",
-                                            reset
-                                        ));
-                                    }
+                            if let Ok(count) = remaining.to_str() {
+                                if let Ok(value) = count.parse::<i64>() {
+                                    requests_remaining = Some(value);
                                 } else {
                                     log::debug!(
-                                        "Failed to parse i64 from reset time about rate limit: {epoch}"
-                                    );
+                                    "Failed to parse i64 from remaining attempts about rate limit: {count}"
+                                );
                                 }
                             }
                         } else {
-                            log::debug!("Response headers does not include a reset timestamp");
+                            // NOTE: I guess it is sometimes valid for a request to
+                            // not include remaining rate limit attempts
+                            log::debug!(
+                                "Response headers do not include remaining API usage count"
+                            );
                         }
-                        return Err(anyhow!("REST API rate limit exceeded!"));
-                    }
-
-                    // check if secondary rate limit is violated; backoff and try again.
-                    if retries > 4 {
-                        return Err(anyhow!("REST API secondary rate limit exceeded"));
-                    }
-                    if let Some(retry_value) = response.headers().get(&rate_limit_headers.retry) {
-                        if let Ok(retry_str) = retry_value.to_str() {
-                            if let Ok(retry) = retry_str.parse::<u64>() {
-                                let interval = Duration::from_secs(retry + retries.pow(2));
-                                tokio::time::sleep(interval).await;
+                        if requests_remaining.is_some_and(|v| v <= 0) {
+                            if let Some(reset_value) =
+                                response.headers().get(&rate_limit_headers.reset)
+                            {
+                                if let Ok(epoch) = reset_value.to_str() {
+                                    if let Ok(value) = epoch.parse::<i64>() {
+                                        if let Some(reset) = DateTime::from_timestamp(value, 0) {
+                                            return Err(anyhow!(
+                                                "REST API rate limit exceeded! Resets at {}",
+                                                reset
+                                            ));
+                                        }
+                                    } else {
+                                        log::debug!(
+                                        "Failed to parse i64 from reset time about rate limit: {epoch}"
+                                    );
+                                    }
+                                }
                             } else {
-                                log::debug!(
+                                log::debug!("Response headers does not include a reset timestamp");
+                            }
+                            return Err(anyhow!("REST API rate limit exceeded!"));
+                        }
+
+                        // check if secondary rate limit is violated; backoff and try again.
+                        if i >= 4 {
+                            break;
+                        }
+                        if let Some(retry_value) = response.headers().get(&rate_limit_headers.retry)
+                        {
+                            if let Ok(retry_str) = retry_value.to_str() {
+                                if let Ok(retry) = retry_str.parse::<u64>() {
+                                    let interval = Duration::from_secs(retry + i.pow(2));
+                                    tokio::time::sleep(interval).await;
+                                } else {
+                                    log::debug!(
                                     "Failed to parse u64 from retry interval about rate limit: {retry_str}"
                                 );
+                                }
                             }
+                            continue;
                         }
-                        return Self::send_api_request(
-                            client,
-                            request,
-                            rate_limit_headers,
-                            retries + 1,
-                        )
-                        .await;
                     }
+                    return result.map_err(Error::from);
                 }
+                return result.map_err(Error::from);
             }
-            result.map_err(Error::from)
+            Err(anyhow!("REST API secondary rate limit exceeded"))
         }
-        .boxed()
     }
 
     /// A way to get the list of changed files using REST API calls. It is this method's
