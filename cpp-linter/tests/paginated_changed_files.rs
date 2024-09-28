@@ -139,17 +139,23 @@ async fn get_paginated_changes(lib_root: &Path, test_params: &TestParams) {
 
     let file_filter = FileFilter::new(&[], vec!["cpp".to_string(), "hpp".to_string()]);
     let files = client.get_list_of_changed_files(&file_filter).await;
-    if let Ok(files) = files {
-        // if !fail_serialization
-        assert_eq!(files.len(), 2);
-        for file in files {
-            assert!(["src/demo.cpp", "src/demo.hpp"].contains(
-                &file
-                    .name
-                    .as_path()
-                    .to_str()
-                    .expect("Failed to get file name from path")
-            ));
+    match files {
+        Err(e) => {
+            if !test_params.fail_serde_diff {
+                panic!("Failed to get changed files: {e:?}");
+            }
+        }
+        Ok(files) => {
+            assert_eq!(files.len(), 2);
+            for file in files {
+                assert!(["src/demo.cpp", "src/demo.hpp"].contains(
+                    &file
+                        .name
+                        .as_path()
+                        .to_str()
+                        .expect("Failed to get file name from path")
+                ));
+            }
         }
     }
     for mock in mocks {
