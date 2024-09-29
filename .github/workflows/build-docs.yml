@@ -57,7 +57,7 @@ jobs:
         run: |
           pip install -r docs/requirements.txt
           pip install --force-reinstall -v docs/
-      - name: Build book
+      - name: Build docs
         working-directory: docs
         run: mkdocs build
       - name: Upload docs build as artifact
