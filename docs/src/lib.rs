@@ -1,4 +1,4 @@
-//! This exposes a function in python, so a mkdocs plugin can use it to generates the CLI document.
+//! This exposes a function in Python, so an mkdocs plugin can use it to generate the CLI document.
 //! For actual library/binary source code look in cpp-linter folder.
 use std::collections::HashMap;
 
