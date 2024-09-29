@@ -330,7 +330,7 @@ checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 
 [[package]]
 name = "cpp-linter"
-version = "2.0.0-rc4"
+version = "2.0.0-rc5"
 dependencies = [
  "anyhow",
  "chrono",
@@ -358,7 +358,7 @@ dependencies = [
 
 [[package]]
 name = "cpp-linter-js"
-version = "2.0.0-rc4"
+version = "2.0.0-rc5"
 dependencies = [
  "anyhow",
  "cpp-linter",
@@ -369,7 +369,7 @@ dependencies = [
 
 [[package]]
 name = "cpp-linter-py"
-version = "2.0.0-rc4"
+version = "2.0.0-rc5"
 dependencies = [
  "cpp-linter",
  "pyo3",
