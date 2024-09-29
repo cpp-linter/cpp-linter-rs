@@ -10,26 +10,28 @@
       
       
       
-        <link rel="canonical" href="https://cpp-linter.github.io/cpp-linter-rs/">
+        <link rel="canonical" href="https://cpp-linter.github.io/cpp-linter-rs/node/">
       
       
+        <link rel="prev" href="../python/">
       
-        <link rel="next" href="cli/">
+      
+        <link rel="next" href="../changelog/">
       
       
-      <link rel="icon" href="images/favicon.ico">
+      <link rel="icon" href="../images/favicon.ico">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.39">
     
     
       
-        <title>Cpp-Linter</title>
+        <title>Node.js Binding - Cpp-Linter</title>
       
     
     
-      <link rel="stylesheet" href="assets/stylesheets/main.8c3ca2c6.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.8c3ca2c6.min.css">
       
         
-        <link rel="stylesheet" href="assets/stylesheets/palette.06af60db.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
       
       
 
@@ -48,9 +50,9 @@
       
     
     
-      <link rel="stylesheet" href="stylesheets/extra.css">
+      <link rel="stylesheet" href="../stylesheets/extra.css">
     
-    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -76,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#cc-linting-package" class="md-skip">
+        <a href="#nodejs-binding" class="md-skip">
           Skip to content
         </a>
       
@@ -92,9 +94,9 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="." title="Cpp-Linter" class="md-header__button md-logo" aria-label="Cpp-Linter" data-md-component="logo">
+    <a href=".." title="Cpp-Linter" class="md-header__button md-logo" aria-label="Cpp-Linter" data-md-component="logo">
       
-  <img src="images/logo.png" alt="logo">
+  <img src="../images/logo.png" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -111,7 +113,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Home
+              Node.js Binding
             
           </span>
         </div>
@@ -241,9 +243,9 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="." title="Cpp-Linter" class="md-nav__button md-logo" aria-label="Cpp-Linter" data-md-component="logo">
+    <a href=".." title="Cpp-Linter" class="md-nav__button md-logo" aria-label="Cpp-Linter" data-md-component="logo">
       
-  <img src="images/logo.png" alt="logo">
+  <img src="../images/logo.png" alt="logo">
 
     </a>
     Cpp-Linter
@@ -267,6 +269,106 @@
       
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Command Line Interface
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pr-review-caveats/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Pull Request Review Caveats
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../permissions/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Permissions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../python/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Python Binding
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
     
   
   
@@ -283,18 +385,18 @@
           
   
   <span class="md-ellipsis">
-    Home
+    Node.js Binding
   </span>
   
 
           <span class="md-nav__icon md-icon"></span>
         </label>
       
-      <a href="." class="md-nav__link md-nav__link--active">
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   <span class="md-ellipsis">
-    Home
+    Node.js Binding
   </span>
   
 
@@ -322,39 +424,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Install">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#rust" class="md-nav__link">
-    <span class="md-ellipsis">
-      Rust
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#python" class="md-nav__link">
-    <span class="md-ellipsis">
-      Python
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#nodejs" class="md-nav__link">
-    <span class="md-ellipsis">
-      Node.js
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
@@ -367,38 +436,39 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#example" class="md-nav__link">
+  <a href="#development" class="md-nav__link">
     <span class="md-ellipsis">
-      Example
+      Development
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Example">
+    <nav class="md-nav" aria-label="Development">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#annotations" class="md-nav__link">
+  <a href="#scripts" class="md-nav__link">
     <span class="md-ellipsis">
-      Annotations
+      Scripts
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Annotations">
+    <nav class="md-nav" aria-label="Scripts">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#clang-format-annotations" class="md-nav__link">
+  <a href="#yarn-build" class="md-nav__link">
     <span class="md-ellipsis">
-      clang-format annotations
+      yarn build
     </span>
   </a>
   
-</li>
+    <nav class="md-nav" aria-label="yarn build">
+      <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#clang-tidy-annotations" class="md-nav__link">
+  <a href="#yarn-builddebug" class="md-nav__link">
     <span class="md-ellipsis">
-      clang-tidy annotations
+      yarn build:debug
     </span>
   </a>
   
@@ -410,46 +480,9 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#thread-comment" class="md-nav__link">
+  <a href="#yarn-test" class="md-nav__link">
     <span class="md-ellipsis">
-      Thread Comment
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-summary" class="md-nav__link">
-    <span class="md-ellipsis">
-      Step Summary
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#pull-request-review" class="md-nav__link">
-    <span class="md-ellipsis">
-      Pull Request Review
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Pull Request Review">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#only-clang-tidy" class="md-nav__link">
-    <span class="md-ellipsis">
-      Only clang-tidy
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#only-clang-format" class="md-nav__link">
-    <span class="md-ellipsis">
-      Only clang-format
+      yarn test
     </span>
   </a>
   
@@ -460,26 +493,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#folder-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      Folder structure
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#have-question-or-feedback" class="md-nav__link">
-    <span class="md-ellipsis">
-      Have question or feedback?
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#license" class="md-nav__link">
-    <span class="md-ellipsis">
-      License
-    </span>
-  </a>
   
 </li>
       
@@ -498,107 +522,7 @@
   
   
     <li class="md-nav__item">
-      <a href="cli/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Command Line Interface
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="pr-review-caveats/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Pull Request Review Caveats
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="permissions/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Permissions
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="python/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Python Binding
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="node/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Node.js Binding
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="changelog/" class="md-nav__link">
+      <a href="../changelog/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -644,39 +568,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Install">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#rust" class="md-nav__link">
-    <span class="md-ellipsis">
-      Rust
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#python" class="md-nav__link">
-    <span class="md-ellipsis">
-      Python
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#nodejs" class="md-nav__link">
-    <span class="md-ellipsis">
-      Node.js
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
@@ -689,38 +580,39 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#example" class="md-nav__link">
+  <a href="#development" class="md-nav__link">
     <span class="md-ellipsis">
-      Example
+      Development
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Example">
+    <nav class="md-nav" aria-label="Development">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#annotations" class="md-nav__link">
+  <a href="#scripts" class="md-nav__link">
     <span class="md-ellipsis">
-      Annotations
+      Scripts
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Annotations">
+    <nav class="md-nav" aria-label="Scripts">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#clang-format-annotations" class="md-nav__link">
+  <a href="#yarn-build" class="md-nav__link">
     <span class="md-ellipsis">
-      clang-format annotations
+      yarn build
     </span>
   </a>
   
-</li>
+    <nav class="md-nav" aria-label="yarn build">
+      <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#clang-tidy-annotations" class="md-nav__link">
+  <a href="#yarn-builddebug" class="md-nav__link">
     <span class="md-ellipsis">
-      clang-tidy annotations
+      yarn build:debug
     </span>
   </a>
   
@@ -732,46 +624,9 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#thread-comment" class="md-nav__link">
+  <a href="#yarn-test" class="md-nav__link">
     <span class="md-ellipsis">
-      Thread Comment
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-summary" class="md-nav__link">
-    <span class="md-ellipsis">
-      Step Summary
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#pull-request-review" class="md-nav__link">
-    <span class="md-ellipsis">
-      Pull Request Review
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Pull Request Review">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#only-clang-tidy" class="md-nav__link">
-    <span class="md-ellipsis">
-      Only clang-tidy
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#only-clang-format" class="md-nav__link">
-    <span class="md-ellipsis">
-      Only clang-format
+      yarn test
     </span>
   </a>
   
@@ -782,26 +637,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#folder-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      Folder structure
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#have-question-or-feedback" class="md-nav__link">
-    <span class="md-ellipsis">
-      Have question or feedback?
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#license" class="md-nav__link">
-    <span class="md-ellipsis">
-      License
-    </span>
-  </a>
   
 </li>
       
@@ -820,7 +666,7 @@
                   
 
   
-    <a href="https://github.com/cpp-linter/cpp-linter-rs/edit/main/docs/docs/index.md" title="Edit this page" class="md-content__button md-icon">
+    <a href="https://github.com/cpp-linter/cpp-linter-rs/edit/main/docs/docs/node.md" title="Edit this page" class="md-content__button md-icon">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
     </a>
@@ -829,143 +675,90 @@
     
       
     
-    <a href="https://github.com/cpp-linter/cpp-linter-rs/raw/main/docs/docs/index.md" title="View source of this page" class="md-content__button md-icon">
+    <a href="https://github.com/cpp-linter/cpp-linter-rs/raw/main/docs/docs/node.md" title="View source of this page" class="md-content__button md-icon">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 18c.56 0 1 .44 1 1s-.44 1-1 1-1-.44-1-1 .44-1 1-1m0-3c-2.73 0-5.06 1.66-6 4 .94 2.34 3.27 4 6 4s5.06-1.66 6-4c-.94-2.34-3.27-4-6-4m0 6.5a2.5 2.5 0 0 1-2.5-2.5 2.5 2.5 0 0 1 2.5-2.5 2.5 2.5 0 0 1 2.5 2.5 2.5 2.5 0 0 1-2.5 2.5M9.27 20H6V4h7v5h5v4.07c.7.08 1.36.25 2 .49V8l-6-6H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h4.5a8.2 8.2 0 0 1-1.23-2"/></svg>
     </a>
   
 
 
-<!-- markdownlint-disable MD041 MD053 -->
-
-<p><a href="https://github.com/cpp-linter/cpp-linter-rs/actions/workflows/python-packaging.yml"><img alt="Python packaging" src="https://github.com/cpp-linter/cpp-linter-rs/actions/workflows/python-packaging.yml/badge.svg" /></a>
-<a href="https://github.com/cpp-linter/cpp-linter-rs/actions/workflows/binary-builds.yml"><img alt="Binary executable builds" src="https://github.com/cpp-linter/cpp-linter-rs/actions/workflows/binary-builds.yml/badge.svg" /></a>
-<a href="https://github.com/cpp-linter/cpp-linter-rs/actions/workflows/node-js-packaging.yml"><img alt="node-js builds" src="https://github.com/cpp-linter/cpp-linter-rs/actions/workflows/node-js-packaging.yml/badge.svg" /></a>
-<a href="https://github.com/cpp-linter/cpp-linter-rs/actions/workflows/run-dev-tests.yml"><img alt="Test CI" src="https://github.com/cpp-linter/cpp-linter-rs/actions/workflows/run-dev-tests.yml/badge.svg" /></a>
-<a href="https://cpp-linter.github.io/cpp-linter-rs"><img alt="Docs" src="https://github.com/cpp-linter/cpp-linter-rs/actions/workflows/build-docs.yml/badge.svg" /></a>
-<a href="https://github.com/cpp-linter/cpp-linter-rs/actions/workflows/pre-commit-hooks.yml"><img alt="Pre-commit-ci" src="https://github.com/cpp-linter/cpp-linter-rs/actions/workflows/pre-commit-hooks.yml/badge.svg" /></a>
-<a href="https://codecov.io/gh/cpp-linter/cpp-linter-rs"><img alt="codecov-status" src="https://codecov.io/gh/cpp-linter/cpp-linter-rs/graph/badge.svg?token=7ibzERx2AD" /></a></p>
-<h1 id="cc-linting-package">C/C++ Linting Package<a class="headerlink" href="#cc-linting-package" title="Permanent link">&para;</a></h1>
-<p>A package for linting C/C++ code with clang-tidy and/or clang-format to collect feedback provided in the form of</p>
-<ul class="task-list">
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <a href="#thread-comment">thread-comments</a></li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <a href="#step-summary">step-summary</a></li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <a href="#annotations">file-annotations</a></li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <a href="#pull-request-review">Pull Request Review</a> suggestions</li>
-</ul>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p>This project is still experimental and subject to drastic changes.
-Please use the <a href="https://github.com/cpp-linter/cpp-linter">pure python cpp-linter</a>
-package until this project is ready for deployment.</p>
-</div>
+<h1 id="nodejs-binding">Node.js Binding<a class="headerlink" href="#nodejs-binding" title="Permanent link">&para;</a></h1>
+<p>The node.js binding for the <a href="https://github.com/cpp-linter/cpp-linter-rs">cpp-linter-rs</a> rust project
+(built using <a href="https://napi.rs">napi-rs</a> and <a href="https://yarnpkg.com">yarn</a>).</p>
 <h2 id="install">Install<a class="headerlink" href="#install" title="Permanent link">&para;</a></h2>
-<p>This package is available in several programming languages (through their respective package managers).</p>
-<h3 id="rust">Rust<a class="headerlink" href="#rust" title="Permanent link">&para;</a></h3>
-<p><a href="https://crates.io/crates/cpp-linter"><img alt="Crates.io Version" src="https://img.shields.io/crates/v/cpp-linter" /></a>
-<a href="https://docs.rs/cpp-linter"><img alt="docs.rs" src="https://img.shields.io/docsrs/cpp-linter?label=docs.rs" /></a></p>
-<p>Install from source code hosted at crates.io:</p>
-<div class="highlight"><pre><span></span><code>cargo install cpp-linter
-</code></pre></div>
-<p>Install a pre-compiled binary from GitHub releases:</p>
-<p>First <a href="https://github.com/cargo-bins/cargo-binstall?tab=readme-ov-file#installation">install <code>cargo-binstall</code></a>.</p>
-<div class="highlight"><pre><span></span><code>cargo binstall cpp-linter
-</code></pre></div>
-<h3 id="python">Python<a class="headerlink" href="#python" title="Permanent link">&para;</a></h3>
-<p><a href="https://pypi.org/project/cpp-linter/"><img alt="PyPI - Version" src="https://img.shields.io/pypi/v/cpp-linter" /></a></p>
-<p>Install the python package:</p>
-<div class="highlight"><pre><span></span><code>pip install cpp-linter
-</code></pre></div>
-<p><a href="https://test.pypi.org/project/cpp-linter/"><img alt="testPyPI - Version" src="https://img.shields.io/pypi/v/cpp-linter?pypiBaseUrl=https%3A%2F%2Ftest.pypi.org&amp;label=test-pypi" /></a></p>
-<p>Pre-releases are uploaded to test-pypi:</p>
-<div class="highlight"><pre><span></span><code>pip install -i https://test.pypi.org/simple/ cpp-linter
-</code></pre></div>
-<h3 id="nodejs">Node.js<a class="headerlink" href="#nodejs" title="Permanent link">&para;</a></h3>
-<p><a href="https://www.npmjs.com/package/@cpp-linter/cpp-linter"><img alt="NPM Version" src="https://img.shields.io/npm/v/%40cpp-linter%2Fcpp-linter" /></a></p>
-<p>Install the Node.js binding:</p>
+<p>Install with <code>npm</code>:</p>
 <div class="highlight"><pre><span></span><code>npm -g install @cpp-linter/cpp-linter
 </code></pre></div>
 <h2 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">&para;</a></h2>
 <p>For usage in a CI workflow, see
 <a href="https://github.com/cpp-linter/cpp-linter-action">the cpp-linter/cpp-linter-action repository</a>.</p>
 <p>For the description of supported Command Line Interface options, see
-<a href="cli/">the CLI documentation</a>.</p>
-<h2 id="example">Example<a class="headerlink" href="#example" title="Permanent link">&para;</a></h2>
-<h3 id="annotations">Annotations<a class="headerlink" href="#annotations" title="Permanent link">&para;</a></h3>
-<p>Using <a href="cli/#-a-file-annotations"><code>--file-annotations</code></a>:</p>
-<h4 id="clang-format-annotations">clang-format annotations<a class="headerlink" href="#clang-format-annotations" title="Permanent link">&para;</a></h4>
-<p><img alt="clang-format annotations" src="images/annotations-clang-format.png" /></p>
-<h4 id="clang-tidy-annotations">clang-tidy annotations<a class="headerlink" href="#clang-tidy-annotations" title="Permanent link">&para;</a></h4>
-<p><img alt="clang-tidy annotations" src="images/annotations-clang-tidy.png" /></p>
-<h3 id="thread-comment">Thread Comment<a class="headerlink" href="#thread-comment" title="Permanent link">&para;</a></h3>
-<p>Using <a href="cli/#-g-thread-comments"><code>--thread-comments</code></a>:</p>
-<p><img alt="sample thread-comment" src="images/comment.png" /></p>
-<h3 id="step-summary">Step Summary<a class="headerlink" href="#step-summary" title="Permanent link">&para;</a></h3>
-<p>Using <a href="cli/#-w-step-summary"><code>--step-summary</code></a>:</p>
-<p><img alt="step summary" src="images/step-summary.png" /></p>
-<h3 id="pull-request-review">Pull Request Review<a class="headerlink" href="#pull-request-review" title="Permanent link">&para;</a></h3>
-<h4 id="only-clang-tidy">Only clang-tidy<a class="headerlink" href="#only-clang-tidy" title="Permanent link">&para;</a></h4>
-<p>Using <a href="cli/#-d-tidy-review"><code>--tidy-review</code></a>:</p>
-<p><img alt="sample tidy-review" src="images/tidy-review.png" /></p>
-<h4 id="only-clang-format">Only clang-format<a class="headerlink" href="#only-clang-format" title="Permanent link">&para;</a></h4>
-<p>Using <a href="cli/#-m-format-review"><code>--format-review</code></a>:</p>
-<p><img alt="sample format-review" src="images/format-review.png" /></p>
-<p><img alt="sample format-suggestion" src="images/format-suggestion.png" /></p>
-<h2 id="have-question-or-feedback">Have question or feedback?<a class="headerlink" href="#have-question-or-feedback" title="Permanent link">&para;</a></h2>
-<p>To provide feedback (requesting a feature or reporting a bug) please post to
-<a href="https://github.com/cpp-linter/cpp-linter-rs/issues">issues</a>.</p>
-<h2 id="license">License<a class="headerlink" href="#license" title="Permanent link">&para;</a></h2>
-<p>The scripts and documentation in this project are released under the <a href="https://choosealicense.com/licenses/mit">MIT</a>.</p>
-<p>Dependencies (that are redistributed by us in binary form) have the following
-license agreements:</p>
-<ul>
-<li><a href="https://crates.io/crates/clap">clap</a>:
-  Dual-licensed under <a href="https://choosealicense.com/licenses/apache-2.0/">Apache 2.0</a> or <a href="https://choosealicense.com/licenses/mit">MIT</a>.</li>
-<li><a href="https://crates.io/crates/git2">git2</a>:
-  Dual-licensed under <a href="https://choosealicense.com/licenses/apache-2.0/">Apache 2.0</a> or <a href="https://choosealicense.com/licenses/mit">MIT</a>.</li>
-</ul>
-<p>The following are conditionally included in binaries (using the <code>openssl-vendored</code> feature on a
-  case-by-case basis) because it is a dependency of git2:</p>
-<ul>
-<li><a href="https://crates.io/crates/openssl">openssl</a>: Licensed under <a href="https://choosealicense.com/licenses/apache-2.0/">Apache 2.0</a></li>
-<li>
-<p><a href="https://crates.io/crates/openssl-probe">openssl-probe</a>:
-    Dual-licensed under <a href="https://choosealicense.com/licenses/apache-2.0/">Apache 2.0</a> or <a href="https://choosealicense.com/licenses/mit">MIT</a>.</p>
-</li>
-<li>
-<p><a href="https://crates.io/crates/lenient_semver">lenient_semver</a>:
-  Dual-licensed under <a href="https://choosealicense.com/licenses/apache-2.0/">Apache 2.0</a> or <a href="https://choosealicense.com/licenses/mit">MIT</a>.</p>
-</li>
-<li><a href="https://crates.io/crates/log">log</a>:
-  Dual-licensed under <a href="https://choosealicense.com/licenses/apache-2.0/">Apache 2.0</a> or <a href="https://choosealicense.com/licenses/mit">MIT</a>.</li>
-<li><a href="https://crates.io/crates/regex">regex</a>:
-  Dual-licensed under <a href="https://choosealicense.com/licenses/apache-2.0/">Apache 2.0</a> or <a href="https://choosealicense.com/licenses/mit">MIT</a>.</li>
-<li><a href="https://crates.io/crates/reqwest">reqwest</a>:
-  Dual-licensed under <a href="https://choosealicense.com/licenses/apache-2.0/">Apache 2.0</a> or <a href="https://choosealicense.com/licenses/mit">MIT</a>.</li>
-<li><a href="https://crates.io/crates/semver">semver</a>:
-  Dual-licensed under <a href="https://choosealicense.com/licenses/apache-2.0/">Apache 2.0</a> or <a href="https://choosealicense.com/licenses/mit">MIT</a>.</li>
-<li><a href="https://crates.io/crates/serde">serde</a>:
-  Dual-licensed under <a href="https://choosealicense.com/licenses/apache-2.0/">Apache 2.0</a> or <a href="https://choosealicense.com/licenses/mit">MIT</a>.</li>
-<li><a href="https://crates.io/crates/serde-xml-rs">serde-xml-rs</a>: Licensed under <a href="https://choosealicense.com/licenses/mit">MIT</a>.</li>
-<li><a href="https://crates.io/crates/serde_json">serde_json</a>:
-  Dual-licensed under <a href="https://choosealicense.com/licenses/apache-2.0/">Apache 2.0</a> or <a href="https://choosealicense.com/licenses/mit">MIT</a>.</li>
-<li><a href="https://crates.io/crates/which">which</a>: Licensed under <a href="https://choosealicense.com/licenses/mit">MIT</a>.</li>
-<li><a href="https://crates.io/crates/tokio">tokio</a>: Licensed under <a href="https://choosealicense.com/licenses/mit">MIT</a>.</li>
-<li><a href="https://crates.io/crates/futures">futures</a>:
-  Dual-licensed under <a href="https://choosealicense.com/licenses/apache-2.0/">Apache 2.0</a> or <a href="https://choosealicense.com/licenses/mit">MIT</a>.</li>
-<li><a href="https://crates.io/crates/chrono">chrono</a>:
-  Dual-licensed under <a href="https://choosealicense.com/licenses/apache-2.0/">Apache 2.0</a> or <a href="https://choosealicense.com/licenses/mit">MIT</a>.</li>
-</ul>
-<p>The python binding uses</p>
-<ul>
-<li><a href="https://crates.io/crates/pyo3">pyo3</a>:
-  Dual-licensed under <a href="https://choosealicense.com/licenses/apache-2.0/">Apache 2.0</a> or <a href="https://choosealicense.com/licenses/mit">MIT</a>.</li>
-</ul>
-<p>The node binding uses</p>
-<ul>
-<li><a href="https://crates.io/crates/napi">napi</a>: Licensed under <a href="https://choosealicense.com/licenses/mit">MIT</a></li>
-<li><a href="https://crates.io/crates/napi-derive">napi-derive</a>: Licensed under <a href="https://choosealicense.com/licenses/mit">MIT</a></li>
-</ul>
+<a href="https://cpp-linter.github.io/cpp-linter-rs/cli.html">the CLI documentation</a>.</p>
+<h2 id="development">Development<a class="headerlink" href="#development" title="Permanent link">&para;</a></h2>
+<p>After the native module is built using <a href="#yarn-builddebug"><code>yarn build:debug</code></a>, you can
+invoke the executable script as a normal CLI app:</p>
+<div class="highlight"><pre><span></span><code>npx cpp-linter --help
+</code></pre></div>
+<h3 id="scripts">Scripts<a class="headerlink" href="#scripts" title="Permanent link">&para;</a></h3>
+<p>If an available script is not described below, it should be considered a convenience
+tool for the CI/CD workflow.</p>
+<h4 id="yarn-build"><code>yarn build</code><a class="headerlink" href="#yarn-build" title="Permanent link">&para;</a></h4>
+<p>This script builds the native module for distribution (with release profile optimizations).</p>
+<h5 id="yarn-builddebug"><code>yarn build:debug</code><a class="headerlink" href="#yarn-builddebug" title="Permanent link">&para;</a></h5>
+<p>Same as <code>yarn build</code> but does not use the release profile optimizations.
+You should use this script when testing locally.</p>
+<h4 id="yarn-test"><code>yarn test</code><a class="headerlink" href="#yarn-test" title="Permanent link">&para;</a></h4>
+<p>This script runs a simple test to ensure the native module was built correctly.</p>
+<h3 id="folder-structure">Folder structure<a class="headerlink" href="#folder-structure" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Name</th>
+<th style="text-align: left;">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;"><code>__test__</code></td>
+<td style="text-align: left;">The location of the unit test(s).</td>
+</tr>
+<tr>
+<td style="text-align: right;"><code>npm</code></td>
+<td style="text-align: left;">The required metadata for publishing platform-specific packages to npm.</td>
+</tr>
+<tr>
+<td style="text-align: right;"><code>src</code></td>
+<td style="text-align: left;">The location for all rust sources related to binding the cpp-linter library.</td>
+</tr>
+<tr>
+<td style="text-align: right;"><code>build.rs</code></td>
+<td style="text-align: left;">The cargo-specific build script used when compiling the binding.</td>
+</tr>
+<tr>
+<td style="text-align: right;"><code>Cargo.toml</code></td>
+<td style="text-align: left;">Metadata about the binding's rust package (which <em>is not</em> intended to be published to crates.io).</td>
+</tr>
+<tr>
+<td style="text-align: right;"><code>package.json</code></td>
+<td style="text-align: left;">Metadata about the npm package (platform agnostic).</td>
+</tr>
+<tr>
+<td style="text-align: right;"><code>index.d.ts</code></td>
+<td style="text-align: left;">The generated TypeScript typing info the describes the exposing functionality in the built native module.</td>
+</tr>
+<tr>
+<td style="text-align: right;"><code>index.js</code></td>
+<td style="text-align: left;">The generated script that delegates which platform-specific package to import.</td>
+</tr>
+<tr>
+<td style="text-align: right;"><code>cpp-linter.x-y-z.node</code></td>
+<td style="text-align: left;">Then native module built for a specific platform (where <code>x-y-z</code> denotes the platform's name using compilation target).</td>
+</tr>
+</tbody>
+</table>
+<p>Hidden files and folders are not described in the table above.
+If they are not ignored by a gitignore specification, then they should be considered
+important for maintenance or distribution.</p>
 
 
 
@@ -1002,15 +795,31 @@ license agreements:</p>
       
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
+          
+          <a href="../python/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Python Binding">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Python Binding
+              </div>
+            </div>
+          </a>
+        
         
           
-          <a href="cli/" class="md-footer__link md-footer__link--next" aria-label="Next: Command Line Interface">
+          <a href="../changelog/" class="md-footer__link md-footer__link--next" aria-label="Next: Changes">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Command Line Interface
+                Changes
               </div>
             </div>
             <div class="md-footer__button md-icon">
@@ -1092,10 +901,10 @@ license agreements:</p>
     </div>
     
     
-    <script id="__config" type="application/json">{"base": ".", "features": ["navigation.top", "content.tabs.link", "content.tooltips", "content.code.annotate", "content.code.copy", "content.action.view", "content.action.edit", "navigation.footer", "search.suggest", "search.share", "navigation.tracking", "toc.follow"], "search": "assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": "..", "features": ["navigation.top", "content.tabs.link", "content.tooltips", "content.code.annotate", "content.code.copy", "content.action.view", "content.action.edit", "navigation.footer", "search.suggest", "search.share", "navigation.tracking", "toc.follow"], "search": "../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
-      <script src="assets/javascripts/bundle.525ec568.min.js"></script>
+      <script src="../assets/javascripts/bundle.525ec568.min.js"></script>
       
     
   </body>
