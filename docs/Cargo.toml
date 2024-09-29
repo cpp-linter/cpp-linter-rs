@@ -2,8 +2,8 @@
 [package]
 name = "cli-gen"
 edition = "2021"
-version = "0.1.0"
-description = "A mdbook pre-processor that generates a CLI doc from source code."
+version = "0.0.0"
+description = "A function exposed in python that generates a CLI doc from rust source code."
 repository = "https://github.com/cpp-linter/cpp-linter-rs/tree/main/docs"
 authors.workspace = true
 homepage.workspace = true
@@ -11,11 +11,8 @@ license.workspace = true
 
 [dependencies]
 cpp-linter = { path = "../cpp-linter" }
-clap = "4.5.17"
-mdbook = "0.4.40"
-semver = "1.0.23"
-serde_json = "1.0.128"
+pyo3 = "0.22.3"
 
-[[bin]]
-name = "cli-gen"
-path = "src/main.rs"
+[lib]
+name = "cli_gen"
+crate-type = ["cdylib"]

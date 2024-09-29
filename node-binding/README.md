@@ -1,5 +1,5 @@
 # cpp-linter
-
+<!-- start -->
 The node.js binding for the [cpp-linter-rs][this] rust project
 (built using [napi-rs](https://napi.rs) and [yarn](https://yarnpkg.com)).
 

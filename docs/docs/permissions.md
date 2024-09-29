@@ -4,7 +4,7 @@
 
 This is an exhaustive list of required permissions organized by features.
 
-> [!important]
+> [!IMPORTANT]
 > The `GITHUB_TOKEN` environment variable should be supplied when running on a private repository.
 > Otherwise the runner does not not have the privileges needed for the features mentioned here.
 >
@@ -15,8 +15,8 @@ This is an exhaustive list of required permissions organized by features.
 
 ## File Changes
 
-When using [`--files-changed-only`](cli.md#-f---files-changed-only) or
-[`--lines-changed-only`](cli.md#-l---lines-changed-only) to get the list
+When using [`--files-changed-only`](cli.md#-f-files-changed-only) or
+[`--lines-changed-only`](cli.md#-l-lines-changed-only) to get the list
 of file changes for a CI event, the following permissions are needed:
 
 ### Push
@@ -51,7 +51,7 @@ the repository is not checked out before running cpp-linter.
 
 ## Thread Comments
 
-The [`--thread-comments`](cli.md#-g---thread-comments) feature requires the following permissions:
+The [`--thread-comments`](cli.md#-g-thread-comments) feature requires the following permissions:
 
 ### Push
 
@@ -78,7 +78,7 @@ For [`pull_request` events][pr-events].
 
 ## Pull Request Reviews
 
-The [`tidy-review`](cli.md#-d---tidy-review), [`format-review`](cli.md#-m---format-review), and [`passive-reviews`](cli.md#-r---passive-reviews) features require the following permissions:
+The [`tidy-review`](cli.md#-d-tidy-review), [`format-review`](cli.md#-m-format-review), and [`passive-reviews`](cli.md#-r-passive-reviews) features require the following permissions:
 
 ```yaml
     permissions:

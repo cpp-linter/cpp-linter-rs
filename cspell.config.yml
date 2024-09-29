@@ -18,22 +18,28 @@ words:
   - endmacro
   - endwith
   - Falsey
+  - fontawesome
   - gitmodules
+  - inlinehilite
   - iomanip
   - libc
   - libgit
+  - linenums
   - markdownlint
   - maturin
   - mdbook
+  - mkdocs
   - msvc
   - napi
   - nonminimal
   - peekable
   - pkgs
+  - positionals
   - posix
   - preprocess
   - pybind
   - pyfunction
+  - pymdownx
   - pymodule
   - pypa
   - pypi
@@ -42,8 +48,11 @@ words:
   - reqwest
   - revparse
   - serde
+  - superfences
+  - tasklist
   - tempdir
   - tempfile
+  - twemoji
   - vararg
   - venv
 ignorePaths:

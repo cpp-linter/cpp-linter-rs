@@ -1,0 +1,17 @@
+[build-system]
+requires = ["maturin>=1.4,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "cli-gen"
+description = "Generate cpp-linter CLI doc from rust src."
+version = "0.0.0"
+readme = "README.md"
+license = {text = "MIT License"}
+requires-python = ">=3.7"
+authors = [
+    { name = "Brendan Doherty", email = "2bndy5@gmail.com" },
+]
+
+[tool.maturin]
+features = ["pyo3/extension-module"]
