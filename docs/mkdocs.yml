@@ -62,6 +62,12 @@ extra:
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/cpp-linter/cpp-linter
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/cpp-linter/
+    - icon: fontawesome/brands/npm
+      link: https://www.npmjs.com/package/@cpp-linter/cpp-linter
+    - icon: simple/rust
+      link: https://crates.io/crates/cpp-linter
 
 extra_css:
   - stylesheets/extra.css
