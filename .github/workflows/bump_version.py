@@ -128,6 +128,8 @@ def main():
             ".config/cliff.toml",
             "--tag",
             Updater.new_version,
+            "--output",
+            "CHANGELOG.md",
         ],
         check=True,
     )

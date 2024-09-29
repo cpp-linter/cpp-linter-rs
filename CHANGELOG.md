@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
-## [Unreleased] - 2024-09-21 to present
+## [2.0.0-rc5] - 2024-09-29
 
 ### <!-- 1 --> 🚀 Added
 
@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### <!-- 4 --> 🛠️ Fixed
 
 - Fix typo in node-binding/README by @2bndy5 in [`7732676`](https://github.com/cpp-linter/cpp-linter-rs/commit/7732676e03941a37a4fb5b474d319c640689985a)
+- Propagate errors by @2bndy5 in [#47](https://github.com/cpp-linter/cpp-linter-rs/pull/47)
+- Fix bump-n-release CI workflow by @2bndy5 in [`cc3ced6`](https://github.com/cpp-linter/cpp-linter-rs/commit/cc3ced643d4b08c542c49f62b15dfb28b4ff36b1)
 
 ### <!-- 6 --> 📦 Dependency updates
 
@@ -23,15 +25,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### <!-- 8 --> 📝 Documentation
 
 - Release trial follow up by @2bndy5 in [#41](https://github.com/cpp-linter/cpp-linter-rs/pull/41)
+- Move logic for release notes generation from Python script to Jinja template (release CI) by @2bndy5 in [#44](https://github.com/cpp-linter/cpp-linter-rs/pull/44)
+- Add ReadTheDocs config by @2bndy5 in [#45](https://github.com/cpp-linter/cpp-linter-rs/pull/45)
 
 ### <!-- 9 --> 🗨️ Changed
 
 - Gimme them badges by @2bndy5 in [`c0f1ea5`](https://github.com/cpp-linter/cpp-linter-rs/commit/c0f1ea516ee6efdf1137884cbc2e99e4ce1d4a11)
-- Move logic from py script to jinja template (release CI) in [`bc05419`](https://github.com/cpp-linter/cpp-linter-rs/commit/bc05419920e15704352d344a4fa7da67824cc776)
+- Rename repository by @2bndy5 in [`5e3d93f`](https://github.com/cpp-linter/cpp-linter-rs/commit/5e3d93f53e98bbfed56057d2f3984f65c7835550)
+- Bump version to v2.0.0-rc5 by @2bndy5 in [`12ecf9f`](https://github.com/cpp-linter/cpp-linter-rs/commit/12ecf9f702fcd1735d16079567e730f0be4a9a35)
 
-[Unreleased]: https://github.com/cpp-linter/cpp-linter-rs/compare/v2.0.0-rc4...HEAD
+[2.0.0-rc5]: https://github.com/cpp-linter/cpp-linter-rs/compare/v2.0.0-rc4...v2.0.0-rc5
 
-Full commit diff: [`v2.0.0-rc4...HEAD`][Unreleased]
+Full commit diff: [`v2.0.0-rc4...v2.0.0-rc5`][2.0.0-rc5]
 
 ## [2.0.0-rc4] - 2024-09-21
 
