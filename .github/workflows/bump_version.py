@@ -35,6 +35,7 @@ In order, this script does the following:
 
 import argparse
 from pathlib import Path
+from os import environ
 import subprocess
 import re
 
@@ -132,19 +133,24 @@ def main():
     )
     print("Updated CHANGELOG.md")
 
+    if environ.get("CI", "false") == "true":
+        # configure git credentials on CI runner
+        # NOTE: this is design to fail locally with `KeyError`
+        git_config = {"name": environ["GITHUB_ACTOR"]}
+        git_config["email"] = (
+            f'{environ["GITHUB_ACTOR_ID"]}+{git_config["name"]}@users.noreply.github.com'
+        )
+        for key, value in git_config.items():
+            subprocess.run(
+                ["git", "config", "--global", f"user.{key}", value], check=True
+            )
     subprocess.run(["git", "add", "--all"], check=True)
     tag = "v" + Updater.new_version
     subprocess.run(["git", "commit", "-m", f"Bump version to {tag}"], check=True)
-    try:
-        subprocess.run(["git", "push"], check=True)
-    except subprocess.CalledProcessError as exc:
-        raise RuntimeError(
-            """Failed to push commit for version bump. Please ensure that
-- You have the necessary permissions and are authenticated properly.
-- All other commits on the branch have ben pushed already."""
-        ) from exc
-    title, notes = get_release_notes()
+    subprocess.run(["git", "push"], check=True)
     print("Pushed commit to 'Bump version to", tag, "'")
+
+    title, notes = get_release_notes()
     gh_cmd = ["gh", "release", "create", tag, "--title", title, "--notes", notes]
     if Updater.component == "rc":
         gh_cmd.append("--prerelease")
