@@ -33,4 +33,4 @@ with mkdocs_gen_files.open(FILENAME, "w") as io_doc:
     # print(doc)
     print(doc, file=io_doc)
 
-mkdocs_gen_files.set_edit_path(FILENAME, "gen_io_doc.py")
+mkdocs_gen_files.set_edit_path(FILENAME, "gen_cli_doc.py")
