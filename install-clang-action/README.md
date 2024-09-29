@@ -1,4 +1,4 @@
-# cpp-linter/cpp_linter_rs/install-clang-action
+# cpp-linter/cpp-linter-rs/install-clang-action
 
 This is action is not meant to be published in the GitHub marketplace.
 It intended to be a repo-specific action for installing multiple versions of
@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Install clang tools v16
-        uses: cpp-linter/cpp_linter_rs/install-clang-action@main
+        uses: cpp-linter/cpp-linter-rs/install-clang-action@main
         with:
           version: 16
       - name: test with clang tools v16
@@ -22,7 +22,7 @@ jobs:
           CLANG_VERSION: 16
         run: just test
       - name: Install clang tools v17
-        uses: cpp-linter/cpp_linter_rs/install-clang-action@main
+        uses: cpp-linter/cpp-linter-rs/install-clang-action@main
         with:
           version: 17
       - name: test with clang tools v17

@@ -80,7 +80,7 @@ jobs:
 
       - name: Install clang v7
         if: runner.os == 'Linux'
-        uses: cpp-linter/cpp_linter_rs/install-clang-action@main
+        uses: cpp-linter/cpp-linter-rs/install-clang-action@main
         with:
           version: '7'
 
@@ -92,7 +92,7 @@ jobs:
 
       - name: Install clang v8
         if: runner.os == 'Linux'
-        uses: cpp-linter/cpp_linter_rs/install-clang-action@main
+        uses: cpp-linter/cpp-linter-rs/install-clang-action@main
         with:
           version: '8'
 
@@ -103,7 +103,7 @@ jobs:
         run: just test ci
 
       - name: Install clang v9
-        uses: cpp-linter/cpp_linter_rs/install-clang-action@main
+        uses: cpp-linter/cpp-linter-rs/install-clang-action@main
         with:
           version: '9'
 
@@ -113,7 +113,7 @@ jobs:
         run: just test ci
 
       - name: Install clang v10
-        uses: cpp-linter/cpp_linter_rs/install-clang-action@main
+        uses: cpp-linter/cpp-linter-rs/install-clang-action@main
         with:
           version: '10'
 
@@ -123,7 +123,7 @@ jobs:
         run: just test ci
 
       - name: Install clang 11
-        uses: cpp-linter/cpp_linter_rs/install-clang-action@main
+        uses: cpp-linter/cpp-linter-rs/install-clang-action@main
         with:
           version: '11'
 
@@ -133,7 +133,7 @@ jobs:
         run: just test ci
 
       - name: Install clang 12
-        uses: cpp-linter/cpp_linter_rs/install-clang-action@main
+        uses: cpp-linter/cpp-linter-rs/install-clang-action@main
         with:
           version: '12'
 
@@ -143,7 +143,7 @@ jobs:
         run: just test ci
 
       - name: Install clang 13
-        uses: cpp-linter/cpp_linter_rs/install-clang-action@main
+        uses: cpp-linter/cpp-linter-rs/install-clang-action@main
         with:
           version: '13'
 
@@ -153,7 +153,7 @@ jobs:
         run: just test ci
 
       - name: Install clang 14
-        uses: cpp-linter/cpp_linter_rs/install-clang-action@main
+        uses: cpp-linter/cpp-linter-rs/install-clang-action@main
         with:
           version: '14'
 
@@ -163,7 +163,7 @@ jobs:
         run: just test ci
 
       - name: Install clang 15
-        uses: cpp-linter/cpp_linter_rs/install-clang-action@main
+        uses: cpp-linter/cpp-linter-rs/install-clang-action@main
         with:
           version: '15'
 
@@ -173,7 +173,7 @@ jobs:
         run: just test ci
 
       - name: Install clang 16
-        uses: cpp-linter/cpp_linter_rs/install-clang-action@main
+        uses: cpp-linter/cpp-linter-rs/install-clang-action@main
         with:
           version: '16'
 
@@ -183,7 +183,7 @@ jobs:
         run: just test ci
 
       - name: Install clang 17
-        uses: cpp-linter/cpp_linter_rs/install-clang-action@main
+        uses: cpp-linter/cpp-linter-rs/install-clang-action@main
         with:
           version: '17'
 
@@ -193,7 +193,7 @@ jobs:
         run: just test ci
 
       - name: Install clang 18
-        uses: cpp-linter/cpp_linter_rs/install-clang-action@main
+        uses: cpp-linter/cpp-linter-rs/install-clang-action@main
         with:
           version: '18'
 

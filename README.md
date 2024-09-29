@@ -1,10 +1,10 @@
 <!-- markdownlint-disable MD041 -->
 
-[file-annotations]: https://cpp-linter.github.io/cpp_linter_rs/cli#-a---file-annotations
-[thread-comments]: https://cpp-linter.github.io/cpp_linter_rs/cli#-g---thread-comments
-[step-summary]: https://cpp-linter.github.io/cpp_linter_rs/cli#-w---step-summary
-[tidy-review]: https://cpp-linter.github.io/cpp_linter_rs/cli#-d---tidy-review
-[format-review]: https://cpp-linter.github.io/cpp_linter_rs/cli#-m---format-review
+[file-annotations]: https://cpp-linter.github.io/cpp-linter-rs/cli#-a---file-annotations
+[thread-comments]: https://cpp-linter.github.io/cpp-linter-rs/cli#-g---thread-comments
+[step-summary]: https://cpp-linter.github.io/cpp-linter-rs/cli#-w---step-summary
+[tidy-review]: https://cpp-linter.github.io/cpp-linter-rs/cli#-d---tidy-review
+[format-review]: https://cpp-linter.github.io/cpp-linter-rs/cli#-m---format-review
 
 [format-annotations-preview]: docs/src/images/annotations-clang-format.png
 [tidy-annotations-preview]: docs/src/images/annotations-clang-tidy.png
@@ -22,20 +22,20 @@
 [![Pre-commit-ci][pre-commit-badge]][pre-commit-ci]
 [![codecov-status][codecov-badge]][codecov-project]
 
-[py-build-ci]: https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/python-packaging.yml
-[py-build-badge]: https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/python-packaging.yml/badge.svg
-[bin-build-badge]: https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/binary-builds.yml/badge.svg
-[bin-build-ci]: https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/binary-builds.yml
-[node-ci-badge]: https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/node-js-packaging.yml/badge.svg
-[node-ci]: https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/node-js-packaging.yml
-[test-ci-badge]: https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/run-dev-tests.yml/badge.svg
-[test-ci]: https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/run-dev-tests.yml
-[docs-ci-badge]: https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/build-docs.yml/badge.svg
-[docs-site]: https://cpp-linter.github.io/cpp_linter_rs
-[pre-commit-badge]: https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/pre-commit-hooks.yml/badge.svg
-[pre-commit-ci]: https://github.com/cpp-linter/cpp_linter_rs/actions/workflows/pre-commit-hooks.yml
-[codecov-badge]: https://codecov.io/gh/cpp-linter/cpp_linter_rs/graph/badge.svg?token=7ibzERx2AD
-[codecov-project]: https://codecov.io/gh/cpp-linter/cpp_linter_rs
+[py-build-ci]: https://github.com/cpp-linter/cpp-linter-rs/actions/workflows/python-packaging.yml
+[py-build-badge]: https://github.com/cpp-linter/cpp-linter-rs/actions/workflows/python-packaging.yml/badge.svg
+[bin-build-badge]: https://github.com/cpp-linter/cpp-linter-rs/actions/workflows/binary-builds.yml/badge.svg
+[bin-build-ci]: https://github.com/cpp-linter/cpp-linter-rs/actions/workflows/binary-builds.yml
+[node-ci-badge]: https://github.com/cpp-linter/cpp-linter-rs/actions/workflows/node-js-packaging.yml/badge.svg
+[node-ci]: https://github.com/cpp-linter/cpp-linter-rs/actions/workflows/node-js-packaging.yml
+[test-ci-badge]: https://github.com/cpp-linter/cpp-linter-rs/actions/workflows/run-dev-tests.yml/badge.svg
+[test-ci]: https://github.com/cpp-linter/cpp-linter-rs/actions/workflows/run-dev-tests.yml
+[docs-ci-badge]: https://github.com/cpp-linter/cpp-linter-rs/actions/workflows/build-docs.yml/badge.svg
+[docs-site]: https://cpp-linter.github.io/cpp-linter-rs
+[pre-commit-badge]: https://github.com/cpp-linter/cpp-linter-rs/actions/workflows/pre-commit-hooks.yml/badge.svg
+[pre-commit-ci]: https://github.com/cpp-linter/cpp-linter-rs/actions/workflows/pre-commit-hooks.yml
+[codecov-badge]: https://codecov.io/gh/cpp-linter/cpp-linter-rs/graph/badge.svg?token=7ibzERx2AD
+[codecov-project]: https://codecov.io/gh/cpp-linter/cpp-linter-rs
 [docs-rs-badge]: https://img.shields.io/docsrs/cpp-linter?label=docs.rs
 [docs-rs]: https://docs.rs/cpp-linter
 [pypi-badge]: https://img.shields.io/pypi/v/cpp-linter
@@ -118,7 +118,7 @@ For usage in a CI workflow, see
 [the cpp-linter/cpp-linter-action repository](https://github.com/cpp-linter/cpp-linter-action).
 
 For the description of supported Command Line Interface options, see
-[the CLI documentation](https://cpp-linter.github.io/cpp_linter_rs/cli.html).
+[the CLI documentation](https://cpp-linter.github.io/cpp-linter-rs/cli.html).
 
 ## Example
 
@@ -165,7 +165,7 @@ Using [`--format-review`][format-review]:
 ## Have question or feedback?
 
 To provide feedback (requesting a feature or reporting a bug) please post to
-[issues](https://github.com/cpp-linter/cpp_linter_rs/issues).
+[issues](https://github.com/cpp-linter/cpp-linter-rs/issues).
 
 ## License
 

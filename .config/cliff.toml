@@ -142,4 +142,4 @@ sort_commits = "oldest"
 
 # [remote.github]
 # owner = "cpp-linter"
-# repo = "cpp_linter_rs"
+# repo = "cpp-linter-rs"

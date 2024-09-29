@@ -1,8 +1,8 @@
 #![doc(
-    html_logo_url = "https://github.com/cpp-linter/cpp_linter_rs/raw/main/docs/theme/favicon.png"
+    html_logo_url = "https://github.com/cpp-linter/cpp-linter-rs/raw/main/docs/theme/favicon.png"
 )]
 #![doc(
-    html_favicon_url = "https://github.com/cpp-linter/cpp_linter_rs/raw/main/docs/theme/favicon.png"
+    html_favicon_url = "https://github.com/cpp-linter/cpp-linter-rs/raw/main/docs/theme/favicon.png"
 )]
 #![doc = include_str!("../README.md")]
 

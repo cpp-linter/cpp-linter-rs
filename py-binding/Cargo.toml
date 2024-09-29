@@ -2,7 +2,7 @@
 name = "cpp-linter-py"
 edition = "2021"
 readme = "README.md"
-repository = "https://github.com/cpp-linter/cpp_linter_rs/tree/main/py-binding"
+repository = "https://github.com/cpp-linter/cpp-linter-rs/tree/main/py-binding"
 version.workspace = true
 authors.workspace = true
 description.workspace = true

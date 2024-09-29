@@ -11,7 +11,7 @@ authors = [
     "Peter Shen",
 ]
 description = "Run clang-format and clang-tidy on a batch of files."
-homepage = "https://cpp-linter.github.io/cpp_linter_rs"
+homepage = "https://cpp-linter.github.io/cpp-linter-rs"
 license = "MIT"
 
 [profile.release]

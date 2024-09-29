@@ -3,7 +3,7 @@
 This folder is only for generating the documentation.
 Please [visit our website][gh-pages] to see generated documentation.
 
-[gh-pages]: https://cpp-linter.github.io/cpp_linter_rs
+[gh-pages]: https://cpp-linter.github.io/cpp-linter-rs
 
 To view the documentation locally, some software needs to be installed.
 

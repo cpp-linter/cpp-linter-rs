@@ -13,4 +13,4 @@
 >
 > See also [docs/README](../README.md) for more information.
 
-[gh-pages]: https://cpp-linter.github.io/cpp_linter_rs/cli.html
+[gh-pages]: https://cpp-linter.github.io/cpp-linter-rs/cli.html

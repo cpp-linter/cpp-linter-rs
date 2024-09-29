@@ -19,4 +19,4 @@ library (see `run::run_main()`).
 See also the [CLI document hosted on github][gh-pages].
 
 [pypi-org]: https://pypi.org/project/cpp-linter
-[gh-pages]: https://cpp-linter.github.io/cpp_linter_rs/cli.html
+[gh-pages]: https://cpp-linter.github.io/cpp-linter-rs/cli.html

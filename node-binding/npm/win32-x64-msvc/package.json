@@ -15,11 +15,11 @@
   "description": "Node.js binding for the cpp-linter Rust source.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/cpp-linter/cpp_linter_rs.git"
+    "url": "git+https://github.com/cpp-linter/cpp-linter-rs.git"
   },
   "author": "Brendan Doherty",
   "bugs": {
-    "url": "https://github.com/cpp-linter/cpp_linter_rs/issues"
+    "url": "https://github.com/cpp-linter/cpp-linter-rs/issues"
   },
   "engines": {
     "node": ">= 10"

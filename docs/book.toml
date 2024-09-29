@@ -4,7 +4,7 @@ language = "en"
 multilingual = false
 src = "src"
 title = "cpp-linter"
-description = "Some documentation about the cpp_linter_rs project"
+description = "Some documentation about the cpp-linter-rs project"
 
 [build]
 create-missing = false
@@ -14,7 +14,7 @@ build-dir = "book/html"
 theme = "theme"
 default-theme = "ayu"
 preferred-dark-theme = "ayu"
-git-repository-url = "https://github.com/cpp-linter/cpp_linter_rs"
+git-repository-url = "https://github.com/cpp-linter/cpp-linter-rs"
 additional-css = ["theme/pagetoc.css"]
 additional-js  = ["theme/pagetoc.js"]
 

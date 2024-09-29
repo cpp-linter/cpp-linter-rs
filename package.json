@@ -1,5 +1,5 @@
 {
-  "name": "@cpp-linter/cpp_linter_rs",
+  "name": "@cpp-linter/cpp-linter-rs",
   "version": "0.0.0",
   "description": "Node.js bindings for the cpp-linter rust source.",
   "main": "node-bindings/index.node",
@@ -13,14 +13,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/cpp-linter/cpp_linter_rs.git"
+    "url": "git+https://github.com/cpp-linter/cpp-linter-rs.git"
   },
   "author": "Brendan Doherty",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/cpp-linter/cpp_linter_rs/issues"
+    "url": "https://github.com/cpp-linter/cpp-linter-rs/issues"
   },
-  "homepage": "https://github.com/cpp-linter/cpp_linter_rs#readme",
+  "homepage": "https://github.com/cpp-linter/cpp-linter-rs#readme",
   "private": true,
   "workspaces": [
     "node-binding"

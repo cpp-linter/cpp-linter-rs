@@ -1,9 +1,9 @@
 # cpp-linter
 
-The python binding for the [cpp_linter_rs][this] rust project
+The python binding for the [cpp-linter-rs][this] rust project
 (built using [pyo3](https://pyo3.rs) and [maturin]).
 
-[this]: https://github.com/cpp-linter/cpp_linter_rs
+[this]: https://github.com/cpp-linter/cpp-linter-rs
 [maturin]: https://maturin.rs
 
 ## Install
@@ -26,7 +26,7 @@ For usage in a CI workflow, see
 [the cpp-linter/cpp-linter-action repository](https://github.com/cpp-linter/cpp-linter-action).
 
 For the description of supported Command Line Interface options, see
-[the CLI documentation](https://cpp-linter.github.io/cpp_linter_rs/cli.html).
+[the CLI documentation](https://cpp-linter.github.io/cpp-linter-rs/cli.html).
 
 ## Development
 
