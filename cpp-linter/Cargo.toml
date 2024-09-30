@@ -26,7 +26,7 @@ log = { version = "0.4.22", features = ["std"] }
 openssl = { version = "0.10", features = ["vendored"], optional = true }
 openssl-probe = { version = "0.1", optional = true }
 regex = "1.10.6"
-reqwest = "0.12.7"
+reqwest = "0.12.8"
 semver = "1.0.23"
 serde = { version = "1.0.210", features = ["derive"] }
 serde-xml-rs = "0.6.0"
