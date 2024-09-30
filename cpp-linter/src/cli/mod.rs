@@ -57,9 +57,9 @@ for an example of setting up Clang Tooling on a source tree.",
 - Set this to a blank string (`''`) to disable using clang-format
   entirely.
 
-> [!note]
+> [!NOTE]
 > If this is not a blank string, then it is also passed to clang-tidy
-> (if [`--tidy_checks`](#-c---tidy-checks) is not `-*`).
+> (if [`--tidy_checks`](#-c-tidy-checks) is not `-*`).
 > This is done to ensure suggestions from both clang-tidy and
 > clang-format are consistent.\n\n",
             ),
@@ -142,7 +142,7 @@ the current working directory if not using a CI runner).\n\n",
 - There is no need to use `./` for each entry; a blank string (`''`)
   represents the repo-root path.
 - This can also have files, but the file's path (relative to
-  the [`--repo-root`](#-r---repo-root)) has to be specified with the filename.
+  the [`--repo-root`](#-r-repo-root)) has to be specified with the filename.
 - Submodules are automatically ignored. Hidden directories (beginning
   with a `.`) are also ignored automatically.
 - Prefix a path with `!` to explicitly not ignore it. This can be
@@ -158,7 +158,7 @@ the current working directory if not using a CI runner).\n\n",
                 .value_delimiter('|')
                 .help_heading("clang-tidy options")
                 .help(
-                    "Similar to [`--ignore`](#-i---ignore) but applied
+                    "Similar to [`--ignore`](#-i-ignore) but applied
 exclusively to files analyzed by clang-tidy.\n\n",
             ),
         )
@@ -169,7 +169,7 @@ exclusively to files analyzed by clang-tidy.\n\n",
                 .value_delimiter('|')
                 .help_heading("clang-format options")
                 .help(
-                    "Similar to [`--ignore`](#-i---ignore) but applied
+                    "Similar to [`--ignore`](#-i-ignore) but applied
 exclusively to files analyzed by clang-format.\n\n",
             ),
         )
@@ -201,9 +201,9 @@ The following values are accepted:
                 .help(
                     "Set this option to false to analyze any source files in the repo.
 This is automatically enabled if
-[`--lines-changed-only`](#-l---lines-changed-only) is enabled.
+[`--lines-changed-only`](#-l-lines-changed-only) is enabled.
 
-> [!note]
+> [!NOTE]
 > The `GITHUB_TOKEN` should be supplied when running on a
 > private repository with this option enabled, otherwise the runner
 > does not not have the privilege to list the changed files for an event.
@@ -241,7 +241,7 @@ cpp-linter --extra-arg="-std=c++17" --extra-arg="-Wall"
 Set this to `update` to update an existing comment if one exists;
 the value 'true' will always delete an old comment and post a new one if necessary.
 
-> [!note]
+> [!NOTE]
 > To use thread comments, the `GITHUB_TOKEN` (provided by
 > Github to each repository) must be declared as an environment
 > variable.
@@ -261,8 +261,8 @@ the value 'true' will always delete an old comment and post a new one if necessa
                     "Set this option to true or false to enable or disable the use of a
 thread comment that basically says 'Looks Good To Me' (when all checks pass).
 
-> [!important]
-> The [`--thread-comments`](#-g---thread-comments)
+> [!IMPORTANT]
+> The [`--thread-comments`](#-g-thread-comments)
 > option also notes further implications.\n\n",
             ),
         )

@@ -34,12 +34,12 @@ lcov:
 # serve docs
 [group("docs")]
 docs open='':
-    mdbook serve docs {{ open }}
+    mkdocs serve --config-file docs/mkdocs.yml {{ open }}
 
 # build docs
 [group("docs")]
-docs-build open='':
-    mdbook build docs {{ open }}
+docs-build:
+    mkdocs build --config-file docs/mkdocs.yml
 
 # rust docs
 [group("docs")]

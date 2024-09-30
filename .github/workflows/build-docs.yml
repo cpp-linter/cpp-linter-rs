@@ -36,7 +36,7 @@ jobs:
           key: ${{ runner.os }}-docs-cargo-${{ hashFiles('Cargo.lock') }}
       - run: cargo fetch
 
-  build-mdbook:
+  build-mkdocs:
     runs-on: ubuntu-latest
     needs: [cache-deps]
     permissions:
@@ -48,26 +48,30 @@ jobs:
         with:
           path: ~/.cargo
           key: ${{ runner.os }}-docs-cargo-${{ hashFiles('Cargo.lock') }}
-      - name: Install mdbook
-        uses: taiki-e/install-action@v2
+      - uses: actions/setup-python@v5
         with:
-          tool: mdbook,cargo-binstall,just
-      - name: Install mdbook plugins
-        run: cargo binstall -y mdbook-alerts
-      - name: Build book
-        run: just docs-build
+          python-version: 3.x
+          cache: 'pip'
+          cache-dependency-path: docs/requirements.txt
+      - name: Install workflow deps
+        run: |
+          pip install -r docs/requirements.txt
+          pip install --force-reinstall -v docs/
+      - name: Build docs
+        working-directory: docs
+        run: mkdocs build
       - name: Upload docs build as artifact
         uses: actions/upload-artifact@v4
         with:
           name: cpp-linter-docs
-          path: docs/book/html
+          path: docs/site
       - name: Upload to github pages
         # only publish doc changes from main branch
         if: github.ref == 'refs/heads/main'
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: docs/book/html
+          publish_dir: docs/site
 
   build-rustdoc:
     runs-on: ubuntu-latest
@@ -80,7 +84,7 @@ jobs:
         with:
           path: ~/.cargo
           key: ${{ runner.os }}-docs-cargo-${{ hashFiles('Cargo.lock') }}
-      - name: Install mdbook
+      - name: Install just
         uses: taiki-e/install-action@v2
         with:
           tool: just

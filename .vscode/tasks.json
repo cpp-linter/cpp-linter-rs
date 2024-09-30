@@ -161,11 +161,12 @@
 		},
 		{
 			"type": "shell",
-			"command": "mdbook",
-			"label": "mdbook: serve",
+			"command": "mkdocs",
+			"label": "mkdocs: serve",
 			"args": [
 				"serve",
-				"docs",
+				" --config-file",
+				"docs/mkdocs.yml",
 				"--open"
 			],
 			"problemMatcher": [],
@@ -173,12 +174,12 @@
 		},
 		{
 			"type": "shell",
-			"command": "mdbook",
-			"label": "mdbook: build",
+			"command": "mkdocs",
+			"label": "mkdocs: build",
 			"args": [
 				"build",
-				"docs",
-				"--open"
+				" --config-file",
+				"docs/mkdocs.yml"
 			],
 			"presentation": {
 				"close": true,

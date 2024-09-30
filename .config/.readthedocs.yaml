@@ -9,20 +9,16 @@ build:
   os: ubuntu-22.04
   tools:
     rust: latest
-  commands:
-    # install cargo-binstall
-    - >-
-      curl
-      -L --proto '=https' --tlsv1.2 -sSf
-      https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh
-      | bash
-    # add .cargo bin to PATH
-    # install mdbook and mdbook-alerts
-    # build docs
-    - >-
-      PATH=/home/docs/.cargo/bin:$PATH &&
-      cargo binstall --install-path /home/docs/.cargo/bin -y mdbook mdbook-alerts &&
-      mdbook build docs
-    # move HTML output to required RTD output path
-    - mkdir -p ${READTHEDOCS_OUTPUT}
-    - mv docs/book/html/ "${READTHEDOCS_OUTPUT}"
+    python: latest
+
+mkdocs:
+  configuration: docs/mkdocs.yml
+
+
+# Optionally declare the Python requirements required to build your docs
+
+python:
+  install:
+    - requirements: docs/requirements.txt
+    - method: pip
+      path: docs/

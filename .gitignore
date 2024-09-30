@@ -338,8 +338,8 @@ debug/
 !.vscode/tasks.json
 !.vscode/extensions.json
 
-# mdbook builds
-book
+# mkdocs builds
+docs/site
 
 # ignore generated files
 .cpp-linter_cache/

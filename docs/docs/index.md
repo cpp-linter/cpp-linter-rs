@@ -1,10 +1,10 @@
 <!-- markdownlint-disable MD041 MD053 -->
 
-[file-annotations]: cli.md#-a---file-annotations
-[thread-comments]: cli.md#-g---thread-comments
-[step-summary]: cli.md#-w---step-summary
-[tidy-review]: cli.md#-d---tidy-review
-[format-review]: cli.md#-m---format-review
+[file-annotations]: cli.md#-a-file-annotations
+[thread-comments]: cli.md#-g-thread-comments
+[step-summary]: cli.md#-w-step-summary
+[tidy-review]: cli.md#-d-tidy-review
+[format-review]: cli.md#-m-format-review
 
 [format-annotations-preview]: images/annotations-clang-format.png
 [tidy-annotations-preview]: images/annotations-clang-tidy.png
@@ -14,4 +14,9 @@
 [format-review-preview]: images/format-review.png
 [format-suggestion-preview]: images/format-suggestion.png
 
-{{#include ../../README.md:16:}}
+[cli-doc]: cli.md
+
+{%
+    include "../../README.md"
+    start="<!-- start -->"
+%}

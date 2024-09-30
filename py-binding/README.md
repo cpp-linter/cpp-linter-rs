@@ -1,5 +1,5 @@
 # cpp-linter
-
+<!-- start -->
 The python binding for the [cpp-linter-rs][this] rust project
 (built using [pyo3](https://pyo3.rs) and [maturin]).
 

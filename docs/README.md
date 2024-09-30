@@ -8,13 +8,14 @@ Please [visit our website][gh-pages] to see generated documentation.
 To view the documentation locally, some software needs to be installed.
 
 ```shell
-cargo install --locked cargo-binstall
-cargo binstall -y mdbook mdbook-alerts
+pip install maturin
+cd docs
+maturin dev
+pip install -r docs/requirements.txt
 ```
 
-Then use `mdbook` to generate the docs and open them in your browser.
+Then use `mkdocs` to generate the docs and open them in your browser.
 
 ```shell
-# in repo root folder
-mdbook serve docs --open
+mkdocs serve --open
 ```

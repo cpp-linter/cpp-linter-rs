@@ -1,0 +1,3 @@
+from typing import Dict, Any
+
+def generate_cli_doc(metadata: Dict[str, Dict[str, Any]]) -> str: ...

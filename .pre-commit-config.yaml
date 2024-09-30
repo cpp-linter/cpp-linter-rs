@@ -10,6 +10,7 @@ repos:
       - id: check-added-large-files
         args: [--maxkb=9000]
       - id: check-yaml
+        exclude: docs/mkdocs.yml
       - id: check-toml
       - id: requirements-txt-fixer
       - id: mixed-line-ending

@@ -5,12 +5,12 @@
 [hiding a comment]: https://docs.github.com/en/communities/moderating-comments-and-conversations/managing-disruptive-comments#hiding-a-comment
 [resolve a conversation]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/commenting-on-a-pull-request#resolving-conversations
 
-[tidy-review]: cli.md#-d---tidy-review
-[format-review]: cli.md#-m---format-review
-[lines-changed-only]: cli.md#-l---lines-changed-only
-[style]: cli.md#-s---style
+[tidy-review]: cli.md#-d-tidy-review
+[format-review]: cli.md#-m-format-review
+[lines-changed-only]: cli.md#-l-lines-changed-only
+[style]: cli.md#-s-style
 
-> [!note]
+> [!NOTE]
 > This information is specific to GitHub Pull Requests (often abbreviated as "PR").
 
 While the Pull Request review feature has been diligently tested, there are still some caveats to
@@ -23,7 +23,7 @@ By default, the bot cannot approve Pull Request changes, only request more chang
 This will show as a warning in the workflow logs if the given token (set to the
 environment variable `GITHUB_TOKEN`) isn't configured with the proper permissions.
 
-> [!important]
+> [!IMPORTANT]
 > Refer to the GitHub documentation for [repository settings][] or [organization settings][]
 > about adjusting the required permissions for GitHub Actions's `secrets.GITHUB_TOKEN`.
 >
@@ -50,7 +50,7 @@ Clang-tidy and clang-format suggestions are shown in 1 Pull Request review.
   Also, the outdated review's summary comment is not automatically hidden.
   To reduce the Pull Request's thread noise, users interaction is required.
 
-> [!important]
+> [!IMPORTANT]
 > Refer to GitHub's documentation about [hiding a comment][].
 > Hiding a Pull Request review's summary comment will not resolve the suggestions in the diff.
 > Please also refer to [resolve a conversation][] to collapse outdated or duplicate suggestions
@@ -58,7 +58,7 @@ Clang-tidy and clang-format suggestions are shown in 1 Pull Request review.
 
 GitHub REST API does not provide a way to hide comments or mark review suggestions as resolved.
 
-> [!tip]
+> [!TIP]
 > We do support an environment variable named `CPP_LINTER_PR_REVIEW_SUMMARY_ONLY`.
 > If the variable is set to `true`, then the review only contains a summary comment
 > with no suggestions posted in the diff.

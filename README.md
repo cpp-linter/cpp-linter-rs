@@ -1,19 +1,22 @@
 <!-- markdownlint-disable MD041 -->
 
-[file-annotations]: https://cpp-linter.github.io/cpp-linter-rs/cli#-a---file-annotations
-[thread-comments]: https://cpp-linter.github.io/cpp-linter-rs/cli#-g---thread-comments
-[step-summary]: https://cpp-linter.github.io/cpp-linter-rs/cli#-w---step-summary
-[tidy-review]: https://cpp-linter.github.io/cpp-linter-rs/cli#-d---tidy-review
-[format-review]: https://cpp-linter.github.io/cpp-linter-rs/cli#-m---format-review
+[file-annotations]: https://cpp-linter.github.io/cpp-linter-rs/cli#-a-file-annotations
+[thread-comments]: https://cpp-linter.github.io/cpp-linter-rs/cli#-g-thread-comments
+[step-summary]: https://cpp-linter.github.io/cpp-linter-rs/cli#-w-step-summary
+[tidy-review]: https://cpp-linter.github.io/cpp-linter-rs/cli#-d-tidy-review
+[format-review]: https://cpp-linter.github.io/cpp-linter-rs/cli#-m-format-review
 
-[format-annotations-preview]: docs/src/images/annotations-clang-format.png
-[tidy-annotations-preview]: docs/src/images/annotations-clang-tidy.png
-[step-summary-preview]: docs/src/images/step-summary.png
-[thread-comment-preview]: docs/src/images/comment.png
-[tidy-review-preview]: docs/src/images/tidy-review.png
-[format-review-preview]: docs/src/images/format-review.png
-[format-suggestion-preview]: docs/src/images/format-suggestion.png
+[format-annotations-preview]: docs/docs/images/annotations-clang-format.png
+[tidy-annotations-preview]: docs/docs/images/annotations-clang-tidy.png
+[step-summary-preview]: docs/docs/images/step-summary.png
+[thread-comment-preview]: docs/docs/images/comment.png
+[tidy-review-preview]: docs/docs/images/tidy-review.png
+[format-review-preview]: docs/docs/images/format-review.png
+[format-suggestion-preview]: docs/docs/images/format-suggestion.png
 
+[cli-doc]: https://cpp-linter.github.io/cpp-linter-rs/cli
+
+<!-- start -->
 [![Python packaging][py-build-badge]][py-build-ci]
 [![Binary executable builds][bin-build-badge]][bin-build-ci]
 [![node-js builds][node-ci-badge]][node-ci]
@@ -56,7 +59,7 @@ A package for linting C/C++ code with clang-tidy and/or clang-format to collect 
 - [x] [file-annotations](#annotations)
 - [x] [Pull Request Review](#pull-request-review) suggestions
 
-> [!CAUTION]
+> [!WARNING]
 > This project is still experimental and subject to drastic changes.
 > Please use the [pure python cpp-linter](https://github.com/cpp-linter/cpp-linter)
 > package until this project is ready for deployment.
@@ -118,7 +121,7 @@ For usage in a CI workflow, see
 [the cpp-linter/cpp-linter-action repository](https://github.com/cpp-linter/cpp-linter-action).
 
 For the description of supported Command Line Interface options, see
-[the CLI documentation](https://cpp-linter.github.io/cpp-linter-rs/cli.html).
+[the CLI documentation][cli-doc].
 
 ## Example
 

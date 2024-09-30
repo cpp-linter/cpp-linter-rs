@@ -1,0 +1,104 @@
+site_name: Cpp-Linter
+site_description: "Documentation for the cpp-linter package."
+site_url: "https://cpp-linter.github.io/cpp-linter-rs"
+repo_url: "https://github.com/cpp-linter/cpp-linter-rs"
+repo_name: "cpp-linter/cpp-linter-rs"
+edit_uri: "edit/main/docs/docs/"
+nav:
+  - index.md
+  - cli.md
+  - pr-review-caveats.md
+  - permissions.md
+  - python.md
+  - node.md
+  - changelog.md
+
+theme:
+  name: material
+  features:
+    - navigation.top
+    - content.tabs.link
+    - content.tooltips
+    - content.code.annotate
+    - content.code.copy
+    - content.action.view
+    - content.action.edit
+    - navigation.footer
+    - search.suggest
+    - search.share
+    - navigation.tracking
+    - toc.follow
+  logo: images/logo.png
+  favicon: images/favicon.ico
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+    # Palette toggle for automatic mode
+    - media: "(prefers-color-scheme)"
+      primary: blue
+      accent: cyan
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue
+      accent: cyan
+      toggle:
+        icon: material/lightbulb-outline
+        name: Switch to dark mode
+
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue
+      accent: cyan
+      toggle:
+        icon: material/lightbulb
+        name: Switch to system preference
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/cpp-linter/cpp-linter
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/cpp-linter/
+    - icon: fontawesome/brands/npm
+      link: https://www.npmjs.com/package/@cpp-linter/cpp-linter
+    - icon: simple/rust
+      link: https://crates.io/crates/cpp-linter
+
+extra_css:
+  - stylesheets/extra.css
+
+plugins:
+  - search
+  - include-markdown
+  - gen-files:
+      scripts:
+        - gen_cli_doc.py
+
+markdown_extensions:
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - toc:
+      permalink: true
+  - pymdownx.highlight:
+      linenums_style: pymdownx-inline
+  - pymdownx.inlinehilite
+  - pymdownx.snippets:
+      check_paths: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - attr_list
+  - admonition
+  - markdown_gfm_admonition
+
+# Hooks
+hooks:
+  - badge_hook.py
