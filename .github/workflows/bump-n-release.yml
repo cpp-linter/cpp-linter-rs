@@ -53,7 +53,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          token: ${{ secrets.BUMP_N_RELEASE }}
           fetch-depth: 0
       - name: Generate a changelog
         uses: orhun/git-cliff-action@v4
@@ -64,5 +63,4 @@ jobs:
         env:
           OUTPUT: ${{ runner.temp }}/changes.md
           GITHUB_REPO: ${{ github.repository }}
-          GITHUB_TOKEN: ${{ secrets.BUMP_N_RELEASE }}
       - run: cat "${{ runner.temp }}/changes.md" >> "$GITHUB_STEP_SUMMARY"
