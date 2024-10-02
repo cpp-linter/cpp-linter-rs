@@ -6,18 +6,27 @@ th {
     background-color: #4051b5;
 }
 
-.md-typeset .admonition.important, .md-typeset details.important {
-	border-color: #00b8d4;
+@media screen and (max-width: 76.2344em) {
+    .md-nav--primary .md-nav__title[for="__drawer"] {
+        background-color: #4051b5;
+    }
 }
 
-.md-typeset .important > .admonition-title::before, .md-typeset .important > summary::before {
-	background-color: #00b8d4;
-	-webkit-mask-image: var(--md-admonition-icon--info);
-	mask-image: var(--md-admonition-icon--info);
+.md-typeset .admonition.important,
+.md-typeset details.important {
+    border-color: #00b8d4;
 }
 
-.md-typeset .important > .admonition-title, .md-typeset .important > summary {
-	background-color: #00b8d41a;
+.md-typeset .important>.admonition-title::before,
+.md-typeset .important>summary::before {
+    background-color: #00b8d4;
+    -webkit-mask-image: var(--md-admonition-icon--info);
+    mask-image: var(--md-admonition-icon--info);
+}
+
+.md-typeset .important>.admonition-title,
+.md-typeset .important>summary {
+    background-color: #00b8d41a;
 }
 
 @keyframes heart {
