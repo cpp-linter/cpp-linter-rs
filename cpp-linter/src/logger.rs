@@ -24,7 +24,7 @@ impl SimpleLogger {
 
 impl log::Log for SimpleLogger {
     fn enabled(&self, metadata: &Metadata) -> bool {
-        metadata.level() <= Level::Debug
+        metadata.level() <= log::max_level()
     }
 
     fn log(&self, record: &Record) {
