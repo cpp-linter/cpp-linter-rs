@@ -95,6 +95,16 @@ impl RestApiClient for GithubApiClient {
         checks_failed
     }
 
+    /// This prints a line to indicate the beginning of a related group of log statements.
+    fn start_log_group(&self, name: String) {
+        log::info!(target: "CI_LOG_GROUPING", "::group::{}", name);
+    }
+
+    /// This prints a line to indicate the ending of a related group of log statements.
+    fn end_log_group(&self) {
+        log::info!(target: "CI_LOG_GROUPING", "::endgroup::");
+    }
+
     fn make_headers() -> Result<HeaderMap<HeaderValue>> {
         let mut headers = HeaderMap::new();
         headers.insert(

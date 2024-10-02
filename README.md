@@ -210,6 +210,7 @@ license agreements:
   Dual-licensed under [Apache 2.0][Apache2] or [MIT].
 - [chrono](https://crates.io/crates/chrono):
   Dual-licensed under [Apache 2.0][Apache2] or [MIT].
+- [colored](https://crates.io/crates/colored): Licensed under [MPL-2.0]
 
 The python binding uses
 
@@ -223,3 +224,4 @@ The node binding uses
 
 [MIT]: https://choosealicense.com/licenses/mit
 [Apache2]: https://choosealicense.com/licenses/apache-2.0/
+[MPL-2.0]: https://choosealicense.com/licenses/mpl-2.0

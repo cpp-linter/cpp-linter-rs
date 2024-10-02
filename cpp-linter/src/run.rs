@@ -17,7 +17,7 @@ use openssl_probe;
 use crate::clang_tools::capture_clang_tools_output;
 use crate::cli::{get_arg_parser, ClangParams, Cli, FeedbackInput, LinesChangedOnly};
 use crate::common_fs::FileFilter;
-use crate::logger::{self, end_log_group, start_log_group};
+use crate::logger;
 use crate::rest_api::{github::GithubApiClient, RestApiClient};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -93,7 +93,7 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
         }
     }
 
-    start_log_group(String::from("Get list of specified source files"));
+    rest_api_client.start_log_group(String::from("Get list of specified source files"));
     let files = if cli.lines_changed_only != LinesChangedOnly::Off || cli.files_changed_only {
         // parse_diff(github_rest_api_payload)
         rest_api_client
@@ -124,16 +124,22 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
         log::info!("  ./{}", file.name.to_string_lossy().replace('\\', "/"));
         arc_files.push(Arc::new(Mutex::new(file)));
     }
-    end_log_group();
+    rest_api_client.end_log_group();
 
     let mut clang_params = ClangParams::from(&cli);
     let user_inputs = FeedbackInput::from(&cli);
-    capture_clang_tools_output(&mut arc_files, cli.version.as_str(), &mut clang_params).await?;
-    start_log_group(String::from("Posting feedback"));
+    capture_clang_tools_output(
+        &mut arc_files,
+        cli.version.as_str(),
+        &mut clang_params,
+        &rest_api_client,
+    )
+    .await?;
+    rest_api_client.start_log_group(String::from("Posting feedback"));
     let checks_failed = rest_api_client
         .post_feedback(&arc_files, user_inputs)
         .await?;
-    end_log_group();
+    rest_api_client.end_log_group();
     if env::var("PRE_COMMIT").is_ok_and(|v| v == "1") {
         if checks_failed > 1 {
             return Err(anyhow!("Some checks did not pass"));
