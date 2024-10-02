@@ -49,7 +49,10 @@ impl log::Log for SimpleLogger {
 /// Returns a [`SetLoggerError`] if the `LOGGER` is already initialized.
 pub fn init() -> Result<()> {
     let logger: SimpleLogger = SimpleLogger;
-    if env::var("CPP_LINTER_COLOR").is_ok_and(|v| ["on", "1", "true"].contains(&v.as_str())) {
+    if matches!(
+        env::var("CPP_LINTER_COLOR").as_deref(),
+        Ok("on" | "1" | "true")
+    ) {
         set_override(true);
     }
     log::set_boxed_logger(Box::new(logger))
