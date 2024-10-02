@@ -277,6 +277,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "clap",
+ "colored",
  "fast-glob",
  "futures",
  "git2",

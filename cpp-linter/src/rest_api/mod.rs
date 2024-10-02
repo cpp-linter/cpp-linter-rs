@@ -49,6 +49,12 @@ pub trait RestApiClient {
         tidy_checks_failed: Option<u64>,
     ) -> u64;
 
+    /// This prints a line to indicate the beginning of a related group of log statements.
+    fn start_log_group(&self, name: String);
+
+    /// This prints a line to indicate the ending of a related group of log statements.
+    fn end_log_group(&self);
+
     /// A convenience method to create the headers attached to all REST API calls.
     ///
     /// If an authentication token is provided (via environment variable),
@@ -453,12 +459,21 @@ mod test {
         ) -> Result<u64> {
             Err(anyhow!("Not implemented"))
         }
+
+        fn start_log_group(&self, name: String) {
+            log::info!(target: "CI_LOG_GROUPING", "start_log_group: {name}");
+        }
+
+        fn end_log_group(&self) {
+            log::info!(target: "CI_LOG_GROUPING", "end_log_group");
+        }
     }
 
     #[tokio::test]
     async fn dummy_coverage() {
         assert!(TestClient::make_headers().is_err());
         let dummy = TestClient::default();
+        dummy.start_log_group("Dummy test".to_string());
         assert_eq!(dummy.set_exit_code(1, None, None), 0);
         assert!(dummy
             .get_list_of_changed_files(&FileFilter::new(&[], vec![]))
@@ -474,7 +489,8 @@ mod test {
         assert!(dummy
             .post_feedback(&[], FeedbackInput::default())
             .await
-            .is_err())
+            .is_err());
+        dummy.end_log_group();
     }
 
     // ************************************************* try_next_page() tests

@@ -1,9 +1,26 @@
 //! A module to initialize and customize the logger object used in (most) stdout.
 
-// non-std crates
-use log::{Level, LevelFilter, Metadata, Record, SetLoggerError};
+use std::env;
 
+use anyhow::{Error, Result};
+use colored::{control::set_override, Colorize};
+use log::{Level, LevelFilter, Metadata, Record};
+
+#[derive(Default)]
 struct SimpleLogger;
+
+impl SimpleLogger {
+    fn level_color(level: &Level) -> String {
+        let name = format!("{:>5}", level.as_str().to_uppercase());
+        match level {
+            Level::Error => name.red().bold().to_string(),
+            Level::Warn => name.yellow().bold().to_string(),
+            Level::Info => name.green().bold().to_string(),
+            Level::Debug => name.blue().bold().to_string(),
+            Level::Trace => name.magenta().bold().to_string(),
+        }
+    }
+}
 
 impl log::Log for SimpleLogger {
     fn enabled(&self, metadata: &Metadata) -> bool {
@@ -11,48 +28,47 @@ impl log::Log for SimpleLogger {
     }
 
     fn log(&self, record: &Record) {
-        if self.enabled(record.metadata()) {
-            println!("{}: {}", record.level(), record.args());
+        if record.target() == "CI_LOG_GROUPING" {
+            // this log is meant to manipulate a CI workflow's log grouping
+            println!("{}", record.args());
+        } else if self.enabled(record.metadata()) {
+            println!(
+                "[{}]: {}",
+                Self::level_color(&record.level()),
+                record.args()
+            );
         }
     }
 
     fn flush(&self) {}
 }
 
-/// A private constant to manage the application's logger object.
-static LOGGER: SimpleLogger = SimpleLogger;
-
 /// A function to initialize the private `LOGGER`.
 ///
 /// The logging level defaults to [`LevelFilter::Info`].
 /// Returns a [`SetLoggerError`] if the `LOGGER` is already initialized.
-pub fn init() -> Result<(), SetLoggerError> {
-    log::set_logger(&LOGGER).map(|()| log::set_max_level(LevelFilter::Info))
-}
-
-/// This prints a line to indicate the beginning of a related group of log statements.
-///
-/// This function may or may not get moved to [crate::rest_api::RestApiClient] trait
-/// if/when platforms other than GitHub are supported.
-pub fn start_log_group(name: String) {
-    println!("::group::{}", name);
-}
-
-/// This prints a line to indicate the ending of a related group of log statements.
-///
-/// This function may or may not get moved to [crate::rest_api::RestApiClient] trait
-/// if/when platforms other than GitHub are supported.
-pub fn end_log_group() {
-    println!("::endgroup::");
+pub fn init() -> Result<()> {
+    let logger: SimpleLogger = SimpleLogger;
+    if env::var("CPP_LINTER_COLOR").is_ok_and(|v| ["on", "1", "true"].contains(&v.as_str())) {
+        set_override(true);
+    }
+    log::set_boxed_logger(Box::new(logger))
+        .map(|()| log::set_max_level(LevelFilter::Info))
+        .map_err(Error::from)
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{end_log_group, start_log_group};
+mod test {
+    use std::env;
+
+    use super::{init, SimpleLogger};
 
     #[test]
-    fn issue_log_grouping_stdout() {
-        start_log_group(String::from("a dumb test"));
-        end_log_group();
+    fn trace_log() {
+        env::set_var("CPP_LINTER_COLOR", "true");
+        init().unwrap_or(());
+        assert!(SimpleLogger::level_color(&log::Level::Trace).contains("TRACE"));
+        log::set_max_level(log::LevelFilter::Trace);
+        log::trace!("A dummy log statement for code coverage");
     }
 }

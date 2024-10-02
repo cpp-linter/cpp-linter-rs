@@ -21,8 +21,7 @@ use which::{which, which_in};
 use super::common_fs::FileObj;
 use crate::{
     cli::ClangParams,
-    logger::{end_log_group, start_log_group},
-    rest_api::{COMMENT_MARKER, USER_OUTREACH},
+    rest_api::{RestApiClient, COMMENT_MARKER, USER_OUTREACH},
 };
 pub mod clang_format;
 use clang_format::run_clang_format;
@@ -144,6 +143,7 @@ pub async fn capture_clang_tools_output(
     files: &mut Vec<Arc<Mutex<FileObj>>>,
     version: &str,
     clang_params: &mut ClangParams,
+    rest_api_client: &impl RestApiClient,
 ) -> Result<()> {
     // find the executable paths for clang-tidy and/or clang-format and show version
     // info as debugging output.
@@ -192,11 +192,11 @@ pub async fn capture_clang_tools_output(
     while let Some(output) = executors.join_next().await {
         if let Ok(out) = output? {
             let (file_name, logs) = out;
-            start_log_group(format!("Analyzing {}", file_name.to_string_lossy()));
+            rest_api_client.start_log_group(format!("Analyzing {}", file_name.to_string_lossy()));
             for (level, msg) in logs {
                 log::log!(level, "{}", msg);
             }
-            end_log_group();
+            rest_api_client.end_log_group();
         }
     }
     Ok(())
