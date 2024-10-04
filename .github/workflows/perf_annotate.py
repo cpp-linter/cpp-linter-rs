@@ -2,7 +2,7 @@ import argparse
 import json
 from os import environ
 from pathlib import Path
-from typing import List, Any, Dict
+from typing import List, Any, Dict, cast
 
 
 class Args(argparse.Namespace):
@@ -18,15 +18,19 @@ def main():
     bench: List[Dict[str, Any]] = json.loads(bench_json)["results"]
 
     assert len(bench) == 3
-    assert bench[0]["command"] == "previous-build"
-    assert bench[1]["command"] == "current-build"
-    assert bench[2]["command"] == "pure-python"
+    old_mean, new_mean = (None, None)
+    for result in bench:
+        mean = cast(float, result["mean"])
+        if result["command"] == "previous-build":
+            old_mean = mean
+        elif result["command"] == "current-build":
+            new_mean = mean
 
-    old_mean: float = bench[0]["mean"]
-    new_mean: float = bench[1]["mean"]
+    assert old_mean is not None, "benchmark report has no result for previous-build"
+    assert new_mean is not None, "benchmark report has no result for current-build"
 
     diff = round(new_mean - old_mean, 2)
-    scalar = round(new_mean / old_mean, 2) * 100
+    scalar = int((new_mean - old_mean) / old_mean * 100)
 
     output = []
     if diff > 2:
