@@ -31,8 +31,10 @@ jobs:
           - commit: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
             name: previous
     outputs:
-      cached-previous: ${{ steps.is-cached-previous.outputs.is-cached }}
-      cached-current: ${{ steps.is-cached-current.outputs.is-cached }}
+      cached-previous: ${{ steps.is-cached-previous.outputs.is-cached == 'true' && steps.validate.outputs.cache-valid != 'false' }}
+      cached-current: ${{ steps.is-cached-current.outputs.is-cached == 'true' && steps.validate.outputs.cache-valid != 'false' }}
+    env:
+      BIN: target/release/cpp-linter
     steps:
       - name: Checkout ${{ matrix.name }}
         uses: actions/checkout@v4
@@ -43,29 +45,38 @@ jobs:
         id: cache
         with:
           key: bin-cache-${{ hashFiles('cpp-linter/src/**', 'Cargo.toml', 'Cargo.lock', 'cpp-linter/Cargo.toml') }}
-          path: target/release/cpp-linter
+          path: ${{ env.BIN }}
       - name: Is previous cached?
         if: matrix.name == 'previous'
         id: is-cached-previous
-        run: echo "is-cached=${{ steps.cache.outputs.cache-hit }}" >> $GITHUB_OUTPUT
+        run: echo "is-cached=${{ steps.cache.outputs.cache-hit }}" >> "$GITHUB_OUTPUT"
       - name: Is current cached?
         if: matrix.name == 'current'
         id: is-cached-current
-        run: echo "is-cached=${{ steps.cache.outputs.cache-hit }}" >> $GITHUB_OUTPUT
+        run: echo "is-cached=${{ steps.cache.outputs.cache-hit }}" >> "$GITHUB_OUTPUT"
+      - name: Validate cached binary
+        if: steps.cache.outputs.cache-hit == 'true'
+        id: validate
+        run: |
+          chmod +x ${{ env.BIN }}
+          if ! ${{ env.BIN }} version; then
+            echo "Cached binary is invalid, rebuilding..."
+            echo "cache-valid=false" >> "$GITHUB_OUTPUT"
+          fi
       - run: rustup update --no-self-update
-        if: steps.cache.outputs.cache-hit != 'true'
+        if: steps.cache.outputs.cache-hit != 'true' || steps.validate.outputs.cache-valid == 'false'
       - run: cargo build --bin cpp-linter --release
-        if: steps.cache.outputs.cache-hit != 'true'
+        if: steps.cache.outputs.cache-hit != 'true' || steps.validate.outputs.cache-valid == 'false'
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.name }}
-          path: target/release/cpp-linter
+          path: ${{ env.BIN }}
 
   benchmark:
     name: Measure Performance Difference
     needs: [build]
-    if: ${{ needs.build.outputs.cached-current != 'true' || needs.build.outputs.cached-previous != 'true' }}
+    if: ${{ !needs.build.outputs.cached-current || !needs.build.outputs.cached-previous }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -118,7 +129,7 @@ jobs:
           --command-name=pure-python
           "cpp-linter -l false -j 0 -p build -i='|!src/libgit2' -e c"
       - name: Append report to job summary
-        run: cat ${{ runner.temp }}/benchmark.md >> $GITHUB_STEP_SUMMARY
+        run: cat ${{ runner.temp }}/benchmark.md >> "$GITHUB_STEP_SUMMARY"
       - name: Upload JSON results
         uses: actions/upload-artifact@v4
         with:
@@ -130,6 +141,6 @@ jobs:
   report-no-src-changes:
     runs-on: ubuntu-latest
     needs: [build]
-    if: needs.build.outputs.cached-current == 'true' && needs.build.outputs.cached-previous == 'true'
+    if: needs.build.outputs.cached-current && needs.build.outputs.cached-previous
     steps:
       - run: echo "::notice title=No benchmark performed::No changes to cpp-linter source code detected."
