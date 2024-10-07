@@ -12,7 +12,7 @@ use anyhow::{anyhow, Context, Result};
 use reqwest::{Client, Method, Url};
 
 use crate::{
-    clang_tools::{clang_format::summarize_style, ReviewComments},
+    clang_tools::{clang_format::summarize_style, ClangVersions, ReviewComments},
     cli::FeedbackInput,
     common_fs::FileObj,
     rest_api::{RestApiRateLimitHeaders, COMMENT_MARKER, USER_AGENT},
@@ -305,6 +305,7 @@ impl GithubApiClient {
         &self,
         files: &[Arc<Mutex<FileObj>>],
         feedback_input: &FeedbackInput,
+        clang_versions: &ClangVersions,
     ) -> Result<()> {
         let url = self
             .api_url
@@ -378,7 +379,7 @@ impl GithubApiClient {
             body: String::new(),
             comments: vec![],
         };
-        payload.body = review_comments.summarize();
+        payload.body = review_comments.summarize(clang_versions);
         if !summary_only {
             payload.comments = {
                 let mut comments = vec![];
