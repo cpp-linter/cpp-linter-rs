@@ -128,7 +128,7 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
 
     let mut clang_params = ClangParams::from(&cli);
     let user_inputs = FeedbackInput::from(&cli);
-    capture_clang_tools_output(
+    let clang_versions = capture_clang_tools_output(
         &mut arc_files,
         cli.version.as_str(),
         &mut clang_params,
@@ -137,7 +137,7 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
     .await?;
     rest_api_client.start_log_group(String::from("Posting feedback"));
     let checks_failed = rest_api_client
-        .post_feedback(&arc_files, user_inputs)
+        .post_feedback(&arc_files, user_inputs, clang_versions)
         .await?;
     rest_api_client.end_log_group();
     if env::var("PRE_COMMIT").is_ok_and(|v| v == "1") {
