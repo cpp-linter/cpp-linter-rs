@@ -16,7 +16,7 @@ name = "cpp_linter"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = { version = "0.22.3", features = ["extension-module"] }
+pyo3 = { version = "0.22.4", features = ["extension-module"] }
 cpp-linter = { path = "../cpp-linter" }
 tokio = "1.40.0"
 

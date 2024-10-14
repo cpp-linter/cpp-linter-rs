@@ -16,7 +16,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 # Default enable napi4 feature, see https://nodejs.org/api/n-api.html#node-api-version-matrix
-napi = { version = "2.12.2", default-features = false, features = ["napi4", "async"] }
+napi = { version = "2.16.12", default-features = false, features = ["napi4", "async"] }
 napi-derive = "2.12.2"
 cpp-linter = { path = "../cpp-linter" }
 anyhow = "1.0.89"
