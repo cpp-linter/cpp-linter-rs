@@ -20,6 +20,7 @@ use serde_json;
 use super::{RestApiClient, RestApiRateLimitHeaders};
 use crate::clang_tools::clang_format::tally_format_advice;
 use crate::clang_tools::clang_tidy::tally_tidy_advice;
+use crate::clang_tools::ClangVersions;
 use crate::cli::{FeedbackInput, ThreadComments};
 use crate::common_fs::{FileFilter, FileObj};
 use crate::git::{get_diff, open_repo, parse_diff, parse_diff_from_buf};
@@ -230,6 +231,7 @@ impl RestApiClient for GithubApiClient {
         &self,
         files: &[Arc<Mutex<FileObj>>],
         feedback_inputs: FeedbackInput,
+        clang_versions: ClangVersions,
     ) -> Result<u64> {
         let tidy_checks_failed = tally_tidy_advice(files);
         let format_checks_failed = tally_format_advice(files);
@@ -239,8 +241,13 @@ impl RestApiClient for GithubApiClient {
             self.post_annotations(files, feedback_inputs.style.as_str());
         }
         if feedback_inputs.step_summary {
-            comment =
-                Some(self.make_comment(files, format_checks_failed, tidy_checks_failed, None));
+            comment = Some(self.make_comment(
+                files,
+                format_checks_failed,
+                tidy_checks_failed,
+                &clang_versions,
+                None,
+            ));
             self.post_step_summary(comment.as_ref().unwrap());
         }
         self.set_exit_code(
@@ -256,6 +263,7 @@ impl RestApiClient for GithubApiClient {
                     files,
                     format_checks_failed,
                     tidy_checks_failed,
+                    &clang_versions,
                     Some(65535),
                 ));
             }
@@ -284,7 +292,8 @@ impl RestApiClient for GithubApiClient {
         if self.event_name == "pull_request"
             && (feedback_inputs.tidy_review || feedback_inputs.format_review)
         {
-            self.post_review(files, &feedback_inputs).await?;
+            self.post_review(files, &feedback_inputs, &clang_versions)
+                .await?;
         }
         Ok(format_checks_failed + tidy_checks_failed)
     }
@@ -308,6 +317,7 @@ mod test {
         clang_tools::{
             clang_format::{FormatAdvice, Replacement},
             clang_tidy::{TidyAdvice, TidyNotification},
+            ClangVersions,
         },
         cli::FeedbackInput,
         common_fs::{FileFilter, FileObj},
@@ -389,8 +399,12 @@ mod test {
                 gh_out_path.path()
             },
         );
+        let clang_versions = ClangVersions {
+            format_version: Some("x.y.z".to_string()),
+            tidy_version: Some("x.y.z".to_string()),
+        };
         rest_api_client
-            .post_feedback(&files, feedback_inputs)
+            .post_feedback(&files, feedback_inputs, clang_versions)
             .await
             .unwrap();
         let mut step_summary_content = String::new();

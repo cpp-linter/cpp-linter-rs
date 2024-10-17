@@ -17,6 +17,7 @@ use reqwest::{Client, IntoUrl, Method, Request, Response, Url};
 
 // project specific modules
 pub mod github;
+use crate::clang_tools::ClangVersions;
 use crate::cli::FeedbackInput;
 use crate::common_fs::{FileFilter, FileObj};
 
@@ -233,6 +234,7 @@ pub trait RestApiClient {
         files: &[Arc<Mutex<FileObj>>],
         format_checks_failed: u64,
         tidy_checks_failed: u64,
+        clang_versions: &ClangVersions,
         max_len: Option<u64>,
     ) -> String {
         let mut comment = format!("{COMMENT_MARKER}# Cpp-Linter Report ");
@@ -248,6 +250,8 @@ pub trait RestApiClient {
                     files,
                     &mut comment,
                     format_checks_failed,
+                    // tidy_version should be `Some()` value at this point.
+                    clang_versions.tidy_version.as_ref().unwrap(),
                     &mut remaining_length,
                 );
             }
@@ -256,6 +260,8 @@ pub trait RestApiClient {
                     files,
                     &mut comment,
                     tidy_checks_failed,
+                    // format_version should be `Some()` value at this point.
+                    clang_versions.format_version.as_ref().unwrap(),
                     &mut remaining_length,
                 );
             }
@@ -280,6 +286,7 @@ pub trait RestApiClient {
         &self,
         files: &[Arc<Mutex<FileObj>>],
         user_inputs: FeedbackInput,
+        clang_versions: ClangVersions,
     ) -> impl Future<Output = Result<u64>>;
 
     /// Gets the URL for the next page in a paginated response.
@@ -324,9 +331,12 @@ fn make_format_comment(
     files: &[Arc<Mutex<FileObj>>],
     comment: &mut String,
     format_checks_failed: u64,
+    version_used: &String,
     remaining_length: &mut u64,
 ) {
-    let opener = format!("\n<details><summary>clang-format reports: <strong>{} file(s) not formatted</strong></summary>\n\n", format_checks_failed);
+    let opener = format!(
+        "\n<details><summary>clang-format (v{version_used}) reports: <strong>{format_checks_failed} file(s) not formatted</strong></summary>\n\n",
+    );
     let closer = String::from("\n</details>");
     let mut format_comment = String::new();
     *remaining_length -= opener.len() as u64 + closer.len() as u64;
@@ -351,11 +361,11 @@ fn make_tidy_comment(
     files: &[Arc<Mutex<FileObj>>],
     comment: &mut String,
     tidy_checks_failed: u64,
+    version_used: &String,
     remaining_length: &mut u64,
 ) {
     let opener = format!(
-        "\n<details><summary>clang-tidy reports: <strong>{} concern(s)</strong></summary>\n\n",
-        tidy_checks_failed
+        "\n<details><summary>clang-tidy (v{version_used}) reports: {tidy_checks_failed}<strong> concern(s)</strong></summary>\n\n"
     );
     let closer = String::from("\n</details>");
     let mut tidy_comment = String::new();
@@ -412,6 +422,7 @@ mod test {
     use reqwest::{Method, Url};
 
     use crate::{
+        clang_tools::ClangVersions,
         cli::FeedbackInput,
         common_fs::{FileFilter, FileObj},
         logger,
@@ -456,6 +467,7 @@ mod test {
             &self,
             _files: &[Arc<Mutex<FileObj>>],
             _user_inputs: FeedbackInput,
+            _clang_versions: ClangVersions,
         ) -> Result<u64> {
             Err(anyhow!("Not implemented"))
         }
@@ -487,7 +499,7 @@ mod test {
             .await
             .is_err());
         assert!(dummy
-            .post_feedback(&[], FeedbackInput::default())
+            .post_feedback(&[], FeedbackInput::default(), ClangVersions::default())
             .await
             .is_err());
         dummy.end_log_group();
