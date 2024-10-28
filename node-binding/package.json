@@ -9,11 +9,11 @@
   },
   "license": "MIT",
   "devDependencies": {
-    "@eslint/js": "^9.11.1",
+    "@eslint/js": "^9.13.0",
     "@napi-rs/cli": "^2.18.4",
-    "ava": "^6.0.1",
-    "eslint": "^9.11.1",
-    "globals": "^15.9.0"
+    "ava": "^6.2.0",
+    "eslint": "^9.13.0",
+    "globals": "^15.11.0"
   },
   "ava": {
     "timeout": "3m"
