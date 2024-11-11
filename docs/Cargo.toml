@@ -11,7 +11,7 @@ license.workspace = true
 
 [dependencies]
 cpp-linter = { path = "../cpp-linter" }
-pyo3 = "0.22.4"
+pyo3 = "0.22.6"
 
 [lib]
 name = "cli_gen"
