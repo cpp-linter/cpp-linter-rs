@@ -13,6 +13,7 @@ use anyhow::{anyhow, Context, Result};
 use git2::{DiffOptions, Patch};
 // non-std crates
 use lenient_semver;
+use regex::Regex;
 use semver::Version;
 use tokio::task::JoinSet;
 use which::{which, which_in};
@@ -135,6 +136,28 @@ fn analyze_single_file(
     Ok((file.name.clone(), logs))
 }
 
+/// A struct to contain the version numbers of the clang-tools used
+#[derive(Default)]
+pub struct ClangVersions {
+    /// The clang-format version used.
+    pub format_version: Option<String>,
+
+    /// The clang-tidy version used.
+    pub tidy_version: Option<String>,
+}
+
+/// Run `clang-tool --version`, then extract and return the version number.
+fn capture_clang_version(clang_tool: &PathBuf) -> Result<String> {
+    let output = Command::new(clang_tool).arg("--version").output()?;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let version_pattern = Regex::new(r"(?i)version\s*([\d.]+)").unwrap();
+    let captures = version_pattern.captures(&stdout).ok_or(anyhow!(
+        "Failed to find version number in `{} --version` output",
+        clang_tool.to_string_lossy()
+    ))?;
+    Ok(captures.get(1).unwrap().as_str().to_string())
+}
+
 /// Runs clang-tidy and/or clang-format and returns the parsed output from each.
 ///
 /// If `tidy_checks` is `"-*"` then clang-tidy is not executed.
@@ -144,30 +167,29 @@ pub async fn capture_clang_tools_output(
     version: &str,
     clang_params: &mut ClangParams,
     rest_api_client: &impl RestApiClient,
-) -> Result<()> {
+) -> Result<ClangVersions> {
+    let mut clang_versions = ClangVersions::default();
     // find the executable paths for clang-tidy and/or clang-format and show version
     // info as debugging output.
     if clang_params.tidy_checks != "-*" {
-        clang_params.clang_tidy_command = {
-            let cmd = get_clang_tool_exe("clang-tidy", version)?;
-            log::debug!(
-                "{} --version\n{}",
-                &cmd.to_string_lossy(),
-                String::from_utf8_lossy(&Command::new(&cmd).arg("--version").output()?.stdout)
-            );
-            Some(cmd)
-        }
+        let exe_path = get_clang_tool_exe("clang-tidy", version)?;
+        let version_found = capture_clang_version(&exe_path)?;
+        log::debug!(
+            "{} --version: v{version_found}",
+            &exe_path.to_string_lossy()
+        );
+        clang_versions.tidy_version = Some(version_found);
+        clang_params.clang_tidy_command = Some(exe_path);
     };
     if !clang_params.style.is_empty() {
-        clang_params.clang_format_command = {
-            let cmd = get_clang_tool_exe("clang-format", version)?;
-            log::debug!(
-                "{} --version\n{}",
-                &cmd.to_string_lossy(),
-                String::from_utf8_lossy(&Command::new(&cmd).arg("--version").output()?.stdout)
-            );
-            Some(cmd)
-        }
+        let exe_path = get_clang_tool_exe("clang-format", version)?;
+        let version_found = capture_clang_version(&exe_path)?;
+        log::debug!(
+            "{} --version: v{version_found}",
+            &exe_path.to_string_lossy()
+        );
+        clang_versions.format_version = Some(version_found);
+        clang_params.clang_format_command = Some(exe_path);
     };
 
     // parse database (if provided) to match filenames when parsing clang-tidy's stdout
@@ -199,7 +221,7 @@ pub async fn capture_clang_tools_output(
             rest_api_client.end_log_group();
         }
     }
-    Ok(())
+    Ok(clang_versions)
 }
 
 /// A struct to describe a single suggestion in a pull_request review.
@@ -221,7 +243,7 @@ pub struct ReviewComments {
     ///
     /// This differs from `comments.len()` because some suggestions may
     /// not fit within the file's diff.
-    pub tool_total: [u32; 2],
+    pub tool_total: [Option<u32>; 2],
     /// A list of comment suggestions to be posted.
     ///
     /// These suggestions are guaranteed to fit in the file's diff.
@@ -234,11 +256,28 @@ pub struct ReviewComments {
 }
 
 impl ReviewComments {
-    pub fn summarize(&self) -> String {
+    pub fn summarize(&self, clang_versions: &ClangVersions) -> String {
         let mut body = format!("{COMMENT_MARKER}## Cpp-linter Review\n");
         for t in 0u8..=1 {
             let mut total = 0;
-            let tool_name = if t == 0 { "clang-format" } else { "clang-tidy" };
+            let (tool_name, tool_version) = if t == 0 {
+                ("clang-format", clang_versions.format_version.as_ref())
+            } else {
+                ("clang-tidy", clang_versions.tidy_version.as_ref())
+            };
+
+            let tool_total = if let Some(total) = self.tool_total[t as usize] {
+                total
+            } else {
+                // review was not requested from this tool or the tool was not used at all
+                continue;
+            };
+
+            // If the tool's version is unknown, then we don't need to output this line.
+            // NOTE: If the tool was invoked at all, then the tool's version shall be known.
+            if let Some(ver_str) = tool_version {
+                body.push_str(format!("### Used {tool_name} {ver_str}\n").as_str());
+            }
             for comment in &self.comments {
                 if comment
                     .suggestion
@@ -248,11 +287,10 @@ impl ReviewComments {
                 }
             }
 
-            if total != self.tool_total[t as usize] {
+            if total != tool_total {
                 body.push_str(
                     format!(
-                        "\nOnly {} out of {} {tool_name} concerns fit within this pull request's diff.\n",
-                        self.tool_total[t as usize], total
+                        "\nOnly {total} out of {tool_total} {tool_name} concerns fit within this pull request's diff.\n",
                     )
                     .as_str(),
                 );
@@ -351,6 +389,7 @@ pub trait MakeSuggestions {
                 .with_context(|| format!("Failed to convert patch to string: {file_name}"))?
                 .as_str(),
         );
+        review_comments.tool_total[is_tidy_tool as usize].get_or_insert(0);
         if summary_only {
             return Ok(());
         }
@@ -408,7 +447,9 @@ pub trait MakeSuggestions {
                 review_comments.comments.push(comment);
             }
         }
-        review_comments.tool_total[is_tidy_tool as usize] += hunks_in_patch;
+        review_comments.tool_total[is_tidy_tool as usize] = Some(
+            review_comments.tool_total[is_tidy_tool as usize].unwrap_or_default() + hunks_in_patch,
+        );
         Ok(())
     }
 }

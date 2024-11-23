@@ -158,12 +158,13 @@ impl FileObj {
                 .unwrap_or_default()
                 .to_str()
                 .unwrap_or_default();
+            // Count of clang-tidy diagnostics that had no fixes applied
+            let mut total = 0;
             for note in &advice.notes {
                 if note.fixed_lines.is_empty() {
                     // notification had no suggestion applied in `patched`
                     let mut suggestion = format!(
-                        "### clang-tidy diagnostic\n**{}:{}:{}** {}: [{}]\n> {}",
-                        file_name,
+                        "### clang-tidy diagnostic\n**{file_name}:{}:{}** {}: [{}]\n> {}",
                         &note.line,
                         &note.cols,
                         &note.severity,
@@ -172,10 +173,10 @@ impl FileObj {
                     );
                     if !note.suggestion.is_empty() {
                         suggestion.push_str(
-                            format!("```{}\n{}```", file_ext, &note.suggestion.join("\n")).as_str(),
+                            format!("```{file_ext}\n{}```", &note.suggestion.join("\n")).as_str(),
                         );
                     }
-                    review_comments.tool_total[1] += 1;
+                    total += 1;
                     let mut is_merged = false;
                     for s in &mut review_comments.comments {
                         if s.path == file_name
@@ -197,6 +198,8 @@ impl FileObj {
                     }
                 }
             }
+            review_comments.tool_total[1] =
+                Some(review_comments.tool_total[1].unwrap_or_default() + total);
         }
         Ok(())
     }
@@ -308,14 +311,14 @@ mod test {
     // *********************** tests for FileObj::get_ranges()
 
     #[test]
-    fn get_ranges_0() {
+    fn get_ranges_none() {
         let file_obj = FileObj::new(PathBuf::from("tests/demo/demo.cpp"));
         let ranges = file_obj.get_ranges(&LinesChangedOnly::Off);
         assert!(ranges.is_empty());
     }
 
     #[test]
-    fn get_ranges_2() {
+    fn get_ranges_diff() {
         let diff_chunks = vec![1..=10];
         let added_lines = vec![4, 5, 9];
         let file_obj = FileObj::from(
@@ -328,7 +331,7 @@ mod test {
     }
 
     #[test]
-    fn get_ranges_1() {
+    fn get_ranges_added() {
         let diff_chunks = vec![1..=10];
         let added_lines = vec![4, 5, 9];
         let file_obj = FileObj::from(
