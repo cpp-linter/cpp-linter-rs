@@ -30,10 +30,10 @@ For the description of supported Command Line Interface options, see
 
 ## Development
 
-Build the binding with [maturin]:
+Build the binding with [maturin] (from repository root folder):
 
 ```text
-maturin dev --manifest-path py-binding/Cargo.toml
+maturin dev
 ```
 
 Then invoke the executable script as a normal CLI app:
@@ -49,7 +49,7 @@ cpp-linter -help
 | `cpp_linter` | The pure python sources that wrap the rust binding. Typing information is located here. |
 | `src` | The location for all rust sources related to binding the cpp-linter library. |
 | `Cargo.toml` | Metadata about the binding's rust package (which _is not_ intended to be published to crates.io). |
-| `pyproject.toml` | Metadata about the python package. |
+| `../../pyproject.toml` | Metadata about the python package (located in repo root). |
 | `requirements-dev.txt` | The dependencies used in development (not needed for runtime/production). |
 
 Hidden files and folders are not described in the table above.
