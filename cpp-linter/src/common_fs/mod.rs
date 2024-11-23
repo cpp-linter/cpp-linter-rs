@@ -158,6 +158,7 @@ impl FileObj {
                 .unwrap_or_default()
                 .to_str()
                 .unwrap_or_default();
+            // Count of clang-tidy diagnostics that had no fixes applied
             let mut total = 0;
             for note in &advice.notes {
                 if note.fixed_lines.is_empty() {

@@ -146,7 +146,7 @@ pub struct ClangVersions {
     pub tidy_version: Option<String>,
 }
 
-/// Run `clang-tool --version`, the extract and return the version number.
+/// Run `clang-tool --version`, then extract and return the version number.
 fn capture_clang_version(clang_tool: &PathBuf) -> Result<String> {
     let output = Command::new(clang_tool).arg("--version").output()?;
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -266,10 +266,12 @@ impl ReviewComments {
                 ("clang-tidy", clang_versions.tidy_version.as_ref())
             };
 
-            if self.tool_total[t as usize].is_none() {
+            let tool_total = if let Some(total) = self.tool_total[t as usize] {
+                total
+            } else {
                 // review was not requested from this tool or the tool was not used at all
                 continue;
-            }
+            };
 
             // If the tool's version is unknown, then we don't need to output this line.
             // NOTE: If the tool was invoked at all, then the tool's version shall be known.
@@ -285,8 +287,6 @@ impl ReviewComments {
                 }
             }
 
-            // at this point tool_total is Some() value; unwrap() is safe here
-            let tool_total = self.tool_total[t as usize].unwrap();
             if total != tool_total {
                 body.push_str(
                     format!(
@@ -389,9 +389,7 @@ pub trait MakeSuggestions {
                 .with_context(|| format!("Failed to convert patch to string: {file_name}"))?
                 .as_str(),
         );
-        if review_comments.tool_total[is_tidy_tool as usize].is_none() {
-            review_comments.tool_total[is_tidy_tool as usize] = Some(0);
-        }
+        review_comments.tool_total[is_tidy_tool as usize].get_or_insert(0);
         if summary_only {
             return Ok(());
         }

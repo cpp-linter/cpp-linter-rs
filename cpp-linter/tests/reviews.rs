@@ -60,6 +60,17 @@ impl Default for TestParams {
     }
 }
 
+fn generate_tool_summary(review_enabled: bool, force_lgtm: bool, tool_name: &str) -> String {
+    if !review_enabled {
+        return String::new();
+    }
+    if force_lgtm {
+        format!("No concerns reported by {}. Great job! :tada:", tool_name)
+    } else {
+        format!("Click here for the full {} patch", tool_name)
+    }
+}
+
 async fn setup(lib_root: &Path, test_params: &TestParams) {
     env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
     env::set_var("GITHUB_EVENT_NAME", "pull_request");
@@ -161,24 +172,16 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
         } else {
             "REQUEST_CHANGES"
         };
-        let tidy_summary = if test_params.tidy_review {
-            if test_params.force_lgtm {
-                "No concerns reported by clang-tidy. Great job! :tada:"
-            } else {
-                "Click here for the full clang-tidy patch"
-            }
-        } else {
-            ""
-        };
-        let format_summary = if test_params.format_review {
-            if test_params.force_lgtm {
-                "No concerns reported by clang-format. Great job! :tada:"
-            } else {
-                "Click here for the full clang-format patch"
-            }
-        } else {
-            ""
-        };
+        let tidy_summary = generate_tool_summary(
+            test_params.tidy_review,
+            test_params.force_lgtm,
+            "clang-tidy",
+        );
+        let format_summary = generate_tool_summary(
+            test_params.format_review,
+            test_params.force_lgtm,
+            "clang-format",
+        );
         let review_summary = format!(
             "{}## Cpp-linter Review.*{format_summary}.*{tidy_summary}.*{}",
             regex::escape(format!("{}", COMMENT_MARKER.escape_default()).as_str()),
