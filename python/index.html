@@ -602,8 +602,8 @@
 <p>For the description of supported Command Line Interface options, see
 <a href="https://cpp-linter.github.io/cpp-linter-rs/cli.html">the CLI documentation</a>.</p>
 <h2 id="development">Development<a class="headerlink" href="#development" title="Permanent link">&para;</a></h2>
-<p>Build the binding with <a href="https://maturin.rs">maturin</a>:</p>
-<div class="highlight"><pre><span></span><code>maturin dev --manifest-path py-binding/Cargo.toml
+<p>Build the binding with <a href="https://maturin.rs">maturin</a> (from repository root folder):</p>
+<div class="highlight"><pre><span></span><code>maturin dev
 </code></pre></div>
 <p>Then invoke the executable script as a normal CLI app:</p>
 <div class="highlight"><pre><span></span><code>cpp-linter -help
@@ -630,8 +630,8 @@
 <td style="text-align: left;">Metadata about the binding's rust package (which <em>is not</em> intended to be published to crates.io).</td>
 </tr>
 <tr>
-<td style="text-align: right;"><code>pyproject.toml</code></td>
-<td style="text-align: left;">Metadata about the python package.</td>
+<td style="text-align: right;"><code>../../pyproject.toml</code></td>
+<td style="text-align: left;">Metadata about the python package (located in repo root).</td>
 </tr>
 <tr>
 <td style="text-align: right;"><code>requirements-dev.txt</code></td>
