@@ -30,10 +30,12 @@ fn probe_ssl_certs() {
 /// This is the backend entry point for console applications.
 ///
 /// The idea here is that all functionality is implemented in Rust. However, passing
-/// command line arguments is done differently in Python or Rust.
+/// command line arguments is done differently in Python, node.js, or Rust.
 ///
-/// - In python, the ``sys.argv`` list is passed from the ``cpp_linter.entry_point.main()``
-///   function to rust via the ``cpp_linter.run.main()`` binding (which wraps [`run_main()`]).
+/// - In python, the `sys.argv` list is passed from the `cpp_linter.main()`
+///   function to rust via the `cpp_linter.main()` binding (which wraps [`run_main()`]).
+/// - In node.js, the `process.argv` array is passed from `cli.js` module to
+///   rust via `index.node` module's `main()` (which wraps([`run_main()`])).
 /// - In rust, the [`std::env::args`] is passed to [`run_main()`] in the binary
 ///   source `main.rs`.
 ///
