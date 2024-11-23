@@ -161,15 +161,23 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
         } else {
             "REQUEST_CHANGES"
         };
-        let tidy_summary = if test_params.force_lgtm {
-            "No concerns reported by clang-tidy. Great job! :tada:"
+        let tidy_summary = if test_params.tidy_review {
+            if test_params.force_lgtm {
+                "No concerns reported by clang-tidy. Great job! :tada:"
+            } else {
+                "Click here for the full clang-tidy patch"
+            }
         } else {
-            "Click here for the full clang-tidy patch"
+            ""
         };
-        let format_summary = if test_params.force_lgtm {
-            "No concerns reported by clang-format. Great job! :tada:"
+        let format_summary = if test_params.format_review {
+            if test_params.force_lgtm {
+                "No concerns reported by clang-format. Great job! :tada:"
+            } else {
+                "Click here for the full clang-format patch"
+            }
         } else {
-            "Click here for the full clang-format patch"
+            ""
         };
         let review_summary = format!(
             "{}## Cpp-linter Review.*{format_summary}.*{tidy_summary}.*{}",
@@ -198,9 +206,7 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
 
     let mut tool_ignore = "**/*.c".to_string();
     if test_params.force_lgtm {
-        // force a LGTM condition by skipping analysis on all files
-        tool_ignore.push('|');
-        tool_ignore.push_str("src");
+        tool_ignore.push_str("|**/*.cpp|**/*.h");
     }
     let mut args = vec![
         "cpp-linter".to_string(),
@@ -209,8 +215,6 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
         format!("-l={}", test_params.lines_changed_only),
         format!("--ignore-tidy={}", tool_ignore),
         format!("--ignore-format={}", tool_ignore),
-        // "--tidy-checks=".to_string(), // use .clang-tidy file
-        "--style=file".to_string(), // use .clang-format file
         format!("--tidy-review={}", test_params.tidy_review),
         format!("--format-review={}", test_params.format_review),
         format!("--passive-reviews={}", test_params.passive_reviews),
@@ -219,7 +223,16 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
         "-i=build".to_string(),
     ];
     if test_params.force_lgtm {
-        args.push("-e=c".to_string());
+        if test_params.tidy_review {
+            // only use a check that doesn't trigger concern on test assets
+            args.push("--tidy-checks=-*,bugprone-infinite-loop".to_string());
+        }
+        if test_params.format_review {
+            // explicitly disable formatting using `DisableFormat: true`
+            args.push("--style={DisableFormat: true}".to_string());
+        }
+    } else {
+        args.push("--style=file".to_string()); // use .clang-format file
     }
     let result = run_main(args).await;
     assert!(result.is_ok());
@@ -241,6 +254,26 @@ async fn test_review(test_params: &TestParams) {
 async fn all_lines() {
     test_review(&TestParams {
         lines_changed_only: LinesChangedOnly::Off,
+        ..Default::default()
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn all_lines_tidy_only() {
+    test_review(&TestParams {
+        lines_changed_only: LinesChangedOnly::Off,
+        format_review: false,
+        ..Default::default()
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn all_lines_format_only() {
+    test_review(&TestParams {
+        lines_changed_only: LinesChangedOnly::Off,
+        tidy_review: false,
         ..Default::default()
     })
     .await;

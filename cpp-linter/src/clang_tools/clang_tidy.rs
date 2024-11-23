@@ -133,7 +133,7 @@ impl MakeSuggestions for TidyAdvice {
 fn parse_tidy_output(
     tidy_stdout: &[u8],
     database_json: &Option<Vec<CompilationUnit>>,
-) -> Result<Option<TidyAdvice>> {
+) -> Result<TidyAdvice> {
     let note_header = Regex::new(r"^(.+):(\d+):(\d+):\s(\w+):(.*)\[([a-zA-Z\d\-\.]+)\]$").unwrap();
     let fixed_note =
         Regex::new(r"^.+:(\d+):\d+:\snote: FIX-IT applied suggested code changes$").unwrap();
@@ -218,14 +218,10 @@ fn parse_tidy_output(
     if let Some(note) = notification {
         result.push(note);
     }
-    if result.is_empty() {
-        Ok(None)
-    } else {
-        Ok(Some(TidyAdvice {
-            notes: result,
-            patched: None,
-        }))
-    }
+    Ok(TidyAdvice {
+        notes: result,
+        patched: None,
+    })
 }
 
 /// Get a total count of clang-tidy advice from the given list of [FileObj]s.
@@ -316,7 +312,10 @@ pub fn run_clang_tidy(
             ),
         ));
     }
-    file.tidy_advice = parse_tidy_output(&output.stdout, &clang_params.database_json)?;
+    file.tidy_advice = Some(parse_tidy_output(
+        &output.stdout,
+        &clang_params.database_json,
+    )?);
     if clang_params.tidy_review {
         if let Some(tidy_advice) = &mut file.tidy_advice {
             // cache file changes in a buffer and restore the original contents for further analysis by clang-format
