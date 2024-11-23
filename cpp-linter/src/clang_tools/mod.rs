@@ -150,7 +150,7 @@ pub struct ClangVersions {
 fn capture_clang_version(clang_tool: &PathBuf) -> Result<String> {
     let output = Command::new(clang_tool).arg("--version").output()?;
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let version_pattern = Regex::new(r"version\s*(\d+\.\d+\.\d+)").unwrap();
+    let version_pattern = Regex::new(r"(?i)version\s*([\d.]+)").unwrap();
     let captures = version_pattern.captures(&stdout).ok_or(anyhow!(
         "Failed to find version number in `{} --version` output",
         clang_tool.to_string_lossy()
