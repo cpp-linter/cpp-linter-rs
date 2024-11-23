@@ -1,6 +1,6 @@
 # Node.js Binding
 
 {%
-    include "../../node-binding/README.md"
+    include "../../bindings/node/README.md"
     start="<!-- start -->"
 %}

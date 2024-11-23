@@ -1,6 +1,6 @@
 # Python Binding
 
 {%
-    include "../../py-binding/README.md"
+    include "../../bindings/python/README.md"
     start="<!-- start -->"
 %}

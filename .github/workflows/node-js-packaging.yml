@@ -14,7 +14,7 @@ on:
       - cpp-linter/Cargo.toml
       - Cargo.toml
       - Cargo.lock
-      - node-binding/**
+      - bindings/node/**
       - package.json
       - yarn.lock
       - .github/workflows/node-js-packaging.yml
@@ -27,7 +27,7 @@ on:
       - cpp-linter/Cargo.toml
       - Cargo.toml
       - Cargo.lock
-      - node-binding/**
+      - bindings/node/**
       - package.json
       - yarn.lock
       - .github/workflows/node-js-packaging.yml
@@ -83,12 +83,12 @@ jobs:
         if: ${{ matrix.settings.setup }}
         shell: bash
       - name: Setup node x86
-        working-directory: node-binding
+        working-directory: bindings/node
         if: matrix.settings.target == 'i686-pc-windows-msvc'
         run: yarn config set supportedArchitectures.cpu "ia32"
         shell: bash
       - name: Install dependencies
-        working-directory: node-binding
+        working-directory: bindings/node
         run: yarn install
       - name: Setup node x86
         uses: actions/setup-node@v4
@@ -113,13 +113,13 @@ jobs:
       - name: Build
         run: ${{ matrix.settings.build }}
         if: ${{ !matrix.settings.docker }}
-        working-directory: node-binding
+        working-directory: bindings/node
         shell: bash
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: bindings-${{ matrix.settings.target }}
-          path: node-binding/${{ env.APP_NAME }}.*.node
+          path: bindings/node/${{ env.APP_NAME }}.*.node
           if-no-files-found: error
   test-macOS-windows-binding:
     name: Test bindings on ${{ matrix.settings.target }} - node@${{ matrix.node }}
@@ -151,10 +151,10 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: bindings-${{ matrix.settings.target }}
-          path: node-binding
+          path: bindings/node
       - name: List packages
         run: ls -R .
-        working-directory: node-binding
+        working-directory: bindings/node
         shell: bash
       - name: Test bindings
         run: yarn test
@@ -182,10 +182,10 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: bindings-x86_64-unknown-linux-gnu
-          path: node-binding
+          path: bindings/node
       - name: List packages
         run: ls -R .
-        working-directory: node-binding
+        working-directory: bindings/node
         shell: bash
       - name: Test bindings
         run: >-
@@ -213,16 +213,16 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          path: node-binding/artifacts
+          path: bindings/node/artifacts
       - name: Move artifacts
-        working-directory: node-binding
+        working-directory: bindings/node
         run: yarn artifacts
       - name: List packages
         run: ls -R ./npm
-        working-directory: node-binding
+        working-directory: bindings/node
         shell: bash
       - name: Publish
-        working-directory: node-binding
+        working-directory: bindings/node
         run: |
           echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" >> ~/.npmrc
           npm publish --access public --provenance true ${{ contains(github.ref_name, '-rc') && '--tag next' || '' }}

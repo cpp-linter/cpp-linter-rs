@@ -2,14 +2,15 @@
   "name": "@cpp-linter/cpp-linter-rs",
   "version": "0.0.0",
   "description": "Node.js bindings for the cpp-linter rust source.",
-  "main": "node-bindings/index.node",
+  "main": "bindings/node/index.node",
   "directories": {
     "doc": "docs"
   },
   "scripts": {
-    "build": "cd node-binding && napi build --platform --release",
-    "build:debug": "cd node-binding && napi build --platform",
-    "test": "cd node-binding && ava"
+    "build": "cd bindings/node && napi build --platform --release",
+    "build:debug": "cd bindings/node && napi build --platform",
+    "test": "cd bindings/node && ava",
+    "lint": "cd bindings/node && yarn run eslint"
   },
   "repository": {
     "type": "git",
@@ -23,7 +24,7 @@
   "homepage": "https://github.com/cpp-linter/cpp-linter-rs#readme",
   "private": true,
   "workspaces": [
-    "node-binding"
+    "bindings/node"
   ],
   "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }

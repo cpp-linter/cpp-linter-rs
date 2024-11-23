@@ -115,11 +115,11 @@ def main():
             Updater.new_version,
             "--no-git-tag-version",
         ],
-        cwd="node-binding",
+        cwd="bindings/node",
         check=True,
     )
-    subprocess.run(["napi", "version"], cwd="node-binding", check=True)
-    print("Updated version in node-binding/**package.json")
+    subprocess.run(["napi", "version"], cwd="bindings/node", check=True)
+    print("Updated version in bindings/node/**package.json")
 
     subprocess.run(
         [
