@@ -5,7 +5,7 @@ build-backend = "maturin"
 [project]
 name = "cpp-linter"
 description = "Run clang-format and clang-tidy on a batch of files."
-readme = "README.md"
+readme = "bindings/python/README.md"
 keywords = ["clang", "clang-tools", "linter", "clang-tidy", "clang-format"]
 license = {text = "MIT License"}
 requires-python = ">=3.9"
@@ -46,3 +46,4 @@ exclude = [
     {path = "**/examples/**", format="sdist"},
     {path = "**/docs/**", format="sdist"},
 ]
+manifest-path = "bindings/python/Cargo.toml"

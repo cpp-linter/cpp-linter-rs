@@ -17,18 +17,20 @@ on:
     branches: [main]
     paths:
       - cpp-linter/**.{rs,toml}
-      - py-binding/**
+      - bindings/python/**
       - Cargo.{toml,lock}
       - .github/workflows/python-packaging.yml
+      - pyproject.toml
     tags:
       - '*'
   pull_request:
     branches: [main]
     paths:
       - cpp-linter/**.{rs,toml}
-      - py-binding/**
+      - bindings/python/**
       - Cargo.{toml,lock}
       - .github/workflows/python-packaging.yml
+      - pyproject.toml
 
 permissions:
   contents: read
@@ -75,7 +77,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist --find-interpreter --manifest-path py-binding/Cargo.toml ${{ steps.is-openssl-vendored.outputs.enabled }}
+          args: --release --out dist --find-interpreter ${{ steps.is-openssl-vendored.outputs.enabled }}
           # sccache: 'true'
           manylinux: auto
           before-script-linux: |
@@ -116,7 +118,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist --find-interpreter --manifest-path py-binding/Cargo.toml
+          args: --release --out dist --find-interpreter
           sccache: 'true'
       - name: Upload wheels
         uses: actions/upload-artifact@v4
@@ -143,7 +145,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist --find-interpreter --manifest-path py-binding/Cargo.toml --features openssl-vendored
+          args: --release --out dist --find-interpreter --features openssl-vendored
           sccache: 'true'
       - name: Upload wheels
         uses: actions/upload-artifact@v4
@@ -162,7 +164,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           command: sdist
-          args: --manifest-path py-binding/Cargo.toml --out dist
+          args: --out dist
       - name: Upload sdist
         uses: actions/upload-artifact@v4
         with:
