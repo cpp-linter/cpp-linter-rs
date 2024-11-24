@@ -39,7 +39,7 @@ tool for the CI/CD workflow.
 
 This script builds the native module for distribution (with release profile optimizations).
 
-##### `yarn build:debug`
+#### `yarn build:debug`
 
 Same as `yarn build` but does not use the release profile optimizations.
 You should use this script when testing locally.
