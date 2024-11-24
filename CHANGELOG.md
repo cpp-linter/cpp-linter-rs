@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
+## [2.0.0-rc7] - 2024-11-24
+
+### <!-- 4 --> 🛠️ Fixed
+
+- Fix python binding's entry point by @2bndy5 in [`bba2e68`](https://github.com/cpp-linter/cpp-linter-rs/commit/bba2e68f43fa2ee652cc67a18ea2cd1cfbfe537a)
+
+[2.0.0-rc7]: https://github.com/cpp-linter/cpp-linter-rs/compare/v2.0.0-rc6...2.0.0-rc7
+
+Full commit diff: [`v2.0.0-rc6...2.0.0-rc7`][2.0.0-rc7]
+
 ## [2.0.0-rc6] - 2024-11-23
 
 ### <!-- 1 --> 🚀 Added
@@ -38,10 +48,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### <!-- 9 --> 🗨️ Changed
 
 - Reorganize repo folders by @2bndy5 in [`d30125b`](https://github.com/cpp-linter/cpp-linter-rs/commit/d30125bbe9015d7ea070a3b8c20fcc9acc56dbc0)
+- Bump version to v2.0.0-rc6 by @2bndy5 in [`12729b8`](https://github.com/cpp-linter/cpp-linter-rs/commit/12729b86ec9047f550c842c7cbbd412a232b8470)
 
-[2.0.0-rc6]: https://github.com/cpp-linter/cpp-linter-rs/compare/v2.0.0-rc5...2.0.0-rc6
+[2.0.0-rc6]: https://github.com/cpp-linter/cpp-linter-rs/compare/v2.0.0-rc5...v2.0.0-rc6
 
-Full commit diff: [`v2.0.0-rc5...2.0.0-rc6`][2.0.0-rc6]
+Full commit diff: [`v2.0.0-rc5...v2.0.0-rc6`][2.0.0-rc6]
 
 ## [2.0.0-rc5] - 2024-09-29
 
