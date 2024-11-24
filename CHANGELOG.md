@@ -6,15 +6,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
+## [2.0.0-rc8] - 2024-11-24
+
+### <!-- 4 --> 🛠️ Fixed
+
+- Include type stubs in python source distribution by @2bndy5 in [`7dfcce7`](https://github.com/cpp-linter/cpp-linter-rs/commit/7dfcce72f39412f45208e5586d0a1ef2d0a40207)
+- Clang tools' version output string in PR review summary by @2bndy5 in [`3333796`](https://github.com/cpp-linter/cpp-linter-rs/commit/33337965a240ff791d39d4e4cd6339855ea42fd8)
+
+### <!-- 8 --> 📝 Documentation
+
+- Minor update node binding README by @2bndy5 in [`fc2244f`](https://github.com/cpp-linter/cpp-linter-rs/commit/fc2244f81903c719a5268f18e595f422d1a958e1)
+
+[2.0.0-rc8]: https://github.com/cpp-linter/cpp-linter-rs/compare/v2.0.0-rc7...2.0.0-rc8
+
+Full commit diff: [`v2.0.0-rc7...2.0.0-rc8`][2.0.0-rc8]
+
 ## [2.0.0-rc7] - 2024-11-24
 
 ### <!-- 4 --> 🛠️ Fixed
 
 - Fix python binding's entry point by @2bndy5 in [`bba2e68`](https://github.com/cpp-linter/cpp-linter-rs/commit/bba2e68f43fa2ee652cc67a18ea2cd1cfbfe537a)
 
-[2.0.0-rc7]: https://github.com/cpp-linter/cpp-linter-rs/compare/v2.0.0-rc6...2.0.0-rc7
+### <!-- 9 --> 🗨️ Changed
 
-Full commit diff: [`v2.0.0-rc6...2.0.0-rc7`][2.0.0-rc7]
+- Bump version to v2.0.0-rc7 by @2bndy5 in [`a2001f3`](https://github.com/cpp-linter/cpp-linter-rs/commit/a2001f395a6bb078ed43d4ef5014fa3304ca9323)
+
+[2.0.0-rc7]: https://github.com/cpp-linter/cpp-linter-rs/compare/v2.0.0-rc6...v2.0.0-rc7
+
+Full commit diff: [`v2.0.0-rc6...v2.0.0-rc7`][2.0.0-rc7]
 
 ## [2.0.0-rc6] - 2024-11-23
 
