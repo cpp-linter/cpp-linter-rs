@@ -46,12 +46,12 @@ cpp-linter -help
 
 | Name | Description |
 |-----:|:------------|
-| `cpp_linter` | The pure python sources that wrap the rust binding. Typing information is located here. |
 | `src` | The location for all rust sources related to binding the cpp-linter library. |
 | `Cargo.toml` | Metadata about the binding's rust package (which _is not_ intended to be published to crates.io). |
+| `../../cpp_linter.pyi` | The typing stubs for the package (located in repo root). |
 | `../../pyproject.toml` | Metadata about the python package (located in repo root). |
 | `requirements-dev.txt` | The dependencies used in development (not needed for runtime/production). |
 
 Hidden files and folders are not described in the table above.
 If they are not ignored by a gitignore specification, then they should be considered
-important for maintenance or distribution.
+important only for maintenance or distribution.

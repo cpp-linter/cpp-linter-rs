@@ -32,10 +32,13 @@ fn probe_ssl_certs() {
 /// The idea here is that all functionality is implemented in Rust. However, passing
 /// command line arguments is done differently in Python, node.js, or Rust.
 ///
-/// - In python, the `sys.argv` list is passed from the `cpp_linter.main()`
-///   function to rust via the `cpp_linter.main()` binding (which wraps [`run_main()`]).
-/// - In node.js, the `process.argv` array is passed from `cli.js` module to
-///   rust via `index.node` module's `main()` (which wraps([`run_main()`])).
+/// - In python, the CLI arguments list is optionally passed to the binding's
+///   `cpp_linter.main()` function (which wraps [`run_main()`]). If no args are passed,
+///   then `cpp_linter.main()` uses [`std::env::args`] without the leading path to the
+///   python interpreter removed.
+/// - In node.js, the `process.argv` array (without the leading path to the node
+///   interpreter removed) is passed from `cli.js` module to rust via `index.node`
+///   module's `main()` (which wraps([`run_main()`])).
 /// - In rust, the [`std::env::args`] is passed to [`run_main()`] in the binary
 ///   source `main.rs`.
 ///

@@ -1,11 +1,15 @@
 use pyo3::{exceptions::PyOSError, prelude::*};
+use std::env;
 use tokio::runtime::Builder;
 
 use ::cpp_linter::run::run_main;
 
 /// A wrapper for the ``::cpp_linter::run::run_main()```
 #[pyfunction]
-fn main(args: Vec<String>) -> PyResult<()> {
+#[pyo3(signature = (args = None))]
+fn main(args: Option<Vec<String>>) -> PyResult<()> {
+    // exclude path to python interpreter
+    let args = args.unwrap_or(env::args().collect::<Vec<String>>()[1..].to_vec());
     Builder::new_multi_thread()
         .enable_all()
         .build()

@@ -58,10 +58,11 @@ This script runs a simple test to ensure the native module was built correctly.
 | `build.rs` | The cargo-specific build script used when compiling the binding. |
 | `Cargo.toml` | Metadata about the binding's rust package (which _is not_ intended to be published to crates.io). |
 | `package.json` | Metadata about the npm package (platform agnostic). |
+| `cli.js` | The executable script invoked as a Command Line Interface. |
 | `index.d.ts` | The generated TypeScript typing info the describes the exposing functionality in the built native module. |
 | `index.js` | The generated script that delegates which platform-specific package to import. |
 | `cpp-linter.x-y-z.node` | Then native module built for a specific platform (where `x-y-z` denotes the platform's name using compilation target). |
 
 Hidden files and folders are not described in the table above.
 If they are not ignored by a gitignore specification, then they should be considered
-important for maintenance or distribution.
+important only for maintenance or distribution.
