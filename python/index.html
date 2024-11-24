@@ -618,16 +618,16 @@
 </thead>
 <tbody>
 <tr>
-<td style="text-align: right;"><code>cpp_linter</code></td>
-<td style="text-align: left;">The pure python sources that wrap the rust binding. Typing information is located here.</td>
-</tr>
-<tr>
 <td style="text-align: right;"><code>src</code></td>
 <td style="text-align: left;">The location for all rust sources related to binding the cpp-linter library.</td>
 </tr>
 <tr>
 <td style="text-align: right;"><code>Cargo.toml</code></td>
 <td style="text-align: left;">Metadata about the binding's rust package (which <em>is not</em> intended to be published to crates.io).</td>
+</tr>
+<tr>
+<td style="text-align: right;"><code>../../cpp_linter.pyi</code></td>
+<td style="text-align: left;">The typing stubs for the package (located in repo root).</td>
 </tr>
 <tr>
 <td style="text-align: right;"><code>../../pyproject.toml</code></td>
@@ -641,7 +641,7 @@
 </table>
 <p>Hidden files and folders are not described in the table above.
 If they are not ignored by a gitignore specification, then they should be considered
-important for maintenance or distribution.</p>
+important only for maintenance or distribution.</p>
 
 
 
