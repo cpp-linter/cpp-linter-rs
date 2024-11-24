@@ -276,7 +276,7 @@ impl ReviewComments {
             // If the tool's version is unknown, then we don't need to output this line.
             // NOTE: If the tool was invoked at all, then the tool's version shall be known.
             if let Some(ver_str) = tool_version {
-                body.push_str(format!("### Used {tool_name} {ver_str}\n").as_str());
+                body.push_str(format!("\n### Used {tool_name} v{ver_str}\n").as_str());
             }
             for comment in &self.comments {
                 if comment
