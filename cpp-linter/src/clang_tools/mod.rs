@@ -180,7 +180,7 @@ pub async fn capture_clang_tools_output(
         );
         clang_versions.tidy_version = Some(version_found);
         clang_params.clang_tidy_command = Some(exe_path);
-    };
+    }
     if !clang_params.style.is_empty() {
         let exe_path = get_clang_tool_exe("clang-format", version)?;
         let version_found = capture_clang_version(&exe_path)?;
@@ -190,7 +190,7 @@ pub async fn capture_clang_tools_output(
         );
         clang_versions.format_version = Some(version_found);
         clang_params.clang_format_command = Some(exe_path);
-    };
+    }
 
     // parse database (if provided) to match filenames when parsing clang-tidy's stdout
     if let Some(db_path) = &clang_params.database {
