@@ -119,6 +119,20 @@ impl FileObj {
         None
     }
 
+    /// Similar to [`FileObj::is_hunk_in_diff()`] but looks for a single line instead of
+    /// an entire [`DiffHunk`].
+    ///
+    /// This is a private function because it is only used in
+    /// [`FileObj::make_suggestions_from_patch()`].
+    fn is_line_in_diff(&self, line: &u32) -> bool {
+        for range in &self.diff_chunks {
+            if range.contains(line) {
+                return true;
+            }
+        }
+        false
+    }
+
     /// Create a list of [`Suggestion`](struct@crate::clang_tools::Suggestion) from a
     /// generated [`Patch`](struct@git2::Patch) and store them in the given
     /// [`ReviewComments`](struct@crate::clang_tools::ReviewComments).
@@ -161,10 +175,10 @@ impl FileObj {
             // Count of clang-tidy diagnostics that had no fixes applied
             let mut total = 0;
             for note in &advice.notes {
-                if note.fixed_lines.is_empty() {
+                if note.fixed_lines.is_empty() && self.is_line_in_diff(&note.line) {
                     // notification had no suggestion applied in `patched`
                     let mut suggestion = format!(
-                        "### clang-tidy diagnostic\n**{file_name}:{}:{}** {}: [{}]\n> {}",
+                        "### clang-tidy diagnostic\n**{file_name}:{}:{}** {}: [{}]\n\n> {}\n",
                         &note.line,
                         &note.cols,
                         &note.severity,
@@ -173,7 +187,8 @@ impl FileObj {
                     );
                     if !note.suggestion.is_empty() {
                         suggestion.push_str(
-                            format!("```{file_ext}\n{}```", &note.suggestion.join("\n")).as_str(),
+                            format!("\n```{file_ext}\n{}\n```\n", &note.suggestion.join("\n"))
+                                .as_str(),
                         );
                     }
                     total += 1;
@@ -341,5 +356,11 @@ mod test {
         );
         let ranges = file_obj.get_ranges(&LinesChangedOnly::On);
         assert_eq!(ranges, vec![4..=5, 9..=9]);
+    }
+
+    #[test]
+    fn line_not_in_diff() {
+        let file_obj = FileObj::new(PathBuf::from("tests/demo/demo.cpp"));
+        assert!(!file_obj.is_line_in_diff(&42));
     }
 }

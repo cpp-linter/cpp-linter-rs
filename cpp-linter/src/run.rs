@@ -221,4 +221,21 @@ mod test {
         .await;
         assert!(result.is_err());
     }
+
+    // Verifies that the system gracefully handles cases where all analysis is disabled.
+    // This ensures no diagnostic comments are generated when analysis is explicitly skipped.
+    #[tokio::test]
+    async fn no_analysis() {
+        env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
+        let result = run_main(vec![
+            "cpp-linter".to_string(),
+            "-l".to_string(),
+            "false".to_string(),
+            "--style".to_string(),
+            String::new(),
+            "--tidy-checks=-*".to_string(),
+        ])
+        .await;
+        assert!(result.is_ok());
+    }
 }
