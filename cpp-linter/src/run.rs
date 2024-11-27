@@ -221,4 +221,20 @@ mod test {
         .await;
         assert!(result.is_err());
     }
+
+    // just for completion. this test is not practical use case
+    #[tokio::test]
+    async fn no_analysis() {
+        env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
+        let result = run_main(vec![
+            "cpp-linter".to_string(),
+            "-l".to_string(),
+            "false".to_string(),
+            "--style".to_string(),
+            String::new(),
+            "--tidy-checks=-*".to_string(),
+        ])
+        .await;
+        assert!(result.is_ok());
+    }
 }
