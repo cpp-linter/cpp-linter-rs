@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
+## [2.0.0-rc9] - 2024-11-27
+
+### <!-- 4 --> 🛠️ Fixed
+
+- Clang-tidy diagnostic comments in PR review by @2bndy5 in [#77](https://github.com/cpp-linter/cpp-linter-rs/pull/77)
+
+### <!-- 6 --> 📦 Dependency updates
+
+- Bump pyo3 from 0.23.1 to 0.23.2 in the cargo group by @dependabot[bot] in [#76](https://github.com/cpp-linter/cpp-linter-rs/pull/76)
+
+[2.0.0-rc9]: https://github.com/cpp-linter/cpp-linter-rs/compare/v2.0.0-rc8...2.0.0-rc9
+
+Full commit diff: [`v2.0.0-rc8...2.0.0-rc9`][2.0.0-rc9]
+
 ## [2.0.0-rc8] - 2024-11-24
 
 ### <!-- 4 --> 🛠️ Fixed
@@ -17,9 +31,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Minor update node binding README by @2bndy5 in [`fc2244f`](https://github.com/cpp-linter/cpp-linter-rs/commit/fc2244f81903c719a5268f18e595f422d1a958e1)
 
-[2.0.0-rc8]: https://github.com/cpp-linter/cpp-linter-rs/compare/v2.0.0-rc7...2.0.0-rc8
+### <!-- 9 --> 🗨️ Changed
 
-Full commit diff: [`v2.0.0-rc7...2.0.0-rc8`][2.0.0-rc8]
+- Bump version to v2.0.0-rc8 by @2bndy5 in [`205bd2d`](https://github.com/cpp-linter/cpp-linter-rs/commit/205bd2d492ee45e199ca23d1ac9f118c03a2c4a2)
+
+[2.0.0-rc8]: https://github.com/cpp-linter/cpp-linter-rs/compare/v2.0.0-rc7...v2.0.0-rc8
+
+Full commit diff: [`v2.0.0-rc7...v2.0.0-rc8`][2.0.0-rc8]
 
 ## [2.0.0-rc7] - 2024-11-24
 
