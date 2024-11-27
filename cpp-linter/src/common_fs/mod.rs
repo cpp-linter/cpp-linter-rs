@@ -122,7 +122,7 @@ impl FileObj {
     /// Similar to [`FileObj::is_hunk_in_diff()`] but looks for a single line instead of
     /// an entire [`DiffHunk`].
     ///
-    /// This is a private function it is because only used in
+    /// This is a private function because it is only used in
     /// [`FileObj::make_suggestions_from_patch()`].
     fn is_line_in_diff(&self, line: &u32) -> bool {
         for range in &self.diff_chunks {

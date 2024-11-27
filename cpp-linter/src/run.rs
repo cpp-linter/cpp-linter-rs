@@ -222,7 +222,8 @@ mod test {
         assert!(result.is_err());
     }
 
-    // just for completion. this test is not practical use case
+    // Verifies that the system gracefully handles cases where all analysis is disabled.
+    // This ensures no diagnostic comments are generated when analysis is explicitly skipped.
     #[tokio::test]
     async fn no_analysis() {
         env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
