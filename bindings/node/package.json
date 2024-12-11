@@ -1,6 +1,6 @@
 {
   "name": "@cpp-linter/cpp-linter",
-  "version": "2.0.0-rc10",
+  "version": "2.0.0-rc11",
   "main": "index.js",
   "types": "index.d.ts",
   "napi": {

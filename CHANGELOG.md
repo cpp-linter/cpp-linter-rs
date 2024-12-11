@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
+## [2.0.0-rc11] - 2024-12-11
+
+### <!-- 4 --> 🛠️ Fixed
+
+- Fix changelog on auto-version bump by @2bndy5 in [`ec4e6d4`](https://github.com/cpp-linter/cpp-linter-rs/commit/ec4e6d4c9a36b84c86fafac071b23bfbe9180716)
+
+### <!-- 6 --> 📦 Dependency updates
+
+- Bump pypa/gh-action-pypi-publish in the actions group by @dependabot[bot] in [#81](https://github.com/cpp-linter/cpp-linter-rs/pull/81)
+- Bump the npm group with 3 updates by @dependabot[bot] in [#78](https://github.com/cpp-linter/cpp-linter-rs/pull/78)
+- Bump the cargo group across 1 directory with 7 updates by @dependabot[bot] in [#82](https://github.com/cpp-linter/cpp-linter-rs/pull/82)
+
+[2.0.0-rc11]: https://github.com/cpp-linter/cpp-linter-rs/compare/v2.0.0-rc10...v2.0.0-rc11
+
+Full commit diff: [`v2.0.0-rc10...v2.0.0-rc11`][2.0.0-rc11]
+
 ## [2.0.0-rc10] - 2024-12-11
 
 ### <!-- 1 --> 🚀 Added
@@ -16,9 +32,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Bump pyo3 from 0.23.2 to 0.23.3 by @dependabot[bot] in [#79](https://github.com/cpp-linter/cpp-linter-rs/pull/79)
 
-[2.0.0-rc10]: https://github.com/cpp-linter/cpp-linter-rs/compare/v2.0.0-rc9...2.0.0-rc10
+### <!-- 9 --> 🗨️ Changed
 
-Full commit diff: [`v2.0.0-rc9...2.0.0-rc10`][2.0.0-rc10]
+- Bump version to v2.0.0-rc10 by @2bndy5 in [`3915e2b`](https://github.com/cpp-linter/cpp-linter-rs/commit/3915e2b5a09fd9b69a0233da6b8f64a2e34ce553)
+
+[2.0.0-rc10]: https://github.com/cpp-linter/cpp-linter-rs/compare/v2.0.0-rc9...v2.0.0-rc10
+
+Full commit diff: [`v2.0.0-rc9...v2.0.0-rc10`][2.0.0-rc10]
 
 ## [2.0.0-rc9] - 2024-11-27
 
