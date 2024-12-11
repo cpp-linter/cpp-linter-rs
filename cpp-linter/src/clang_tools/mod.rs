@@ -95,25 +95,6 @@ fn analyze_single_file(
         .lock()
         .map_err(|_| anyhow!("Failed to lock file mutex"))?;
     let mut logs = vec![];
-    if clang_params.clang_tidy_command.is_some() {
-        if clang_params
-            .tidy_filter
-            .as_ref()
-            .is_some_and(|f| f.is_source_or_ignored(file.name.as_path()))
-            || clang_params.tidy_filter.is_none()
-        {
-            let tidy_result = run_clang_tidy(&mut file, &clang_params)?;
-            logs.extend(tidy_result);
-        } else {
-            logs.push((
-                log::Level::Info,
-                format!(
-                    "{} not scanned by clang-tidy due to `--ignore-tidy`",
-                    file.name.as_os_str().to_string_lossy()
-                ),
-            ));
-        }
-    }
     if clang_params.clang_format_command.is_some() {
         if clang_params
             .format_filter
@@ -128,6 +109,25 @@ fn analyze_single_file(
                 log::Level::Info,
                 format!(
                     "{} not scanned by clang-format due to `--ignore-format`",
+                    file.name.as_os_str().to_string_lossy()
+                ),
+            ));
+        }
+    }
+    if clang_params.clang_tidy_command.is_some() {
+        if clang_params
+            .tidy_filter
+            .as_ref()
+            .is_some_and(|f| f.is_source_or_ignored(file.name.as_path()))
+            || clang_params.tidy_filter.is_none()
+        {
+            let tidy_result = run_clang_tidy(&mut file, &clang_params)?;
+            logs.extend(tidy_result);
+        } else {
+            logs.push((
+                log::Level::Info,
+                format!(
+                    "{} not scanned by clang-tidy due to `--ignore-tidy`",
                     file.name.as_os_str().to_string_lossy()
                 ),
             ));

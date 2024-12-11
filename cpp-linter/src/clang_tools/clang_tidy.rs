@@ -318,7 +318,7 @@ pub fn run_clang_tidy(
     )?);
     if clang_params.tidy_review {
         if let Some(tidy_advice) = &mut file.tidy_advice {
-            // cache file changes in a buffer and restore the original contents for further analysis by clang-format
+            // cache file changes in a buffer and restore the original contents for further analysis
             tidy_advice.patched =
                 Some(fs::read(&file_name).with_context(|| {
                     format!("Failed to read changes from clang-tidy: {file_name}")

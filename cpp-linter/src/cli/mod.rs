@@ -336,13 +336,33 @@ Further filtering can still be applied (see [Source options](#source-options))."
         )
         .groups([
             ArgGroup::new("Clang-tidy options")
-                .args(["tidy-checks", "database", "extra-arg", "ignore-tidy"]).multiple(true),
-            ArgGroup::new("Clang-format options").args(["style", "ignore-format"]).multiple(true),
-            ArgGroup::new("General options").args(["verbosity", "version"]).multiple(true),
-            ArgGroup::new("Source options").args(["extensions", "repo-root", "ignore", "lines-changed-only", "files-changed-only"]).multiple(true),
-            ArgGroup::new("Feedback options").args([
-                "thread-comments", "no-lgtm", "step-summary", "file-annotations", "tidy-review", "format-review", "passive-reviews"
-            ]).multiple(true),
+                .args(["tidy-checks", "database", "extra-arg", "ignore-tidy"])
+                .multiple(true)
+                .required(false),
+            ArgGroup::new("Clang-format options")
+                .args(["style", "ignore-format"])
+                .multiple(true)
+                .required(false),
+            ArgGroup::new("General options")
+                .args(["verbosity", "version"])
+                .multiple(true)
+                .required(false),
+            ArgGroup::new("Source options")
+                .args(["extensions", "repo-root", "ignore", "lines-changed-only", "files-changed-only"])
+                .multiple(true)
+                .required(false),
+            ArgGroup::new("Feedback options")
+                .args([
+                    "thread-comments",
+                    "no-lgtm",
+                    "step-summary",
+                    "file-annotations",
+                    "tidy-review",
+                    "format-review",
+                    "passive-reviews",
+                ])
+                .multiple(true)
+                .required(false),
         ])
         .next_line_help(true)
 }

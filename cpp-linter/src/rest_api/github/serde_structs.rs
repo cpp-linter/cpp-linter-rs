@@ -4,6 +4,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::clang_tools::Suggestion;
+use crate::rest_api::COMMENT_MARKER;
 
 #[derive(Debug, Serialize)]
 pub struct FullReview {
@@ -24,7 +25,7 @@ pub struct ReviewDiffComment {
 impl From<Suggestion> for ReviewDiffComment {
     fn from(value: Suggestion) -> Self {
         Self {
-            body: value.suggestion,
+            body: format!("{COMMENT_MARKER}{}", value.suggestion),
             line: value.line_end as i64,
             start_line: if value.line_end != value.line_start {
                 Some(value.line_start as i64)
