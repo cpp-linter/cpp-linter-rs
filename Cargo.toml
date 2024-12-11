@@ -5,7 +5,7 @@ members = ["cpp-linter", "bindings/python", "bindings/node", "docs"]
 resolver = "2"
 
 [workspace.package]
-version = "2.0.0-rc9" # auto
+version = "2.0.0-rc10" # auto
 authors = [
     "Brendan Doherty",
     "Peter Shen",

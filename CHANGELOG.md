@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
+## [2.0.0-rc10] - 2024-12-11
+
+### <!-- 1 --> 🚀 Added
+
+- Prefix review comments with marker by @2bndy5 in [`9d2a9a3`](https://github.com/cpp-linter/cpp-linter-rs/commit/9d2a9a3e4c4f91ab778959396e4e153d7cbb6d56)
+
+### <!-- 6 --> 📦 Dependency updates
+
+- Bump pyo3 from 0.23.2 to 0.23.3 by @dependabot[bot] in [#79](https://github.com/cpp-linter/cpp-linter-rs/pull/79)
+
+[2.0.0-rc10]: https://github.com/cpp-linter/cpp-linter-rs/compare/v2.0.0-rc9...2.0.0-rc10
+
+Full commit diff: [`v2.0.0-rc9...2.0.0-rc10`][2.0.0-rc10]
+
 ## [2.0.0-rc9] - 2024-11-27
 
 ### <!-- 4 --> 🛠️ Fixed
@@ -16,9 +30,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Bump pyo3 from 0.23.1 to 0.23.2 in the cargo group by @dependabot[bot] in [#76](https://github.com/cpp-linter/cpp-linter-rs/pull/76)
 
-[2.0.0-rc9]: https://github.com/cpp-linter/cpp-linter-rs/compare/v2.0.0-rc8...2.0.0-rc9
+### <!-- 9 --> 🗨️ Changed
 
-Full commit diff: [`v2.0.0-rc8...2.0.0-rc9`][2.0.0-rc9]
+- Bump version to v2.0.0-rc9 by @2bndy5 in [`9ccbc14`](https://github.com/cpp-linter/cpp-linter-rs/commit/9ccbc14c575ddceec5827f18c9c0cf69d8296927)
+
+[2.0.0-rc9]: https://github.com/cpp-linter/cpp-linter-rs/compare/v2.0.0-rc8...v2.0.0-rc9
+
+Full commit diff: [`v2.0.0-rc8...v2.0.0-rc9`][2.0.0-rc9]
 
 ## [2.0.0-rc8] - 2024-11-24
 

@@ -1,6 +1,6 @@
 {
   "name": "@cpp-linter/cpp-linter-darwin-x64",
-  "version": "2.0.0-rc9",
+  "version": "2.0.0-rc10",
   "os": [
     "darwin"
   ],
