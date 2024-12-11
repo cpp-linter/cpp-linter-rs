@@ -127,7 +127,7 @@ def main():
             "--config",
             ".config/cliff.toml",
             "--tag",
-            Updater.new_version,
+            f"v{Updater.new_version}",
             "--output",
             "CHANGELOG.md",
         ],
