@@ -106,7 +106,11 @@ impl MakeSuggestions for TidyAdvice {
         for note in &self.notes {
             for fixed_line in &note.fixed_lines {
                 if (start_line..=end_line).contains(fixed_line) {
-                    diagnostics.push(format!("- {}\n", note.diagnostic_link()));
+                    diagnostics.push(format!(
+                        "- {} [{}]\n",
+                        note.rationale,
+                        note.diagnostic_link()
+                    ));
                 }
             }
         }
