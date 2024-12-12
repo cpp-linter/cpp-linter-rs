@@ -1,6 +1,6 @@
 {
   "name": "@cpp-linter/cpp-linter-win32-x64-msvc",
-  "version": "2.0.0-rc11",
+  "version": "2.0.0-rc12",
   "os": [
     "win32"
   ],

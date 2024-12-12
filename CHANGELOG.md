@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
+## [2.0.0-rc12] - 2024-12-12
+
+### <!-- 1 --> 🚀 Added
+
+- Rationale to diagnostic comments in PR reviews by @2bndy5 in [`0923c6a`](https://github.com/cpp-linter/cpp-linter-rs/commit/0923c6a1c61617a09fd914a702959204fc41c26d)
+
+### <!-- 8 --> 📝 Documentation
+
+- [rust API] update logo, favicon, and some links by @2bndy5 in [`31b7add`](https://github.com/cpp-linter/cpp-linter-rs/commit/31b7add5ea8b1938ea4f816f27a732f3ec8d5227)
+
+[2.0.0-rc12]: https://github.com/cpp-linter/cpp-linter-rs/compare/v2.0.0-rc11...v2.0.0-rc12
+
+Full commit diff: [`v2.0.0-rc11...v2.0.0-rc12`][2.0.0-rc12]
+
 ## [2.0.0-rc11] - 2024-12-11
 
 ### <!-- 4 --> 🛠️ Fixed
@@ -17,6 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump pypa/gh-action-pypi-publish in the actions group by @dependabot[bot] in [#81](https://github.com/cpp-linter/cpp-linter-rs/pull/81)
 - Bump the npm group with 3 updates by @dependabot[bot] in [#78](https://github.com/cpp-linter/cpp-linter-rs/pull/78)
 - Bump the cargo group across 1 directory with 7 updates by @dependabot[bot] in [#82](https://github.com/cpp-linter/cpp-linter-rs/pull/82)
+
+### <!-- 9 --> 🗨️ Changed
+
+- Bump version to v2.0.0-rc11 by @2bndy5 in [`d73c4f6`](https://github.com/cpp-linter/cpp-linter-rs/commit/d73c4f6c7d80bc55e8204b3b9a75879c5914f75a)
 
 [2.0.0-rc11]: https://github.com/cpp-linter/cpp-linter-rs/compare/v2.0.0-rc10...v2.0.0-rc11
 
