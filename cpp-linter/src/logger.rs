@@ -46,7 +46,7 @@ impl log::Log for SimpleLogger {
 /// A function to initialize the private `LOGGER`.
 ///
 /// The logging level defaults to [`LevelFilter::Info`].
-/// Returns a [`SetLoggerError`] if the `LOGGER` is already initialized.
+/// Returns a [`SetLoggerError`](struct@log::SetLoggerError) if the `LOGGER` is already initialized.
 pub fn init() -> Result<()> {
     let logger: SimpleLogger = SimpleLogger;
     if matches!(
