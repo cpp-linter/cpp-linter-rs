@@ -29,6 +29,7 @@ use crate::git::{get_diff, open_repo, parse_diff, parse_diff_from_buf};
 mod serde_structs;
 mod specific_api;
 use serde_structs::{GithubChangedFile, PushEventFiles};
+mod graphql;
 
 /// A structure to work with Github REST API.
 pub struct GithubApiClient {
