@@ -435,6 +435,22 @@ pub struct FeedbackOptions {
         help_heading = "Feedback options",
     )]
     pub passive_reviews: bool,
+
+    /// Set to `true` to delete outdated/resolved
+    /// suggestions in generated Pull Request reviews.
+    ///
+    /// Enabling this may not be desirable for various reasons.
+    #[arg(
+        short = 'E',
+        long,
+        default_value_t = true,
+        default_missing_value = "true",
+        num_args = 0..=1,
+        action = ArgAction::Set,
+        value_parser = FalseyValueParser::new(),
+        help_heading = "Feedback options",
+    )]
+    pub delete_review_comments: bool,
 }
 
 /// Converts the parsed value of the `--extra-arg` option into an optional vector of strings.

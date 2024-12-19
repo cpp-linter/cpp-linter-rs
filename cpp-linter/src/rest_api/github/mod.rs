@@ -26,6 +26,7 @@ use crate::common_fs::{FileFilter, FileObj};
 use crate::git::{get_diff, open_repo, parse_diff, parse_diff_from_buf};
 
 // private submodules.
+mod graphql;
 mod serde_structs;
 mod specific_api;
 

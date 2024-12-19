@@ -268,6 +268,7 @@ pub struct FeedbackInput {
     pub tidy_review: bool,
     pub format_review: bool,
     pub passive_reviews: bool,
+    pub delete_review_comments: bool,
 }
 
 impl From<&Cli> for FeedbackInput {
@@ -282,6 +283,7 @@ impl From<&Cli> for FeedbackInput {
             tidy_review: args.feedback_options.tidy_review,
             format_review: args.feedback_options.format_review,
             passive_reviews: args.feedback_options.passive_reviews,
+            delete_review_comments: args.feedback_options.delete_review_comments,
         }
     }
 }
@@ -298,6 +300,7 @@ impl Default for FeedbackInput {
             tidy_review: false,
             format_review: false,
             passive_reviews: false,
+            delete_review_comments: false,
         }
     }
 }
