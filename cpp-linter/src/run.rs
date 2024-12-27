@@ -58,7 +58,9 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
         return Ok(());
     }
 
-    logger::init().unwrap();
+    if let Err(e) = logger::init() {
+        log::warn!("logger attempt to re-init: {e:?}");
+    }
 
     if cli.version == "NO-VERSION" {
         log::error!("The `--version` arg is used to specify which version of clang to use.");
@@ -191,6 +193,7 @@ mod test {
             "false".to_string(),
             "-v".to_string(),
             "debug".to_string(),
+            "-i=target|benches/libgit2".to_string(),
         ])
         .await;
         assert!(result.is_ok());
@@ -217,6 +220,7 @@ mod test {
             "cpp-linter".to_string(),
             "-l".to_string(),
             "false".to_string(),
+            "-i=target|benches/libgit2".to_string(),
         ])
         .await;
         assert!(result.is_err());

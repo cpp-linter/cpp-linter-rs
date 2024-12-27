@@ -14,6 +14,7 @@ license.workspace = true
 [lib]
 name = "cpp_linter"
 crate-type = ["cdylib"]
+bench = false
 
 [dependencies]
 pyo3 = { version = "0.23.3", features = ["extension-module"] }

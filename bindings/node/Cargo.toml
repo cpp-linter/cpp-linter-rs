@@ -13,6 +13,7 @@ license.workspace = true
 
 [lib]
 crate-type = ["cdylib"]
+bench = false
 
 [dependencies]
 # Default enable napi4 feature, see https://nodejs.org/api/n-api.html#node-api-version-matrix
