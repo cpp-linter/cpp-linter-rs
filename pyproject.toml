@@ -11,7 +11,7 @@ license = {text = "MIT License"}
 requires-python = ">=3.9"
 authors = [
     { name = "Brendan Doherty", email = "2bndy5@gmail.com" },
-    { name = "Peter Shen", email = "xianpeng.shen@gmail.com" },
+    { name = "Xianpeng Shen", email = "xianpeng.shen@gmail.com" },
 ]
 classifiers = [
     # https://pypi.org/pypi?%3Aaction=list_classifiers

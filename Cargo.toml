@@ -8,7 +8,7 @@ resolver = "2"
 version = "2.0.0-rc12" # auto
 authors = [
     "Brendan Doherty",
-    "Peter Shen",
+    "Xianpeng Shen",
 ]
 description = "Run clang-format and clang-tidy on a batch of files."
 homepage = "https://cpp-linter.github.io/cpp-linter-rs"

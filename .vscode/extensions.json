@@ -3,6 +3,7 @@
         "rust-lang.rust-analyzer",
         "streetsidesoftware.code-spell-checker",
         "fill-labs.dependi",
-        "wolfmah-vscode.just-syntax"
+        "wolfmah-vscode.just-syntax",
+        "eamodio.gitlens"
     ]
 }
