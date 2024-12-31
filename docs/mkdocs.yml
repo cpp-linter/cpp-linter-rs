@@ -79,6 +79,7 @@ plugins:
   - gen-files:
       scripts:
         - gen_cli_doc.py
+        - license_gen.py
 
 markdown_extensions:
   - pymdownx.superfences
