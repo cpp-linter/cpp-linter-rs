@@ -1,14 +1,16 @@
+# Third-party Licenses
+
 - [clap](https://crates.io/crates/clap):
   Dual-licensed under [Apache 2.0][Apache2] or [MIT].
 - [git2](https://crates.io/crates/git2):
   Dual-licensed under [Apache 2.0][Apache2] or [MIT].
 
-  The following are conditionally included in binaries (using the `openssl-vendored` feature on a
-  case-by-case basis) because it is a dependency of git2:
+    The following are conditionally included in binaries (using the `openssl-vendored` feature on a
+    case-by-case basis) because it is a dependency of git2:
 
-  - [openssl](https://crates.io/crates/openssl): Licensed under [Apache 2.0][Apache2]
-  - [openssl-probe](https://crates.io/crates/openssl-probe):
-    Dual-licensed under [Apache 2.0][Apache2] or [MIT].
+    - [openssl](https://crates.io/crates/openssl): Licensed under [Apache 2.0][Apache2]
+    - [openssl-probe](https://crates.io/crates/openssl-probe):
+      Dual-licensed under [Apache 2.0][Apache2] or [MIT].
 
 - [lenient_semver](https://crates.io/crates/lenient_semver):
   Dual-licensed under [Apache 2.0][Apache2] or [MIT].

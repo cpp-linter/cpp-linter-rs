@@ -5,6 +5,7 @@
 [step-summary]: cli.md#-w-step-summary
 [tidy-review]: cli.md#-d-tidy-review
 [format-review]: cli.md#-m-format-review
+[other-licenses]: other-licenses.md
 
 [format-annotations-preview]: images/annotations-clang-format.png
 [tidy-annotations-preview]: images/annotations-clang-tidy.png

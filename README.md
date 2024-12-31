@@ -5,6 +5,7 @@
 [step-summary]: https://cpp-linter.github.io/cpp-linter-rs/cli#-w-step-summary
 [tidy-review]: https://cpp-linter.github.io/cpp-linter-rs/cli#-d-tidy-review
 [format-review]: https://cpp-linter.github.io/cpp-linter-rs/cli#-m-format-review
+[other-licenses]: https://cpp-linter.github.io/cpp-linter-rs/other-licenses
 
 [format-annotations-preview]: docs/docs/images/annotations-clang-format.png
 [tidy-annotations-preview]: docs/docs/images/annotations-clang-tidy.png
@@ -172,6 +173,8 @@ To provide feedback (requesting a feature or reporting a bug) please post to
 
 ## License
 
-The scripts and documentation in this project are released under the [MIT].
+The scripts and documentation in this project are released under the [MIT] license.
 
-Dependencies (that are redistributed by us in binary form) and their licenses, refer to [THIRD-PARTY LICENSES](docs/THIRD-PARTY-LICENSES.md).
+As for dependencies (that are redistributed by us in binary form) and their licenses, refer to [THIRD-PARTY LICENSES][other-licenses].
+
+[MIT]: https://choosealicense.com/licenses/mit
