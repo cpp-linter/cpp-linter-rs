@@ -732,7 +732,7 @@ You should use this script when testing locally.</p>
 </tr>
 <tr>
 <td style="text-align: right;"><code>npm</code></td>
-<td style="text-align: left;">The required metadata for publishing platform-specific packages to npm.</td>
+<td style="text-align: left;">The required metadata for publishing platform-specific binary packages to npm.</td>
 </tr>
 <tr>
 <td style="text-align: right;"><code>src</code></td>
@@ -748,7 +748,7 @@ You should use this script when testing locally.</p>
 </tr>
 <tr>
 <td style="text-align: right;"><code>package.json</code></td>
-<td style="text-align: left;">Metadata about the npm package (platform agnostic).</td>
+<td style="text-align: left;">Metadata about the npm package (platform agnostic - no binary).</td>
 </tr>
 <tr>
 <td style="text-align: right;"><code>cli.js</code></td>
@@ -756,15 +756,15 @@ You should use this script when testing locally.</p>
 </tr>
 <tr>
 <td style="text-align: right;"><code>index.d.ts</code></td>
-<td style="text-align: left;">The generated TypeScript typing info the describes the exposing functionality in the built native module.</td>
+<td style="text-align: left;">The generated TypeScript typing and doc info that describes the exposed API in the built native module.</td>
 </tr>
 <tr>
 <td style="text-align: right;"><code>index.js</code></td>
-<td style="text-align: left;">The generated script that delegates which platform-specific package to import.</td>
+<td style="text-align: left;">The generated script that delegates which native binary (platform-specific package or dev build) to import.</td>
 </tr>
 <tr>
 <td style="text-align: right;"><code>cpp-linter.x-y-z.node</code></td>
-<td style="text-align: left;">Then native module built for a specific platform (where <code>x-y-z</code> denotes the platform's name using compilation target).</td>
+<td style="text-align: left;">The native module built for a specific platform (where <code>x-y-z</code> denotes the platform's name using the compilation target).</td>
 </tr>
 </tbody>
 </table>
