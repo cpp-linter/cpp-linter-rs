@@ -105,10 +105,15 @@ impl FileFilter {
             let glob_matched =
                 glob_match(pattern, file_name.to_string_lossy().to_string().as_str());
             let pat = PathBuf::from(&pattern);
-            if glob_matched
+            if pattern.as_str() == "./"
+                || glob_matched
                 || (pat.is_file() && file_name == pat)
                 || (pat.is_dir() && file_name.starts_with(pat))
             {
+                log::debug!(
+                    "file {file_name:?} is in {}ignored with domain {pattern:?}.",
+                    if is_ignored { "" } else { "not " }
+                );
                 return true;
             }
         }

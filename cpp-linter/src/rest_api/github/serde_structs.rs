@@ -49,6 +49,8 @@ pub struct GithubChangedFile {
     pub previous_filename: Option<String>,
     /// The individual patch that describes the file's changes.
     pub patch: Option<String>,
+    /// The number of changes to the file contents.
+    pub changes: i64,
 }
 
 /// A structure for deserializing a Push event's changed files.

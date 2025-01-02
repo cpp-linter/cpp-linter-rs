@@ -230,7 +230,6 @@ pub trait RestApiClient {
     /// Returns the markdown comment as a string as well as the total count of
     /// `format_checks_failed` and `tidy_checks_failed` (in respective order).
     fn make_comment(
-        &self,
         files: &[Arc<Mutex<FileObj>>],
         format_checks_failed: u64,
         tidy_checks_failed: u64,
@@ -513,7 +512,7 @@ mod test {
         assert!(headers
             .insert("link", HeaderValue::from_str("; rel=\"next\"").unwrap())
             .is_none());
-        logger::init().unwrap();
+        logger::try_init();
         log::set_max_level(log::LevelFilter::Debug);
         let result = TestClient::try_next_page(&headers);
         assert!(result.is_none());
@@ -528,7 +527,7 @@ mod test {
                 HeaderValue::from_str("<not a domain>; rel=\"next\"").unwrap()
             )
             .is_none());
-        logger::init().unwrap();
+        logger::try_init();
         log::set_max_level(log::LevelFilter::Debug);
         let result = TestClient::try_next_page(&headers);
         assert!(result.is_none());
@@ -553,7 +552,7 @@ mod test {
             remaining: "remaining".to_string(),
             retry: "retry".to_string(),
         };
-        logger::init().unwrap();
+        logger::try_init();
         log::set_max_level(log::LevelFilter::Debug);
 
         let mut server = Server::new_async().await;

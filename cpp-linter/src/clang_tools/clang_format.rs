@@ -135,8 +135,8 @@ pub fn run_clang_format(
                     .to_str()
                     .unwrap_or_default(),
                 cmd.get_args()
-                    .map(|a| a.to_str().unwrap())
-                    .collect::<Vec<&str>>()
+                    .map(|a| a.to_string_lossy())
+                    .collect::<Vec<_>>()
                     .join(" ")
             ),
         ));
@@ -153,8 +153,8 @@ pub fn run_clang_format(
             "Running \"{} {}\"",
             cmd.get_program().to_string_lossy(),
             cmd.get_args()
-                .map(|x| x.to_str().unwrap())
-                .collect::<Vec<&str>>()
+                .map(|x| x.to_string_lossy())
+                .collect::<Vec<_>>()
                 .join(" ")
         ),
     ));

@@ -105,13 +105,10 @@ pub fn parse_diff(diff: &git2::Diff, file_filter: &FileFilter) -> Vec<FileObj> {
     for file_idx in 0..diff.deltas().count() {
         let diff_delta = diff.get_delta(file_idx).unwrap();
         let file_path = diff_delta.new_file().path().unwrap().to_path_buf();
-        if [
-            git2::Delta::Added,
-            git2::Delta::Modified,
-            git2::Delta::Renamed,
-        ]
-        .contains(&diff_delta.status())
-            && file_filter.is_source_or_ignored(&file_path)
+        if matches!(
+            diff_delta.status(),
+            git2::Delta::Added | git2::Delta::Modified | git2::Delta::Renamed,
+        ) && file_filter.is_source_or_ignored(&file_path)
         {
             let (added_lines, diff_chunks) =
                 parse_patch(&Patch::from_diff(diff, file_idx).unwrap().unwrap());

@@ -74,7 +74,7 @@ async fn get_paginated_changes(lib_root: &Path, test_params: &TestParams) {
     let mut server = mock_server().await;
     env::set_var("GITHUB_API_URL", server.url());
     env::set_current_dir(tmp.path()).unwrap();
-    logger::init().unwrap();
+    logger::try_init();
     log::set_max_level(log::LevelFilter::Debug);
     let gh_client = GithubApiClient::new();
     if test_params.fail_serde_event_payload || test_params.no_event_payload {

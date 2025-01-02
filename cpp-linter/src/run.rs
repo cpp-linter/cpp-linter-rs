@@ -58,9 +58,7 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
         return Ok(());
     }
 
-    if let Err(e) = logger::init() {
-        log::warn!("logger attempt to re-init: {e:?}");
-    }
+    logger::try_init();
 
     if cli.version == "NO-VERSION" {
         log::error!("The `--version` arg is used to specify which version of clang to use.");
@@ -147,12 +145,8 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
         .post_feedback(&arc_files, user_inputs, clang_versions)
         .await?;
     rest_api_client.end_log_group();
-    if env::var("PRE_COMMIT").is_ok_and(|v| v == "1") {
-        if checks_failed > 1 {
-            return Err(anyhow!("Some checks did not pass"));
-        } else {
-            return Ok(());
-        }
+    if env::var("PRE_COMMIT").is_ok_and(|v| v == "1") && checks_failed > 1 {
+        return Err(anyhow!("Some checks did not pass"));
     }
     Ok(())
 }

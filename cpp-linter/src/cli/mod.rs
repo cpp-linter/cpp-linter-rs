@@ -390,14 +390,13 @@ pub fn convert_extra_arg_val(args: &ArgMatches) -> Vec<String> {
     let mut val = args.get_many::<String>("extra-arg").unwrap_or_default();
     if val.len() == 1 {
         // specified once; split and return result
-        return val
-            .next()
+        val.next()
             .unwrap()
             .trim_matches('\'')
             .trim_matches('"')
             .split(' ')
             .map(|i| i.to_string())
-            .collect();
+            .collect()
     } else {
         // specified multiple times; just return
         val.map(|i| i.to_string()).collect()

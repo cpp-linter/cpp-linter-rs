@@ -241,7 +241,7 @@ impl RestApiClient for GithubApiClient {
             self.post_annotations(files, feedback_inputs.style.as_str());
         }
         if feedback_inputs.step_summary {
-            comment = Some(self.make_comment(
+            comment = Some(Self::make_comment(
                 files,
                 format_checks_failed,
                 tidy_checks_failed,
@@ -259,7 +259,7 @@ impl RestApiClient for GithubApiClient {
         if feedback_inputs.thread_comments != ThreadComments::Off {
             // post thread comment for PR or push event
             if comment.as_ref().is_some_and(|c| c.len() > 65535) || comment.is_none() {
-                comment = Some(self.make_comment(
+                comment = Some(Self::make_comment(
                     files,
                     format_checks_failed,
                     tidy_checks_failed,
@@ -334,7 +334,7 @@ mod test {
     ) -> (String, String) {
         let tmp_dir = tempdir().unwrap();
         let rest_api_client = GithubApiClient::new().unwrap();
-        logger::init().unwrap();
+        logger::try_init();
         if env::var("ACTIONS_STEP_DEBUG").is_ok_and(|var| var == "true") {
             assert!(rest_api_client.debug_enabled);
             log::set_max_level(log::LevelFilter::Debug);
