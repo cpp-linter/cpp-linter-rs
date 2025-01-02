@@ -53,15 +53,15 @@ This script runs a simple test to ensure the native module was built correctly.
 | Name | Description |
 |-----:|:------------|
 | `__test__` | The location of the unit test(s). |
-| `npm` | The required metadata for publishing platform-specific packages to npm. |
+| `npm` | The required metadata for publishing platform-specific binary packages to npm. |
 | `src` | The location for all rust sources related to binding the cpp-linter library. |
 | `build.rs` | The cargo-specific build script used when compiling the binding. |
 | `Cargo.toml` | Metadata about the binding's rust package (which _is not_ intended to be published to crates.io). |
-| `package.json` | Metadata about the npm package (platform agnostic). |
+| `package.json` | Metadata about the npm package (platform agnostic - no binary). |
 | `cli.js` | The executable script invoked as a Command Line Interface. |
-| `index.d.ts` | The generated TypeScript typing info the describes the exposing functionality in the built native module. |
-| `index.js` | The generated script that delegates which platform-specific package to import. |
-| `cpp-linter.x-y-z.node` | Then native module built for a specific platform (where `x-y-z` denotes the platform's name using compilation target). |
+| `index.d.ts` | The generated TypeScript typing and doc info that describes the exposed API in the built native module. |
+| `index.js` | The generated script that delegates which native binary (platform-specific package or dev build) to import. |
+| `cpp-linter.x-y-z.node` | The native module built for a specific platform (where `x-y-z` denotes the platform's name using the compilation target). |
 
 Hidden files and folders are not described in the table above.
 If they are not ignored by a gitignore specification, then they should be considered
