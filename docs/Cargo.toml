@@ -16,3 +16,4 @@ pyo3 = "0.23.3"
 [lib]
 name = "cli_gen"
 crate-type = ["cdylib"]
+bench = false

@@ -58,7 +58,7 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
         return Ok(());
     }
 
-    logger::init().unwrap();
+    logger::try_init();
 
     if cli.version == "NO-VERSION" {
         log::error!("The `--version` arg is used to specify which version of clang to use.");
@@ -78,6 +78,7 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
         LevelFilter::Info
     });
     log::info!("Processing event {}", rest_api_client.event_name);
+    let is_pr = rest_api_client.event_name == "pull_request";
 
     let mut file_filter = FileFilter::new(&cli.ignore, cli.extensions.clone());
     file_filter.parse_submodules();
@@ -99,30 +100,31 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
     }
 
     rest_api_client.start_log_group(String::from("Get list of specified source files"));
-    let files = if cli.lines_changed_only != LinesChangedOnly::Off || cli.files_changed_only {
-        // parse_diff(github_rest_api_payload)
-        rest_api_client
-            .get_list_of_changed_files(&file_filter)
-            .await?
-    } else {
-        // walk the folder and look for files with specified extensions according to ignore values.
-        let mut all_files = file_filter.list_source_files(".")?;
-        if rest_api_client.event_name == "pull_request" && (cli.tidy_review || cli.format_review) {
-            let changed_files = rest_api_client
-                .get_list_of_changed_files(&file_filter)
-                .await?;
-            for changed_file in changed_files {
-                for file in &mut all_files {
-                    if changed_file.name == file.name {
-                        file.diff_chunks = changed_file.diff_chunks.clone();
-                        file.added_lines = changed_file.added_lines.clone();
-                        file.added_ranges = changed_file.added_ranges.clone();
+    let files =
+        if !matches!(cli.lines_changed_only, LinesChangedOnly::Off) || cli.files_changed_only {
+            // parse_diff(github_rest_api_payload)
+            rest_api_client
+                .get_list_of_changed_files(&file_filter, &cli.lines_changed_only)
+                .await?
+        } else {
+            // walk the folder and look for files with specified extensions according to ignore values.
+            let mut all_files = file_filter.list_source_files(".")?;
+            if is_pr && (cli.tidy_review || cli.format_review) {
+                let changed_files = rest_api_client
+                    .get_list_of_changed_files(&file_filter, &LinesChangedOnly::Off)
+                    .await?;
+                for changed_file in changed_files {
+                    for file in &mut all_files {
+                        if changed_file.name == file.name {
+                            file.diff_chunks = changed_file.diff_chunks.clone();
+                            file.added_lines = changed_file.added_lines.clone();
+                            file.added_ranges = changed_file.added_ranges.clone();
+                        }
                     }
                 }
             }
-        }
-        all_files
-    };
+            all_files
+        };
     let mut arc_files = vec![];
     log::info!("Giving attention to the following files:");
     for file in files {
@@ -132,6 +134,8 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
     rest_api_client.end_log_group();
 
     let mut clang_params = ClangParams::from(&cli);
+    clang_params.format_review &= is_pr;
+    clang_params.tidy_review &= is_pr;
     let user_inputs = FeedbackInput::from(&cli);
     let clang_versions = capture_clang_tools_output(
         &mut arc_files,
@@ -145,12 +149,8 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
         .post_feedback(&arc_files, user_inputs, clang_versions)
         .await?;
     rest_api_client.end_log_group();
-    if env::var("PRE_COMMIT").is_ok_and(|v| v == "1") {
-        if checks_failed > 1 {
-            return Err(anyhow!("Some checks did not pass"));
-        } else {
-            return Ok(());
-        }
+    if env::var("PRE_COMMIT").is_ok_and(|v| v == "1") && checks_failed > 1 {
+        return Err(anyhow!("Some checks did not pass"));
     }
     Ok(())
 }
@@ -191,6 +191,7 @@ mod test {
             "false".to_string(),
             "-v".to_string(),
             "debug".to_string(),
+            "-i=target|benches/libgit2".to_string(),
         ])
         .await;
         assert!(result.is_ok());
@@ -217,6 +218,7 @@ mod test {
             "cpp-linter".to_string(),
             "-l".to_string(),
             "false".to_string(),
+            "-i=target|benches/libgit2".to_string(),
         ])
         .await;
         assert!(result.is_err());

@@ -346,3 +346,4 @@ docs/site
 cpp-linter-py/docs/cli_args.rst
 lcov.info
 coverage.json
+cpp-linter/benches/libgit2/

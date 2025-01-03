@@ -14,21 +14,19 @@ use reqwest::{
     header::{HeaderMap, HeaderValue, AUTHORIZATION},
     Client, Method, Url,
 };
-use serde_json;
 
 // project specific modules/crates
 use super::{RestApiClient, RestApiRateLimitHeaders};
 use crate::clang_tools::clang_format::tally_format_advice;
 use crate::clang_tools::clang_tidy::tally_tidy_advice;
 use crate::clang_tools::ClangVersions;
-use crate::cli::{FeedbackInput, ThreadComments};
+use crate::cli::{FeedbackInput, LinesChangedOnly, ThreadComments};
 use crate::common_fs::{FileFilter, FileObj};
 use crate::git::{get_diff, open_repo, parse_diff, parse_diff_from_buf};
 
 // private submodules.
 mod serde_structs;
 mod specific_api;
-use serde_structs::{GithubChangedFile, PushEventFiles};
 
 /// A structure to work with Github REST API.
 pub struct GithubApiClient {
@@ -121,7 +119,11 @@ impl RestApiClient for GithubApiClient {
         Ok(headers)
     }
 
-    async fn get_list_of_changed_files(&self, file_filter: &FileFilter) -> Result<Vec<FileObj>> {
+    async fn get_list_of_changed_files(
+        &self,
+        file_filter: &FileFilter,
+        lines_changed_only: &LinesChangedOnly,
+    ) -> Result<Vec<FileObj>> {
         if env::var("CI").is_ok_and(|val| val.as_str() == "true")
             && self.repo.is_some()
             && self.sha.is_some()
@@ -153,9 +155,13 @@ impl RestApiClient for GithubApiClient {
                 0,
             )
             .await
-            .with_context(|| "Failed to get list of changed files from GitHub server.")?;
+            .with_context(|| "Failed to get list of changed files.")?;
             if response.status().is_success() {
-                Ok(parse_diff_from_buf(&response.bytes().await?, file_filter))
+                Ok(parse_diff_from_buf(
+                    &response.bytes().await?,
+                    file_filter,
+                    lines_changed_only,
+                ))
             } else {
                 let endpoint = if is_pr {
                     Url::parse(format!("{}/files", url.as_str()).as_str())?
@@ -164,7 +170,7 @@ impl RestApiClient for GithubApiClient {
                 };
                 Self::log_response(response, "Failed to get full diff for event").await;
                 log::debug!("Trying paginated request to {}", endpoint.as_str());
-                self.get_changed_files_paginated(endpoint, file_filter)
+                self.get_changed_files_paginated(endpoint, file_filter, lines_changed_only)
                     .await
             }
         } else {
@@ -172,59 +178,9 @@ impl RestApiClient for GithubApiClient {
             let repo = open_repo(".").with_context(|| {
                 "Please ensure the repository is checked out before running cpp-linter."
             })?;
-            let list = parse_diff(&get_diff(&repo)?, file_filter);
+            let list = parse_diff(&get_diff(&repo)?, file_filter, lines_changed_only);
             Ok(list)
         }
-    }
-
-    async fn get_changed_files_paginated(
-        &self,
-        url: Url,
-        file_filter: &FileFilter,
-    ) -> Result<Vec<FileObj>> {
-        let mut url = Some(Url::parse_with_params(url.as_str(), &[("page", "1")])?);
-        let mut files = vec![];
-        while let Some(ref endpoint) = url {
-            let request =
-                Self::make_api_request(&self.client, endpoint.as_str(), Method::GET, None, None)?;
-            let response = Self::send_api_request(
-                self.client.clone(),
-                request,
-                self.rate_limit_headers.clone(),
-                0,
-            )
-            .await;
-            if let Ok(response) = response {
-                url = Self::try_next_page(response.headers());
-                let files_list = if self.event_name != "pull_request" {
-                    let json_value: PushEventFiles = serde_json::from_str(&response.text().await?)
-                        .with_context(|| {
-                            "Failed to deserialize list of changed files from json response"
-                        })?;
-                    json_value.files
-                } else {
-                    serde_json::from_str::<Vec<GithubChangedFile>>(&response.text().await?)
-                        .with_context(|| {
-                            "Failed to deserialize list of file changes from Pull Request event."
-                        })?
-                };
-                for file in files_list {
-                    if let Some(patch) = file.patch {
-                        let diff = format!(
-                            "diff --git a/{old} b/{new}\n--- a/{old}\n+++ b/{new}\n{patch}",
-                            old = file.previous_filename.unwrap_or(file.filename.clone()),
-                            new = file.filename,
-                        );
-                        if let Some(file_obj) =
-                            parse_diff_from_buf(diff.as_bytes(), file_filter).first()
-                        {
-                            files.push(file_obj.to_owned());
-                        }
-                    }
-                }
-            }
-        }
-        Ok(files)
     }
 
     async fn post_feedback(
@@ -241,7 +197,7 @@ impl RestApiClient for GithubApiClient {
             self.post_annotations(files, feedback_inputs.style.as_str());
         }
         if feedback_inputs.step_summary {
-            comment = Some(self.make_comment(
+            comment = Some(Self::make_comment(
                 files,
                 format_checks_failed,
                 tidy_checks_failed,
@@ -259,7 +215,7 @@ impl RestApiClient for GithubApiClient {
         if feedback_inputs.thread_comments != ThreadComments::Off {
             // post thread comment for PR or push event
             if comment.as_ref().is_some_and(|c| c.len() > 65535) || comment.is_none() {
-                comment = Some(self.make_comment(
+                comment = Some(Self::make_comment(
                     files,
                     format_checks_failed,
                     tidy_checks_failed,
@@ -319,7 +275,7 @@ mod test {
             clang_tidy::{TidyAdvice, TidyNotification},
             ClangVersions,
         },
-        cli::FeedbackInput,
+        cli::{FeedbackInput, LinesChangedOnly},
         common_fs::{FileFilter, FileObj},
         logger,
         rest_api::{RestApiClient, USER_OUTREACH},
@@ -334,7 +290,7 @@ mod test {
     ) -> (String, String) {
         let tmp_dir = tempdir().unwrap();
         let rest_api_client = GithubApiClient::new().unwrap();
-        logger::init().unwrap();
+        logger::try_init();
         if env::var("ACTIONS_STEP_DEBUG").is_ok_and(|var| var == "true") {
             assert!(rest_api_client.debug_enabled);
             log::set_max_level(log::LevelFilter::Debug);
@@ -478,7 +434,7 @@ mod test {
         env::set_current_dir(tmp_dir.path()).unwrap();
         let rest_client = GithubApiClient::new().unwrap();
         let files = rest_client
-            .get_list_of_changed_files(&FileFilter::new(&[], vec![]))
+            .get_list_of_changed_files(&FileFilter::new(&[], vec![]), &LinesChangedOnly::Off)
             .await;
         assert!(files.is_err())
     }

@@ -5,6 +5,7 @@ use std::{
     env,
     fs::OpenOptions,
     io::{Read, Write},
+    path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
 
@@ -13,15 +14,16 @@ use reqwest::{Client, Method, Url};
 
 use crate::{
     clang_tools::{clang_format::summarize_style, ClangVersions, ReviewComments},
-    cli::FeedbackInput,
-    common_fs::FileObj,
+    cli::{FeedbackInput, LinesChangedOnly},
+    common_fs::{FileFilter, FileObj},
+    git::parse_diff_from_buf,
     rest_api::{RestApiRateLimitHeaders, COMMENT_MARKER, USER_AGENT},
 };
 
 use super::{
     serde_structs::{
-        FullReview, PullRequestInfo, ReviewComment, ReviewDiffComment, ThreadComment,
-        REVIEW_DISMISSAL,
+        FullReview, GithubChangedFile, PullRequestInfo, PushEventFiles, ReviewComment,
+        ReviewDiffComment, ThreadComment, REVIEW_DISMISSAL,
     },
     GithubApiClient, RestApiClient,
 };
@@ -75,6 +77,73 @@ impl GithubApiClient {
                 retry: "retry-after".to_string(),
             },
         })
+    }
+
+    /// A way to get the list of changed files using REST API calls that employ a paginated response.
+    ///
+    /// This is a helper to [`Self::get_list_of_changed_files()`] but takes a formulated `url`
+    /// endpoint based on the context of the triggering CI event.
+    pub(super) async fn get_changed_files_paginated(
+        &self,
+        url: Url,
+        file_filter: &FileFilter,
+        lines_changed_only: &LinesChangedOnly,
+    ) -> Result<Vec<FileObj>> {
+        let mut url = Some(Url::parse_with_params(url.as_str(), &[("page", "1")])?);
+        let mut files = vec![];
+        while let Some(ref endpoint) = url {
+            let request =
+                Self::make_api_request(&self.client, endpoint.as_str(), Method::GET, None, None)?;
+            let response = Self::send_api_request(
+                self.client.clone(),
+                request,
+                self.rate_limit_headers.clone(),
+                0,
+            )
+            .await
+            .with_context(|| "Failed to get paginated list of changed files")?;
+            url = Self::try_next_page(response.headers());
+            let files_list = if self.event_name != "pull_request" {
+                let json_value: PushEventFiles = serde_json::from_str(&response.text().await?)
+                    .with_context(|| {
+                        "Failed to deserialize list of changed files from json response"
+                    })?;
+                json_value.files
+            } else {
+                serde_json::from_str::<Vec<GithubChangedFile>>(&response.text().await?)
+                    .with_context(|| {
+                        "Failed to deserialize list of file changes from Pull Request event."
+                    })?
+            };
+            for file in files_list {
+                let ext = Path::new(&file.filename).extension().unwrap_or_default();
+                if !file_filter
+                    .extensions
+                    .contains(&ext.to_string_lossy().to_string())
+                {
+                    continue;
+                }
+                if let Some(patch) = file.patch {
+                    let diff = format!(
+                        "diff --git a/{old} b/{new}\n--- a/{old}\n+++ b/{new}\n{patch}\n",
+                        old = file.previous_filename.unwrap_or(file.filename.clone()),
+                        new = file.filename,
+                    );
+                    if let Some(file_obj) =
+                        parse_diff_from_buf(diff.as_bytes(), file_filter, lines_changed_only)
+                            .first()
+                    {
+                        files.push(file_obj.to_owned());
+                    }
+                } else if file.changes == 0 {
+                    // file may have been only renamed.
+                    // include it in case files-changed-only is enabled.
+                    files.push(FileObj::new(PathBuf::from(file.filename)));
+                }
+                // else changes are too big or we don't care
+            }
+        }
+        Ok(files)
     }
 
     /// Append step summary to CI workflow's summary page.

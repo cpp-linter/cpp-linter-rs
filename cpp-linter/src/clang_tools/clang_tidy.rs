@@ -264,15 +264,17 @@ pub fn run_clang_tidy(
     let file_name = file.name.to_string_lossy().to_string();
     if clang_params.lines_changed_only != LinesChangedOnly::Off {
         let ranges = file.get_ranges(&clang_params.lines_changed_only);
-        let filter = format!(
-            "[{{\"name\":{:?},\"lines\":{:?}}}]",
-            &file_name.replace('/', if OS == "windows" { "\\" } else { "/" }),
-            ranges
-                .iter()
-                .map(|r| [r.start(), r.end()])
-                .collect::<Vec<_>>()
-        );
-        cmd.args(["--line-filter", filter.as_str()]);
+        if !ranges.is_empty() {
+            let filter = format!(
+                "[{{\"name\":{:?},\"lines\":{:?}}}]",
+                &file_name.replace('/', if OS == "windows" { "\\" } else { "/" }),
+                ranges
+                    .iter()
+                    .map(|r| [r.start(), r.end()])
+                    .collect::<Vec<_>>()
+            );
+            cmd.args(["--line-filter", filter.as_str()]);
+        }
     }
     let mut original_content = None;
     if clang_params.tidy_review {
@@ -294,8 +296,8 @@ pub fn run_clang_tidy(
             "Running \"{} {}\"",
             cmd.get_program().to_string_lossy(),
             cmd.get_args()
-                .map(|x| x.to_str().unwrap())
-                .collect::<Vec<&str>>()
+                .map(|x| x.to_string_lossy())
+                .collect::<Vec<_>>()
                 .join(" ")
         ),
     ));

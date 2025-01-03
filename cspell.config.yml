@@ -8,6 +8,7 @@ words:
   - bugprone
   - chrono
   - codecov
+  - codspeed
   - consts
   - cppcoreguidelines
   - cstdio
@@ -31,6 +32,7 @@ words:
   - mkdocs
   - msvc
   - napi
+  - nextest
   - nonminimal
   - peekable
   - pkgs

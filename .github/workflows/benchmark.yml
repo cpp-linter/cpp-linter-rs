@@ -1,0 +1,55 @@
+name: Benchmark
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - cpp-linter/src/
+      - cpp-linter/benches/
+      - cpp-linter/Cargo.toml
+      - Cargo.toml
+      - Cargo.lock
+      - .github/workflows/benchmark.yml
+    tags-ignore: ['*']
+  pull_request:
+    branches: [main]
+    paths:
+      - cpp-linter/src/
+      - cpp-linter/benches/
+      - cpp-linter/Cargo.toml
+      - Cargo.toml
+      - Cargo.lock
+      - .github/workflows/benchmark.yml
+  # `workflow_dispatch` allows CodSpeed to trigger back-test
+  # performance analysis in order to generate initial data.
+  workflow_dispatch:
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # using the generated compilation database,
+      # we will use cpp-linter to scan libgit2 src/libgit2/**.c files.
+      - name: Checkout libgit2
+        uses: actions/checkout@v4
+        with:
+          repository: libgit2/libgit2
+          ref: v1.8.1
+          path: cpp-linter/benches/libgit2
+      - name: Generate compilation database
+        working-directory: cpp-linter/benches/libgit2
+        run: |
+          mkdir build && cd build
+          cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ..
+      - name: Install cargo-binstall
+        uses: cargo-bins/cargo-binstall@main
+      - name: Install cargo-codspeed
+        run: cargo binstall -y cargo-codspeed
+      - name: Build the benchmark target(s)
+        run: cargo codspeed build
+      - name: Run benchmarks
+        uses: CodSpeedHQ/action@v3
+        with:
+          run: cargo codspeed run
+          token: ${{ secrets.CODSPEED_TOKEN }}

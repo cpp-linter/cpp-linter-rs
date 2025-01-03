@@ -19,11 +19,10 @@
       "status": "modified",
       "additions": 11,
       "deletions": 10,
-      "changes": 21,
+      "changes": 0,
       "blob_url": "https://github.com/cpp-linter/test-cpp-linter-action/blob/635a9c57bdcca07b99ddef52c2640337c50280b1/src%2Fdemo.cpp",
       "raw_url": "https://github.com/cpp-linter/test-cpp-linter-action/raw/635a9c57bdcca07b99ddef52c2640337c50280b1/src%2Fdemo.cpp",
-      "contents_url": "https://api.github.com/repos/cpp-linter/test-cpp-linter-action/contents/src%2Fdemo.cpp?ref=635a9c57bdcca07b99ddef52c2640337c50280b1",
-      "patch": "@@ -1,17 +1,18 @@\n /** This is a very ugly test code (doomed to fail linting) */\n #include \"demo.hpp\"\n-#include <cstdio>\n-#include <cstddef>\n+#include <stdio.h>\n \n-// using size_t from cstddef\n-size_t dummyFunc(size_t i) { return i; }\n \n-int main()\n-{\n-    for (;;)\n-        break;\n+\n+\n+int main(){\n+\n+    for (;;) break;\n+\n \n     printf(\"Hello world!\\n\");\n \n-    return 0;\n-}\n+\n+\n+\n+    return 0;}"
+      "contents_url": "https://api.github.com/repos/cpp-linter/test-cpp-linter-action/contents/src%2Fdemo.cpp?ref=635a9c57bdcca07b99ddef52c2640337c50280b1"
     }
   ]
 }

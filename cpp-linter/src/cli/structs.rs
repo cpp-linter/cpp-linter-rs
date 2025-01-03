@@ -25,6 +25,14 @@ impl LinesChangedOnly {
             _ => LinesChangedOnly::Off,
         }
     }
+
+    pub fn is_change_valid(&self, added_lines: bool, diff_chunks: bool) -> bool {
+        match self {
+            LinesChangedOnly::Off => true,
+            LinesChangedOnly::Diff => diff_chunks,
+            LinesChangedOnly::On => added_lines,
+        }
+    }
 }
 
 impl Display for LinesChangedOnly {
@@ -91,7 +99,14 @@ impl From<&ArgMatches> for Cli {
         let extensions = args
             .get_many::<String>("extensions")
             .unwrap()
-            .map(|s| s.to_string())
+            .filter_map(|s| {
+                if s.is_empty() {
+                    // filter out blank extensions here
+                    None
+                } else {
+                    Some(s.to_string())
+                }
+            })
             .collect::<Vec<_>>();
 
         Self {
