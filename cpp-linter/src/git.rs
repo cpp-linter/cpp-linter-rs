@@ -64,6 +64,10 @@ pub fn get_diff(repo: &Repository) -> Result<git2::Diff> {
         }
     }
 
+    // RARE BUG when `head` is the first commit in the repo! Affects local-only runs.
+    // > panicked at cpp-linter\src\git.rs:73:43:
+    // > called `Result::unwrap()` on an `Err` value:
+    // > Error { code: -3, class: 3, message: "parent 0 does not exist" }
     if has_staged_files {
         // get diff for staged files only
         repo.diff_tree_to_index(Some(&head), None, None)
