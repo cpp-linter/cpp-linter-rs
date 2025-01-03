@@ -129,23 +129,17 @@ impl FileFilter {
     /// - Is `entry` specified in the list of explicitly `not_ignored` paths? (supersedes
     ///   specified `ignored` paths)
     pub fn is_source_or_ignored(&self, entry: &Path) -> bool {
-        let extension = entry.extension();
-        if extension.is_none() {
+        let extension = entry
+            .extension()
+            .unwrap_or_default() // allow for matching files with no extension
+            .to_string_lossy()
+            .to_string();
+        if !self.extensions.contains(&extension) {
             return false;
         }
-        let mut is_ignored = true;
-        for ext in &self.extensions {
-            if ext == &extension.unwrap().to_os_string().into_string().unwrap() {
-                is_ignored = false;
-                break;
-            }
-        }
-        if !is_ignored {
-            let is_in_ignored = self.is_file_in_list(entry, true);
-            let is_in_not_ignored = self.is_file_in_list(entry, false);
-            if is_in_not_ignored || !is_in_ignored {
-                return true;
-            }
+        let is_in_not_ignored = self.is_file_in_list(entry, false);
+        if is_in_not_ignored || !self.is_file_in_list(entry, true) {
+            return true;
         }
         false
     }
