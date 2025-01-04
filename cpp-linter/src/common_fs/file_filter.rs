@@ -105,10 +105,15 @@ impl FileFilter {
             let glob_matched =
                 glob_match(pattern, file_name.to_string_lossy().to_string().as_str());
             let pat = PathBuf::from(&pattern);
-            if glob_matched
+            if pattern.as_str() == "./"
+                || glob_matched
                 || (pat.is_file() && file_name == pat)
                 || (pat.is_dir() && file_name.starts_with(pat))
             {
+                log::debug!(
+                    "file {file_name:?} is in {}ignored with domain {pattern:?}.",
+                    if is_ignored { "" } else { "not " }
+                );
                 return true;
             }
         }
@@ -124,23 +129,17 @@ impl FileFilter {
     /// - Is `entry` specified in the list of explicitly `not_ignored` paths? (supersedes
     ///   specified `ignored` paths)
     pub fn is_source_or_ignored(&self, entry: &Path) -> bool {
-        let extension = entry.extension();
-        if extension.is_none() {
+        let extension = entry
+            .extension()
+            .unwrap_or_default() // allow for matching files with no extension
+            .to_string_lossy()
+            .to_string();
+        if !self.extensions.contains(&extension) {
             return false;
         }
-        let mut is_ignored = true;
-        for ext in &self.extensions {
-            if ext == &extension.unwrap().to_os_string().into_string().unwrap() {
-                is_ignored = false;
-                break;
-            }
-        }
-        if !is_ignored {
-            let is_in_ignored = self.is_file_in_list(entry, true);
-            let is_in_not_ignored = self.is_file_in_list(entry, false);
-            if is_in_not_ignored || !is_in_ignored {
-                return true;
-            }
+        let is_in_not_ignored = self.is_file_in_list(entry, false);
+        if is_in_not_ignored || !self.is_file_in_list(entry, true) {
+            return true;
         }
         false
     }

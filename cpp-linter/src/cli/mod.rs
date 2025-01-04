@@ -390,14 +390,13 @@ pub fn convert_extra_arg_val(args: &ArgMatches) -> Vec<String> {
     let mut val = args.get_many::<String>("extra-arg").unwrap_or_default();
     if val.len() == 1 {
         // specified once; split and return result
-        return val
-            .next()
+        val.next()
             .unwrap()
             .trim_matches('\'')
             .trim_matches('"')
             .split(' ')
             .map(|i| i.to_string())
-            .collect();
+            .collect()
     } else {
         // specified multiple times; just return
         val.map(|i| i.to_string()).collect()
@@ -408,11 +407,18 @@ pub fn convert_extra_arg_val(args: &ArgMatches) -> Vec<String> {
 mod test {
     use clap::ArgMatches;
 
-    use super::{convert_extra_arg_val, get_arg_parser};
+    use super::{convert_extra_arg_val, get_arg_parser, Cli};
 
     fn parser_args(input: Vec<&str>) -> ArgMatches {
         let arg_parser = get_arg_parser();
         arg_parser.get_matches_from(input)
+    }
+
+    #[test]
+    fn ignore_blank_extensions() {
+        let args = parser_args(vec!["cpp-linter", "-e", "c,,h"]);
+        let cli = Cli::from(&args);
+        assert!(!cli.extensions.contains(&"".to_string()));
     }
 
     #[test]

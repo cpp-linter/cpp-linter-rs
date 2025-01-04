@@ -15,7 +15,10 @@ use anyhow::{Context, Result};
 use git2::{Diff, Error, Patch, Repository};
 
 // project specific modules/crates
-use crate::common_fs::{FileFilter, FileObj};
+use crate::{
+    cli::LinesChangedOnly,
+    common_fs::{FileFilter, FileObj},
+};
 
 /// This (re-)initializes the repository located in the specified `path`.
 ///
@@ -61,6 +64,10 @@ pub fn get_diff(repo: &Repository) -> Result<git2::Diff> {
         }
     }
 
+    // RARE BUG when `head` is the first commit in the repo! Affects local-only runs.
+    // > panicked at cpp-linter\src\git.rs:73:43:
+    // > called `Result::unwrap()` on an `Err` value:
+    // > Error { code: -3, class: 3, message: "parent 0 does not exist" }
     if has_staged_files {
         // get diff for staged files only
         repo.diff_tree_to_index(Some(&head), None, None)
@@ -100,22 +107,26 @@ fn parse_patch(patch: &Patch) -> (Vec<u32>, Vec<RangeInclusive<u32>>) {
 ///
 /// The specified list of `extensions`, `ignored` and `not_ignored` files are used as
 /// filters to expedite the process and only focus on the data cpp_linter can use.
-pub fn parse_diff(diff: &git2::Diff, file_filter: &FileFilter) -> Vec<FileObj> {
+pub fn parse_diff(
+    diff: &git2::Diff,
+    file_filter: &FileFilter,
+    lines_changed_only: &LinesChangedOnly,
+) -> Vec<FileObj> {
     let mut files: Vec<FileObj> = Vec::new();
     for file_idx in 0..diff.deltas().count() {
         let diff_delta = diff.get_delta(file_idx).unwrap();
         let file_path = diff_delta.new_file().path().unwrap().to_path_buf();
-        if [
-            git2::Delta::Added,
-            git2::Delta::Modified,
-            git2::Delta::Renamed,
-        ]
-        .contains(&diff_delta.status())
-            && file_filter.is_source_or_ignored(&file_path)
+        if matches!(
+            diff_delta.status(),
+            git2::Delta::Added | git2::Delta::Modified | git2::Delta::Renamed,
+        ) && file_filter.is_source_or_ignored(&file_path)
         {
             let (added_lines, diff_chunks) =
                 parse_patch(&Patch::from_diff(diff, file_idx).unwrap().unwrap());
-            files.push(FileObj::from(file_path, added_lines, diff_chunks));
+            if lines_changed_only.is_change_valid(!added_lines.is_empty(), !diff_chunks.is_empty())
+            {
+                files.push(FileObj::from(file_path, added_lines, diff_chunks));
+            }
         }
     }
     files
@@ -128,12 +139,20 @@ pub fn parse_diff(diff: &git2::Diff, file_filter: &FileFilter) -> Vec<FileObj> {
 /// log warning and error are output when this occurs. Please report this instance for
 /// troubleshooting/diagnosis as this likely means the diff is malformed or there is a
 /// bug in libgit2 source.
-pub fn parse_diff_from_buf(buff: &[u8], file_filter: &FileFilter) -> Vec<FileObj> {
+pub fn parse_diff_from_buf(
+    buff: &[u8],
+    file_filter: &FileFilter,
+    lines_changed_only: &LinesChangedOnly,
+) -> Vec<FileObj> {
     if let Ok(diff_obj) = &Diff::from_buffer(buff) {
-        parse_diff(diff_obj, file_filter)
+        parse_diff(diff_obj, file_filter, lines_changed_only)
     } else {
         log::warn!("libgit2 failed to parse the diff");
-        brute_force_parse_diff::parse_diff(&String::from_utf8_lossy(buff), file_filter)
+        brute_force_parse_diff::parse_diff(
+            &String::from_utf8_lossy(buff),
+            file_filter,
+            lines_changed_only,
+        )
     }
 }
 
@@ -149,7 +168,10 @@ mod brute_force_parse_diff {
     use regex::Regex;
     use std::{ops::RangeInclusive, path::PathBuf};
 
-    use crate::common_fs::{FileFilter, FileObj};
+    use crate::{
+        cli::LinesChangedOnly,
+        common_fs::{FileFilter, FileObj},
+    };
 
     fn get_filename_from_front_matter(front_matter: &str) -> Option<&str> {
         let diff_file_name = Regex::new(r"(?m)^\+\+\+\sb?/(.*)$").unwrap();
@@ -212,7 +234,11 @@ mod brute_force_parse_diff {
         (additions, diff_chunks)
     }
 
-    pub fn parse_diff(diff: &str, file_filter: &FileFilter) -> Vec<FileObj> {
+    pub fn parse_diff(
+        diff: &str,
+        file_filter: &FileFilter,
+        lines_changed_only: &LinesChangedOnly,
+    ) -> Vec<FileObj> {
         log::error!("Using brute force diff parsing!");
         let mut results = Vec::new();
         let diff_file_delimiter = Regex::new(r"(?m)^diff --git a/.*$").unwrap();
@@ -233,7 +259,11 @@ mod brute_force_parse_diff {
                 let file_path = PathBuf::from(file_name);
                 if file_filter.is_source_or_ignored(&file_path) {
                     let (added_lines, diff_chunks) = parse_patch(&file_diff[hunk_start..]);
-                    results.push(FileObj::from(file_path, added_lines, diff_chunks));
+                    if lines_changed_only
+                        .is_change_valid(!added_lines.is_empty(), !diff_chunks.is_empty())
+                    {
+                        results.push(FileObj::from(file_path, added_lines, diff_chunks));
+                    }
                 }
             }
             // } else {
@@ -250,6 +280,7 @@ mod brute_force_parse_diff {
 
         use super::parse_diff;
         use crate::{
+            cli::LinesChangedOnly,
             common_fs::{FileFilter, FileObj},
             git::parse_diff_from_buf,
         };
@@ -277,6 +308,7 @@ rename to /tests/demo/some source.c
             let files = parse_diff_from_buf(
                 diff_buf,
                 &FileFilter::new(&["target".to_string()], vec!["c".to_string()]),
+                &LinesChangedOnly::Off,
             );
             assert!(!files.is_empty());
             assert!(files
@@ -292,6 +324,7 @@ rename to /tests/demo/some source.c
             let files = parse_diff_from_buf(
                 diff_buf,
                 &FileFilter::new(&["target".to_string()], vec!["c".to_string()]),
+                &LinesChangedOnly::Off,
             );
             assert!(!files.is_empty());
         }
@@ -304,8 +337,13 @@ rename to /tests/demo/some source.c
                 parse_diff_from_buf(
                     buf.as_bytes(),
                     &FileFilter::new(&ignore, extensions.to_owned()),
+                    &LinesChangedOnly::Off,
                 ),
-                parse_diff(buf, &FileFilter::new(&ignore, extensions.to_owned())),
+                parse_diff(
+                    buf,
+                    &FileFilter::new(&ignore, extensions.to_owned()),
+                    &LinesChangedOnly::Off,
+                ),
             )
         }
 
@@ -380,6 +418,7 @@ mod test {
     use tempfile::{tempdir, TempDir};
 
     use crate::{
+        cli::LinesChangedOnly,
         common_fs::FileFilter,
         rest_api::{github::GithubApiClient, RestApiClient},
     };
@@ -409,7 +448,7 @@ mod test {
         env::set_var("CI", "false"); // avoid use of REST API when testing in CI
         rest_api_client
             .unwrap()
-            .get_list_of_changed_files(&file_filter)
+            .get_list_of_changed_files(&file_filter, &LinesChangedOnly::Off)
             .await
             .unwrap()
     }

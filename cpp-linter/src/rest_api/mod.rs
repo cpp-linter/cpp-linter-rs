@@ -18,7 +18,7 @@ use reqwest::{Client, IntoUrl, Method, Request, Response, Url};
 // project specific modules
 pub mod github;
 use crate::clang_tools::ClangVersions;
-use crate::cli::FeedbackInput;
+use crate::cli::{FeedbackInput, LinesChangedOnly};
 use crate::common_fs::{FileFilter, FileObj};
 
 pub static COMMENT_MARKER: &str = "<!-- cpp linter action -->\n";
@@ -209,16 +209,7 @@ pub trait RestApiClient {
     fn get_list_of_changed_files(
         &self,
         file_filter: &FileFilter,
-    ) -> impl Future<Output = Result<Vec<FileObj>>>;
-
-    /// A way to get the list of changed files using REST API calls that employ a paginated response.
-    ///
-    /// This is a helper to [`RestApiClient::get_list_of_changed_files()`] but takes a formulated URL
-    /// endpoint based on the context of the triggering CI event.
-    fn get_changed_files_paginated(
-        &self,
-        url: Url,
-        file_filter: &FileFilter,
+        lines_changed_only: &LinesChangedOnly,
     ) -> impl Future<Output = Result<Vec<FileObj>>>;
 
     /// Makes a comment in MarkDown syntax based on the concerns in `format_advice` and
@@ -230,7 +221,6 @@ pub trait RestApiClient {
     /// Returns the markdown comment as a string as well as the total count of
     /// `format_checks_failed` and `tidy_checks_failed` (in respective order).
     fn make_comment(
-        &self,
         files: &[Arc<Mutex<FileObj>>],
         format_checks_failed: u64,
         tidy_checks_failed: u64,
@@ -415,12 +405,13 @@ mod test {
     use anyhow::{anyhow, Result};
     use chrono::Utc;
     use mockito::{Matcher, Server};
+    use reqwest::Method;
     use reqwest::{
         header::{HeaderMap, HeaderValue},
         Client,
     };
-    use reqwest::{Method, Url};
 
+    use crate::cli::LinesChangedOnly;
     use crate::{
         clang_tools::ClangVersions,
         cli::FeedbackInput,
@@ -451,14 +442,7 @@ mod test {
         async fn get_list_of_changed_files(
             &self,
             _file_filter: &FileFilter,
-        ) -> Result<Vec<FileObj>> {
-            Err(anyhow!("Not implemented"))
-        }
-
-        async fn get_changed_files_paginated(
-            &self,
-            _url: reqwest::Url,
-            _file_filter: &FileFilter,
+            _lines_changed_only: &LinesChangedOnly,
         ) -> Result<Vec<FileObj>> {
             Err(anyhow!("Not implemented"))
         }
@@ -488,14 +472,7 @@ mod test {
         dummy.start_log_group("Dummy test".to_string());
         assert_eq!(dummy.set_exit_code(1, None, None), 0);
         assert!(dummy
-            .get_list_of_changed_files(&FileFilter::new(&[], vec![]))
-            .await
-            .is_err());
-        assert!(dummy
-            .get_changed_files_paginated(
-                Url::parse("https://example.net").unwrap(),
-                &FileFilter::new(&[], vec![])
-            )
+            .get_list_of_changed_files(&FileFilter::new(&[], vec![]), &LinesChangedOnly::Off)
             .await
             .is_err());
         assert!(dummy
@@ -513,7 +490,7 @@ mod test {
         assert!(headers
             .insert("link", HeaderValue::from_str("; rel=\"next\"").unwrap())
             .is_none());
-        logger::init().unwrap();
+        logger::try_init();
         log::set_max_level(log::LevelFilter::Debug);
         let result = TestClient::try_next_page(&headers);
         assert!(result.is_none());
@@ -528,7 +505,7 @@ mod test {
                 HeaderValue::from_str("<not a domain>; rel=\"next\"").unwrap()
             )
             .is_none());
-        logger::init().unwrap();
+        logger::try_init();
         log::set_max_level(log::LevelFilter::Debug);
         let result = TestClient::try_next_page(&headers);
         assert!(result.is_none());
@@ -553,7 +530,7 @@ mod test {
             remaining: "remaining".to_string(),
             retry: "retry".to_string(),
         };
-        logger::init().unwrap();
+        logger::try_init();
         log::set_max_level(log::LevelFilter::Debug);
 
         let mut server = Server::new_async().await;

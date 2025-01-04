@@ -5,6 +5,7 @@ use mockito::Matcher;
 use tempfile::{NamedTempFile, TempDir};
 
 use cpp_linter::{
+    cli::LinesChangedOnly,
     common_fs::FileFilter,
     logger,
     rest_api::{github::GithubApiClient, RestApiClient},
@@ -74,7 +75,7 @@ async fn get_paginated_changes(lib_root: &Path, test_params: &TestParams) {
     let mut server = mock_server().await;
     env::set_var("GITHUB_API_URL", server.url());
     env::set_current_dir(tmp.path()).unwrap();
-    logger::init().unwrap();
+    logger::try_init();
     log::set_max_level(log::LevelFilter::Debug);
     let gh_client = GithubApiClient::new();
     if test_params.fail_serde_event_payload || test_params.no_event_payload {
@@ -138,7 +139,9 @@ async fn get_paginated_changes(lib_root: &Path, test_params: &TestParams) {
     }
 
     let file_filter = FileFilter::new(&[], vec!["cpp".to_string(), "hpp".to_string()]);
-    let files = client.get_list_of_changed_files(&file_filter).await;
+    let files = client
+        .get_list_of_changed_files(&file_filter, &LinesChangedOnly::Off)
+        .await;
     match files {
         Err(e) => {
             if !test_params.fail_serde_diff {

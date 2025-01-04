@@ -2,7 +2,6 @@
 
 use std::env;
 
-use anyhow::{Error, Result};
 use colored::{control::set_override, Colorize};
 use log::{Level, LevelFilter, Metadata, Record};
 
@@ -46,8 +45,9 @@ impl log::Log for SimpleLogger {
 /// A function to initialize the private `LOGGER`.
 ///
 /// The logging level defaults to [`LevelFilter::Info`].
-/// Returns a [`SetLoggerError`](struct@log::SetLoggerError) if the `LOGGER` is already initialized.
-pub fn init() -> Result<()> {
+/// This logs a debug message about [`SetLoggerError`](struct@log::SetLoggerError)
+/// if the `LOGGER` is already initialized.
+pub fn try_init() {
     let logger: SimpleLogger = SimpleLogger;
     if matches!(
         env::var("CPP_LINTER_COLOR").as_deref(),
@@ -55,21 +55,25 @@ pub fn init() -> Result<()> {
     ) {
         set_override(true);
     }
-    log::set_boxed_logger(Box::new(logger))
-        .map(|()| log::set_max_level(LevelFilter::Info))
-        .map_err(Error::from)
+    if let Err(e) =
+        log::set_boxed_logger(Box::new(logger)).map(|()| log::set_max_level(LevelFilter::Info))
+    {
+        // logger singleton already instantiated.
+        // we'll just use whatever the current config is.
+        log::debug!("{e:?}");
+    }
 }
 
 #[cfg(test)]
 mod test {
     use std::env;
 
-    use super::{init, SimpleLogger};
+    use super::{try_init, SimpleLogger};
 
     #[test]
     fn trace_log() {
         env::set_var("CPP_LINTER_COLOR", "true");
-        init().unwrap_or(());
+        try_init();
         assert!(SimpleLogger::level_color(&log::Level::Trace).contains("TRACE"));
         log::set_max_level(log::LevelFilter::Trace);
         log::trace!("A dummy log statement for code coverage");
