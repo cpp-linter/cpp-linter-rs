@@ -258,20 +258,18 @@ pub struct ReviewComments {
 impl ReviewComments {
     pub fn summarize(&self, clang_versions: &ClangVersions) -> String {
         let mut body = format!("{COMMENT_MARKER}## Cpp-linter Review\n");
-        for t in 0u8..=1 {
+        for t in 0_usize..=1 {
             let mut total = 0;
             let (tool_name, tool_version) = if t == 0 {
                 ("clang-format", clang_versions.format_version.as_ref())
             } else {
                 ("clang-tidy", clang_versions.tidy_version.as_ref())
             };
-
-            let tool_total = if let Some(total) = self.tool_total[t as usize] {
-                total
-            } else {
-                // review was not requested from this tool or the tool was not used at all
+            if tool_version.is_none() {
+                // this tool was not used at all
                 continue;
-            };
+            }
+            let tool_total = self.tool_total[t].unwrap_or_default();
 
             // If the tool's version is unknown, then we don't need to output this line.
             // NOTE: If the tool was invoked at all, then the tool's version shall be known.
@@ -295,11 +293,11 @@ impl ReviewComments {
                     .as_str(),
                 );
             }
-            if !self.full_patch[t as usize].is_empty() {
+            if !self.full_patch[t].is_empty() {
                 body.push_str(
                     format!(
                         "\n<details><summary>Click here for the full {tool_name} patch</summary>\n\n```diff\n{}```\n\n</details>\n",
-                        self.full_patch[t as usize]
+                        self.full_patch[t]
                     ).as_str()
                 );
             } else {
@@ -370,8 +368,7 @@ pub trait MakeSuggestions {
         patch: &mut Patch,
         summary_only: bool,
     ) -> Result<()> {
-        let tool_name = self.get_tool_name();
-        let is_tidy_tool = tool_name == "clang-tidy";
+        let is_tidy_tool = (&self.get_tool_name() == "clang-tidy") as usize;
         let hunks_total = patch.num_hunks();
         let mut hunks_in_patch = 0u32;
         let file_name = file_obj
@@ -384,13 +381,13 @@ pub trait MakeSuggestions {
             .to_buf()
             .with_context(|| "Failed to convert patch to byte array")?
             .to_vec();
-        review_comments.full_patch[is_tidy_tool as usize].push_str(
+        review_comments.full_patch[is_tidy_tool].push_str(
             String::from_utf8(patch_buf.to_owned())
                 .with_context(|| format!("Failed to convert patch to string: {file_name}"))?
                 .as_str(),
         );
-        review_comments.tool_total[is_tidy_tool as usize].get_or_insert(0);
         if summary_only {
+            review_comments.tool_total[is_tidy_tool].get_or_insert(0);
             return Ok(());
         }
         for hunk_id in 0..hunks_total {
@@ -447,9 +444,8 @@ pub trait MakeSuggestions {
                 review_comments.comments.push(comment);
             }
         }
-        review_comments.tool_total[is_tidy_tool as usize] = Some(
-            review_comments.tool_total[is_tidy_tool as usize].unwrap_or_default() + hunks_in_patch,
-        );
+        review_comments.tool_total[is_tidy_tool] =
+            Some(review_comments.tool_total[is_tidy_tool].unwrap_or_default() + hunks_in_patch);
         Ok(())
     }
 }

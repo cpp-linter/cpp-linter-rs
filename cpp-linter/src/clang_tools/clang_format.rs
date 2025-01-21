@@ -94,8 +94,9 @@ pub fn run_clang_format(
     }
     let file_name = file.name.to_string_lossy().to_string();
     cmd.arg(file.name.to_path_buf().as_os_str());
-    let mut patched = None;
-    if clang_params.format_review {
+    let patched = if !clang_params.format_review {
+        None
+    } else {
         logs.push((
             Level::Info,
             format!(
@@ -112,12 +113,12 @@ pub fn run_clang_format(
                     .join(" ")
             ),
         ));
-        patched = Some(
+        Some(
             cmd.output()
                 .with_context(|| format!("Failed to get fixes from clang-format: {file_name}"))?
                 .stdout,
-        );
-    }
+        )
+    };
     cmd.arg("--output-replacements-xml");
     logs.push((
         log::Level::Info,
@@ -142,16 +143,19 @@ pub fn run_clang_format(
             ),
         ));
     }
-    if output.stdout.is_empty() {
-        return Ok(logs);
-    }
-    let xml = String::from_utf8(output.stdout).with_context(|| {
-        format!("XML output from clang-format was not UTF-8 encoded: {file_name}")
-    })?;
-    let mut format_advice = quick_xml::de::from_str::<FormatAdvice>(&xml).unwrap_or(FormatAdvice {
-        replacements: vec![],
-        patched: None,
-    });
+    let mut format_advice = if !output.stdout.is_empty() {
+        let xml = String::from_utf8(output.stdout).with_context(|| {
+            format!("XML output from clang-format was not UTF-8 encoded: {file_name}")
+        })?;
+        quick_xml::de::from_str::<FormatAdvice>(&xml).with_context(|| {
+            format!("Failed to parse XML output from clang-format for {file_name}")
+        })?
+    } else {
+        FormatAdvice {
+            replacements: vec![],
+            patched: None,
+        }
+    };
     format_advice.patched = patched;
     if !format_advice.replacements.is_empty() {
         let original_contents = fs::read(&file.name).with_context(|| {
@@ -184,6 +188,13 @@ pub fn run_clang_format(
 #[cfg(test)]
 mod tests {
     use super::{summarize_style, FormatAdvice, Replacement};
+
+    #[test]
+    fn parse_blank_xml() {
+        let xml = String::new();
+        let result = quick_xml::de::from_str::<FormatAdvice>(&xml);
+        assert!(result.is_err());
+    }
 
     #[test]
     fn parse_xml() {
