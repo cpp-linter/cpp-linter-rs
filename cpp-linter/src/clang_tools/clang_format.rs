@@ -18,7 +18,7 @@ use crate::{
     common_fs::{get_line_cols_from_offset, FileObj},
 };
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct FormatAdvice {
     /// A list of [`Replacement`]s that clang-tidy wants to make.
     #[serde(rename(deserialize = "replacement"))]
@@ -38,25 +38,25 @@ impl MakeSuggestions for FormatAdvice {
 }
 
 /// A single replacement that clang-format wants to make.
-#[derive(Debug, PartialEq, Default, Clone, Copy, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Default, Clone, Copy, Deserialize)]
 pub struct Replacement {
     /// The byte offset where the replacement will start.
     #[serde(rename = "@offset")]
-    pub offset: usize,
+    pub offset: u32,
 
     /// The line number described by the [`Replacement::offset`].
     ///
     /// This value is not provided by the XML output, but we calculate it after
     /// deserialization.
     #[serde(default)]
-    pub line: usize,
+    pub line: u32,
 
     /// The column number on the line described by the [`Replacement::offset`].
     ///
     /// This value is not provided by the XML output, but we calculate it after
     /// deserialization.
     #[serde(default)]
-    pub cols: usize,
+    pub cols: u32,
 }
 
 /// Get a string that summarizes the given `--style`
@@ -163,8 +163,7 @@ pub fn run_clang_format(
     if !format_advice.replacements.is_empty() {
         let original_contents = fs::read(&file.name).with_context(|| {
             format!(
-                "Failed to cache file's original content before applying clang-tidy changes: {}",
-                file_name.clone()
+                "Failed to read file's original content before translating byte offsets: {file_name}",
             )
         })?;
         // get line and column numbers from format_advice.offset
@@ -175,7 +174,7 @@ pub fn run_clang_format(
             replacement.line = line_number;
             replacement.cols = columns;
             for range in &ranges {
-                if range.contains(&line_number.try_into().unwrap_or(0)) {
+                if range.contains(&line_number) {
                     filtered_replacements.push(*replacement);
                     break;
                 }
@@ -208,37 +207,20 @@ mod tests {
             .to_vec();
 
         let expected = FormatAdvice {
-            replacements: vec![
-                Replacement {
-                    offset: 113,
+            replacements: [113, 147, 161, 165]
+                .iter()
+                .map(|offset| Replacement {
+                    offset: *offset,
                     ..Default::default()
-                },
-                Replacement {
-                    offset: 147,
-                    ..Default::default()
-                },
-                Replacement {
-                    offset: 161,
-                    ..Default::default()
-                },
-                Replacement {
-                    offset: 165,
-                    ..Default::default()
-                },
-            ],
+                })
+                .collect(),
             patched: None,
         };
 
         let xml = String::from_utf8(xml_raw).unwrap();
 
         let document = quick_xml::de::from_str::<FormatAdvice>(&xml).unwrap();
-        assert_eq!(expected.replacements.len(), document.replacements.len());
-        for i in 0..expected.replacements.len() {
-            assert_eq!(
-                expected.replacements[i].offset,
-                document.replacements[i].offset
-            );
-        }
+        assert_eq!(expected, document);
     }
 
     fn formalize_style(style: &str, expected: &str) {

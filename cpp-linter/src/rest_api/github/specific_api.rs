@@ -169,7 +169,7 @@ impl GithubApiClient {
             let file = file.lock().unwrap();
             if let Some(format_advice) = &file.format_advice {
                 // assemble a list of line numbers
-                let mut lines: Vec<usize> = Vec::new();
+                let mut lines = Vec::new();
                 for replacement in &format_advice.replacements {
                     if !lines.contains(&replacement.line) {
                         lines.push(replacement.line);

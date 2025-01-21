@@ -227,11 +227,11 @@ impl FileObj {
 /// boundary exists at the returned column number. However, the `offset` given to this
 /// function is expected to originate from diagnostic information provided by
 /// clang-format or clang-tidy.
-pub fn get_line_cols_from_offset(contents: &[u8], offset: usize) -> (usize, usize) {
-    let lines = contents[0..offset].split(|byte| byte == &b'\n');
-    let line_count = lines.clone().count();
+pub fn get_line_cols_from_offset(contents: &[u8], offset: u32) -> (u32, u32) {
+    let lines = contents[0..offset as usize].split(|byte| byte == &b'\n');
+    let line_count = lines.clone().count() as u32;
     // here we `cols.len() + 1` because columns is not a 0-based count
-    let column_count = lines.last().map(|cols| cols.len() + 1).unwrap_or(1);
+    let column_count = lines.last().map(|cols| cols.len() + 1).unwrap_or(1) as u32;
     (line_count, column_count)
 }
 
