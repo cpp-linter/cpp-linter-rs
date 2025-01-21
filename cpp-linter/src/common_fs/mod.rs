@@ -2,7 +2,6 @@
 
 use std::fmt::Debug;
 use std::fs;
-use std::io::Read;
 use std::path::{Component, Path};
 use std::{ops::RangeInclusive, path::PathBuf};
 
@@ -228,15 +227,11 @@ impl FileObj {
 /// boundary exists at the returned column number. However, the `offset` given to this
 /// function is expected to originate from diagnostic information provided by
 /// clang-format or clang-tidy.
-pub fn get_line_cols_from_offset(file_path: &PathBuf, offset: usize) -> (usize, usize) {
-    let mut file_buf = vec![0; offset];
-    fs::File::open(file_path)
-        .unwrap()
-        .read_exact(&mut file_buf)
-        .unwrap();
-    let lines = file_buf.split(|byte| byte == &b'\n');
+pub fn get_line_cols_from_offset(contents: &[u8], offset: usize) -> (usize, usize) {
+    let lines = contents[0..offset].split(|byte| byte == &b'\n');
     let line_count = lines.clone().count();
-    let column_count = lines.last().unwrap_or(&[]).len() + 1; // +1 because not a 0 based count
+    // here we `cols.len() + 1` because columns is not a 0-based count
+    let column_count = lines.last().map(|cols| cols.len() + 1).unwrap_or(1);
     (line_count, column_count)
 }
 
@@ -272,8 +267,8 @@ pub fn normalize_path(path: &Path) -> PathBuf {
 
 #[cfg(test)]
 mod test {
-    use std::env::current_dir;
     use std::path::PathBuf;
+    use std::{env::current_dir, fs};
 
     use super::{get_line_cols_from_offset, normalize_path, FileObj};
     use crate::cli::LinesChangedOnly;
@@ -317,7 +312,8 @@ mod test {
 
     #[test]
     fn translate_byte_offset() {
-        let (lines, cols) = get_line_cols_from_offset(&PathBuf::from("tests/demo/demo.cpp"), 144);
+        let contents = fs::read(PathBuf::from("tests/demo/demo.cpp")).unwrap();
+        let (lines, cols) = get_line_cols_from_offset(&contents, 144);
         println!("lines: {lines}, cols: {cols}");
         assert_eq!(lines, 13);
         assert_eq!(cols, 5);

@@ -2,15 +2,14 @@
 //! output.
 
 use std::{
+    fs,
     process::Command,
     sync::{Arc, Mutex, MutexGuard},
 };
 
 use anyhow::{Context, Result};
 use log::Level;
-// non-std crates
 use serde::Deserialize;
-use serde_xml_rs::de::Deserializer;
 
 // project-specific crates/modules
 use super::MakeSuggestions;
@@ -19,12 +18,10 @@ use crate::{
     common_fs::{get_line_cols_from_offset, FileObj},
 };
 
-/// A Structure used to deserialize clang-format's XML output.
-#[derive(Debug, Deserialize, PartialEq, Clone)]
-#[serde(rename = "replacements")]
+#[derive(Debug, Clone, Deserialize)]
 pub struct FormatAdvice {
     /// A list of [`Replacement`]s that clang-tidy wants to make.
-    #[serde(rename = "$value")]
+    #[serde(rename(deserialize = "replacement"))]
     pub replacements: Vec<Replacement>,
 
     pub patched: Option<Vec<u8>>,
@@ -41,17 +38,11 @@ impl MakeSuggestions for FormatAdvice {
 }
 
 /// A single replacement that clang-format wants to make.
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Debug, PartialEq, Default, Clone, Copy, Deserialize)]
 pub struct Replacement {
     /// The byte offset where the replacement will start.
+    #[serde(rename = "@offset")]
     pub offset: usize,
-
-    /// The amount of bytes that will be removed.
-    pub length: usize,
-
-    /// The bytes (UTF-8 encoded) that will be added at the [`Replacement::offset`] position.
-    #[serde(rename = "$value")]
-    pub value: Option<String>,
 
     /// The line number described by the [`Replacement::offset`].
     ///
@@ -66,18 +57,6 @@ pub struct Replacement {
     /// deserialization.
     #[serde(default)]
     pub cols: usize,
-}
-
-impl Clone for Replacement {
-    fn clone(&self) -> Self {
-        Replacement {
-            offset: self.offset,
-            length: self.length,
-            value: self.value.clone(),
-            line: self.line,
-            cols: self.cols,
-        }
-    }
 }
 
 /// Get a string that summarizes the given `--style`
@@ -173,38 +152,37 @@ pub fn run_clang_format(
     if output.stdout.is_empty() {
         return Ok(logs);
     }
-    let xml = String::from_utf8(output.stdout)
-        .with_context(|| format!("stdout from clang-format was not UTF-8 encoded: {file_name}"))?
-        .lines()
-        .collect::<Vec<&str>>()
-        .join("");
-    let config = serde_xml_rs::ParserConfig::new()
-        .trim_whitespace(false)
-        .whitespace_to_characters(true)
-        .ignore_root_level_whitespace(true);
-    let event_reader = serde_xml_rs::EventReader::new_with_config(xml.as_bytes(), config);
-    let mut format_advice = FormatAdvice::deserialize(&mut Deserializer::new(event_reader))
-        .unwrap_or(FormatAdvice {
-            replacements: vec![],
-            patched: None,
-        });
+    let xml = String::from_utf8(output.stdout).with_context(|| {
+        format!("XML output from clang-format was not UTF-8 encoded: {file_name}")
+    })?;
+    let mut format_advice = quick_xml::de::from_str::<FormatAdvice>(&xml).unwrap_or(FormatAdvice {
+        replacements: vec![],
+        patched: None,
+    });
     format_advice.patched = patched;
     if !format_advice.replacements.is_empty() {
+        let original_contents = fs::read(&file.name).with_context(|| {
+            format!(
+                "Failed to cache file's original content before applying clang-tidy changes: {}",
+                file_name.clone()
+            )
+        })?;
         // get line and column numbers from format_advice.offset
         let mut filtered_replacements = Vec::new();
         for replacement in &mut format_advice.replacements {
-            let (line_number, columns) = get_line_cols_from_offset(&file.name, replacement.offset);
+            let (line_number, columns) =
+                get_line_cols_from_offset(&original_contents, replacement.offset);
             replacement.line = line_number;
             replacement.cols = columns;
             for range in &ranges {
                 if range.contains(&line_number.try_into().unwrap_or(0)) {
-                    filtered_replacements.push(replacement.clone());
+                    filtered_replacements.push(*replacement);
                     break;
                 }
             }
             if ranges.is_empty() {
                 // lines_changed_only is disabled
-                filtered_replacements.push(replacement.clone());
+                filtered_replacements.push(*replacement);
             }
         }
         format_advice.replacements = filtered_replacements;
@@ -216,7 +194,6 @@ pub fn run_clang_format(
 #[cfg(test)]
 mod tests {
     use super::{summarize_style, FormatAdvice, Replacement};
-    use serde::Deserialize;
 
     #[test]
     fn parse_xml() {
@@ -226,52 +203,42 @@ mod tests {
 <replacement offset='147' length='0'> </replacement>
 <replacement offset='161' length='0'></replacement>
 <replacement offset='165' length='19'>&#10;&#10;</replacement>
-</replacements>"#;
-        //since whitespace is part of the elements' body, we need to remove the LFs first
-        let xml = xml_raw.lines().collect::<Vec<&str>>().join("");
+</replacements>"#
+            .as_bytes()
+            .to_vec();
 
         let expected = FormatAdvice {
             replacements: vec![
                 Replacement {
                     offset: 113,
-                    length: 5,
-                    value: Some(String::from("\n      ")),
-                    line: 0,
-                    cols: 0,
+                    ..Default::default()
                 },
                 Replacement {
                     offset: 147,
-                    length: 0,
-                    value: Some(String::from(" ")),
-                    line: 0,
-                    cols: 0,
+                    ..Default::default()
                 },
                 Replacement {
                     offset: 161,
-                    length: 0,
-                    value: None,
-                    line: 0,
-                    cols: 0,
+                    ..Default::default()
                 },
                 Replacement {
                     offset: 165,
-                    length: 19,
-                    value: Some(String::from("\n\n")),
-                    line: 0,
-                    cols: 0,
+                    ..Default::default()
                 },
             ],
             patched: None,
         };
-        let config = serde_xml_rs::ParserConfig::new()
-            .trim_whitespace(false)
-            .whitespace_to_characters(true)
-            .ignore_root_level_whitespace(true);
-        let event_reader = serde_xml_rs::EventReader::new_with_config(xml.as_bytes(), config);
-        let document =
-            FormatAdvice::deserialize(&mut serde_xml_rs::de::Deserializer::new(event_reader))
-                .unwrap();
-        assert_eq!(expected, document);
+
+        let xml = String::from_utf8(xml_raw).unwrap();
+
+        let document = quick_xml::de::from_str::<FormatAdvice>(&xml).unwrap();
+        assert_eq!(expected.replacements.len(), document.replacements.len());
+        for i in 0..expected.replacements.len() {
+            assert_eq!(
+                expected.replacements[i].offset,
+                document.replacements[i].offset
+            );
+        }
     }
 
     fn formalize_style(style: &str, expected: &str) {

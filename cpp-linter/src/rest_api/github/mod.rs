@@ -316,8 +316,6 @@ mod test {
                 });
                 let replacements = vec![Replacement {
                     offset: 0,
-                    length: 0,
-                    value: Some(String::new()),
                     line: 1,
                     cols: 1,
                 }];
