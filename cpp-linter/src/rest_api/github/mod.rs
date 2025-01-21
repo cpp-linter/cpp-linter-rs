@@ -314,13 +314,8 @@ mod test {
                     notes,
                     patched: None,
                 });
-                let replacements = vec![Replacement {
-                    offset: 0,
-                    line: 1,
-                    cols: 1,
-                }];
                 file.format_advice = Some(FormatAdvice {
-                    replacements,
+                    replacements: vec![Replacement { offset: 0, line: 1 }],
                     patched: None,
                 });
                 files.push(Arc::new(Mutex::new(file)));

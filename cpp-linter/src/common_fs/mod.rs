@@ -227,12 +227,11 @@ impl FileObj {
 /// boundary exists at the returned column number. However, the `offset` given to this
 /// function is expected to originate from diagnostic information provided by
 /// clang-format or clang-tidy.
-pub fn get_line_cols_from_offset(contents: &[u8], offset: u32) -> (u32, u32) {
-    let lines = contents[0..offset as usize].split(|byte| byte == &b'\n');
-    let line_count = lines.clone().count() as u32;
-    // here we `cols.len() + 1` because columns is not a 0-based count
-    let column_count = lines.last().map(|cols| cols.len() + 1).unwrap_or(1) as u32;
-    (line_count, column_count)
+pub fn get_line_count_from_offset(contents: &[u8], offset: u32) -> u32 {
+    let offset = (offset as usize).min(contents.len());
+    let lines = contents[0..offset].split(|byte| byte == &b'\n');
+
+    lines.count() as u32
 }
 
 /// This was copied from [cargo source code](https://github.com/rust-lang/cargo/blob/fede83ccf973457de319ba6fa0e36ead454d2e20/src/cargo/util/paths.rs#L61).
@@ -270,7 +269,7 @@ mod test {
     use std::path::PathBuf;
     use std::{env::current_dir, fs};
 
-    use super::{get_line_cols_from_offset, normalize_path, FileObj};
+    use super::{get_line_count_from_offset, normalize_path, FileObj};
     use crate::cli::LinesChangedOnly;
 
     // *********************** tests for normalized paths
@@ -313,10 +312,8 @@ mod test {
     #[test]
     fn translate_byte_offset() {
         let contents = fs::read(PathBuf::from("tests/demo/demo.cpp")).unwrap();
-        let (lines, cols) = get_line_cols_from_offset(&contents, 144);
-        println!("lines: {lines}, cols: {cols}");
+        let lines = get_line_count_from_offset(&contents, 144);
         assert_eq!(lines, 13);
-        assert_eq!(cols, 5);
     }
 
     // *********************** tests for FileObj::get_ranges()

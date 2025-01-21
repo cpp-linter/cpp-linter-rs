@@ -15,7 +15,7 @@ use serde::Deserialize;
 use super::MakeSuggestions;
 use crate::{
     cli::ClangParams,
-    common_fs::{get_line_cols_from_offset, FileObj},
+    common_fs::{get_line_count_from_offset, FileObj},
 };
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
@@ -50,13 +50,6 @@ pub struct Replacement {
     /// deserialization.
     #[serde(default)]
     pub line: u32,
-
-    /// The column number on the line described by the [`Replacement::offset`].
-    ///
-    /// This value is not provided by the XML output, but we calculate it after
-    /// deserialization.
-    #[serde(default)]
-    pub cols: u32,
 }
 
 /// Get a string that summarizes the given `--style`
@@ -169,10 +162,8 @@ pub fn run_clang_format(
         // get line and column numbers from format_advice.offset
         let mut filtered_replacements = Vec::new();
         for replacement in &mut format_advice.replacements {
-            let (line_number, columns) =
-                get_line_cols_from_offset(&original_contents, replacement.offset);
+            let line_number = get_line_count_from_offset(&original_contents, replacement.offset);
             replacement.line = line_number;
-            replacement.cols = columns;
             for range in &ranges {
                 if range.contains(&line_number) {
                     filtered_replacements.push(*replacement);
