@@ -111,7 +111,7 @@ impl FileFilter {
                 || (pat.is_dir() && file_name.starts_with(pat))
             {
                 log::debug!(
-                    "file {file_name:?} is in {}ignored with domain {pattern:?}.",
+                    "file {file_name:?} is {}ignored with domain {pattern:?}.",
                     if is_ignored { "" } else { "not " }
                 );
                 return true;

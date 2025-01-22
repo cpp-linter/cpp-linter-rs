@@ -2,7 +2,6 @@
 
 use std::fmt::Debug;
 use std::fs;
-use std::io::Read;
 use std::path::{Component, Path};
 use std::{ops::RangeInclusive, path::PathBuf};
 
@@ -220,24 +219,16 @@ impl FileObj {
     }
 }
 
-/// Gets the line and column number from a given `offset` (of bytes) for given
-/// `file_path`.
+/// Gets the line number for a given `offset` (of bytes) from the given
+/// buffer `contents`.
 ///
-/// This computes the line and column numbers from a buffer of bytes read from the
-/// `file_path`. In non-UTF-8 encoded files, this does not guarantee that a word
-/// boundary exists at the returned column number. However, the `offset` given to this
-/// function is expected to originate from diagnostic information provided by
-/// clang-format or clang-tidy.
-pub fn get_line_cols_from_offset(file_path: &PathBuf, offset: usize) -> (usize, usize) {
-    let mut file_buf = vec![0; offset];
-    fs::File::open(file_path)
-        .unwrap()
-        .read_exact(&mut file_buf)
-        .unwrap();
-    let lines = file_buf.split(|byte| byte == &b'\n');
-    let line_count = lines.clone().count();
-    let column_count = lines.last().unwrap_or(&[]).len() + 1; // +1 because not a 0 based count
-    (line_count, column_count)
+/// The `offset` given to this function is expected to originate from
+/// diagnostic information provided by clang-format. Any `offset` out of
+/// bounds is clamped to the given `contents` buffer's length.
+pub fn get_line_count_from_offset(contents: &[u8], offset: u32) -> u32 {
+    let offset = (offset as usize).min(contents.len());
+    let lines = contents[0..offset].split(|byte| byte == &b'\n');
+    lines.count() as u32
 }
 
 /// This was copied from [cargo source code](https://github.com/rust-lang/cargo/blob/fede83ccf973457de319ba6fa0e36ead454d2e20/src/cargo/util/paths.rs#L61).
@@ -272,10 +263,10 @@ pub fn normalize_path(path: &Path) -> PathBuf {
 
 #[cfg(test)]
 mod test {
-    use std::env::current_dir;
     use std::path::PathBuf;
+    use std::{env::current_dir, fs};
 
-    use super::{get_line_cols_from_offset, normalize_path, FileObj};
+    use super::{get_line_count_from_offset, normalize_path, FileObj};
     use crate::cli::LinesChangedOnly;
 
     // *********************** tests for normalized paths
@@ -317,12 +308,25 @@ mod test {
 
     #[test]
     fn translate_byte_offset() {
-        let (lines, cols) = get_line_cols_from_offset(&PathBuf::from("tests/demo/demo.cpp"), 144);
-        println!("lines: {lines}, cols: {cols}");
+        let contents = fs::read(PathBuf::from("tests/demo/demo.cpp")).unwrap();
+        let lines = get_line_count_from_offset(&contents, 144);
         assert_eq!(lines, 13);
-        assert_eq!(cols, 5);
     }
 
+    #[test]
+    fn get_line_count_edge_cases() {
+        // Empty content
+        assert_eq!(get_line_count_from_offset(&[], 0), 1);
+
+        // No newlines
+        assert_eq!(get_line_count_from_offset(b"abc", 3), 1);
+
+        // Consecutive newlines
+        assert_eq!(get_line_count_from_offset(b"a\n\nb", 3), 3);
+
+        // Offset beyond content length
+        assert_eq!(get_line_count_from_offset(b"a\nb\n", 10), 3);
+    }
     // *********************** tests for FileObj::get_ranges()
 
     #[test]

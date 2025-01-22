@@ -276,16 +276,17 @@ pub fn run_clang_tidy(
             cmd.args(["--line-filter", filter.as_str()]);
         }
     }
-    let mut original_content = None;
-    if clang_params.tidy_review {
+    let original_content = if !clang_params.tidy_review {
+        None
+    } else {
         cmd.arg("--fix-errors");
-        original_content = Some(fs::read_to_string(&file.name).with_context(|| {
+        Some(fs::read_to_string(&file.name).with_context(|| {
             format!(
                 "Failed to cache file's original content before applying clang-tidy changes: {}",
                 file_name.clone()
             )
-        })?);
-    }
+        })?)
+    };
     if !clang_params.style.is_empty() {
         cmd.args(["--format-style", clang_params.style.as_str()]);
     }
