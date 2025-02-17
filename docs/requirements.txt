@@ -1,6 +1,6 @@
 markdown-gfm-admonition==0.1.1
 mkdocs==1.6.1
 mkdocs-gen-files==0.5.0
-mkdocs-include-markdown-plugin==7.1.2
-mkdocs-material==9.5.50
+mkdocs-include-markdown-plugin==7.1.4
+mkdocs-material==9.6.4
 pyyaml==6.0.2
