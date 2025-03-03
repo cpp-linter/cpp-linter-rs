@@ -14,32 +14,32 @@ license.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.95"
-chrono = "0.4.39"
-clap = "4.5.27"
+anyhow = "1.0.97"
+chrono = "0.4.40"
+clap = "4.5.31"
 colored = "3.0.0"
-fast-glob = "0.4.3"
+fast-glob = "0.4.5"
 futures = "0.3.31"
 git2 = "0.20.0"
 lenient_semver = "0.4.2"
-log = { version = "0.4.25", features = ["std"] }
+log = { version = "0.4.26", features = ["std"] }
 openssl = { version = "0.10", features = ["vendored"], optional = true }
 openssl-probe = { version = "0.1", optional = true }
 quick-xml = {version = "0.37.2", features = ["serialize"]}
 regex = "1.11.1"
 reqwest = "0.12.12"
 semver = "1.0.25"
-serde = { version = "1.0.217", features = ["derive"] }
-serde_json = "1.0.137"
+serde = { version = "1.0.218", features = ["derive"] }
+serde_json = "1.0.140"
 tokio = { version = "1.43.0", features = ["macros", "rt-multi-thread"]}
 tokio-macros = "2.4.0"
 tokio-stream = "0.1.17"
-which = "7.0.1"
+which = "7.0.2"
 
 [dev-dependencies]
 criterion = { version = "2.7.2", package = "codspeed-criterion-compat", features=["async_tokio"] }
 mockito = "1.6.1"
-tempfile = "3.15.0"
+tempfile = "3.17.1"
 
 [features]
 openssl-vendored = ["dep:openssl", "dep:openssl-probe"]
