@@ -14,9 +14,9 @@ license.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.97"
+anyhow = "1.0.98"
 chrono = "0.4.40"
-clap = "4.5.35"
+clap = "4.5.37"
 colored = "3.0.0"
 fast-glob = "0.4.5"
 futures = "0.3.31"
