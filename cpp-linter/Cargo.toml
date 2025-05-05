@@ -14,18 +14,18 @@ license.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.97"
-chrono = "0.4.40"
-clap = "4.5.35"
+anyhow = "1.0.98"
+chrono = "0.4.41"
+clap = "4.5.37"
 colored = "3.0.0"
 fast-glob = "0.4.5"
 futures = "0.3.31"
-git2 = "0.20.1"
+git2 = "0.20.2"
 lenient_semver = "0.4.2"
 log = { version = "0.4.27", features = ["std"] }
 openssl = { version = "0.10", features = ["vendored"], optional = true }
 openssl-probe = { version = "0.1", optional = true }
-quick-xml = {version = "0.37.4", features = ["serialize"]}
+quick-xml = {version = "0.37.5", features = ["serialize"]}
 regex = "1.11.1"
 reqwest = "0.12.15"
 semver = "1.0.26"
