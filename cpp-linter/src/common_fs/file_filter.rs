@@ -61,7 +61,8 @@ impl FileFilter {
             for line in read_buf.split('\n') {
                 if line.trim_start().starts_with("path") {
                     assert!(line.find('=').unwrap() > 0);
-                    let submodule = String::from("./") + line.split('=').last().unwrap().trim();
+                    let submodule =
+                        String::from("./") + line.split('=').next_back().unwrap().trim();
                     log::debug!("Found submodule: {submodule}");
                     let mut is_ignored = true;
                     for pat in &self.not_ignored {
@@ -159,7 +160,7 @@ impl FileFilter {
                 let mut is_hidden = false;
                 let parent = path
                     .components()
-                    .last()
+                    .next_back()
                     .ok_or(anyhow!("parent directory not known for {path:?}"))?;
                 if parent.as_os_str().to_str().unwrap().starts_with('.') {
                     is_hidden = true;
