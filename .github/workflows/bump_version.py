@@ -140,7 +140,7 @@ def main():
         # NOTE: this is design to fail locally with `KeyError`
         git_config = {"name": environ["GITHUB_ACTOR"]}
         git_config["email"] = (
-            f'{environ["GITHUB_ACTOR_ID"]}+{git_config["name"]}@users.noreply.github.com'
+            f"{environ['GITHUB_ACTOR_ID']}+{git_config['name']}@users.noreply.github.com"
         )
         for key, value in git_config.items():
             subprocess.run(
