@@ -66,7 +66,6 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
         "GITHUB_EVENT_NAME",
         test_params.event_t.to_string().as_str(),
     );
-    env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
     env::set_var("GITHUB_REPOSITORY", REPO);
     env::set_var("GITHUB_SHA", SHA);
     env::set_var("GITHUB_TOKEN", TOKEN);
@@ -251,6 +250,8 @@ async fn test_comment(test_params: &TestParams) {
     let tmp_dir = create_test_space(true);
     let lib_root = env::current_dir().unwrap();
     env::set_current_dir(tmp_dir.path()).unwrap();
+    let fake_gh_out = NamedTempFile::new().unwrap();
+    env::set_var("GITHUB_OUTPUT", fake_gh_out.path());
     setup(&lib_root, test_params).await;
     env::set_current_dir(lib_root.as_path()).unwrap();
     drop(tmp_dir);

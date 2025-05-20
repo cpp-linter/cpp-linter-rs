@@ -72,7 +72,6 @@ fn generate_tool_summary(review_enabled: bool, force_lgtm: bool, tool_name: &str
 }
 
 async fn setup(lib_root: &Path, test_params: &TestParams) {
-    env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
     env::set_var("GITHUB_EVENT_NAME", "pull_request");
     env::set_var("GITHUB_REPOSITORY", REPO);
     env::set_var("GITHUB_SHA", SHA);
@@ -247,6 +246,8 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
 async fn test_review(test_params: &TestParams) {
     let tmp_dir = create_test_space(true);
     let lib_root = env::current_dir().unwrap();
+    let fake_gh_out = NamedTempFile::new().unwrap();
+    env::set_var("GITHUB_OUTPUT", fake_gh_out.path());
     env::set_current_dir(tmp_dir.path()).unwrap();
     setup(&lib_root, test_params).await;
     env::set_current_dir(lib_root.as_path()).unwrap();

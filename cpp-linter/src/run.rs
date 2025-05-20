@@ -159,10 +159,19 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
 mod test {
     use super::run_main;
     use std::env;
+    use tempfile::NamedTempFile;
+
+    /// Avoid writing to GITHUB_OUTPUT in parallel-running tests.
+    ///
+    /// This simply creates a temp file and sets the env var, GITHUB_OUTPUT, to the temp file's path.
+    fn monkey_patch_gh_output() {
+        let fake_gh_out = NamedTempFile::new().unwrap();
+        env::set_var("GITHUB_OUTPUT", fake_gh_out.path());
+    }
 
     #[tokio::test]
     async fn normal() {
-        env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
+        monkey_patch_gh_output();
         let result = run_main(vec![
             "cpp-linter".to_string(),
             "-l".to_string(),
@@ -177,14 +186,14 @@ mod test {
 
     #[tokio::test]
     async fn version_command() {
-        env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
+        monkey_patch_gh_output();
         let result = run_main(vec!["cpp-linter".to_string(), "version".to_string()]).await;
         assert!(result.is_ok());
     }
 
     #[tokio::test]
     async fn force_debug_output() {
-        env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
+        monkey_patch_gh_output();
         let result = run_main(vec![
             "cpp-linter".to_string(),
             "-l".to_string(),
@@ -199,7 +208,7 @@ mod test {
 
     #[tokio::test]
     async fn bad_version_input() {
-        env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
+        monkey_patch_gh_output();
         let result = run_main(vec![
             "cpp-linter".to_string(),
             "-l".to_string(),
@@ -212,7 +221,7 @@ mod test {
 
     #[tokio::test]
     async fn pre_commit_env() {
-        env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
+        monkey_patch_gh_output();
         env::set_var("PRE_COMMIT", "1");
         let result = run_main(vec![
             "cpp-linter".to_string(),
@@ -228,7 +237,7 @@ mod test {
     // This ensures no diagnostic comments are generated when analysis is explicitly skipped.
     #[tokio::test]
     async fn no_analysis() {
-        env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
+        monkey_patch_gh_output();
         let result = run_main(vec![
             "cpp-linter".to_string(),
             "-l".to_string(),
