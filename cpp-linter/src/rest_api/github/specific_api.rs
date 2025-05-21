@@ -17,7 +17,7 @@ use crate::{
     cli::{FeedbackInput, LinesChangedOnly},
     common_fs::{FileFilter, FileObj},
     git::parse_diff_from_buf,
-    rest_api::{RestApiRateLimitHeaders, COMMENT_MARKER, USER_AGENT},
+    rest_api::{send_api_request, RestApiRateLimitHeaders, COMMENT_MARKER, USER_AGENT},
 };
 
 use super::{
@@ -94,14 +94,9 @@ impl GithubApiClient {
         while let Some(ref endpoint) = url {
             let request =
                 Self::make_api_request(&self.client, endpoint.as_str(), Method::GET, None, None)?;
-            let response = Self::send_api_request(
-                self.client.clone(),
-                request,
-                self.rate_limit_headers.clone(),
-                0,
-            )
-            .await
-            .with_context(|| "Failed to get paginated list of changed files")?;
+            let response = send_api_request(&self.client, request, &self.rate_limit_headers)
+                .await
+                .with_context(|| "Failed to get paginated list of changed files")?;
             url = Self::try_next_page(response.headers());
             let files_list = if self.event_name != "pull_request" {
                 let json_value: PushEventFiles = serde_json::from_str(&response.text().await?)
@@ -233,14 +228,7 @@ impl GithubApiClient {
                 Some(serde_json::json!(&payload).to_string()),
                 None,
             )?;
-            match Self::send_api_request(
-                self.client.clone(),
-                request,
-                self.rate_limit_headers.to_owned(),
-                0,
-            )
-            .await
-            {
+            match send_api_request(&self.client, request, &self.rate_limit_headers).await {
                 Ok(response) => {
                     Self::log_response(response, "Failed to post thread comment").await;
                 }
@@ -270,13 +258,7 @@ impl GithubApiClient {
         while let Some(ref endpoint) = comments_url {
             let request =
                 Self::make_api_request(&self.client, endpoint.as_str(), Method::GET, None, None)?;
-            let result = Self::send_api_request(
-                self.client.clone(),
-                request,
-                self.rate_limit_headers.to_owned(),
-                0,
-            )
-            .await;
+            let result = send_api_request(&self.client, request, &self.rate_limit_headers).await;
             match result {
                 Err(e) => {
                     log::error!("Failed to get list of existing thread comments: {e:?}");
@@ -330,11 +312,10 @@ impl GithubApiClient {
                                             None,
                                             None,
                                         )?;
-                                        match Self::send_api_request(
-                                            self.client.clone(),
+                                        match send_api_request(
+                                            &self.client,
                                             req,
-                                            self.rate_limit_headers.to_owned(),
-                                            0,
+                                            &self.rate_limit_headers,
                                         )
                                         .await
                                         {
@@ -391,12 +372,7 @@ impl GithubApiClient {
             // if we got here, then we know that it is a self.pull_request is a valid value
             .join(self.pull_request.to_string().as_str())?;
         let request = Self::make_api_request(&self.client, url.as_str(), Method::GET, None, None)?;
-        let response = Self::send_api_request(
-            self.client.clone(),
-            request,
-            self.rate_limit_headers.clone(),
-            0,
-        );
+        let response = send_api_request(&self.client, request, &self.rate_limit_headers);
 
         let url = Url::parse(format!("{}/", url).as_str())?.join("reviews")?;
         let dismissal = self.dismiss_outdated_reviews(&url);
@@ -462,7 +438,7 @@ impl GithubApiClient {
         dismissal.await?; // free up the `url` variable
         let request = Self::make_api_request(
             &self.client,
-            url.clone(),
+            url,
             Method::POST,
             Some(
                 serde_json::to_string(&payload)
@@ -470,14 +446,7 @@ impl GithubApiClient {
             ),
             None,
         )?;
-        match Self::send_api_request(
-            self.client.clone(),
-            request,
-            self.rate_limit_headers.clone(),
-            0,
-        )
-        .await
-        {
+        match send_api_request(&self.client, request, &self.rate_limit_headers).await {
             Ok(response) => {
                 if !response.status().is_success() {
                     Self::log_response(response, "Failed to post a new PR review").await;
@@ -496,13 +465,7 @@ impl GithubApiClient {
         while let Some(ref endpoint) = url_ {
             let request =
                 Self::make_api_request(&self.client, endpoint.as_str(), Method::GET, None, None)?;
-            let result = Self::send_api_request(
-                self.client.clone(),
-                request,
-                self.rate_limit_headers.clone(),
-                0,
-            )
-            .await;
+            let result = send_api_request(&self.client, request, &self.rate_limit_headers).await;
             match result {
                 Err(e) => {
                     log::error!("Failed to get a list of existing PR reviews: {e:?}");
@@ -538,11 +501,10 @@ impl GithubApiClient {
                                                 Some(REVIEW_DISMISSAL.to_string()),
                                                 None,
                                             ) {
-                                                match Self::send_api_request(
-                                                    self.client.clone(),
+                                                match send_api_request(
+                                                    &self.client,
                                                     req,
-                                                    self.rate_limit_headers.clone(),
-                                                    0,
+                                                    &self.rate_limit_headers,
                                                 )
                                                 .await
                                                 {
