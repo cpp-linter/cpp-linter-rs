@@ -16,7 +16,7 @@ use reqwest::{
 };
 
 // project specific modules/crates
-use super::{RestApiClient, RestApiRateLimitHeaders};
+use super::{send_api_request, RestApiClient, RestApiRateLimitHeaders};
 use crate::clang_tools::clang_format::tally_format_advice;
 use crate::clang_tools::clang_tidy::tally_tidy_advice;
 use crate::clang_tools::ClangVersions;
@@ -148,14 +148,9 @@ impl RestApiClient for GithubApiClient {
                 None,
                 Some(diff_header),
             )?;
-            let response = Self::send_api_request(
-                self.client.clone(),
-                request,
-                self.rate_limit_headers.to_owned(),
-                0,
-            )
-            .await
-            .with_context(|| "Failed to get list of changed files.")?;
+            let response = send_api_request(&self.client, request, &self.rate_limit_headers)
+                .await
+                .with_context(|| "Failed to get list of changed files.")?;
             if response.status().is_success() {
                 Ok(parse_diff_from_buf(
                     &response.bytes().await?,
