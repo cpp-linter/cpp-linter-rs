@@ -1,9 +1,12 @@
 //! A module to initialize and customize the logger object used in (most) stdout.
 
-use std::env;
+use std::{
+    env,
+    io::{stdout, Write},
+};
 
 use colored::{control::set_override, Colorize};
-use log::{Level, LevelFilter, Metadata, Record};
+use log::{Level, LevelFilter, Log, Metadata, Record};
 
 #[derive(Default)]
 struct SimpleLogger;
@@ -21,21 +24,43 @@ impl SimpleLogger {
     }
 }
 
-impl log::Log for SimpleLogger {
+impl Log for SimpleLogger {
     fn enabled(&self, metadata: &Metadata) -> bool {
         metadata.level() <= log::max_level()
     }
 
     fn log(&self, record: &Record) {
+        let mut stdout = stdout().lock();
         if record.target() == "CI_LOG_GROUPING" {
             // this log is meant to manipulate a CI workflow's log grouping
-            println!("{}", record.args());
+            writeln!(stdout, "{}", record.args()).expect("Failed to write log command to stdout");
+            stdout
+                .flush()
+                .expect("Failed to flush log command to stdout");
         } else if self.enabled(record.metadata()) {
-            println!(
-                "[{}]: {}",
-                Self::level_color(&record.level()),
-                record.args()
-            );
+            let module = record.module_path();
+            if module.is_none_or(|v| v.starts_with("cpp_linter")) {
+                writeln!(
+                    stdout,
+                    "[{}]: {}",
+                    Self::level_color(&record.level()),
+                    record.args()
+                )
+                .expect("Failed to write log message to stdout");
+            } else {
+                writeln!(
+                    stdout,
+                    "[{}]{{{}:{}}}: {}",
+                    Self::level_color(&record.level()),
+                    module.unwrap(), // safe to unwrap here because the None case is caught above
+                    record.line().unwrap_or_default(),
+                    record.args()
+                )
+                .expect("Failed to write detailed log message to stdout");
+            }
+            stdout
+                .flush()
+                .expect("Failed to flush log message to stdout");
         }
     }
 
