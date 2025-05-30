@@ -20,4 +20,4 @@ build:
         - uvx nox -s docs-build
     post_build:
       - mkdir -p $READTHEDOCS_OUTPUT/html/
-      - mv docs/site $READTHEDOCS_OUTPUT/html/
+      - mv docs/site/* $READTHEDOCS_OUTPUT/html
