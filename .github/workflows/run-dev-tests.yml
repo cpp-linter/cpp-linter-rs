@@ -81,18 +81,6 @@ jobs:
       - if: runner.os == 'Linux'
         run: sudo apt-get update
 
-      - name: Install clang v7
-        if: runner.os == 'Linux'
-        uses: ./.github/install-clang-action
-        with:
-          version: '7'
-
-      - name: Collect Coverage for clang v7
-        if: runner.os == 'Linux'
-        env:
-          CLANG_VERSION: '7'
-        run: uvx nox -s test -- --profile ci
-
       - name: Install clang v8
         if: runner.os == 'Linux'
         uses: ./.github/install-clang-action
