@@ -56,8 +56,11 @@ jobs:
         with:
           python-version: 3.x
 
-      - name: Install workflow deps
-        run: python3 -m pip install meson
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
 
       # # https://github.com/ninja-build/ninja/wiki/Pre-built-Ninja-packages
       - name: Install ninja (Linux)
@@ -88,7 +91,7 @@ jobs:
         if: runner.os == 'Linux'
         env:
           CLANG_VERSION: '7'
-        run: just test ci
+        run: uvx nox -s test -- --profile ci
 
       - name: Install clang v8
         if: runner.os == 'Linux'
@@ -100,7 +103,7 @@ jobs:
         if: runner.os == 'Linux'
         env:
           CLANG_VERSION: '8'
-        run: just test ci
+        run: uvx nox -s test -- --profile ci
 
       - name: Install clang v9
         uses: ./.github/install-clang-action
@@ -110,7 +113,7 @@ jobs:
       - name: Collect Coverage for clang v9
         env:
           CLANG_VERSION: '9'
-        run: just test ci
+        run: uvx nox -s test -- --profile ci
 
       - name: Install clang v10
         uses: ./.github/install-clang-action
@@ -120,7 +123,7 @@ jobs:
       - name: Collect Coverage for clang v10
         env:
           CLANG_VERSION: '10'
-        run: just test ci
+        run: uvx nox -s test -- --profile ci
 
       - name: Install clang 11
         uses: ./.github/install-clang-action
@@ -130,7 +133,7 @@ jobs:
       - name: Collect Coverage for clang v11
         env:
           CLANG_VERSION: '11'
-        run: just test ci
+        run: uvx nox -s test -- --profile ci
 
       - name: Install clang 12
         uses: ./.github/install-clang-action
@@ -140,7 +143,7 @@ jobs:
       - name: Collect Coverage for clang v12
         env:
           CLANG_VERSION: '12'
-        run: just test ci
+        run: uvx nox -s test -- --profile ci
 
       - name: Install clang 13
         uses: ./.github/install-clang-action
@@ -150,7 +153,7 @@ jobs:
       - name: Collect Coverage for clang v13
         env:
           CLANG_VERSION: '13'
-        run: just test ci
+        run: uvx nox -s test -- --profile ci
 
       - name: Install clang 14
         uses: ./.github/install-clang-action
@@ -160,7 +163,7 @@ jobs:
       - name: Collect Coverage for clang v14
         env:
           CLANG_VERSION: '14'
-        run: just test ci
+        run: uvx nox -s test -- --profile ci
 
       - name: Install clang 15
         uses: ./.github/install-clang-action
@@ -170,7 +173,7 @@ jobs:
       - name: Collect Coverage for clang v15
         env:
           CLANG_VERSION: '15'
-        run: just test ci
+        run: uvx nox -s test -- --profile ci
 
       - name: Install clang 16
         uses: ./.github/install-clang-action
@@ -180,7 +183,7 @@ jobs:
       - name: Collect Coverage for clang v16
         env:
           CLANG_VERSION: '16'
-        run: just test ci
+        run: uvx nox -s test -- --profile ci
 
       - name: Install clang 17
         uses: ./.github/install-clang-action
@@ -190,7 +193,7 @@ jobs:
       - name: Collect Coverage for clang v17
         env:
           CLANG_VERSION: '17'
-        run: just test ci
+        run: uvx nox -s test -- --profile ci
 
       - name: Install clang 18
         uses: ./.github/install-clang-action
@@ -200,10 +203,10 @@ jobs:
       - name: Collect Coverage for clang v18
         env:
           CLANG_VERSION: '18'
-        run: just test all
+        run: uvx nox -s test -- --profile all
 
       - name: Generate Coverage HTML report
-        run: just pretty-cov
+        run: uvx nox -s pretty-cov
 
       - name: Upload coverage data
         uses: actions/upload-artifact@v4
@@ -214,7 +217,7 @@ jobs:
       - name: Generate Coverage lcov report
         run: |
           rm coverage.json
-          just lcov
+          uvx nox -s lcov
 
       - uses: codecov/codecov-action@v5
         with:

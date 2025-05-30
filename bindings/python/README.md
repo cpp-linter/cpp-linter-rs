@@ -50,7 +50,6 @@ cpp-linter -help
 | `Cargo.toml` | Metadata about the binding's rust package (which _is not_ intended to be published to crates.io). |
 | `../../cpp_linter.pyi` | The typing stubs for the package (located in repo root). |
 | `../../pyproject.toml` | Metadata about the python package (located in repo root). |
-| `requirements-dev.txt` | The dependencies used in development (not needed for runtime/production). |
 
 Hidden files and folders are not described in the table above.
 If they are not ignored by a gitignore specification, then they should be considered

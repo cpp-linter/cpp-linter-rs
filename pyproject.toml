@@ -50,3 +50,22 @@ exclude = [
     {path = "**/docs/**", format="sdist"},
 ]
 manifest-path = "bindings/python/Cargo.toml"
+
+[dependency-groups]
+dev = [
+    "maturin>=1.8.6",
+    "mypy>=1.15.0",
+    "nox>=2025.5.1",
+    "pre-commit>=4.2.0",
+    "ruff>=0.11.11",
+]
+test = [
+    "meson>=1.8.1",
+]
+
+[tool.uv]
+# we don't need to build the python binding every time we spin up a venv
+package = false
+
+[tool.uv.workspace]
+members = ["docs"]

@@ -2,11 +2,10 @@
 [package]
 name = "cli-gen"
 edition = "2021"
-version = "0.0.0"
 description = "A function exposed in python that generates a CLI doc from rust source code."
 repository = "https://github.com/cpp-linter/cpp-linter-rs/tree/main/docs"
+version.workspace = true
 authors.workspace = true
-homepage.workspace = true
 license.workspace = true
 
 [dependencies]
