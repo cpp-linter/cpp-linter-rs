@@ -17,7 +17,7 @@ build:
         curl -LsSf https://astral.sh/uv/install.sh | sh
     build:
       html:
-        - ${HOME}/.local/bin/uvx nox -s docs
+        - ${HOME}/.local/bin/uvx nox -s docs-build
     post_build:
       - mkdir -p $READTHEDOCS_OUTPUT/html/
       - mv docs/site/* $READTHEDOCS_OUTPUT/html
