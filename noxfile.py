@@ -111,8 +111,6 @@ def llvm_cov(session: nox.Session):
 
     To open the built report in your browser::
         uv run nox -s llvm-cov -- --open
-
-    Otherwise, the default profile is used.
     """
     session.run(
         "cargo",
@@ -132,8 +130,6 @@ def pretty_cov(session: nox.Session):
 
     To open the built report in your browser::
         uv run nox -s pretty-cov -- --open
-
-    Otherwise, the default profile is used.
     """
     session.run(
         "cargo",
