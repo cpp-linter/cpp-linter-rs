@@ -26,4 +26,4 @@ anyhow = "1.0.98"
 openssl-vendored = ["cpp-linter/openssl-vendored"]
 
 [build-dependencies]
-napi-build = "2.2.0"
+napi-build = "2.2.1"
