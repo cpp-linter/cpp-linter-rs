@@ -1,21 +1,14 @@
 # Docs
 
-This folder is only for generating the documentation.
+This folder is only for generating the documentation about CLI and runtime permissions.
 Please [visit our website][gh-pages] to see generated documentation.
 
 [gh-pages]: https://cpp-linter.github.io/cpp-linter-rs
 
+## Build and inspect locally
+
 To view the documentation locally, some software needs to be installed.
 
-```shell
-pip install maturin
-cd docs
-maturin dev
-pip install -r docs/requirements.txt
-```
-
-Then use `mkdocs` to generate the docs and open them in your browser.
-
-```shell
-mkdocs serve --open
-```
+> [!IMPORTANT]
+> Please review of [Contributing doc](../CONTRIBUTING.md)
+> which contains instruction about building and inspecting docs.

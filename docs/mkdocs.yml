@@ -12,6 +12,7 @@ nav:
   - python.md
   - node.md
   - changelog.md
+  - contributing.md
   - other-licenses.md
 
 theme:

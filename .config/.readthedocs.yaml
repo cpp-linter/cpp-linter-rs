@@ -10,15 +10,14 @@ build:
   tools:
     rust: latest
     python: latest
-
-mkdocs:
-  configuration: docs/mkdocs.yml
-
-
-# Optionally declare the Python requirements required to build your docs
-
-python:
-  install:
-    - requirements: docs/requirements.txt
-    - method: pip
-      path: docs/
+  jobs:
+    pre_create_environment:
+      - >-
+        UV_INSTALL_DIR="${HOME}/.local/bin" &&
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+    build:
+      html:
+        - ${HOME}/.local/bin/uvx nox -s docs-build
+    post_build:
+      - mkdir -p $READTHEDOCS_OUTPUT/html/
+      - mv docs/site/* $READTHEDOCS_OUTPUT/html

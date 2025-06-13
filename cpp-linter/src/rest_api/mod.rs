@@ -221,7 +221,7 @@ const MAX_RETRIES: u8 = 5;
 /// This method respects both primary and secondary rate limits.
 /// In the event where  the secondary rate limits is reached,
 /// this function will wait for a time interval specified the server and retry afterward.
-async fn send_api_request(
+pub async fn send_api_request(
     client: &Client,
     request: Request,
     rate_limit_headers: &RestApiRateLimitHeaders,

@@ -48,18 +48,13 @@ jobs:
         with:
           path: ~/.cargo
           key: ${{ runner.os }}-docs-cargo-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/setup-python@v5
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
         with:
-          python-version: 3.x
-          cache: 'pip'
-          cache-dependency-path: docs/requirements.txt
-      - name: Install workflow deps
-        run: |
-          pip install -r docs/requirements.txt
-          pip install --force-reinstall -v docs/
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
       - name: Build docs
-        working-directory: docs
-        run: mkdocs build
+        run: uvx nox -s docs-build
       - name: Upload docs build as artifact
         uses: actions/upload-artifact@v4
         with:
@@ -84,11 +79,9 @@ jobs:
         with:
           path: ~/.cargo
           key: ${{ runner.os }}-docs-cargo-${{ hashFiles('Cargo.lock') }}
-      - name: Install just
-        uses: taiki-e/install-action@v2
-        with:
-          tool: just
-      - run: just docs-rs
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - run: uvx nox -s docs-rs
       - name: upload rustdoc build as artifact
         uses: actions/upload-artifact@v4
         with:
