@@ -49,7 +49,7 @@ jobs:
           path: ~/.cargo
           key: ${{ runner.os }}-docs-cargo-${{ hashFiles('Cargo.lock') }}
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
           cache-dependency-glob: "uv.lock"
@@ -80,7 +80,7 @@ jobs:
           path: ~/.cargo
           key: ${{ runner.os }}-docs-cargo-${{ hashFiles('Cargo.lock') }}
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v6
       - run: uvx nox -s docs-rs
       - name: upload rustdoc build as artifact
         uses: actions/upload-artifact@v4
