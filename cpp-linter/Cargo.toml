@@ -25,9 +25,9 @@ lenient_semver = "0.4.2"
 log = { version = "0.4.27", features = ["std"] }
 openssl = { version = "0.10", features = ["vendored"], optional = true }
 openssl-probe = { version = "0.1", optional = true }
-quick-xml = {version = "0.37.5", features = ["serialize"]}
+quick-xml = {version = "0.38.0", features = ["serialize"]}
 regex = "1.11.1"
-reqwest = "0.12.20"
+reqwest = "0.12.21"
 semver = "1.0.26"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
