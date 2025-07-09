@@ -49,6 +49,7 @@ def run_mkdocs(session: nox.Session, cmd: str, *args: str):
         "--config-file",
         "docs/mkdocs.yml",
         *args,
+        env={"CARGO_TERM_COLOR": "never"},
     )
 
 
