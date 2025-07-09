@@ -5,6 +5,7 @@
         "fill-labs.dependi",
         "ms-python.python",
         "charliermarsh.ruff",
-        "ms-python.mypy-type-checker"
+        "ms-python.mypy-type-checker",
+        "eamodio.gitlens"
     ]
 }
