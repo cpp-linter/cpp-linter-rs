@@ -3,7 +3,9 @@
         "rust-lang.rust-analyzer",
         "streetsidesoftware.code-spell-checker",
         "fill-labs.dependi",
-        "wolfmah-vscode.just-syntax",
+        "ms-python.python",
+        "charliermarsh.ruff",
+        "ms-python.mypy-type-checker",
         "eamodio.gitlens"
     ]
 }
