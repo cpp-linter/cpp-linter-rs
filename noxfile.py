@@ -53,7 +53,6 @@ def run_mkdocs(session: nox.Session, cmd: str, *args: str):
 
 
 @nox.session(name="docs-build")
-# @nox.parametrize("cmd", ["build", "serve", "rs"], ids=["build", "serve", "rs"])
 def docs_build(session: nox.Session):
     """Build docs with mkdocs"""
     run_mkdocs(session, "build", *session.posargs)
