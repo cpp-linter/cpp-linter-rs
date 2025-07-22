@@ -27,4 +27,3 @@
 *.code-workspace text eol=lf
 *.clang-tidy text eol=lf
 *.clang-format text eol=lf
-justfile text eol=lf

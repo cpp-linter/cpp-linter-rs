@@ -24,7 +24,9 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn probe_ssl_certs() {
     #[cfg(feature = "openssl-vendored")]
-    openssl_probe::init_ssl_cert_env_vars();
+    unsafe {
+        openssl_probe::init_openssl_env_vars();
+    }
 }
 
 /// This is the backend entry point for console applications.

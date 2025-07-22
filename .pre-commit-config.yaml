@@ -8,18 +8,21 @@ repos:
         exclude: bindings/node/.*package\.json
       - id: check-docstring-first
       - id: check-added-large-files
-        args: [--maxkb=9000]
+        exclude: '.yarn/releases/yarn.*js'
       - id: check-yaml
         exclude: docs/mkdocs.yml
       - id: check-toml
-      - id: requirements-txt-fixer
       - id: mixed-line-ending
         args: ["--fix=lf"]
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.11.10
+    rev: v0.12.4
     hooks:
       # Run the python linter.
-      - id: ruff
+      - id: ruff-check
         args: [ --fix ]
       # Run the python formatter.
       - id: ruff-format
+  - repo: https://github.com/streetsidesoftware/cspell-cli
+    rev: v9.2.0
+    hooks:
+      - id: cspell # Spell check changed files

@@ -39,63 +39,63 @@ jobs:
         include:
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-latest
-            vendered: true
+            vendored: true
             cross: true
           - target: aarch64-unknown-linux-musl
             os: ubuntu-latest
-            vendered: true
+            vendored: true
             cross: true
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
-            vendered: false
+            vendored: false
             cross: false
           - target: x86_64-unknown-linux-musl
             os: ubuntu-latest
-            vendered: true
+            vendored: true
             cross: true
           - target: arm-unknown-linux-gnueabi
             os: ubuntu-latest
-            vendered: true
+            vendored: true
             cross: true
           - target: arm-unknown-linux-gnueabihf
             os: ubuntu-latest
-            vendered: true
+            vendored: true
             cross: true
           - target: armv7-unknown-linux-gnueabihf
             os: ubuntu-latest
-            vendered: true
+            vendored: true
             cross: true
           - target: powerpc-unknown-linux-gnu
             os: ubuntu-latest
-            vendered: true
+            vendored: true
             cross: true
           - target: powerpc64-unknown-linux-gnu
             os: ubuntu-latest
-            vendered: true
+            vendored: true
             cross: true
           - target: powerpc64le-unknown-linux-gnu
             os: ubuntu-latest
-            vendered: true
+            vendored: true
             cross: true
           - target: s390x-unknown-linux-gnu
             os: ubuntu-latest
-            vendered: true
+            vendored: true
             cross: true
           - target: aarch64-apple-darwin
             os: macos-latest
-            vendered: true
+            vendored: true
             cross: false
           - target: x86_64-apple-darwin
             os: macos-latest
-            vendered: true
+            vendored: true
             cross: false
           - target: x86_64-pc-windows-msvc
             os: windows-latest
-            vendered: false
+            vendored: false
             cross: false
           - target: aarch64-pc-windows-msvc
             os: windows-latest
-            vendered: false
+            vendored: false
             cross: false
     runs-on: ${{ matrix.os }}
     permissions:
@@ -123,7 +123,7 @@ jobs:
           --bin cpp-linter
           --release
           --target ${{ matrix.target }}
-          ${{ matrix.vendered && '--features openssl-vendored' || '' }}
+          ${{ matrix.vendored && '--features openssl-vendored' || '' }}
 
       - name: Prepare artifacts
         run: mv target/${{ matrix.target }}/release/cpp-linter${{ runner.os == 'Windows' && '.exe' || '' }} ./cpp-linter-${{ matrix.target }}${{ runner.os == 'Windows' && '.exe' || '' }}
