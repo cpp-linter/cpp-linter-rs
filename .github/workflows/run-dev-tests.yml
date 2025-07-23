@@ -47,8 +47,10 @@ jobs:
 
       - name: Install third-party binaries
         uses: taiki-e/install-action@v2
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         with:
-          tool: cargo-nextest,cargo-llvm-cov,cargo-binstall,just
+          tool: cargo-nextest,cargo-llvm-cov,cargo-binstall
 
       - name: Install llvm-cov-pretty (HTML report generator)
         run: cargo binstall -y llvm-cov-pretty
