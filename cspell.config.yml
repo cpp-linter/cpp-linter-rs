@@ -51,6 +51,7 @@ words:
   - maturin
   - mdbook
   - mkdocs
+  - mlugg
   - msvc
   - multiarch
   - musleabihf

@@ -68,7 +68,7 @@ jobs:
           - host: windows-latest
             target: aarch64-pc-windows-msvc
             build: yarn build --target aarch64-pc-windows-msvc
-    name: build ${{ matrix.settings.target }}
+    name: Build ${{ matrix.settings.target }}
     runs-on: ${{ matrix.settings.host }}
     steps:
       - uses: actions/checkout@v4
@@ -93,17 +93,17 @@ jobs:
             .cargo-cache
             target/
           key: ${{ matrix.settings.target }}-cargo-${{ matrix.settings.host }}
-      - uses: goto-bus-stop/setup-zig@v2
-        if: ${{ contains(matrix.settings.target, 'musl') }}
+      - uses: mlugg/setup-zig@v2
+        if: ${{ contains(matrix.settings.build, ' -x ') }}
         with:
           version: 0.14.1
       - name: Install cargo-zigbuild
         uses: taiki-e/install-action@v2
-        if: ${{ contains(matrix.settings.target, 'musl') }}
+        if: contains(matrix.settings.build, ' -x ') || contains(matrix.settings.build, '--use-cross ')
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
-          tool: cargo-zigbuild
+          tool: ${{contains(matrix.settings.build, ' -x ') && 'cargo-zigbuild' || 'cargo-cross'}}
       - name: Setup toolchain
         run: ${{ matrix.settings.setup }}
         if: ${{ matrix.settings.setup }}
@@ -123,7 +123,7 @@ jobs:
           if-no-files-found: error
   build-freebsd:
     runs-on: ubuntu-latest
-    name: Build FreeBSD
+    name: Build fFreeBSD
     steps:
       - uses: actions/checkout@v4
       - name: Build
@@ -168,7 +168,7 @@ jobs:
           path: bindings/node/${{ env.APP_NAME }}.*.node
           if-no-files-found: error
   test-macOS-windows-binding:
-    name: Test bindings on ${{ matrix.settings.target }} - node@${{ matrix.node }}
+    name: Test ${{ matrix.settings.target }} - node@${{ matrix.node }}
     needs:
       - build
     strategy:
