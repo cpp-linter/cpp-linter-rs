@@ -49,7 +49,7 @@ jobs:
             target: i686-pc-windows-msvc
           - host: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            build: yarn build --target x86_64-unknown-linux-gnu -x --features openssl-vendored
+            build: yarn build --target x86_64-unknown-linux-gnu --use-cross --features openssl-vendored
           - host: ubuntu-latest
             target: x86_64-unknown-linux-musl
             build: yarn build --target x86_64-unknown-linux-musl -x --features openssl-vendored
@@ -58,10 +58,10 @@ jobs:
             build: yarn build --target aarch64-apple-darwin --features openssl-vendored
           - host: ubuntu-latest
             target: aarch64-unknown-linux-gnu
-            build: yarn build --target aarch64-unknown-linux-gnu --use-napi-cross --features openssl-vendored
+            build: yarn build --target aarch64-unknown-linux-gnu --use-cross --features openssl-vendored
           - host: ubuntu-latest
             target: armv7-unknown-linux-gnueabihf
-            build: yarn build --target armv7-unknown-linux-gnueabihf --use-napi-cross --features openssl-vendored
+            build: yarn build --target armv7-unknown-linux-gnueabihf --use-cross --features openssl-vendored
           - host: ubuntu-latest
             target: aarch64-unknown-linux-musl
             build: yarn build --target aarch64-unknown-linux-musl -x --features openssl-vendored
@@ -97,13 +97,13 @@ jobs:
         if: ${{ contains(matrix.settings.build, ' -x ') }}
         with:
           version: 0.14.1
-      - name: Install cargo-zigbuild
+      - name: Install ${{contains(matrix.settings.build, ' -x ') && 'cargo-zigbuild' || 'cargo-cross'}}
         uses: taiki-e/install-action@v2
         if: contains(matrix.settings.build, ' -x ') || contains(matrix.settings.build, '--use-cross ')
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
-          tool: ${{contains(matrix.settings.build, ' -x ') && 'cargo-zigbuild' || 'cargo-cross'}}
+          tool: ${{contains(matrix.settings.build, ' -x ') && 'cargo-zigbuild' || 'cross'}}
       - name: Setup toolchain
         run: ${{ matrix.settings.setup }}
         if: ${{ matrix.settings.setup }}
