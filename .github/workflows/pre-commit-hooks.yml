@@ -30,13 +30,28 @@ jobs:
       - name: cargo fmt
         run: cargo fmt --check
 
-  eslint:
+  lint-js:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: yarn
       - run: yarn install
       - run: yarn lint
+
+  conventional-commit:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup update --no-self-update
+      - name: Install cargo-binstall
+        uses: cargo-bins/cargo-binstall@main
+      - name: Install committed
+        run: cargo binstall -y committed
+      - name: Check PR title
+        run: >-
+          echo "${{ github.event.pull_request.title }}"
+          | committed --config .config/committed.toml --commit-file -

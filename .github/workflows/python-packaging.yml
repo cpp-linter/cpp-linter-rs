@@ -8,7 +8,7 @@
 # - use openssl-vendored cargo feature on
 #   * most cross-compiled Linux wheels
 #   * all MacOS builds
-# - muslinux builds (& x390 Linux target) are excluded due to complexity of
+# - musl linux builds (& x390 Linux target) are excluded due to complexity of
 #   installing openSSL lib in cross-compiler's docker/env.
 name: Python builds
 

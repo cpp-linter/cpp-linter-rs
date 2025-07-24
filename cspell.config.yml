@@ -1,11 +1,15 @@
 version: "0.2"
 language: en
 words:
+  - addnab
+  - armv
   - bindgen
   - binstall
   - bndy
   - Boolish
   - bugprone
+  - cdylib
+  - choco
   - chrono
   - clippy
   - codecov
@@ -14,28 +18,57 @@ words:
   - cppcoreguidelines
   - cstdio
   - cstdlib
+  - DCMAKE
+  - devel
   - Doherty
+  - dtolnay
+  - eabi
+  - ecure
+  - ecurity
+  - efactor
+  - elete
+  - emove
   - endfor
   - endgroup
   - endmacro
   - endwith
+  - eprecated
+  - esac
   - Falsey
   - fontawesome
   - gitmodules
+  - gnueabi
+  - gnueabihf
   - inlinehilite
   - iomanip
+  - isnan
   - libc
   - libgit
+  - libnghttp
   - linenums
+  - manylinux
   - markdownlint
   - maturin
   - mdbook
   - mkdocs
+  - mlugg
   - msvc
+  - multiarch
+  - musleabihf
   - mypy
   - napi
   - nextest
+  - nonconstructor
   - nonminimal
+  - nonoctal
+  - npmjs
+  - ocumentation
+  - ohos
+  - openharmony
+  - orhun
+  - oxlint
+  - patchelf
+  - peaceiris
   - peekable
   - pkgs
   - posargs
@@ -49,26 +82,44 @@ words:
   - pypa
   - pypi
   - pyproject
+  - pyyaml
   - ratelimit
   - reqwest
   - revparse
+  - riscv
+  - rustc
   - rustdoc
+  - rustflags
   - rustup
+  - sccache
   - sdist
   - serde
   - Shen
+  - startswith
   - superfences
   - tada
+  - taiki
   - tasklist
   - tempdir
   - tempfile
+  - topo
   - twemoji
+  - upport
   - vararg
+  - vcpkg
   - venv
+  - Werror
   - Xianpeng
+  - zigbuild
 ignorePaths:
   - .env/**
   - .venv/**
   - env/**
   - venv/**
   - target/**
+  - "**/.gitignore"
+  - cpp-linter/tests/**/*.json
+  - cpp-linter/tests/**/*.diff
+  - cpp-linter/tests/**/.clang-tidy
+  - .vscode/extensions.json
+  - .yarn/releases/*
