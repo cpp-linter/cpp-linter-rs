@@ -18,7 +18,7 @@ jobs:
       RUST_BACKTRACE: 1
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: rustup update
       - name: Cache .cargo locked resources
         uses: actions/cache@v4
@@ -33,7 +33,7 @@ jobs:
   lint-js:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -45,7 +45,7 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: rustup update --no-self-update
       - name: Install cargo-binstall
         uses: cargo-bins/cargo-binstall@main

@@ -71,7 +71,7 @@ jobs:
     name: Build ${{ matrix.settings.target }}
     runs-on: ${{ matrix.settings.host }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Setup node
         uses: actions/setup-node@v4
         with:
@@ -125,10 +125,10 @@ jobs:
     runs-on: ubuntu-latest
     name: Build fFreeBSD
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Build
         id: build
-        uses: cross-platform-actions/action@v0.28.0
+        uses: cross-platform-actions/action@v0.29.0
         env:
           DEBUG: napi:*
           RUSTUP_IO_THREADS: 1
@@ -192,7 +192,7 @@ jobs:
           - '22'
     runs-on: ${{ matrix.settings.host }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Setup node
         uses: actions/setup-node@v4
         with:
@@ -202,7 +202,7 @@ jobs:
       - name: Install dependencies
         run: yarn install
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: bindings-${{ matrix.settings.target }}
           path: bindings/node
@@ -229,7 +229,7 @@ jobs:
           - '22'
     runs-on: ${{ contains(matrix.target, 'aarch64') && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Setup node
         uses: actions/setup-node@v4
         with:
@@ -260,7 +260,7 @@ jobs:
           yarn config set --json supportedArchitectures.libc '["current", "musl", "gnu"]'
           yarn install
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: bindings-${{ matrix.target }}
           path: bindings/node
@@ -293,7 +293,7 @@ jobs:
       - test-macOS-windows-binding
       - test-linux-binding
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Setup node
         uses: actions/setup-node@v4
         with:
@@ -305,7 +305,7 @@ jobs:
         working-directory: bindings/node
         run: yarn napi create-npm-dirs
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           path: bindings/node/artifacts
       - name: Move artifacts
