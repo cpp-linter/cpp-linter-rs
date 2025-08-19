@@ -28,11 +28,11 @@ jobs:
   benchmark:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       # using the generated compilation database,
       # we will use cpp-linter to scan libgit2 src/libgit2/**.c files.
       - name: Checkout libgit2
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: libgit2/libgit2
           ref: v1.8.1
