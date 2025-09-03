@@ -65,9 +65,9 @@ pub fn get_clang_tool_exe(name: &str, version: &str) -> Result<PathBuf> {
             // On Unix systems, this block is not likely reached. Typically, installing clang
             // will produce a symlink to the executable with the major version appended to the
             // name.
-            return Ok(cmd);
+            Ok(cmd)
         } else {
-            return Err(anyhow!("Could not find clang tool by name and version"));
+            Err(anyhow!("Could not find clang tool by name and version"))
         }
     } else {
         // `version` specified is not a semantic version; treat as path/to/bin
