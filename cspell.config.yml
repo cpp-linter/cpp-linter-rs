@@ -70,6 +70,7 @@ words:
   - patchelf
   - peaceiris
   - peekable
+  - pipx
   - pkgs
   - posargs
   - positionals
