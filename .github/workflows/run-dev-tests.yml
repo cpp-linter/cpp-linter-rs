@@ -52,9 +52,6 @@ jobs:
         with:
           tool: cargo-nextest,cargo-llvm-cov,cargo-binstall
 
-      - name: Install llvm-cov-pretty (HTML report generator)
-        run: cargo binstall -y llvm-cov-pretty
-
       - uses: actions/setup-python@v5
         with:
           python-version: 3.x
@@ -221,18 +218,16 @@ jobs:
         run: uvx nox -s test -- --profile all
 
       - name: Generate Coverage HTML report
-        run: uvx nox -s pretty-cov
+        run: uvx nox -s llvm-cov
 
       - name: Upload coverage data
         uses: actions/upload-artifact@v4
         with:
           name: HTML_report-${{ runner.os }}
-          path: target/llvm-cov-pretty
+          path: target/llvm-cov/html
 
       - name: Generate Coverage lcov report
-        run: |
-          rm coverage.json
-          uvx nox -s lcov
+        run: uvx nox -s lcov
 
       - uses: codecov/codecov-action@v5
         with:
