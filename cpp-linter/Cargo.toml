@@ -16,17 +16,17 @@ license.workspace = true
 [dependencies]
 anyhow = "1.0.99"
 chrono = "0.4.41"
-clap = "4.5.45"
+clap = "4.5.46"
 colored = "3.0.0"
-fast-glob = "0.4.5"
+fast-glob = "1.0.0"
 futures = "0.3.31"
 git2 = "0.20.2"
 lenient_semver = "0.4.2"
 log = { version = "0.4.27", features = ["std"] }
 openssl = { version = "0.10", features = ["vendored"], optional = true }
 openssl-probe = { version = "0.1", optional = true }
-quick-xml = {version = "0.38.1", features = ["serialize"]}
-regex = "1.11.1"
+quick-xml = {version = "0.38.3", features = ["serialize"]}
+regex = "1.11.2"
 reqwest = "0.12.23"
 semver = "1.0.26"
 serde = { version = "1.0.219", features = ["derive"] }
@@ -39,7 +39,7 @@ which = "8.0.0"
 [dev-dependencies]
 criterion = { version = "3.0.5", package = "codspeed-criterion-compat", features=["async_tokio"] }
 mockito = "1.7.0"
-tempfile = "3.20.0"
+tempfile = "3.21.0"
 
 [features]
 openssl-vendored = ["dep:openssl", "dep:openssl-probe"]

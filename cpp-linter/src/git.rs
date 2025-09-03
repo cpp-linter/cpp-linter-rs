@@ -49,7 +49,7 @@ fn get_sha(repo: &Repository, depth: Option<u32>) -> Result<git2::Object<'_>, Er
 /// If there are files staged for a commit, then the resulting [`Diff`] will describe
 /// the staged changes. However, if there are no staged changes, then the last commit's
 /// [`Diff`] is returned.
-pub fn get_diff(repo: &Repository) -> Result<git2::Diff> {
+pub fn get_diff(repo: &'_ Repository) -> Result<git2::Diff<'_>> {
     let head = get_sha(repo, None).unwrap().peel_to_tree().unwrap();
     let mut has_staged_files = false;
     for entry in repo.statuses(None).unwrap().iter() {
