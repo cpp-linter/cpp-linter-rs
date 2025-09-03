@@ -17,7 +17,7 @@ crate-type = ["cdylib"]
 bench = false
 
 [dependencies]
-pyo3 = { version = "0.25.1", features = ["extension-module"] }
+pyo3 = { version = "0.26.0", features = ["extension-module"] }
 cpp-linter = { path = "../../cpp-linter" }
 tokio = "1.47.1"
 
