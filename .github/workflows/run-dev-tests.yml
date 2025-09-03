@@ -84,18 +84,6 @@ jobs:
       - if: runner.os == 'Linux'
         run: sudo apt-get update
 
-      - name: Install clang v8
-        if: runner.os == 'Linux'
-        uses: ./.github/install-clang-action
-        with:
-          version: '8'
-
-      - name: Collect Coverage for clang v8
-        if: runner.os == 'Linux'
-        env:
-          CLANG_VERSION: '8'
-        run: uvx nox -s test -- --profile ci
-
       - name: Install clang v9
         uses: ./.github/install-clang-action
         with:
@@ -194,6 +182,42 @@ jobs:
       - name: Collect Coverage for clang v18
         env:
           CLANG_VERSION: '18'
+        run: uvx nox -s test -- --profile ci
+
+      - name: Install clang v19
+        if: runner.os == 'Linux'
+        uses: ./.github/install-clang-action
+        with:
+          version: '19'
+
+      - name: Collect Coverage for clang v19
+        if: runner.os == 'Linux'
+        env:
+          CLANG_VERSION: '19'
+        run: uvx nox -s test -- --profile ci
+
+      - name: Install clang v20
+        if: runner.os == 'Linux'
+        uses: ./.github/install-clang-action
+        with:
+          version: '20'
+
+      - name: Collect Coverage for clang v20
+        if: runner.os == 'Linux'
+        env:
+          CLANG_VERSION: '20'
+        run: uvx nox -s test -- --profile ci
+
+      - name: Install clang v21
+        if: runner.os == 'Linux'
+        uses: ./.github/install-clang-action
+        with:
+          version: '21'
+
+      - name: Collect Coverage for clang v21
+        if: runner.os == 'Linux'
+        env:
+          CLANG_VERSION: '21'
         run: uvx nox -s test -- --profile all
 
       - name: Generate Coverage HTML report
