@@ -24,6 +24,12 @@ on:
   # performance analysis in order to generate initial data.
   workflow_dispatch:
 
+# This CI workflow can take up to 2 hours.
+# This setting will auto-cancel a old run if a new run is started.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   benchmark:
     runs-on: ubuntu-latest
