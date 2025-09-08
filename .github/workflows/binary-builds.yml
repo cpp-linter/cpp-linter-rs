@@ -148,7 +148,7 @@ jobs:
           persist-credentials: false
       - name: Install Rust
         run: rustup update stable --no-self-update
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: 3.x
       - name: Download built assets
