@@ -9,6 +9,6 @@ jobs:
   stale:
     permissions:
       contents: read
-      pull-requests: write
       issues: write
+      pull-requests: write
     uses: cpp-linter/.github/.github/workflows/stale.yml@main
