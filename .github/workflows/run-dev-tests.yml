@@ -182,37 +182,31 @@ jobs:
         run: uvx nox -s test -- --profile ci
 
       - name: Install clang v19
-        if: runner.os == 'Linux'
         uses: ./.github/install-clang-action
         with:
           version: '19'
 
       - name: Collect Coverage for clang v19
-        if: runner.os == 'Linux'
         env:
           CLANG_VERSION: '19'
         run: uvx nox -s test -- --profile ci
 
       - name: Install clang v20
-        if: runner.os == 'Linux'
         uses: ./.github/install-clang-action
         with:
           version: '20'
 
       - name: Collect Coverage for clang v20
-        if: runner.os == 'Linux'
         env:
           CLANG_VERSION: '20'
         run: uvx nox -s test -- --profile ci
 
       - name: Install clang v21
-        if: runner.os == 'Linux'
         uses: ./.github/install-clang-action
         with:
           version: '21'
 
       - name: Collect Coverage for clang v21
-        if: runner.os == 'Linux'
         env:
           CLANG_VERSION: '21'
         run: uvx nox -s test -- --profile all

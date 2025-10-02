@@ -130,6 +130,9 @@ impl MakeSuggestions for TidyAdvice {
     }
 }
 
+/// A regex pattern to capture the clang-tidy note header.
+const NOTE_HEADER: &str = r"^(.+):(\d+):(\d+):\s(\w+):(.*)\[([a-zA-Z\d\-\.]+),?[^\]]*\]$";
+
 /// Parses clang-tidy stdout.
 ///
 /// Here it helps to have the JSON database deserialized for normalizing paths present
@@ -138,7 +141,7 @@ fn parse_tidy_output(
     tidy_stdout: &[u8],
     database_json: &Option<Vec<CompilationUnit>>,
 ) -> Result<TidyAdvice> {
-    let note_header = Regex::new(r"^(.+):(\d+):(\d+):\s(\w+):(.*)\[([a-zA-Z\d\-\.]+)\]$").unwrap();
+    let note_header = Regex::new(NOTE_HEADER).unwrap();
     let fixed_note =
         Regex::new(r"^.+:(\d+):\d+:\snote: FIX-IT applied suggested code changes$").unwrap();
     let mut found_fix = false;
@@ -354,8 +357,7 @@ mod test {
         common_fs::FileObj,
     };
 
-    use super::run_clang_tidy;
-    use super::TidyNotification;
+    use super::{run_clang_tidy, TidyNotification, NOTE_HEADER};
 
     #[test]
     fn clang_diagnostic_link() {
@@ -397,13 +399,15 @@ mod test {
 
     #[test]
     fn test_capture() {
-        let src = "tests/demo/demo.hpp:11:11: warning: use a trailing return type for this function [modernize-use-trailing-return-type]";
-        let pat = Regex::new(r"^(.+):(\d+):(\d+):\s(\w+):(.*)\[([a-zA-Z\d\-\.]+)\]$").unwrap();
+        let src = "tests/demo/demo.hpp:11:11: \
+        warning: use a trailing return type for this function \
+        [modernize-use-trailing-return-type,-warnings-as-errors]";
+        let pat = Regex::new(NOTE_HEADER).unwrap();
         let cap = pat.captures(src).unwrap();
         assert_eq!(
             cap.get(0).unwrap().as_str(),
             format!(
-                "{}:{}:{}: {}:{}[{}]",
+                "{}:{}:{}: {}:{}[{},-warnings-as-errors]",
                 cap.get(1).unwrap().as_str(),
                 cap.get(2).unwrap().as_str(),
                 cap.get(3).unwrap().as_str(),
