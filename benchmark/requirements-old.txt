@@ -1,0 +1,2 @@
+cpp-linter < 2.0
+rich

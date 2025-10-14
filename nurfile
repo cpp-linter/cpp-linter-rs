@@ -1,0 +1,185 @@
+
+# A helper function to display the command being executed.
+#
+# This also prints the elapsed time the command took to execute.
+export def --wrapped run-cmd [...cmd: string] {
+    let app = if (
+        ($cmd | first) == "cargo"
+        or ($cmd | first) == "yarn"
+    ) {
+        ($cmd | first 2) | str join ' '
+    } else if (($cmd | first) == "uv") {
+        mut sub_cmd = $cmd.1
+        if ($sub_cmd == "run") {
+            mut index = 2
+            mut skip_val = false
+            for arg in ($cmd | skip 2) {
+                if ($arg | str starts-with "-") {
+                    $skip_val = true
+                } else if $skip_val {
+                    $skip_val = false
+                } else {
+                    break
+                }
+                $index = $index + 1
+            }
+            if (($cmd | get $index) == "cargo") {
+                $sub_cmd = $cmd | skip $index | first 2 | str join ' '
+            }
+            $sub_cmd
+        } else {
+            ($cmd | first 2) | str join ' '
+        }
+    } else {
+        ($cmd | first)
+    }
+    print $"(ansi blue)\nRunning(ansi reset) ($cmd | str join ' ')"
+    let elapsed = timeit {|| ^($cmd | first) ...($cmd | skip 1)}
+    print $"(ansi magenta)($app) took ($elapsed)(ansi reset)"
+}
+
+
+# Build rust API docs
+def "nur docs rs" [
+    --open (-o), # open the built docs in the default browser
+] {
+    mut cmd = [
+        "cargo",
+        "doc",
+        "--no-deps",
+        "--lib",
+        "--manifest-path",
+        "cpp-linter/Cargo.toml",
+    ]
+    if $open {
+        $cmd = $cmd | append "--open"
+    }
+    run-cmd ...$cmd
+}
+
+
+# Build mkdocs output.
+#
+# This uses `uv` to drive `mkdocs`.
+# This also ensures the cli-gen binding is built because
+# the CLI is part of the documentation.
+export def "nur docs" [
+    --build (-b), # Build the docs without serving them.
+    --dirty (-d), # Skip re-building bindings and use the previously built version.
+    --open (-o), # Open the built docs in your browser.
+] {
+    mut sync_args = [--package cli-gen --all-groups]
+    let has_cli_gen_installed = (^uv pip show cli-gen) | complete | ($in.exit_code == 0)
+    if not $dirty or not $has_cli_gen_installed {
+        $sync_args = $sync_args | append [--reinstall-package cli-gen]
+    }
+    run-cmd uv sync ...$sync_args
+    let mkdocs_cmd = if $build { "build" } else { "serve" }
+    mut cmd = [
+        uv run mkdocs $mkdocs_cmd --config-file docs/mkdocs.yml
+    ]
+    if $open and not $build {
+        $cmd = $cmd | append '--open'
+    }
+    run-cmd  ...$cmd
+    if $open and $build {
+        start docs/site/index.html
+    }
+}
+
+
+# Run unit tests
+#
+# To select a profile defined in .config/nextest.toml:
+#     nur test --profile ci
+#
+# Otherwise, the default profile is used.
+export def "nur test" [
+    --profile (-p): string  = "default", # The nextest profile to use.
+    --clean (-c), # Clean before testing
+] {
+    # run-cmd uv sync --group test
+    if $clean {
+        run-cmd cargo llvm-cov clean
+    }
+    let cmd = [
+        cargo,
+        llvm-cov,
+        --no-report,
+        nextest,
+        --manifest-path,
+        cpp-linter/Cargo.toml,
+        --lib,
+        --tests,
+        --color,
+        always,
+        --profile,
+        $profile,
+    ]
+    run-cmd uv run --group test ...$cmd
+}
+
+# Generate HTML coverage report
+export def "nur test llvm-cov" [
+    --open (-o), # Open the built report in your browser.
+] {
+    mut cmd = [
+        cargo
+        llvm-cov
+        report
+        --html
+        --ignore-filename-regex
+        main
+    ]
+    if $open {
+        $cmd = $cmd | append "--open"
+    }
+    run-cmd ...$cmd
+}
+
+# Generate lcov.info
+#
+# Useful for codecov uploads and VSCode extensions
+# like "Coverage Gutters".
+export def "nur test lcov" [] {
+    run-cmd ...[
+        cargo
+        llvm-cov
+        report
+        --lcov
+        --output-path
+        lcov.info
+        --ignore-filename-regex
+        main
+    ]
+}
+
+
+# Run clippy and rustfmt
+export def "nur lint" [
+    --check (-c), # Only check, do not fix
+] {
+    mut clippy = [cargo clippy]
+    if $check {
+        $clippy = $clippy | append [-- -D warnings]
+    } else {
+        $clippy = $clippy | append [--fix --allow-dirty --allow-staged]
+    }
+    run-cmd ...$clippy
+    mut fmt = [cargo fmt]
+    if $check {
+        $fmt = $fmt | append "--check"
+    }
+    run-cmd ...$fmt
+}
+
+export def "nur pre-commit" [
+    --all (-a), # Run pre-commit hooks on all files, not just staged files.
+    --upgrade (-U), # Upgrade pre-commit hooks to the latest version.
+] {
+    if $upgrade {
+        run-cmd uv run pre-commit autoupdate
+    }
+    let args = if $all { ["--all-files"] } else { [] }
+    run-cmd uv run pre-commit run ...$args
+}

@@ -22,24 +22,30 @@ on:
           - patch
           - rc
 
+permissions: {}
+
 jobs:
   bump-release:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - name: Checkout repository
+        uses: actions/checkout@v5
         with:
           token: ${{ secrets.BUMP_N_RELEASE }}
           fetch-depth: 0
-      - uses: actions/setup-python@v6
+          fetch-tags: true
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@v6
         with:
           python-version: 3.x
-      - uses: actions/setup-node@v5
+      - name: Install Node.js
+        uses: actions/setup-node@v5
         with:
-          node-version: 20.x
+          node-version: 24.x
       - run: yarn install
-      - run: yarn global add @napi-rs/cli
-      - uses: cargo-bins/cargo-binstall@main
+      - uses: cargo-bins/cargo-binstall@38e8f5e4c386b611d51e8aa997b9a06a3c8eb67a # v1.15.6
       - run: cargo binstall -y git-cliff
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -52,18 +58,25 @@ jobs:
 
   update-changelog:
     if: github.event_name != 'workflow_dispatch'
+    permissions:
+      contents: read
+      pull-requests: read
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - name: Generate a changelog
-        uses: orhun/git-cliff-action@v4
-        id: git-cliff
+          fetch-tags: true
+          persist-credentials: false
+      - uses: actions/setup-python@v6
         with:
-          config: .config/cliff.toml
-          args: --unreleased
+          python-version: 3.x
+      - name: Generate a release notes
         env:
-          OUTPUT: ${{ runner.temp }}/changes.md
+          GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPO: ${{ github.repository }}
-      - run: cat "${{ runner.temp }}/changes.md" >> "$GITHUB_STEP_SUMMARY"
+          GIT_CLIFF_CONFIG: .config/cliff.toml
+        run: >-
+          pipx run git-cliff
+          --unreleased
+          --output "$GITHUB_STEP_SUMMARY"

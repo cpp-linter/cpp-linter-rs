@@ -39,6 +39,7 @@ words:
   - gitmodules
   - gnueabi
   - gnueabihf
+  - hustcer
   - inlinehilite
   - iomanip
   - isnan
@@ -62,6 +63,8 @@ words:
   - nonminimal
   - nonoctal
   - npmjs
+  - nurfile
+  - nushell
   - ocumentation
   - ohos
   - openharmony
@@ -76,6 +79,7 @@ words:
   - positionals
   - posix
   - preprocess
+  - pwsh
   - pybind
   - pyfunction
   - pymdownx
@@ -103,6 +107,7 @@ words:
   - tasklist
   - tempdir
   - tempfile
+  - timeit
   - topo
   - twemoji
   - upport
@@ -112,6 +117,7 @@ words:
   - Werror
   - Xianpeng
   - zigbuild
+  - zizmor
 ignorePaths:
   - .env/**
   - .venv/**
@@ -124,3 +130,4 @@ ignorePaths:
   - cpp-linter/tests/**/.clang-tidy
   - .vscode/extensions.json
   - .yarn/releases/*
+  - "*.lock"

@@ -55,7 +55,6 @@ manifest-path = "bindings/python/Cargo.toml"
 dev = [
     "maturin==1.9.1",
     "mypy==1.17.0",
-    "nox==2025.5.1",
     "patchelf==0.17.2.2 ; sys_platform == 'linux'",
     "pre-commit>=4.2.0",
     "ruff==0.12.4",
