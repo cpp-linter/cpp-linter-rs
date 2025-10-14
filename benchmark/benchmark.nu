@@ -122,7 +122,7 @@ export def run-hyperfine [
         --export-markdown ../benchmark.md
         --warmup 1
         --style color
-        --runs 5
+        --runs 3
     ]
     let common_args = "-l 0 -a 0 -i=|!src/libgit2 -p build -e c"
     if ($old_path | is-not-empty) {
