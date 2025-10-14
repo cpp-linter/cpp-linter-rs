@@ -293,7 +293,7 @@ jobs:
         with:
           image: ${{ steps.docker.outputs.IMAGE }}
           options: >- # zizmor: ignore[template-injection]
-            v ${{ github.workspace }}:${{ github.workspace }}
+            -v ${{ github.workspace }}:${{ github.workspace }}
             -w ${{ github.workspace }}
             --platform ${{ steps.docker.outputs.PLATFORM }}
           run: yarn test

@@ -102,11 +102,12 @@ jobs:
           persist-credentials: false
 
       - name: Setup Rust
+        shell: bash
         env:
           RS_TARGET: ${{ matrix.target }}
         run: |-
           rustup update stable --no-self-update
-          rustup target add $RS_TARGET
+          rustup target add ${RS_TARGET}
 
       - name: Install cargo-binstall
         if: matrix.cross

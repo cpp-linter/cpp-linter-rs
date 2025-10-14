@@ -17,7 +17,12 @@ build:
         curl -LsSf https://astral.sh/uv/install.sh | sh
     build:
       html:
-        - ${HOME}/.local/bin/uvx nox -s docs-build
+        - >-
+          ${HOME}/.local/bin/uv sync
+          --package cli-gen
+          --all-groups
+          --reinstall-package cli-gen
+        - ${HOME}/.local/bin/uv run mkdocs build --config-file docs/mkdocs.yml
     post_build:
       - mkdir -p $READTHEDOCS_OUTPUT/html/
       - mv docs/site/* $READTHEDOCS_OUTPUT/html
