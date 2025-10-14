@@ -122,8 +122,9 @@ export def run-hyperfine [
         --export-markdown ../benchmark.md
         --warmup 1
         --style color
+        --runs 5
     ]
-    let common_args = "-l 0 -a 0 -i=|!src/libgit2 -p build"
+    let common_args = "-l 0 -a 0 -i=|!src/libgit2 -p build -e c"
     if ($old_path | is-not-empty) {
         $hyperfine_args = $hyperfine_args | append [--command-name python-pure $"($old_path) ($common_args) -j 0"]
     }
