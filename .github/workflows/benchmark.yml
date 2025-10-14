@@ -1,4 +1,4 @@
-name: Performance Regression
+name: Benchmark
 
 on:
   push:
@@ -79,7 +79,7 @@ jobs:
         uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1.49.4
         with:
           target: x86_64
-          args: --release --out dist --find-interpreter --features openssl-vendored
+          args: --release --out dist --find-interpreter
           manylinux: auto
           before-script-linux: |
             # NOTE: rust-cross/manylinux docker images are CentOS based
