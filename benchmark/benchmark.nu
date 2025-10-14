@@ -54,6 +54,9 @@ export def install-py-binding [
 ] {
     print "Installing new cpp-linter version (2.x) via python binding..."
     cd ..
+    if not (".venv" | path exists) {
+        run-cmd uv venv
+    }
     let path_to_dist = if ($wheel_path | is-not-empty) {
         $wheel_path
     } else {
