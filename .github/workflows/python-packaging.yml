@@ -32,11 +32,15 @@ on:
       - .github/workflows/python-packaging.yml
       - pyproject.toml
 
-permissions: {}
-
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   linux:
