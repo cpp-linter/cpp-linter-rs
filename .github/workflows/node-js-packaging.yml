@@ -1,11 +1,5 @@
 name: Node.js builds
-env:
-  DEBUG: napi:*
-  APP_NAME: cpp-linter
-  MACOSX_DEPLOYMENT_TARGET: '10.13'
-permissions:
-  contents: write
-  id-token: write
+
 on:
   push:
     branches: [main]
@@ -31,6 +25,17 @@ on:
       - package.json
       - yarn.lock
       - .github/workflows/node-js-packaging.yml
+
+env:
+  DEBUG: napi:*
+  APP_NAME: cpp-linter
+  MACOSX_DEPLOYMENT_TARGET: '10.13'
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   build:
@@ -72,18 +77,19 @@ jobs:
     runs-on: ${{ matrix.settings.host }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: Setup node
         uses: actions/setup-node@v5
         with:
           node-version: 22
-          cache: yarn
-      - name: Install
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: stable
-          targets: ${{ matrix.settings.target }}
+          cache: yarn # zizmor: ignore[cache-poisoning]
+      - name: Setup Rust
+        run: |-
+          rustup update stable --no-self-update
+          rustup target add ${{ matrix.settings.target }}
       - name: Cache cargo
-        uses: actions/cache@v4
+        uses: actions/cache@v4 # zizmor: ignore[cache-poisoning]
         with:
           path: |
             ~/.cargo/registry/index/
@@ -93,17 +99,22 @@ jobs:
             .cargo-cache
             target/
           key: ${{ matrix.settings.target }}-cargo-${{ matrix.settings.host }}
-      - uses: mlugg/setup-zig@v2
+      - uses: mlugg/setup-zig@8d6198c65fb0feaa111df26e6b467fea8345e46f # v2.0.5
         if: ${{ contains(matrix.settings.build, ' -x ') }}
         with:
           version: 0.14.1
+          use-cache: true # zizmor: ignore[cache-poisoning]
+      - name: Install cargo-binstall
+        if: contains(matrix.settings.build, ' -x ') || contains(matrix.settings.build, '--use-cross ')
+        uses: cargo-bins/cargo-binstall@38e8f5e4c386b611d51e8aa997b9a06a3c8eb67a # v1.15.6
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
       - name: Install ${{contains(matrix.settings.build, ' -x ') && 'cargo-zigbuild' || 'cargo-cross'}}
-        uses: taiki-e/install-action@v2
         if: contains(matrix.settings.build, ' -x ') || contains(matrix.settings.build, '--use-cross ')
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        with:
           tool: ${{contains(matrix.settings.build, ' -x ') && 'cargo-zigbuild' || 'cross'}}
+        run: cargo binstall -y $tool
       - name: Setup toolchain
         run: ${{ matrix.settings.setup }}
         if: ${{ matrix.settings.setup }}
@@ -126,9 +137,11 @@ jobs:
     name: Build FreeBSD
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: Build
         id: build
-        uses: cross-platform-actions/action@v0.29.0
+        uses: cross-platform-actions/action@e8a7b572196ff79ded1979dc2bb9ee67d1ddb252 # v0.29.0
         env:
           DEBUG: napi:*
           RUSTUP_IO_THREADS: 1
@@ -193,11 +206,13 @@ jobs:
     runs-on: ${{ matrix.settings.host }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: Setup node
         uses: actions/setup-node@v5
         with:
           node-version: ${{ matrix.node }}
-          cache: yarn
+          cache: yarn # zizmor: ignore[cache-poisoning]
           architecture: ${{ matrix.settings.architecture }}
       - name: Install dependencies
         run: yarn install
@@ -230,11 +245,13 @@ jobs:
     runs-on: ${{ contains(matrix.target, 'aarch64') && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: Setup node
         uses: actions/setup-node@v5
         with:
           node-version: ${{ matrix.node }}
-          cache: yarn
+          cache: yarn # zizmor: ignore[cache-poisoning]
       - name: Output docker params
         id: docker
         run: |
@@ -268,7 +285,7 @@ jobs:
         run: ls -R .
         shell: bash
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
         if: ${{ contains(matrix.target, 'armv7') }}
         with:
           platforms: all
@@ -276,10 +293,13 @@ jobs:
         if: ${{ contains(matrix.target, 'armv7') }}
       - name: Test bindings
         if: matrix.target != 'x86_64-unknown-linux-gnu'
-        uses: addnab/docker-run-action@v3
+        uses: addnab/docker-run-action@4f65fabd2431ebc8d299f8e5a018d79a769ae185 # v3
         with:
           image: ${{ steps.docker.outputs.IMAGE }}
-          options: '-v ${{ github.workspace }}:${{ github.workspace }} -w ${{ github.workspace }} --platform ${{ steps.docker.outputs.PLATFORM }}'
+          options: >- # zizmor: ignore[template-injection]
+            -v ${{ github.workspace }}:${{ github.workspace }}
+            -w ${{ github.workspace }}
+            --platform ${{ steps.docker.outputs.PLATFORM }}
           run: yarn test
       - name: Test x86_64-unknown-linux-gnu
         if: matrix.target == 'x86_64-unknown-linux-gnu'
@@ -287,17 +307,22 @@ jobs:
   publish:
     name: Publish
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     needs:
       - build-freebsd
       - test-macOS-windows-binding
       - test-linux-binding
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: Setup node
         uses: actions/setup-node@v5
         with:
           node-version: 22
-          cache: yarn
+          cache: yarn # zizmor: ignore[cache-poisoning]
       - name: Install dependencies
         run: yarn install
       - name: Create npm dirs
@@ -322,9 +347,3 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-      # - name: Upload release assets
-      #   env:
-      #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #   run:
-      #     files=$(ls ./npm/**cpp-linter.*.node)
-      #     gh release upload "${{ github.ref_name }}" $files

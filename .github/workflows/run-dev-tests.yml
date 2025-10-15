@@ -20,6 +20,12 @@ env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
 
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   test:
     strategy:
@@ -30,9 +36,13 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
-      - run: rustup update --no-self-update
-      - run: rustup component add llvm-tools-preview
+      - name: Setup Rust
+        run: |-
+          rustup update --no-self-update
+          rustup component add llvm-tools-preview
 
       # https://docs.rs/openssl/latest/openssl/#automatic
       # - name: Install OpenSSL (Linux)
@@ -45,19 +55,21 @@ jobs:
       #   if: runner.os == 'Windows'
       #   run: vcpkg install openssl
 
-      - name: Install third-party binaries
-        uses: taiki-e/install-action@v2
+      - uses: cargo-bins/cargo-binstall@38e8f5e4c386b611d51e8aa997b9a06a3c8eb67a # v1.15.6
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        with:
-          tool: cargo-nextest,cargo-llvm-cov,cargo-binstall
+      - name: Install third-party binaries
+        run: >-
+          cargo binstall -y cargo-nextest cargo-llvm-cov nur
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
       - uses: actions/setup-python@v6
         with:
           python-version: 3.x
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
         with:
           enable-cache: true
           cache-dependency-glob: "uv.lock"
@@ -89,7 +101,7 @@ jobs:
       - name: Collect Coverage for clang v9
         env:
           CLANG_VERSION: '9'
-        run: uvx nox -s test -- --profile ci
+        run: nur test --profile ci
 
       - name: Install clang v10
         uses: ./.github/install-clang-action
@@ -99,7 +111,7 @@ jobs:
       - name: Collect Coverage for clang v10
         env:
           CLANG_VERSION: '10'
-        run: uvx nox -s test -- --profile ci
+        run: nur test --profile ci
 
       - name: Install clang 11
         uses: ./.github/install-clang-action
@@ -109,7 +121,7 @@ jobs:
       - name: Collect Coverage for clang v11
         env:
           CLANG_VERSION: '11'
-        run: uvx nox -s test -- --profile ci
+        run: nur test --profile ci
 
       - name: Install clang 12
         uses: ./.github/install-clang-action
@@ -119,7 +131,7 @@ jobs:
       - name: Collect Coverage for clang v12
         env:
           CLANG_VERSION: '12'
-        run: uvx nox -s test -- --profile ci
+        run: nur test --profile ci
 
       - name: Install clang 13
         uses: ./.github/install-clang-action
@@ -129,7 +141,7 @@ jobs:
       - name: Collect Coverage for clang v13
         env:
           CLANG_VERSION: '13'
-        run: uvx nox -s test -- --profile ci
+        run: nur test --profile ci
 
       - name: Install clang 14
         uses: ./.github/install-clang-action
@@ -139,7 +151,7 @@ jobs:
       - name: Collect Coverage for clang v14
         env:
           CLANG_VERSION: '14'
-        run: uvx nox -s test -- --profile ci
+        run: nur test --profile ci
 
       - name: Install clang 15
         uses: ./.github/install-clang-action
@@ -149,7 +161,7 @@ jobs:
       - name: Collect Coverage for clang v15
         env:
           CLANG_VERSION: '15'
-        run: uvx nox -s test -- --profile ci
+        run: nur test --profile ci
 
       - name: Install clang 16
         uses: ./.github/install-clang-action
@@ -159,7 +171,7 @@ jobs:
       - name: Collect Coverage for clang v16
         env:
           CLANG_VERSION: '16'
-        run: uvx nox -s test -- --profile ci
+        run: nur test --profile ci
 
       - name: Install clang 17
         uses: ./.github/install-clang-action
@@ -169,7 +181,7 @@ jobs:
       - name: Collect Coverage for clang v17
         env:
           CLANG_VERSION: '17'
-        run: uvx nox -s test -- --profile ci
+        run: nur test --profile ci
 
       - name: Install clang 18
         uses: ./.github/install-clang-action
@@ -179,7 +191,7 @@ jobs:
       - name: Collect Coverage for clang v18
         env:
           CLANG_VERSION: '18'
-        run: uvx nox -s test -- --profile ci
+        run: nur test --profile ci
 
       - name: Install clang v19
         uses: ./.github/install-clang-action
@@ -189,7 +201,7 @@ jobs:
       - name: Collect Coverage for clang v19
         env:
           CLANG_VERSION: '19'
-        run: uvx nox -s test -- --profile ci
+        run: nur test --profile ci
 
       - name: Install clang v20
         uses: ./.github/install-clang-action
@@ -199,7 +211,7 @@ jobs:
       - name: Collect Coverage for clang v20
         env:
           CLANG_VERSION: '20'
-        run: uvx nox -s test -- --profile ci
+        run: nur test --profile ci
 
       - name: Install clang v21
         uses: ./.github/install-clang-action
@@ -209,10 +221,10 @@ jobs:
       - name: Collect Coverage for clang v21
         env:
           CLANG_VERSION: '21'
-        run: uvx nox -s test -- --profile all
+        run: nur test --profile all
 
       - name: Generate Coverage HTML report
-        run: uvx nox -s llvm-cov
+        run: nur test llvm-cov
 
       - name: Upload coverage data
         uses: actions/upload-artifact@v4
@@ -221,9 +233,9 @@ jobs:
           path: target/llvm-cov/html
 
       - name: Generate Coverage lcov report
-        run: uvx nox -s lcov
+        run: nur test lcov
 
-      - uses: codecov/codecov-action@v5
+      - uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7 # v5.5.1
         with:
           token: ${{secrets.CODECOV_TOKEN}}
           files: lcov.info

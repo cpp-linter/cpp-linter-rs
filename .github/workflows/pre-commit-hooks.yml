@@ -6,8 +6,12 @@ on:
   pull_request:
     branches: [main]
 
+permissions: {}
+
 jobs:
   pre-commit:
+    permissions:
+      contents: read
     uses: cpp-linter/.github/.github/workflows/pre-commit.yml@main
 
   cargo-tools:
@@ -19,6 +23,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - run: rustup update
       - name: Cache .cargo locked resources
         uses: actions/cache@v4
@@ -34,24 +40,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: yarn
       - run: yarn install
       - run: yarn lint
-
-  conventional-commit:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - run: rustup update --no-self-update
-      - name: Install cargo-binstall
-        uses: cargo-bins/cargo-binstall@main
-      - name: Install committed
-        run: cargo binstall -y committed
-      - name: Check PR title
-        run: >-
-          echo "${{ github.event.pull_request.title }}"
-          | committed --config .config/committed.toml --commit-file -

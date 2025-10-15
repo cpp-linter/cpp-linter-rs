@@ -27,3 +27,5 @@
 *.code-workspace text eol=lf
 *.clang-tidy text eol=lf
 *.clang-format text eol=lf
+nurfile text eol=lf
+*.nu text eol=lf

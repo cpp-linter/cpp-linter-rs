@@ -4,59 +4,138 @@ on:
   push:
     branches: [main]
     paths:
-      - cpp-linter/src/
-      - cpp-linter/benches/
+      - cpp-linter/src/**
       - cpp-linter/Cargo.toml
       - Cargo.toml
       - Cargo.lock
       - .github/workflows/benchmark.yml
-    tags-ignore: ['*']
   pull_request:
     branches: [main]
     paths:
-      - cpp-linter/src/
-      - cpp-linter/benches/
+      - cpp-linter/src/**
       - cpp-linter/Cargo.toml
       - Cargo.toml
       - Cargo.lock
       - .github/workflows/benchmark.yml
-  # `workflow_dispatch` allows CodSpeed to trigger back-test
-  # performance analysis in order to generate initial data.
-  workflow_dispatch:
 
-# This CI workflow can take up to 2 hours.
-# This setting will auto-cancel a old run if a new run is started.
+permissions: {}
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  benchmark:
+  build-bin:
+    name: Build ${{ matrix.name }} binary
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - commit: ${{ github.sha }}
+            name: current
+          - commit: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+            name: previous
+    env:
+      BIN: target/release/cpp-linter
+    steps:
+      - name: Checkout ${{ matrix.name }}
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ matrix.commit }}
+          persist-credentials: false
+      - name: Cache base ref build
+        uses: actions/cache@v4
+        id: cache
+        with:
+          key: bin-cache-${{ hashFiles('cpp-linter/src/**', 'Cargo.toml', 'Cargo.lock', 'cpp-linter/Cargo.toml') }}
+          path: ${{ env.BIN }}
+      - name: Validate cached binary
+        if: steps.cache.outputs.cache-hit == 'true'
+        id: validate
+        run: |
+          chmod +x ${{ env.BIN }}
+          if ! ${{ env.BIN }} version; then
+            echo "Cached binary is invalid, rebuilding..."
+            echo "cache-valid=false" >> "$GITHUB_OUTPUT"
+          fi
+      - run: rustup update --no-self-update
+        if: steps.cache.outputs.cache-hit != 'true' || steps.validate.outputs.cache-valid == 'false'
+      - run: cargo build --bin cpp-linter --release
+        if: steps.cache.outputs.cache-hit != 'true' || steps.validate.outputs.cache-valid == 'false'
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: ${{ env.BIN }}
+
+  build-py-binding:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      # using the generated compilation database,
-      # we will use cpp-linter to scan libgit2 src/libgit2/**.c files.
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        id: setup-python
+        with:
+          python-version: '3.x'
+      - name: Build wheels
+        uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1.49.4
+        with:
+          target: x86_64
+          args: --release --out dist --find-interpreter
+          manylinux: auto
+          before-script-linux: |
+            # NOTE: rust-cross/manylinux docker images are CentOS based
+            yum update -y
+            yum install -y openssl openssl-devel
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheel
+          path: dist/*
+
+  benchmark:
+    name: Measure Performance Difference
+    needs: [build-bin, build-py-binding]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: Checkout libgit2
         uses: actions/checkout@v5
         with:
           repository: libgit2/libgit2
           ref: v1.8.1
-          path: cpp-linter/benches/libgit2
-      - name: Generate compilation database
-        working-directory: cpp-linter/benches/libgit2
-        run: |
-          mkdir build && cd build
-          cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ..
+          path: benchmark/libgit2
+          persist-credentials: false
+
+      - name: Download built binaries
+        uses: actions/download-artifact@v5
+
       - name: Install cargo-binstall
-        uses: cargo-bins/cargo-binstall@main
-      - name: Install cargo-codspeed
-        run: cargo binstall -y cargo-codspeed
-      - name: Build the benchmark target(s)
-        run: cargo codspeed build
-      - name: Run benchmarks
-        uses: CodSpeedHQ/action@v4
-        with:
-          mode: instrumentation
-          run: cargo codspeed run
-          token: ${{ secrets.CODSPEED_TOKEN }}
+        uses: cargo-bins/cargo-binstall@38e8f5e4c386b611d51e8aa997b9a06a3c8eb67a # v1.15.6
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Install hyperfine
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: cargo binstall -y hyperfine
+      - name: Install nushell
+        uses: hustcer/setup-nu@985d59ec83ae3e3418f9d36471cda38b9d8b9879 # v3.20
+      - name: Install uv
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+
+      - name: Run benchmark script
+        working-directory: benchmark
+        shell: nu {0}
+        run: |-
+          let new_py = (
+            glob "../wheel/cpp_linter-*.whl"
+            | first
+            | path expand
+          )
+          let prev_bin = "../previous/cpp-linter" | path expand
+          let curr_bin = "../current/cpp-linter" | path expand
+          nu benchmark.nu --new-py $new_py --rust-bin $curr_bin --prev-rust-bin $prev_bin
