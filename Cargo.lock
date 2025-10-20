@@ -277,8 +277,6 @@ dependencies = [
  "lenient_semver",
  "log",
  "mockito",
- "openssl",
- "openssl-probe",
  "quick-xml",
  "regex",
  "reqwest",

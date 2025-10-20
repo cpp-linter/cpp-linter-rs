@@ -23,8 +23,6 @@ futures = "0.3.31"
 git2 = "0.20.2"
 lenient_semver = "0.4.2"
 log = { version = "0.4.28", features = ["std"] }
-openssl = { version = "0.10", features = ["vendored"], optional = true }
-openssl-probe = { version = "0.1", optional = true }
 quick-xml = { version = "0.38.3", features = ["serialize"] }
 regex = "1.11.2"
 reqwest = "0.12.23"
@@ -39,9 +37,10 @@ which = "8.0.0"
 [dev-dependencies]
 mockito = "1.7.0"
 tempfile = "3.22.0"
+git2 = { version = "0.20.2", features = ["https"]}
 
 [features]
-openssl-vendored = ["dep:openssl", "dep:openssl-probe"]
+openssl-vendored = ["git2/vendored-openssl"]
 
 [lib]
 bench = false
