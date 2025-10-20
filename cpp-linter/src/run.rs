@@ -10,8 +10,6 @@ use std::sync::{Arc, Mutex};
 // non-std crates
 use anyhow::{anyhow, Result};
 use log::{set_max_level, LevelFilter};
-#[cfg(feature = "openssl-vendored")]
-use openssl_probe;
 
 // project specific modules/crates
 use crate::clang_tools::capture_clang_tools_output;
@@ -21,13 +19,6 @@ use crate::logger;
 use crate::rest_api::{github::GithubApiClient, RestApiClient};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-
-fn probe_ssl_certs() {
-    #[cfg(feature = "openssl-vendored")]
-    unsafe {
-        openssl_probe::init_openssl_env_vars();
-    }
-}
 
 /// This is the backend entry point for console applications.
 ///
@@ -49,8 +40,6 @@ fn probe_ssl_certs() {
 /// alias ("path/to/cpp-linter.exe"). Thus, the parser in [`crate::cli`] will halt on an error
 /// because it is not configured to handle positional arguments.
 pub async fn run_main(args: Vec<String>) -> Result<()> {
-    probe_ssl_certs();
-
     let arg_parser = get_arg_parser();
     let args = arg_parser.get_matches_from(args);
     let cli = Cli::from(&args);
