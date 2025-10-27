@@ -106,7 +106,7 @@ jobs:
           use-cache: true # zizmor: ignore[cache-poisoning]
       - name: Install cargo-binstall
         if: contains(matrix.settings.build, ' -x ') || contains(matrix.settings.build, '--use-cross ')
-        uses: cargo-bins/cargo-binstall@a66119fbb1c952daba62640c2609111fe0803621 # v1.15.7
+        uses: cargo-bins/cargo-binstall@afcf9780305558bcc9e4bc94b7589ab2bb8b6106 # v1.15.9
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - name: Install ${{contains(matrix.settings.build, ' -x ') && 'cargo-zigbuild' || 'cargo-cross'}}
@@ -125,7 +125,7 @@ jobs:
         run: ${{ matrix.settings.build }}
         shell: bash
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: bindings-${{ matrix.settings.target }}
           path: |
@@ -175,7 +175,7 @@ jobs:
             rm -rf target
             rm -rf .yarn/cache
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: bindings-freebsd
           path: bindings/node/${{ env.APP_NAME }}.*.node
@@ -217,7 +217,7 @@ jobs:
       - name: Install dependencies
         run: yarn install
       - name: Download artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: bindings-${{ matrix.settings.target }}
           path: bindings/node
@@ -277,7 +277,7 @@ jobs:
           yarn config set --json supportedArchitectures.libc '["current", "musl", "gnu"]'
           yarn install
       - name: Download artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: bindings-${{ matrix.target }}
           path: bindings/node
@@ -329,7 +329,7 @@ jobs:
         working-directory: bindings/node
         run: yarn napi create-npm-dirs
       - name: Download all artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           path: bindings/node/artifacts
       - name: Move artifacts
