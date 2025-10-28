@@ -63,7 +63,7 @@ jobs:
       - run: cargo build --bin cpp-linter --release
         if: steps.cache.outputs.cache-hit != 'true' || steps.validate.outputs.cache-valid == 'false'
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ${{ matrix.name }}
           path: ${{ env.BIN }}
@@ -90,7 +90,7 @@ jobs:
             yum update -y
             yum install -y openssl openssl-devel
       - name: Upload wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: wheel
           path: dist/*
@@ -112,10 +112,10 @@ jobs:
           persist-credentials: false
 
       - name: Download built binaries
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
 
       - name: Install cargo-binstall
-        uses: cargo-bins/cargo-binstall@a66119fbb1c952daba62640c2609111fe0803621 # v1.15.7
+        uses: cargo-bins/cargo-binstall@afcf9780305558bcc9e4bc94b7589ab2bb8b6106 # v1.15.9
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - name: Install hyperfine
@@ -123,9 +123,9 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: cargo binstall -y hyperfine
       - name: Install nushell
-        uses: hustcer/setup-nu@985d59ec83ae3e3418f9d36471cda38b9d8b9879 # v3.20
+        uses: hustcer/setup-nu@3a97c8160c2bb5af321a03336e7addc28f94444e # v3.21
       - name: Install uv
-        uses: astral-sh/setup-uv@3259c6206f993105e3a61b142c2d97bf4b9ef83d # v7.1.0
+        uses: astral-sh/setup-uv@85856786d1ce8acfbcc2f13a5f3fbd6b938f9f41 # v7.1.2
 
       - name: Run benchmark script
         working-directory: benchmark
