@@ -58,11 +58,11 @@ pub struct Cli {
     pub not_ignored: Option<Vec<String>>,
 
     #[command(subcommand)]
-    pub commands: Option<SubCommand>,
+    pub commands: Option<CliCommand>,
 }
 
 #[derive(Debug, Subcommand, Clone)]
-pub enum SubCommand {
+pub enum CliCommand {
     /// Display the version of cpp-linter and exit.
     Version,
 }

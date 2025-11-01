@@ -14,7 +14,7 @@ use log::{set_max_level, LevelFilter};
 
 // project specific modules/crates
 use crate::clang_tools::capture_clang_tools_output;
-use crate::cli::{ClangParams, Cli, FeedbackInput, LinesChangedOnly, SubCommand};
+use crate::cli::{ClangParams, Cli, CliCommand, FeedbackInput, LinesChangedOnly};
 use crate::common_fs::FileFilter;
 use crate::logger;
 use crate::rest_api::{github::GithubApiClient, RestApiClient};
@@ -43,7 +43,7 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub async fn run_main(args: Vec<String>) -> Result<()> {
     let cli = Cli::parse_from(args);
 
-    if matches!(cli.commands, Some(SubCommand::Version)) {
+    if matches!(cli.commands, Some(CliCommand::Version)) {
         println!("cpp-linter v{}", VERSION);
         return Ok(());
     }
@@ -57,12 +57,12 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
     }
 
     if cli.source_options.repo_root != "." {
-        env::set_current_dir(Path::new(&cli.source_options.repo_root)).unwrap_or_else(|_| {
-            panic!(
-                "'{}' is inaccessible or does not exist",
+        env::set_current_dir(Path::new(&cli.source_options.repo_root)).map_err(|e| {
+            anyhow!(
+                "'{}' is inaccessible or does not exist: {e:?}",
                 cli.source_options.repo_root
             )
-        });
+        })?;
     }
 
     let rest_api_client = GithubApiClient::new()?;
@@ -239,5 +239,17 @@ mod test {
         ])
         .await;
         assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn bad_repo_root() {
+        env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
+        let result = run_main(vec![
+            "cpp-linter".to_string(),
+            "-r".to_string(),
+            "some-non-existent-dir".to_string(),
+        ])
+        .await;
+        assert!(result.is_err());
     }
 }
