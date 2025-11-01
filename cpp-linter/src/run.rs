@@ -9,11 +9,12 @@ use std::sync::{Arc, Mutex};
 
 // non-std crates
 use anyhow::{anyhow, Result};
+use clap::Parser;
 use log::{set_max_level, LevelFilter};
 
 // project specific modules/crates
 use crate::clang_tools::capture_clang_tools_output;
-use crate::cli::{get_arg_parser, ClangParams, Cli, FeedbackInput, LinesChangedOnly};
+use crate::cli::{ClangParams, Cli, CliCommand, FeedbackInput, LinesChangedOnly};
 use crate::common_fs::FileFilter;
 use crate::logger;
 use crate::rest_api::{github::GithubApiClient, RestApiClient};
@@ -40,38 +41,45 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// alias ("path/to/cpp-linter.exe"). Thus, the parser in [`crate::cli`] will halt on an error
 /// because it is not configured to handle positional arguments.
 pub async fn run_main(args: Vec<String>) -> Result<()> {
-    let arg_parser = get_arg_parser();
-    let args = arg_parser.get_matches_from(args);
-    let cli = Cli::from(&args);
+    let cli = Cli::parse_from(args);
 
-    if args.subcommand_matches("version").is_some() {
+    if matches!(cli.commands, Some(CliCommand::Version)) {
         println!("cpp-linter v{}", VERSION);
         return Ok(());
     }
 
     logger::try_init();
 
-    if cli.version == "NO-VERSION" {
+    if cli.general_options.version == "NO-VERSION" {
         log::error!("The `--version` arg is used to specify which version of clang to use.");
         log::error!("To get the cpp-linter version, use `cpp-linter version` sub-command.");
         return Err(anyhow!("Clang version not specified."));
     }
 
-    if cli.repo_root != "." {
-        env::set_current_dir(Path::new(&cli.repo_root))
-            .unwrap_or_else(|_| panic!("'{}' is inaccessible or does not exist", cli.repo_root));
+    if cli.source_options.repo_root != "." {
+        env::set_current_dir(Path::new(&cli.source_options.repo_root)).map_err(|e| {
+            anyhow!(
+                "'{}' is inaccessible or does not exist: {e:?}",
+                cli.source_options.repo_root
+            )
+        })?;
     }
 
     let rest_api_client = GithubApiClient::new()?;
-    set_max_level(if cli.verbosity || rest_api_client.debug_enabled {
-        LevelFilter::Debug
-    } else {
-        LevelFilter::Info
-    });
+    set_max_level(
+        if cli.general_options.verbosity.is_debug() || rest_api_client.debug_enabled {
+            LevelFilter::Debug
+        } else {
+            LevelFilter::Info
+        },
+    );
     log::info!("Processing event {}", rest_api_client.event_name);
     let is_pr = rest_api_client.event_name == "pull_request";
 
-    let mut file_filter = FileFilter::new(&cli.ignore, cli.extensions.clone());
+    let mut file_filter = FileFilter::new(
+        &cli.source_options.ignore,
+        cli.source_options.extensions.clone(),
+    );
     file_filter.parse_submodules();
     if let Some(files) = &cli.not_ignored {
         file_filter.not_ignored.extend(files.clone());
@@ -91,31 +99,32 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
     }
 
     rest_api_client.start_log_group(String::from("Get list of specified source files"));
-    let files =
-        if !matches!(cli.lines_changed_only, LinesChangedOnly::Off) || cli.files_changed_only {
-            // parse_diff(github_rest_api_payload)
-            rest_api_client
-                .get_list_of_changed_files(&file_filter, &cli.lines_changed_only)
-                .await?
-        } else {
-            // walk the folder and look for files with specified extensions according to ignore values.
-            let mut all_files = file_filter.list_source_files(".")?;
-            if is_pr && (cli.tidy_review || cli.format_review) {
-                let changed_files = rest_api_client
-                    .get_list_of_changed_files(&file_filter, &LinesChangedOnly::Off)
-                    .await?;
-                for changed_file in changed_files {
-                    for file in &mut all_files {
-                        if changed_file.name == file.name {
-                            file.diff_chunks = changed_file.diff_chunks.clone();
-                            file.added_lines = changed_file.added_lines.clone();
-                            file.added_ranges = changed_file.added_ranges.clone();
-                        }
+    let files = if !matches!(cli.source_options.lines_changed_only, LinesChangedOnly::Off)
+        || cli.source_options.files_changed_only
+    {
+        // parse_diff(github_rest_api_payload)
+        rest_api_client
+            .get_list_of_changed_files(&file_filter, &cli.source_options.lines_changed_only)
+            .await?
+    } else {
+        // walk the folder and look for files with specified extensions according to ignore values.
+        let mut all_files = file_filter.list_source_files(".")?;
+        if is_pr && (cli.feedback_options.tidy_review || cli.feedback_options.format_review) {
+            let changed_files = rest_api_client
+                .get_list_of_changed_files(&file_filter, &LinesChangedOnly::Off)
+                .await?;
+            for changed_file in changed_files {
+                for file in &mut all_files {
+                    if changed_file.name == file.name {
+                        file.diff_chunks = changed_file.diff_chunks.clone();
+                        file.added_lines = changed_file.added_lines.clone();
+                        file.added_ranges = changed_file.added_ranges.clone();
                     }
                 }
             }
-            all_files
-        };
+        }
+        all_files
+    };
     let mut arc_files = vec![];
     log::info!("Giving attention to the following files:");
     for file in files {
@@ -130,7 +139,7 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
     let user_inputs = FeedbackInput::from(&cli);
     let clang_versions = capture_clang_tools_output(
         &mut arc_files,
-        cli.version.as_str(),
+        cli.general_options.version.as_str(),
         &mut clang_params,
         &rest_api_client,
     )
@@ -230,5 +239,17 @@ mod test {
         ])
         .await;
         assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn bad_repo_root() {
+        env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
+        let result = run_main(vec![
+            "cpp-linter".to_string(),
+            "-r".to_string(),
+            "some-non-existent-dir".to_string(),
+        ])
+        .await;
+        assert!(result.is_err());
     }
 }

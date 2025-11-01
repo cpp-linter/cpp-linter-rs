@@ -2,7 +2,8 @@
 //! For actual library/binary source code look in cpp-linter folder.
 use std::collections::HashMap;
 
-use cpp_linter::cli;
+use clap::CommandFactory;
+use cpp_linter::cli::Cli;
 use pyo3::{exceptions::PyValueError, prelude::*};
 
 const GROUPS_ORDER: [&str; 5] = [
@@ -16,7 +17,7 @@ const GROUPS_ORDER: [&str; 5] = [
 #[pyfunction]
 fn generate_cli_doc(metadata: HashMap<String, HashMap<String, Py<PyAny>>>) -> PyResult<String> {
     let mut out = String::new();
-    let mut command = cli::get_arg_parser();
+    let mut command = Cli::command();
     out.push_str(
         format!(
             "```text title=\"Usage\"\n{}\n```\n",
@@ -49,7 +50,8 @@ fn generate_cli_doc(metadata: HashMap<String, HashMap<String, Py<PyAny>>>) -> Py
     out.push_str("## Arguments\n");
     for arg in command.get_positionals() {
         out.push_str(format!("\n### `{}`\n\n", arg.get_id().as_str()).as_str());
-        if let Some(help) = arg.get_help() {
+        let short_help = &arg.get_help();
+        if let Some(help) = arg.get_long_help().or(*short_help) {
             out.push_str(format!("{}\n", help.to_string().trim()).as_str());
         }
     }
@@ -110,7 +112,8 @@ fn generate_cli_doc(metadata: HashMap<String, HashMap<String, Py<PyAny>>>) -> Py
             } else {
                 out.push('\n');
             }
-            if let Some(help) = &arg.get_help() {
+            let short_help = arg.get_help();
+            if let Some(help) = &arg.get_long_help().or(short_help) {
                 out.push_str(format!("{}\n", help.to_string().trim()).as_str());
             }
         }
@@ -118,7 +121,7 @@ fn generate_cli_doc(metadata: HashMap<String, HashMap<String, Py<PyAny>>>) -> Py
     Ok(out)
 }
 
-#[pymodule]
+#[pymodule(gil_used = false)]
 pub fn cli_gen(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(generate_cli_doc, m)?)?;
     Ok(())
