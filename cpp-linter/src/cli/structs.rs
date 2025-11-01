@@ -1,12 +1,12 @@
-use std::{fmt::Display, path::PathBuf};
+use std::{fmt::Display, path::PathBuf, str::FromStr};
 
-use clap::ArgMatches;
+use clap::ValueEnum;
 
-use super::convert_extra_arg_val;
+use super::Cli;
 use crate::{clang_tools::clang_tidy::CompilationUnit, common_fs::FileFilter};
 
 /// An enum to describe `--lines-changed-only` CLI option's behavior.
-#[derive(PartialEq, Clone, Debug, Default)]
+#[derive(PartialEq, Clone, Debug, Default, ValueEnum)]
 pub enum LinesChangedOnly {
     /// All lines are scanned
     #[default]
@@ -17,15 +17,19 @@ pub enum LinesChangedOnly {
     On,
 }
 
-impl LinesChangedOnly {
-    fn from_string(val: &str) -> LinesChangedOnly {
+impl FromStr for LinesChangedOnly {
+    type Err = ();
+
+    fn from_str(val: &str) -> Result<LinesChangedOnly, Self::Err> {
         match val {
-            "true" | "on" | "1" => LinesChangedOnly::On,
-            "diff" => LinesChangedOnly::Diff,
-            _ => LinesChangedOnly::Off,
+            "true" | "on" | "1" => Ok(LinesChangedOnly::On),
+            "diff" => Ok(LinesChangedOnly::Diff),
+            _ => Ok(LinesChangedOnly::Off),
         }
     }
+}
 
+impl LinesChangedOnly {
     pub fn is_change_valid(&self, added_lines: bool, diff_chunks: bool) -> bool {
         match self {
             LinesChangedOnly::Off => true,
@@ -45,100 +49,8 @@ impl Display for LinesChangedOnly {
     }
 }
 
-/// A structure to contain parsed CLI options.
-pub struct Cli {
-    pub version: String,
-    pub verbosity: bool,
-    pub extensions: Vec<String>,
-    pub repo_root: String,
-    pub lines_changed_only: LinesChangedOnly,
-    pub files_changed_only: bool,
-    pub ignore: Vec<String>,
-    pub style: String,
-    pub ignore_format: Option<Vec<String>>,
-    pub ignore_tidy: Option<Vec<String>>,
-    pub tidy_checks: String,
-    pub database: Option<PathBuf>,
-    pub extra_arg: Vec<String>,
-    pub thread_comments: ThreadComments,
-    pub no_lgtm: bool,
-    pub step_summary: bool,
-    pub file_annotations: bool,
-    pub not_ignored: Option<Vec<String>>,
-    pub tidy_review: bool,
-    pub format_review: bool,
-    pub passive_reviews: bool,
-}
-
-impl From<&ArgMatches> for Cli {
-    /// Construct a [`Cli`] instance from a [`ArgMatches`] instance (after options are parsed from CLI).
-    fn from(args: &ArgMatches) -> Self {
-        let ignore = args
-            .get_many::<String>("ignore")
-            .unwrap()
-            .map(|s| s.to_owned())
-            .collect::<Vec<_>>();
-        let ignore_tidy = args
-            .get_many::<String>("ignore-tidy")
-            .map(|val| val.map(|s| s.to_owned()).collect::<Vec<_>>());
-        let ignore_format = args
-            .get_many::<String>("ignore-format")
-            .map(|val| val.map(|s| s.to_owned()).collect::<Vec<_>>());
-        let extra_arg = convert_extra_arg_val(args);
-
-        let lines_changed_only = LinesChangedOnly::from_string(
-            args.get_one::<String>("lines-changed-only")
-                .unwrap()
-                .as_str(),
-        );
-
-        let thread_comments = ThreadComments::from_string(
-            args.get_one::<String>("thread-comments").unwrap().as_str(),
-        );
-
-        let extensions = args
-            .get_many::<String>("extensions")
-            .unwrap()
-            .filter_map(|s| {
-                if s.is_empty() {
-                    // filter out blank extensions here
-                    None
-                } else {
-                    Some(s.to_string())
-                }
-            })
-            .collect::<Vec<_>>();
-
-        Self {
-            version: args.get_one::<String>("version").unwrap().to_owned(),
-            verbosity: args.get_one::<String>("verbosity").unwrap().as_str() == "debug",
-            extensions,
-            repo_root: args.get_one::<String>("repo-root").unwrap().to_owned(),
-            lines_changed_only,
-            files_changed_only: args.get_flag("files-changed-only"),
-            ignore,
-            style: args.get_one::<String>("style").unwrap().to_owned(),
-            ignore_format,
-            ignore_tidy,
-            tidy_checks: args.get_one::<String>("tidy-checks").unwrap().to_owned(),
-            database: args.get_one::<PathBuf>("database").map(|v| v.to_owned()),
-            extra_arg,
-            no_lgtm: args.get_flag("no-lgtm"),
-            step_summary: args.get_flag("step-summary"),
-            thread_comments,
-            file_annotations: args.get_flag("file-annotations"),
-            not_ignored: args
-                .get_many::<String>("files")
-                .map(|files| Vec::from_iter(files.map(|v| v.to_owned()))),
-            tidy_review: args.get_flag("tidy-review"),
-            format_review: args.get_flag("format-review"),
-            passive_reviews: args.get_flag("passive-reviews"),
-        }
-    }
-}
-
 /// An enum to describe `--thread-comments` CLI option's behavior.
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Clone, Debug, ValueEnum)]
 pub enum ThreadComments {
     /// Always post a new comment and delete any outdated ones.
     On,
@@ -149,12 +61,14 @@ pub enum ThreadComments {
     Update,
 }
 
-impl ThreadComments {
-    fn from_string(val: &str) -> ThreadComments {
+impl FromStr for ThreadComments {
+    type Err = ();
+
+    fn from_str(val: &str) -> Result<ThreadComments, Self::Err> {
         match val {
-            "true" | "on" | "1" => ThreadComments::On,
-            "update" => ThreadComments::Update,
-            _ => ThreadComments::Off,
+            "true" | "on" | "1" => Ok(ThreadComments::On),
+            "update" => Ok(ThreadComments::Update),
+            _ => Ok(ThreadComments::Off),
         }
     }
 }
@@ -191,24 +105,26 @@ impl From<&Cli> for ClangParams {
     /// Construct a [`ClangParams`] instance from a [`Cli`] instance.
     fn from(args: &Cli) -> Self {
         ClangParams {
-            tidy_checks: args.tidy_checks.clone(),
-            lines_changed_only: args.lines_changed_only.clone(),
-            database: args.database.clone(),
-            extra_args: args.extra_arg.clone(),
+            tidy_checks: args.tidy_options.tidy_checks.clone(),
+            lines_changed_only: args.source_options.lines_changed_only.clone(),
+            database: args.tidy_options.database.clone(),
+            extra_args: args.tidy_options.extra_arg.clone(),
             database_json: None,
-            style: args.style.clone(),
+            style: args.format_options.style.clone(),
             clang_tidy_command: None,
             clang_format_command: None,
-            tidy_filter: args
-                .ignore_tidy
-                .as_ref()
-                .map(|ignore_tidy| FileFilter::new(ignore_tidy, args.extensions.clone())),
+            tidy_filter: args.tidy_options.ignore_tidy.as_ref().map(|ignore_tidy| {
+                FileFilter::new(ignore_tidy, args.source_options.extensions.clone())
+            }),
             format_filter: args
+                .format_options
                 .ignore_format
                 .as_ref()
-                .map(|ignore_format| FileFilter::new(ignore_format, args.extensions.clone())),
-            tidy_review: args.tidy_review,
-            format_review: args.format_review,
+                .map(|ignore_format| {
+                    FileFilter::new(ignore_format, args.source_options.extensions.clone())
+                }),
+            tidy_review: args.feedback_options.tidy_review,
+            format_review: args.feedback_options.format_review,
         }
     }
 }
@@ -230,14 +146,14 @@ impl From<&Cli> for FeedbackInput {
     /// Construct a [`FeedbackInput`] instance from a [`Cli`] instance.
     fn from(args: &Cli) -> Self {
         FeedbackInput {
-            style: args.style.clone(),
-            no_lgtm: args.no_lgtm,
-            step_summary: args.step_summary,
-            thread_comments: args.thread_comments.clone(),
-            file_annotations: args.file_annotations,
-            tidy_review: args.tidy_review,
-            format_review: args.format_review,
-            passive_reviews: args.passive_reviews,
+            style: args.format_options.style.clone(),
+            no_lgtm: args.feedback_options.no_lgtm,
+            step_summary: args.feedback_options.step_summary,
+            thread_comments: args.feedback_options.thread_comments.clone(),
+            file_annotations: args.feedback_options.file_annotations,
+            tidy_review: args.feedback_options.tidy_review,
+            format_review: args.feedback_options.format_review,
+            passive_reviews: args.feedback_options.passive_reviews,
         }
     }
 }
@@ -260,15 +176,15 @@ impl Default for FeedbackInput {
 
 #[cfg(test)]
 mod test {
-    use crate::cli::get_arg_parser;
+    // use crate::cli::get_arg_parser;
 
     use super::{Cli, LinesChangedOnly, ThreadComments};
+    use clap::Parser;
+    use std::str::FromStr;
 
     #[test]
     fn parse_positional() {
-        let parser = get_arg_parser();
-        let args = parser.get_matches_from(["cpp-linter", "file1.c", "file2.h"]);
-        let cli = Cli::from(&args);
+        let cli = Cli::parse_from(["cpp-linter", "file1.c", "file2.h"]);
         let not_ignored = cli.not_ignored.expect("failed to parse positional args");
         assert!(!not_ignored.is_empty());
         assert!(not_ignored.contains(&String::from("file1.c")));
@@ -279,7 +195,7 @@ mod test {
     fn display_lines_changed_only_enum() {
         let input = "diff".to_string();
         assert_eq!(
-            LinesChangedOnly::from_string(&input),
+            LinesChangedOnly::from_str(&input).unwrap(),
             LinesChangedOnly::Diff
         );
         assert_eq!(format!("{}", LinesChangedOnly::Diff), input);
@@ -288,7 +204,10 @@ mod test {
     #[test]
     fn display_thread_comments_enum() {
         let input = "false".to_string();
-        assert_eq!(ThreadComments::from_string(&input), ThreadComments::Off);
+        assert_eq!(
+            ThreadComments::from_str(&input).unwrap(),
+            ThreadComments::Off
+        );
         assert_eq!(format!("{}", ThreadComments::Off), input);
     }
 }

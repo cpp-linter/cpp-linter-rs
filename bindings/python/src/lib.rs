@@ -20,7 +20,7 @@ fn main(args: Option<Vec<String>>) -> PyResult<()> {
 
 /// The python binding for the cpp_linter package. It only exposes a ``main()`` function
 /// that is used as the entrypoint script.
-#[pymodule]
+#[pymodule(gil_used = false)]
 fn cpp_linter(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(main, m)?)?;
     Ok(())

@@ -6,31 +6,28 @@ build-backend = "maturin"
 name = "cli-gen"
 description = "Generate cpp-linter CLI doc from rust src."
 readme = "README.md"
-license = {text = "MIT License"}
-requires-python = ">=3.7"
+license = "MIT"
+requires-python = ">=3.9"
 authors = [
     { name = "Brendan Doherty", email = "2bndy5@gmail.com" },
 ]
 classifiers = ["Private :: Do Not Upload"]
 dynamic = ["version"]
 
-[tool.maturin]
-features = ["pyo3/extension-module"]
-
 [dependency-groups]
 dev = [
     "maturin==1.9.1",
     "mypy==1.17.0",
     "patchelf==0.17.2.2 ; sys_platform == 'linux'",
-    "ruff==0.12.4",
+    "ruff==0.14.3",
 ]
 docs = [
     "markdown-gfm-admonition==0.1.1",
     "mkdocs==1.6.1",
     "mkdocs-gen-files==0.5.0",
-    "mkdocs-include-markdown-plugin==7.1.6",
-    "mkdocs-material==9.6.15",
-    "pyyaml==6.0.2",
+    "mkdocs-include-markdown-plugin==7.2.0",
+    "mkdocs-material==9.6.22",
+    "pyyaml==6.0.3",
 ]
 
 [tool.uv]

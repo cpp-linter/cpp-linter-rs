@@ -183,20 +183,17 @@ impl FileFilter {
 
 #[cfg(test)]
 mod tests {
+    use clap::Parser;
+
     use super::FileFilter;
-    use crate::cli::get_arg_parser;
+    use crate::cli::Cli;
     use std::{env::set_current_dir, path::PathBuf};
 
     // ************* tests for ignored paths
 
     fn setup_ignore(input: &str, extension: Vec<String>) -> FileFilter {
-        let arg_parser = get_arg_parser();
-        let args = arg_parser.get_matches_from(vec!["cpp-linter", "-i", input]);
-        let ignore_arg = args
-            .get_many::<String>("ignore")
-            .unwrap()
-            .map(|s| s.to_owned())
-            .collect::<Vec<_>>();
+        let args = Cli::parse_from(["cpp-linter", "-i", input]);
+        let ignore_arg = args.source_options.ignore;
         let file_filter = FileFilter::new(&ignore_arg, extension);
         println!("ignored = {:?}", file_filter.ignored);
         println!("not ignored = {:?}", file_filter.not_ignored);
