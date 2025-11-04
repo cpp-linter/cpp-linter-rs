@@ -5,7 +5,10 @@ use clap::{builder::PossibleValue, ValueEnum};
 use semver::VersionReq;
 
 use super::Cli;
-use crate::{clang_tools::clang_tidy::CompilationUnit, common_fs::FileFilter};
+use crate::{
+    clang_tools::clang_tidy::CompilationUnit,
+    common_fs::{normalize_path, FileFilter},
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum RequestedVersion {
@@ -48,9 +51,20 @@ impl FromStr for RequestedVersion {
                     input
                 ));
             }
-            let path = path
-                .canonicalize()
-                .map_err(|e| anyhow!("Failed to canonicalize path '{input}': {e:?}"))?;
+            let path = if !path.is_dir() {
+                path.parent()
+                    .ok_or(anyhow!(
+                        "Unknown parent directory of the given file path for `--version`: {}",
+                        input
+                    ))?
+                    .to_path_buf()
+            } else {
+                path
+            };
+            let path = match path.canonicalize() {
+                Ok(p) => Ok(normalize_path(&p)),
+                Err(e) => Err(anyhow!("Failed to canonicalize path '{input}': {e:?}")),
+            }?;
             Ok(Self::Path(path))
         }
     }
@@ -292,6 +306,10 @@ impl Default for FeedbackInput {
 mod test {
     // use crate::cli::get_arg_parser;
 
+    use std::{path::PathBuf, str::FromStr};
+
+    use crate::{cli::RequestedVersion, common_fs::normalize_path};
+
     use super::{Cli, LinesChangedOnly, ThreadComments};
     use clap::{Parser, ValueEnum};
 
@@ -331,5 +349,20 @@ mod test {
             ThreadComments::from_str(input, false).unwrap(),
             ThreadComments::Off
         );
+    }
+
+    #[test]
+    fn validate_version_path() {
+        let this_path_str = "src/cli/structs.rs";
+        let this_path = PathBuf::from(this_path_str);
+        let this_canonical = this_path.canonicalize().unwrap();
+        let parent = this_canonical.parent().unwrap();
+        let expected = normalize_path(parent);
+        let req_ver = RequestedVersion::from_str(this_path_str).unwrap();
+        if let RequestedVersion::Path(parsed) = req_ver {
+            assert_eq!(&parsed, &expected);
+        }
+
+        assert!(RequestedVersion::from_str("file.rs").is_err());
     }
 }

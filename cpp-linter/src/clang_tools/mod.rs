@@ -62,7 +62,7 @@ impl ClangTool {
         match version {
             RequestedVersion::Path(path_buf) => {
                 which_in(name, Some(path_buf), current_dir().unwrap())
-                    .map_err(|_| anyhow!("Could not find {name} by path"))
+                    .map_err(|_| anyhow!("Could not find {self} by path"))
             }
             // Thus, we should use whatever is installed and added to $PATH.
             RequestedVersion::SystemDefault | RequestedVersion::NoValue => {
@@ -77,7 +77,7 @@ impl ClangTool {
                 let mut it = req.comparators.iter();
                 let mut highest_major = it.next().map(|v| v.major).unwrap_or_default() + 1;
                 for n in it {
-                    if n.major < highest_major {
+                    if n.major > highest_major {
                         // +1 because we aren't checking the comparator's operator here.
                         highest_major = n.major + 1;
                     }
@@ -95,7 +95,7 @@ impl ClangTool {
 
                 // now we're ready to search for the binary exe with the major version suffixed.
                 for major in majors {
-                    if let Ok(cmd) = which(format!("{name}-{major}")) {
+                    if let Ok(cmd) = which(format!("{self}-{major}")) {
                         return Ok(cmd);
                     }
                 }
@@ -109,7 +109,7 @@ impl ClangTool {
                 // On Unix systems, this line is not likely reached. Typically, installing clang
                 // will produce a symlink to the executable with the major version appended to the
                 // name.
-                which(name).map_err(|_| anyhow!("Could not find {name} by version"))
+                which(name).map_err(|_| anyhow!("Could not find {self} by version"))
             }
         }
     }
