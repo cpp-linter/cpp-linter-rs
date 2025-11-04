@@ -9,8 +9,8 @@ use std::{
     sync::{Arc, Mutex, MutexGuard},
 };
 
-use anyhow::{Context, Result};
 // non-std crates
+use anyhow::{Context, Result};
 use regex::Regex;
 use serde::Deserialize;
 
@@ -346,14 +346,15 @@ mod test {
     use std::{
         env,
         path::PathBuf,
+        str::FromStr,
         sync::{Arc, Mutex},
     };
 
     use regex::Regex;
 
     use crate::{
-        clang_tools::get_clang_tool_exe,
-        cli::{ClangParams, LinesChangedOnly},
+        clang_tools::ClangTool,
+        cli::{ClangParams, LinesChangedOnly, RequestedVersion},
         common_fs::FileObj,
     };
 
@@ -421,11 +422,14 @@ mod test {
 
     #[test]
     fn use_extra_args() {
-        let exe_path = get_clang_tool_exe(
-            "clang-tidy",
-            env::var("CLANG_VERSION").unwrap_or("".to_string()).as_str(),
-        )
-        .unwrap();
+        let exe_path = ClangTool::ClangTidy
+            .get_exe_path(
+                &RequestedVersion::from_str(
+                    env::var("CLANG_VERSION").unwrap_or("".to_string()).as_str(),
+                )
+                .unwrap(),
+            )
+            .unwrap();
         let file = FileObj::new(PathBuf::from("tests/demo/demo.cpp"));
         let arc_ref = Arc::new(Mutex::new(file));
         let extra_args = vec!["-std=c++17".to_string(), "-Wall".to_string()];

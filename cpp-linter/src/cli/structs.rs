@@ -1,12 +1,60 @@
 use std::{fmt::Display, path::PathBuf, str::FromStr};
 
-use clap::ValueEnum;
+use anyhow::{anyhow, Error};
+use clap::{builder::PossibleValue, ValueEnum};
+use semver::VersionReq;
 
 use super::Cli;
 use crate::{clang_tools::clang_tidy::CompilationUnit, common_fs::FileFilter};
 
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub enum RequestedVersion {
+    /// A specific path to the clang tool binary.
+    Path(PathBuf),
+
+    /// Whatever the system default uses (if any).
+    #[default]
+    SystemDefault,
+
+    /// A specific version requirement for the clang tool binary.
+    ///
+    /// For example, `=12.0.1`, `>=10.0.0, <13.0.0`.
+    Requirement(VersionReq),
+
+    /// A sentinel when no value is given.
+    ///
+    /// This is used internally to differentiate when the user intended
+    /// to invoke the `version` subcommand instead.
+    NoValue,
+}
+
+impl FromStr for RequestedVersion {
+    type Err = Error;
+
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        if input.is_empty() {
+            Ok(Self::SystemDefault)
+        } else if input == "CPP-LINTER-VERSION" {
+            Ok(Self::NoValue)
+        } else if let Ok(req) = VersionReq::parse(input) {
+            Ok(Self::Requirement(req))
+        } else if let Ok(req) = VersionReq::parse(format!("={input}").as_str()) {
+            Ok(Self::Requirement(req))
+        } else {
+            let path = PathBuf::from(input);
+            if !path.exists() {
+                return Err(anyhow!(
+                    "The specified version is not a proper requirement or a valid path: {}",
+                    input
+                ));
+            }
+            Ok(Self::Path(PathBuf::from(input)))
+        }
+    }
+}
+
 /// An enum to describe `--lines-changed-only` CLI option's behavior.
-#[derive(PartialEq, Clone, Debug, Default, ValueEnum)]
+#[derive(PartialEq, Clone, Debug, Default)]
 pub enum LinesChangedOnly {
     /// All lines are scanned
     #[default]
@@ -17,11 +65,44 @@ pub enum LinesChangedOnly {
     On,
 }
 
-impl FromStr for LinesChangedOnly {
-    type Err = ();
+impl ValueEnum for LinesChangedOnly {
+    /// Get a list possible value variants for display in `--help` output.
+    fn value_variants<'a>() -> &'a [Self] {
+        &[
+            LinesChangedOnly::Off,
+            LinesChangedOnly::Diff,
+            LinesChangedOnly::On,
+        ]
+    }
 
-    fn from_str(val: &str) -> Result<LinesChangedOnly, Self::Err> {
-        match val {
+    /// Get a display value (for `--help` output) of the enum variant.
+    fn to_possible_value(&self) -> Option<PossibleValue> {
+        match self {
+            LinesChangedOnly::Off => Some(
+                PossibleValue::new("false")
+                    .help("All lines in a file are analyzed.")
+                    .aliases(["off", "0"]),
+            ),
+            LinesChangedOnly::Diff => Some(PossibleValue::new("diff").help(
+                "All lines in the diff are analyzed \
+                    (including unchanged lines but not subtractions).",
+            )),
+            LinesChangedOnly::On => Some(
+                PossibleValue::new("true")
+                    .help("Only lines in the diff that contain additions are analyzed.")
+                    .aliases(["on", "1"]),
+            ),
+        }
+    }
+
+    /// Parse a string into a [`LinesChangedOnly`] enum variant.
+    fn from_str(val: &str, ignore_case: bool) -> Result<LinesChangedOnly, String> {
+        let val = if ignore_case {
+            val.to_lowercase()
+        } else {
+            val.to_string()
+        };
+        match val.as_str() {
             "true" | "on" | "1" => Ok(LinesChangedOnly::On),
             "diff" => Ok(LinesChangedOnly::Diff),
             _ => Ok(LinesChangedOnly::Off),
@@ -50,7 +131,7 @@ impl Display for LinesChangedOnly {
 }
 
 /// An enum to describe `--thread-comments` CLI option's behavior.
-#[derive(PartialEq, Clone, Debug, ValueEnum)]
+#[derive(PartialEq, Clone, Debug)]
 pub enum ThreadComments {
     /// Always post a new comment and delete any outdated ones.
     On,
@@ -61,11 +142,41 @@ pub enum ThreadComments {
     Update,
 }
 
-impl FromStr for ThreadComments {
-    type Err = ();
+impl ValueEnum for ThreadComments {
+    /// Get a list possible value variants for display in `--help` output.
+    fn value_variants<'a>() -> &'a [Self] {
+        &[Self::On, Self::Off, Self::Update]
+    }
 
-    fn from_str(val: &str) -> Result<ThreadComments, Self::Err> {
-        match val {
+    /// Get a display value (for `--help` output) of the enum variant.
+    fn to_possible_value(&self) -> Option<PossibleValue> {
+        match self {
+            ThreadComments::On => Some(
+                PossibleValue::new("true")
+                    .help("Always post a new comment and delete any outdated ones.")
+                    .aliases(["on", "1"]),
+            ),
+            ThreadComments::Off => Some(
+                PossibleValue::new("false")
+                    .help("Do not post thread comments.")
+                    .aliases(["off", "0"]),
+            ),
+            ThreadComments::Update => {
+                Some(PossibleValue::new("update").help(
+                    "Only update existing thread comments. If none exist, then post a new one.",
+                ))
+            }
+        }
+    }
+
+    /// Parse a string into a [`ThreadComments`] enum variant.
+    fn from_str(val: &str, ignore_case: bool) -> Result<ThreadComments, String> {
+        let val = if ignore_case {
+            val.to_lowercase()
+        } else {
+            val.to_string()
+        };
+        match val.as_str() {
             "true" | "on" | "1" => Ok(ThreadComments::On),
             "update" => Ok(ThreadComments::Update),
             _ => Ok(ThreadComments::Off),
@@ -179,8 +290,7 @@ mod test {
     // use crate::cli::get_arg_parser;
 
     use super::{Cli, LinesChangedOnly, ThreadComments};
-    use clap::Parser;
-    use std::str::FromStr;
+    use clap::{Parser, ValueEnum};
 
     #[test]
     fn parse_positional() {
@@ -193,21 +303,30 @@ mod test {
 
     #[test]
     fn display_lines_changed_only_enum() {
-        let input = "diff".to_string();
+        let input = "Diff";
         assert_eq!(
-            LinesChangedOnly::from_str(&input).unwrap(),
+            LinesChangedOnly::from_str(&input, true).unwrap(),
             LinesChangedOnly::Diff
         );
-        assert_eq!(format!("{}", LinesChangedOnly::Diff), input);
+        assert_eq!(format!("{}", LinesChangedOnly::Diff), input.to_lowercase());
+
+        assert_eq!(
+            LinesChangedOnly::from_str(&input, false).unwrap(),
+            LinesChangedOnly::Off
+        );
     }
 
     #[test]
     fn display_thread_comments_enum() {
-        let input = "false".to_string();
+        let input = "Update";
         assert_eq!(
-            ThreadComments::from_str(&input).unwrap(),
+            ThreadComments::from_str(input, true).unwrap(),
+            ThreadComments::Update
+        );
+        assert_eq!(format!("{}", ThreadComments::Update), input.to_lowercase());
+        assert_eq!(
+            ThreadComments::from_str(input, false).unwrap(),
             ThreadComments::Off
         );
-        assert_eq!(format!("{}", ThreadComments::Off), input);
     }
 }

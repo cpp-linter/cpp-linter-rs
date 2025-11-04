@@ -3,15 +3,12 @@ use std::{path::PathBuf, str::FromStr};
 
 // non-std crates
 use clap::{
-    builder::{
-        ArgPredicate, FalseyValueParser, NonEmptyStringValueParser, PossibleValuesParser,
-        TypedValueParser,
-    },
+    builder::{FalseyValueParser, NonEmptyStringValueParser},
     value_parser, ArgAction, Args, Parser, Subcommand, ValueEnum,
 };
 
 mod structs;
-pub use structs::{ClangParams, FeedbackInput, LinesChangedOnly, ThreadComments};
+pub use structs::{ClangParams, FeedbackInput, LinesChangedOnly, RequestedVersion, ThreadComments};
 
 #[derive(Debug, Clone, PartialEq, Eq, ValueEnum)]
 pub enum Verbosity {
@@ -74,23 +71,25 @@ pub struct GeneralOptions {
     ///
     /// Accepted options are:
     ///
-    /// - A semantic major version number from `10` to `21`.
+    /// - A semantic version specifier, eg. `>=10, <13`, `=12.0.1`, or simply `16`.
     /// - A blank string (`''`) to use the platform's default
     ///   installed version.
     /// - A path to where the clang tools are
     ///   installed (if using a custom install location).
     ///   All paths specified here are converted to absolute.
+    /// - If this option is specified without a value, then
+    ///   the cpp-linter version is printed and the program exits.
     #[arg(
         short = 'V',
         long,
-        default_missing_value = "NO-VERSION",
-        default_value = "",
+        default_missing_value = "CPP-LINTER-VERSION",
         num_args = 0..=1,
-        require_equals = true,
+        value_parser = RequestedVersion::from_str,
+        default_value = "",
         help_heading = "General options",
-        verbatim_doc_comment,
+        verbatim_doc_comment
     )]
-    pub version: String,
+    pub version: RequestedVersion,
 
     /// This controls the action's verbosity in the workflow's logs.
     ///
@@ -100,6 +99,8 @@ pub struct GeneralOptions {
         short = 'v',
         long,
         default_value = "info",
+        default_missing_value = "debug",
+        num_args = 0..=1,
         help_heading = "General options"
     )]
     pub verbosity: Verbosity,
@@ -128,22 +129,13 @@ pub struct SourceOptions {
     pub repo_root: String,
 
     /// This controls what part of the files are analyzed.
-    ///
-    /// The following values are accepted:
-    ///
-    /// - `false`: All lines in a file are analyzed.
-    /// - `true`: Only lines in the diff that contain additions are analyzed.
-    /// - `diff`: All lines in the diff are analyzed (including unchanged
-    ///   lines but not subtractions).
     #[arg(
         short,
         long,
         default_value = "true",
-        value_parser = PossibleValuesParser::new(
-            ["true", "on", "1", "false", "off", "0", "diff"],
-        ).map(|s| <LinesChangedOnly as FromStr>::from_str(&s).unwrap()),
         help_heading = "Source options",
-        verbatim_doc_comment,
+        ignore_case = true,
+        verbatim_doc_comment
     )]
     pub lines_changed_only: LinesChangedOnly,
 
@@ -163,7 +155,15 @@ pub struct SourceOptions {
         short,
         long,
         default_value = "false",
-        default_value_if("lines-changed-only", ArgPredicate::Equals("true".into()), "true"),
+        default_missing_value = "true",
+        default_value_ifs = [
+            ("lines-changed-only", "true", "true"),
+            ("lines-changed-only", "on", "true"),
+            ("lines-changed-only", "1", "true"),
+            ("lines-changed-only", "diff", "true"),
+        ],
+        num_args = 0..=1,
+        action = ArgAction::Set,
         value_parser = FalseyValueParser::new(),
         help_heading = "Source options",
         verbatim_doc_comment,
@@ -200,7 +200,7 @@ pub struct FormatOptions {
     /// The style rules to use.
     ///
     /// - Set this to `file` to have clang-format use the closest relative
-    ///   .clang-format file.
+    ///   .clang-format file. Same as passing no value to this option.
     /// - Set this to a blank string (`''`) to disable using clang-format
     ///   entirely.
     ///
@@ -213,6 +213,8 @@ pub struct FormatOptions {
         short,
         long,
         default_value = "llvm",
+        default_missing_value = "file",
+        num_args = 0..=1,
         help_heading = "Clang-format options",
         verbatim_doc_comment
     )]
@@ -260,6 +262,8 @@ pub struct TidyOptions {
         short = 'c',
         long,
         default_value = "boost-*,bugprone-*,performance-*,readability-*,portability-*,modernize-*,clang-analyzer-*,cppcoreguidelines-*",
+        default_missing_value = "",
+        num_args = 0..=1,
         help_heading = "Clang-tidy options",
         verbatim_doc_comment
     )]
@@ -306,10 +310,6 @@ pub struct TidyOptions {
 pub struct FeedbackOptions {
     /// Set this option to true to enable the use of thread comments as feedback.
     ///
-    /// Set this to `update` to update an existing comment if one exists;
-    /// the value 'true' will always delete an old comment and post a new one
-    /// if necessary.
-    ///
     /// > [!NOTE]
     /// > To use thread comments, the `GITHUB_TOKEN` (provided by
     /// > Github to each repository) must be declared as an environment
@@ -321,11 +321,11 @@ pub struct FeedbackOptions {
         short = 'g',
         long,
         default_value = "false",
-        value_parser = PossibleValuesParser::new(
-            ["true", "on", "1", "false", "off", "0", "update"],
-        ).map(|s| <ThreadComments as FromStr>::from_str(&s).unwrap()),
+        default_missing_value = "update",
+        num_args = 0..=1,
         help_heading = "Feedback options",
-        verbatim_doc_comment,
+        ignore_case = true,
+        verbatim_doc_comment
     )]
     pub thread_comments: ThreadComments,
 
@@ -352,6 +352,8 @@ pub struct FeedbackOptions {
         short = 'w',
         long,
         default_value_t = false,
+        default_missing_value = "true",
+        num_args = 0..=1,
         action = ArgAction::Set,
         value_parser = FalseyValueParser::new(),
         help_heading = "Feedback options",
@@ -375,6 +377,8 @@ pub struct FeedbackOptions {
         short = 'd',
         long,
         default_value_t = false,
+        default_missing_value = "true",
+        num_args = 0..=1,
         action = ArgAction::Set,
         value_parser = FalseyValueParser::new(),
         help_heading = "Feedback options",
@@ -386,6 +390,8 @@ pub struct FeedbackOptions {
         short = 'm',
         long,
         default_value_t = false,
+        default_missing_value = "true",
+        num_args = 0..=1,
         action = ArgAction::Set,
         value_parser = FalseyValueParser::new(),
         help_heading = "Feedback options",
@@ -398,6 +404,8 @@ pub struct FeedbackOptions {
         short = 'R',
         long,
         default_value_t = false,
+        default_missing_value = "true",
+        num_args = 0..=1,
         action = ArgAction::Set,
         value_parser = FalseyValueParser::new(),
         help_heading = "Feedback options",
