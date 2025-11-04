@@ -1,6 +1,6 @@
 //! This exposes a function in Python, so an mkdocs plugin can use it to generate the CLI document.
 //! For actual library/binary source code look in cpp-linter folder.
-use std::collections::HashMap;
+use std::{any::TypeId, collections::HashMap};
 
 use clap::CommandFactory;
 use cpp_linter::cli::Cli;
@@ -115,6 +115,38 @@ fn generate_cli_doc(metadata: HashMap<String, HashMap<String, Py<PyAny>>>) -> Py
             let short_help = arg.get_help();
             if let Some(help) = &arg.get_long_help().or(short_help) {
                 out.push_str(format!("{}\n", help.to_string().trim()).as_str());
+            }
+            let possible_vals = arg.get_possible_values();
+            let is_boolean = arg.get_value_parser().type_id() == TypeId::of::<bool>();
+            if !possible_vals.is_empty() {
+                out.push_str("\nPossible values:\n\n");
+                if is_boolean {
+                    out.push_str("- `true` | `on` | `1`\n");
+                    out.push_str("- `false` | `off` | `0`\n");
+                } else {
+                    for val in possible_vals {
+                        let name = format!(
+                            "`{}`",
+                            val.get_name_and_aliases()
+                                .collect::<Vec<&str>>()
+                                .join("` | `")
+                        );
+                        let help = val
+                            .get_help()
+                            .map(|v| {
+                                let v = v.to_string();
+                                let trimmed = v.trim();
+                                if !trimmed.is_empty() {
+                                    format!(": {trimmed}")
+                                } else {
+                                    trimmed.to_string()
+                                }
+                            })
+                            .unwrap_or_default();
+
+                        out.push_str(format!("- {name}{help}\n").as_str());
+                    }
+                }
             }
         }
     }

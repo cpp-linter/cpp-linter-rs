@@ -3,9 +3,11 @@
 //! In python, this module is exposed as `cpp_linter.run` that has 1 function exposed:
 //! `main()`.
 
-use std::env;
-use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::{
+    env,
+    path::Path,
+    sync::{Arc, Mutex},
+};
 
 // non-std crates
 use anyhow::{anyhow, Result};
@@ -13,11 +15,13 @@ use clap::Parser;
 use log::{set_max_level, LevelFilter};
 
 // project specific modules/crates
-use crate::clang_tools::capture_clang_tools_output;
-use crate::cli::{ClangParams, Cli, CliCommand, FeedbackInput, LinesChangedOnly};
-use crate::common_fs::FileFilter;
-use crate::logger;
-use crate::rest_api::{github::GithubApiClient, RestApiClient};
+use crate::{
+    clang_tools::capture_clang_tools_output,
+    cli::{ClangParams, Cli, CliCommand, FeedbackInput, LinesChangedOnly, RequestedVersion},
+    common_fs::FileFilter,
+    logger,
+    rest_api::{github::GithubApiClient, RestApiClient},
+};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -43,18 +47,14 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub async fn run_main(args: Vec<String>) -> Result<()> {
     let cli = Cli::parse_from(args);
 
-    if matches!(cli.commands, Some(CliCommand::Version)) {
+    if matches!(cli.commands, Some(CliCommand::Version))
+        || cli.general_options.version == RequestedVersion::NoValue
+    {
         println!("cpp-linter v{}", VERSION);
         return Ok(());
     }
 
     logger::try_init();
-
-    if cli.general_options.version == "NO-VERSION" {
-        log::error!("The `--version` arg is used to specify which version of clang to use.");
-        log::error!("To get the cpp-linter version, use `cpp-linter version` sub-command.");
-        return Err(anyhow!("Clang version not specified."));
-    }
 
     if cli.source_options.repo_root != "." {
         env::set_current_dir(Path::new(&cli.source_options.repo_root)).map_err(|e| {
@@ -139,7 +139,7 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
     let user_inputs = FeedbackInput::from(&cli);
     let clang_versions = capture_clang_tools_output(
         &mut arc_files,
-        cli.general_options.version.as_str(),
+        &cli.general_options.version,
         &mut clang_params,
         &rest_api_client,
     )
@@ -190,7 +190,6 @@ mod test {
             "-l".to_string(),
             "false".to_string(),
             "-v".to_string(),
-            "debug".to_string(),
             "-i=target|benches/libgit2".to_string(),
         ])
         .await;
@@ -198,7 +197,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn bad_version_input() {
+    async fn no_version_input() {
         env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
         let result = run_main(vec![
             "cpp-linter".to_string(),
@@ -207,7 +206,7 @@ mod test {
             "-V".to_string(),
         ])
         .await;
-        assert!(result.is_err());
+        assert!(result.is_ok());
     }
 
     #[tokio::test]
@@ -216,9 +215,9 @@ mod test {
         env::set_var("PRE_COMMIT", "1");
         let result = run_main(vec![
             "cpp-linter".to_string(),
-            "-l".to_string(),
+            "--lines-changed-only".to_string(),
             "false".to_string(),
-            "-i=target|benches/libgit2".to_string(),
+            "--ignore=target|benches/libgit2".to_string(),
         ])
         .await;
         assert!(result.is_err());
@@ -246,7 +245,7 @@ mod test {
         env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
         let result = run_main(vec![
             "cpp-linter".to_string(),
-            "-r".to_string(),
+            "--repo-root".to_string(),
             "some-non-existent-dir".to_string(),
         ])
         .await;
