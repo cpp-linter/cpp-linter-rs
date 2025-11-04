@@ -48,7 +48,10 @@ impl FromStr for RequestedVersion {
                     input
                 ));
             }
-            Ok(Self::Path(PathBuf::from(input)))
+            let path = path
+                .canonicalize()
+                .map_err(|e| anyhow!("Failed to canonicalize path '{input}': {e:?}"))?;
+            Ok(Self::Path(path))
         }
     }
 }

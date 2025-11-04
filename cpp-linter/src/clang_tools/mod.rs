@@ -14,6 +14,7 @@ use std::{
 use anyhow::{anyhow, Context, Result};
 use git2::{DiffOptions, Patch};
 use regex::Regex;
+use semver::Version;
 use tokio::task::JoinSet;
 use which::{which, which_in};
 
@@ -68,9 +69,32 @@ impl ClangTool {
                 which(name).map_err(|_| anyhow!("Could not find clang tool by name"))
             }
             RequestedVersion::Requirement(req) => {
-                // `version` specified has at least a major version number.
-                for req_ver in &req.comparators {
-                    let major = req_ver.major;
+                // `req.comparators` has at least a major version number for each comparator.
+                // We need to start with the highest major version number first, then
+                // decrement to the lowest that satisfies the requirement.
+
+                // find the highest major version from requirement's boundaries.
+                let mut it = req.comparators.iter();
+                let mut highest_major = it.next().map(|v| v.major).unwrap_or_default() + 1;
+                for n in it {
+                    if n.major < highest_major {
+                        // +1 because we aren't checking the comparator's operator here.
+                        highest_major = n.major + 1;
+                    }
+                }
+
+                // aggregate by decrementing through major versions that satisfy the requirement.
+                let mut majors = vec![];
+                while highest_major > 0 {
+                    // check if the current major version satisfies the requirement.
+                    if req.matches(&Version::new(highest_major, 0, 0)) {
+                        majors.push(highest_major);
+                    }
+                    highest_major -= 1;
+                }
+
+                // now we're ready to search for the binary exe with the major version suffixed.
+                for major in majors {
                     if let Ok(cmd) = which(format!("{name}-{major}")) {
                         return Ok(cmd);
                     }
@@ -464,7 +488,7 @@ pub trait MakeSuggestions {
 
 #[cfg(test)]
 mod tests {
-    use std::{env, path::PathBuf, str::FromStr};
+    use std::{path::PathBuf, str::FromStr};
 
     use which::which;
 
@@ -475,8 +499,8 @@ mod tests {
 
     #[test]
     fn get_exe_by_version() {
-        let clang_version = env::var("CLANG_VERSION").unwrap_or("16".to_string());
-        let req_version = RequestedVersion::from_str(&clang_version).unwrap();
+        let requirement = ">=9, <22";
+        let req_version = RequestedVersion::from_str(requirement).unwrap();
         let tool_exe = CLANG_FORMAT.get_exe_path(&req_version);
         println!("tool_exe: {:?}", tool_exe);
         assert!(tool_exe.is_ok_and(|val| val
