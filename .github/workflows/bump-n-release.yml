@@ -35,7 +35,7 @@ jobs:
           token: ${{ secrets.BUMP_N_RELEASE }}
           fetch-depth: 0
           fetch-tags: true
-          persist-credentials: false
+          persist-credentials: true # needed for `git push`
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
