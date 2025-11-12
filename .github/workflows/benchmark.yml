@@ -93,7 +93,8 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: wheel
-          path: dist/*
+          path: dist/cpp_linter-*-cp3*-abi3-*.whl
+          if-no-files-found: error
 
   benchmark:
     name: Measure Performance Difference
@@ -132,7 +133,7 @@ jobs:
         shell: nu {0}
         run: |-
           let new_py = (
-            glob "../wheel/cpp_linter-*.whl"
+            glob "../wheel/cpp_linter-*-cp3*-abi3-*.whl"
             | first
             | path expand
           )
