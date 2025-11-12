@@ -94,6 +94,7 @@ jobs:
         with:
           name: wheel
           path: dist/cpp_linter-*-cp3*-abi3-*.whl
+          if-no-files-found: error
 
   benchmark:
     name: Measure Performance Difference
