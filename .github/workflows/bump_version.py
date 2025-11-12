@@ -111,15 +111,12 @@ def main():
         [
             "yarn",
             "version",
-            "--new-version",
             Updater.new_version,
-            "--no-git-tag-version",
         ],
         cwd="bindings/node",
         check=True,
     )
-    subprocess.run(["napi", "version"], cwd="bindings/node", check=True, shell=True)
-    print("Updated version in bindings/node/**package.json")
+    print("Updated version in bindings/node/package.json")
 
     subprocess.run(
         [
