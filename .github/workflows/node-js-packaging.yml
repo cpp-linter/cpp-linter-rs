@@ -308,7 +308,7 @@ jobs:
     name: Publish
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      # needed for trusted publishing
       id-token: write
     needs:
       - build-freebsd
@@ -341,9 +341,4 @@ jobs:
       - name: Publish
         if: startsWith(github.ref, 'refs/tags/')
         working-directory: bindings/node
-        run: |
-          echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" >> ~/.npmrc
-          npm publish --access public --provenance true ${{ contains(github.ref_name, '-rc') && '--tag next' || '' }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish ${{ contains(github.ref_name, '-rc') && '--tag next' || '' }}
