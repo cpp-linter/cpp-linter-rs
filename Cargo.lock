@@ -200,7 +200,7 @@ checksum = "b94f61472cee1439c0b966b47e3aca9ae07e45d070759512cd390ea2bebc6675"
 
 [[package]]
 name = "cli-gen"
-version = "2.0.0-rc14"
+version = "2.0.0-rc15"
 dependencies = [
  "clap",
  "cpp-linter",
@@ -249,7 +249,7 @@ checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 
 [[package]]
 name = "cpp-linter"
-version = "2.0.0-rc14"
+version = "2.0.0-rc15"
 dependencies = [
  "anyhow",
  "chrono",
@@ -275,7 +275,7 @@ dependencies = [
 
 [[package]]
 name = "cpp-linter-js"
-version = "2.0.0-rc14"
+version = "2.0.0-rc15"
 dependencies = [
  "anyhow",
  "cpp-linter",
@@ -286,7 +286,7 @@ dependencies = [
 
 [[package]]
 name = "cpp-linter-py"
-version = "2.0.0-rc14"
+version = "2.0.0-rc15"
 dependencies = [
  "cpp-linter",
  "pyo3",

@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
+## [2.0.0-rc15] - 2025-11-12
+
+### <!-- 9 --> 🗨️ Changed
+
+- Upgrade npm for trusted publishing in CI job by @2bndy5 in [`4560672`](https://github.com/cpp-linter/cpp-linter-rs/commit/456067201fbc4ac71f50d5c1711520ca9ab6f1a2)
+- Include LICENSE file in source distribution for PyPI by @2bndy5 in [`32e20b3`](https://github.com/cpp-linter/cpp-linter-rs/commit/32e20b39d43908e254534f4a6bf2a67560a315ba)
+
+[2.0.0-rc15]: https://github.com/cpp-linter/cpp-linter-rs/compare/v2.0.0-rc14...v2.0.0-rc15
+
+Full commit diff: [`v2.0.0-rc14...v2.0.0-rc15`][2.0.0-rc15]
+
 ## [2.0.0-rc14] - 2025-11-12
 
 ### <!-- 6 --> 📦 Dependency updates
