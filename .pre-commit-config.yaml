@@ -3,16 +3,17 @@ repos:
     rev: v6.0.0
     hooks:
       - id: trailing-whitespace
-        exclude: cpp-linter/tests/.*\.(?:patch|diff)
+        exclude: '^(?:cpp-linter/tests/.*\.(?:patch|diff))|(?:\.yarn/releases/yarn.*js)'
       - id: end-of-file-fixer
         exclude: bindings/node/.*package\.json
       - id: check-docstring-first
       - id: check-added-large-files
-        exclude: '.yarn/releases/yarn.*js'
+        exclude: '^\.yarn/releases/yarn.*js'
       - id: check-yaml
         exclude: docs/mkdocs.yml
       - id: check-toml
       - id: mixed-line-ending
+        exclude: '^\.yarn/releases/yarn.*js'
         args: ["--fix=lf"]
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.14.0
