@@ -321,8 +321,8 @@ jobs:
       - name: Setup node
         uses: actions/setup-node@v6
         with:
-          node-version: 22
-          cache: yarn # zizmor: ignore[cache-poisoning]
+          node-version: 24
+          package-manager-cache: false
       - name: Install dependencies
         run: yarn install
       - name: Create npm dirs
