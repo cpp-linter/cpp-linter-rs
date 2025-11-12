@@ -1,6 +1,6 @@
 {
   "name": "@cpp-linter/cpp-linter",
-  "version": "2.0.0-rc12",
+  "version": "2.0.0-rc13",
   "main": "index.js",
   "types": "index.d.ts",
   "napi": {
@@ -50,5 +50,6 @@
   "bugs": {
     "url": "https://github.com/cpp-linter/cpp-linter-rs/issues"
   },
-  "homepage": "https://github.com/cpp-linter/cpp-linter-rs#readme"
+  "homepage": "https://github.com/cpp-linter/cpp-linter-rs#readme",
+  "stableVersion": "2.0.0-rc12"
 }
