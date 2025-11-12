@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
+## [2.0.0-rc14] - 2025-11-12
+
+### <!-- 6 --> 📦 Dependency updates
+
+- Bump python dependencies by @2bndy5 in [#214](https://github.com/cpp-linter/cpp-linter-rs/pull/214)
+- Bump oxlint from 1.24.0 to 1.28.0 in the npm group by @dependabot[bot] in [#215](https://github.com/cpp-linter/cpp-linter-rs/pull/215)
+
+### <!-- 9 --> 🗨️ Changed
+
+- Use trusted publishing for npm deployments by @2bndy5 in [#212](https://github.com/cpp-linter/cpp-linter-rs/pull/212)
+
+[2.0.0-rc14]: https://github.com/cpp-linter/cpp-linter-rs/compare/v2.0.0-rc13...v2.0.0-rc14
+
+Full commit diff: [`v2.0.0-rc13...v2.0.0-rc14`][2.0.0-rc14]
+
 ## [2.0.0-rc13] - 2025-11-12
 
 ### <!-- 1 --> 🚀 Added
