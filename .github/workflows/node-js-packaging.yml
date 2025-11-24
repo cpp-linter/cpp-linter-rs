@@ -76,7 +76,7 @@ jobs:
     name: Build ${{ matrix.settings.target }}
     runs-on: ${{ matrix.settings.host }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: Setup node
@@ -106,7 +106,7 @@ jobs:
           use-cache: true # zizmor: ignore[cache-poisoning]
       - name: Install cargo-binstall
         if: contains(matrix.settings.build, ' -x ') || contains(matrix.settings.build, '--use-cross ')
-        uses: cargo-bins/cargo-binstall@ae04fb5e853ae6cd3ad7de4a1d554a8b646d12aa # v1.15.11
+        uses: cargo-bins/cargo-binstall@3fc81674af4165a753833a94cae9f91d8849049f # v1.16.2
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - name: Install ${{contains(matrix.settings.build, ' -x ') && 'cargo-zigbuild' || 'cargo-cross'}}
@@ -136,7 +136,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Build FreeBSD
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: Build
@@ -205,7 +205,7 @@ jobs:
           - '22'
     runs-on: ${{ matrix.settings.host }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: Setup node
@@ -244,7 +244,7 @@ jobs:
           - '22'
     runs-on: ${{ contains(matrix.target, 'aarch64') && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: Setup node
@@ -315,7 +315,7 @@ jobs:
       - test-macOS-windows-binding
       - test-linux-binding
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: Setup node
