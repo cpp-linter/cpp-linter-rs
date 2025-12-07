@@ -3,13 +3,13 @@
 
 use std::{
     fs,
-    process::Command,
-    sync::{Arc, Mutex, MutexGuard},
+    sync::{Arc, Mutex},
 };
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow};
 use log::Level;
 use serde::Deserialize;
+use tokio::process::Command;
 
 // project-specific crates/modules
 use super::MakeSuggestions;
@@ -81,58 +81,61 @@ pub fn tally_format_advice(files: &[Arc<Mutex<FileObj>>]) -> u64 {
 }
 
 /// Run clang-tidy for a specific `file`, then parse and return it's XML output.
-pub fn run_clang_format(
-    file: &mut MutexGuard<FileObj>,
+pub async fn run_clang_format(
+    file: &Arc<Mutex<FileObj>>,
     clang_params: &ClangParams,
 ) -> Result<Vec<(log::Level, String)>> {
-    let mut cmd = Command::new(clang_params.clang_format_command.as_ref().unwrap());
     let mut logs = vec![];
-    cmd.args(["--style", &clang_params.style]);
-    let ranges = file.get_ranges(&clang_params.lines_changed_only);
-    for range in &ranges {
-        cmd.arg(format!("--lines={}:{}", range.start(), range.end()));
-    }
-    let file_name = file.name.to_string_lossy().to_string();
-    cmd.arg(file.name.to_path_buf().as_os_str());
+    let program = clang_params.clang_format_command.as_ref().unwrap();
+    let (file_name, mut args, ranges) = {
+        let mut args = vec![];
+        let file = file
+            .lock()
+            .map_err(|e| anyhow!("Failed to lock mutex: {e:?}"))?;
+        args.extend(["--style".to_string(), clang_params.style.clone()]);
+        let ranges = file.get_ranges(&clang_params.lines_changed_only);
+        for range in &ranges {
+            args.push(format!("--lines={}:{}", range.start(), range.end()));
+        }
+        let file_name = file.name.to_string_lossy().to_string();
+        (file_name, args, ranges)
+    };
+    let mut cmd = Command::new(program);
+    cmd.args(&args);
     let patched = if !clang_params.format_review {
         None
     } else {
         logs.push((
             Level::Info,
             format!(
-                "Getting format fixes with \"{} {}\"",
-                clang_params
-                    .clang_format_command
-                    .as_ref()
-                    .unwrap()
-                    .to_str()
-                    .unwrap_or_default(),
-                cmd.get_args()
-                    .map(|a| a.to_string_lossy())
-                    .collect::<Vec<_>>()
-                    .join(" ")
+                "Getting format fixes with \"{} {} {}\"",
+                program.to_string_lossy(),
+                args.join(" "),
+                &file_name
             ),
         ));
+        cmd.arg(&file_name);
         Some(
             cmd.output()
+                .await
                 .with_context(|| format!("Failed to get fixes from clang-format: {file_name}"))?
                 .stdout,
         )
     };
-    cmd.arg("--output-replacements-xml");
+    args.extend(["--output-replacements-xml".to_string(), file_name.clone()]);
+    let mut cmd = Command::new(program);
+    cmd.args(&args);
     logs.push((
         log::Level::Info,
         format!(
             "Running \"{} {}\"",
-            cmd.get_program().to_string_lossy(),
-            cmd.get_args()
-                .map(|x| x.to_string_lossy())
-                .collect::<Vec<_>>()
-                .join(" ")
+            program.to_string_lossy(),
+            args.join(" ")
         ),
     ));
     let output = cmd
         .output()
+        .await
         .with_context(|| format!("Failed to get replacements from clang-format: {file_name}"))?;
     if !output.stderr.is_empty() || !output.status.success() {
         logs.push((
@@ -155,7 +158,7 @@ pub fn run_clang_format(
     };
     format_advice.patched = patched;
     if !format_advice.replacements.is_empty() {
-        let original_contents = fs::read(&file.name).with_context(|| {
+        let original_contents = fs::read(&file_name).with_context(|| {
             format!(
                 "Failed to read file's original content before translating byte offsets: {file_name}",
             )
@@ -178,7 +181,12 @@ pub fn run_clang_format(
         }
         format_advice.replacements = filtered_replacements;
     }
-    file.format_advice = Some(format_advice);
+    {
+        let mut file = file
+            .lock()
+            .map_err(|e| anyhow!("Failed to lock mutex: {e:?}"))?;
+        file.format_advice = Some(format_advice);
+    }
     Ok(logs)
 }
 

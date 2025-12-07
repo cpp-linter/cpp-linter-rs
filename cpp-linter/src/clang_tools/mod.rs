@@ -6,7 +6,6 @@ use std::{
     fmt::{self, Display},
     fs,
     path::{Path, PathBuf},
-    process::Command,
     sync::{Arc, Mutex},
 };
 
@@ -15,7 +14,7 @@ use anyhow::{Context, Result, anyhow};
 use git2::{DiffOptions, Patch};
 use regex::Regex;
 use semver::Version;
-use tokio::task::JoinSet;
+use tokio::{process::Command, task::JoinSet};
 use which::{which, which_in};
 
 // project-specific modules/crates
@@ -115,8 +114,8 @@ impl ClangTool {
     }
 
     /// Run `clang-tool --version`, then extract and return the version number.
-    fn capture_version(clang_tool: &PathBuf) -> Result<String> {
-        let output = Command::new(clang_tool).arg("--version").output()?;
+    async fn capture_version(clang_tool: &PathBuf) -> Result<String> {
+        let output = Command::new(clang_tool).arg("--version").output().await?;
         let stdout = String::from_utf8_lossy(&output.stdout);
         let version_pattern = Regex::new(r"(?i)version[^\d]*([\d.]+)").unwrap();
         let captures = version_pattern.captures(&stdout).ok_or(anyhow!(
@@ -135,29 +134,31 @@ impl ClangTool {
 /// 2. A collections of cached logs. A [`Vec`] of tuples that hold
 ///    - log level
 ///    - messages
-fn analyze_single_file(
+async fn analyze_single_file(
     file: Arc<Mutex<FileObj>>,
     clang_params: Arc<ClangParams>,
 ) -> Result<(PathBuf, Vec<(log::Level, String)>)> {
-    let mut file = file
-        .lock()
-        .map_err(|_| anyhow!("Failed to lock file mutex"))?;
     let mut logs = vec![];
+    let file_name = {
+        let lock = file
+            .lock()
+            .map_err(|e| anyhow!("Failed to lock mutex: {e:?}"))?;
+        lock.name.to_owned()
+    };
     if clang_params.clang_format_command.is_some() {
         if clang_params
             .format_filter
             .as_ref()
-            .is_some_and(|f| f.is_source_or_ignored(file.name.as_path()))
-            || clang_params.format_filter.is_none()
+            .is_none_or(|f| f.is_source_or_ignored(file_name.as_path()))
         {
-            let format_result = run_clang_format(&mut file, &clang_params)?;
+            let format_result = run_clang_format(&file, &clang_params).await?;
             logs.extend(format_result);
         } else {
             logs.push((
                 log::Level::Info,
                 format!(
                     "{} not scanned by clang-format due to `--ignore-format`",
-                    file.name.as_os_str().to_string_lossy()
+                    file_name.as_os_str().to_string_lossy()
                 ),
             ));
         }
@@ -166,22 +167,21 @@ fn analyze_single_file(
         if clang_params
             .tidy_filter
             .as_ref()
-            .is_some_and(|f| f.is_source_or_ignored(file.name.as_path()))
-            || clang_params.tidy_filter.is_none()
+            .is_none_or(|f| f.is_source_or_ignored(file_name.as_path()))
         {
-            let tidy_result = run_clang_tidy(&mut file, &clang_params)?;
+            let tidy_result = run_clang_tidy(&file, &clang_params).await?;
             logs.extend(tidy_result);
         } else {
             logs.push((
                 log::Level::Info,
                 format!(
                     "{} not scanned by clang-tidy due to `--ignore-tidy`",
-                    file.name.as_os_str().to_string_lossy()
+                    file_name.as_os_str().to_string_lossy()
                 ),
             ));
         }
     }
-    Ok((file.name.clone(), logs))
+    Ok((file_name, logs))
 }
 
 /// A struct to contain the version numbers of the clang-tools used
@@ -209,7 +209,7 @@ pub async fn capture_clang_tools_output(
     // info as debugging output.
     if clang_params.tidy_checks != "-*" {
         let exe_path = ClangTool::ClangTidy.get_exe_path(version)?;
-        let version_found = ClangTool::capture_version(&exe_path)?;
+        let version_found = ClangTool::capture_version(&exe_path).await?;
         log::debug!(
             "{} --version: v{version_found}",
             &exe_path.to_string_lossy()
@@ -219,7 +219,7 @@ pub async fn capture_clang_tools_output(
     }
     if !clang_params.style.is_empty() {
         let exe_path = ClangTool::ClangFormat.get_exe_path(version)?;
-        let version_found = ClangTool::capture_version(&exe_path)?;
+        let version_found = ClangTool::capture_version(&exe_path).await?;
         log::debug!(
             "{} --version: v{version_found}",
             &exe_path.to_string_lossy()
@@ -243,9 +243,8 @@ pub async fn capture_clang_tools_output(
     let arc_params = Arc::new(clang_params);
     // iterate over the discovered files and run the clang tools
     for file in files {
-        let arc_file = file.clone();
-        let arc_params = arc_params.clone();
-        executors.spawn(async move { analyze_single_file(arc_file, arc_params) });
+        let arc_file = Arc::clone(file);
+        executors.spawn(analyze_single_file(arc_file, arc_params.clone()));
     }
 
     while let Some(output) = executors.join_next().await {

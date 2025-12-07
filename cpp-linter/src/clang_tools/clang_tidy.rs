@@ -5,14 +5,14 @@ use std::{
     env::{consts::OS, current_dir},
     fs,
     path::PathBuf,
-    process::Command,
-    sync::{Arc, Mutex, MutexGuard},
+    sync::{Arc, Mutex},
 };
 
 // non-std crates
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow};
 use regex::Regex;
 use serde::Deserialize;
+use tokio::process::Command;
 
 // project-specific modules/crates
 use super::MakeSuggestions;
@@ -247,39 +247,45 @@ pub fn tally_tidy_advice(files: &[Arc<Mutex<FileObj>>]) -> u64 {
 }
 
 /// Run clang-tidy, then parse and return it's output.
-pub fn run_clang_tidy(
-    file: &mut MutexGuard<FileObj>,
+pub async fn run_clang_tidy(
+    file: &Arc<Mutex<FileObj>>,
     clang_params: &ClangParams,
 ) -> Result<Vec<(log::Level, std::string::String)>> {
-    let mut cmd = Command::new(clang_params.clang_tidy_command.as_ref().unwrap());
     let mut logs = vec![];
-    if !clang_params.tidy_checks.is_empty() {
-        cmd.args(["-checks", &clang_params.tidy_checks]);
-    }
-    if let Some(db) = &clang_params.database {
-        cmd.args(["-p", &db.to_string_lossy()]);
-    }
-    for arg in &clang_params.extra_args {
-        cmd.args(["--extra-arg", format!("\"{}\"", arg).as_str()]);
-    }
-    let file_name = file.name.to_string_lossy().to_string();
-    let ranges = file.get_ranges(&clang_params.lines_changed_only);
-    if !ranges.is_empty() {
-        let filter = format!(
-            "[{{\"name\":{:?},\"lines\":{:?}}}]",
-            &file_name.replace('/', if OS == "windows" { "\\" } else { "/" }),
-            ranges
-                .iter()
-                .map(|r| [r.start(), r.end()])
-                .collect::<Vec<_>>()
-        );
-        cmd.args(["--line-filter", filter.as_str()]);
-    }
+    let (file_name, mut args) = {
+        let mut args = vec![];
+        let file = file
+            .lock()
+            .map_err(|e| anyhow!("Failed to lock mutex: {e:?}"))?;
+        let file_name = file.name.to_string_lossy().to_string();
+        if !clang_params.tidy_checks.is_empty() {
+            args.extend(["-checks".to_string(), clang_params.tidy_checks.to_owned()]);
+        }
+        if let Some(db) = &clang_params.database {
+            args.extend(["-p".to_string(), db.to_string_lossy().to_string()]);
+        }
+        for arg in &clang_params.extra_args {
+            args.extend(["--extra-arg".to_string(), format!("\"{}\"", arg)]);
+        }
+        let ranges = file.get_ranges(&clang_params.lines_changed_only);
+        if !ranges.is_empty() {
+            let filter = format!(
+                "[{{\"name\":{:?},\"lines\":{:?}}}]",
+                &file_name.replace('/', if OS == "windows" { "\\" } else { "/" }),
+                ranges
+                    .iter()
+                    .map(|r| [r.start(), r.end()])
+                    .collect::<Vec<_>>()
+            );
+            args.extend(["--line-filter".to_string(), filter]);
+        }
+        (file_name, args)
+    };
     let original_content = if !clang_params.tidy_review {
         None
     } else {
-        cmd.arg("--fix-errors");
-        Some(fs::read_to_string(&file.name).with_context(|| {
+        args.push("--fix-errors".to_string());
+        Some(fs::read_to_string(&file_name).with_context(|| {
             format!(
                 "Failed to cache file's original content before applying clang-tidy changes: {}",
                 file_name.clone()
@@ -287,21 +293,24 @@ pub fn run_clang_tidy(
         })?)
     };
     if !clang_params.style.is_empty() {
-        cmd.args(["--format-style", clang_params.style.as_str()]);
+        args.extend(["--format-style".to_string(), clang_params.style.to_owned()]);
     }
-    cmd.arg(file.name.to_string_lossy().as_ref());
+    args.push(file_name.clone());
+    let program = clang_params.clang_tidy_command.as_ref().unwrap();
+    let mut cmd = Command::new(program);
+    cmd.args(&args);
     logs.push((
         log::Level::Info,
         format!(
             "Running \"{} {}\"",
-            cmd.get_program().to_string_lossy(),
-            cmd.get_args()
-                .map(|x| x.to_string_lossy())
-                .collect::<Vec<_>>()
-                .join(" ")
+            program.to_string_lossy(),
+            args.join(" ")
         ),
     ));
-    let output = cmd.output().unwrap();
+    let output = cmd
+        .output()
+        .await
+        .with_context(|| format!("Failed to run clang-tidy on file: {}", file_name.clone()))?;
     logs.push((
         log::Level::Debug,
         format!(
@@ -318,21 +327,22 @@ pub fn run_clang_tidy(
             ),
         ));
     }
-    file.tidy_advice = Some(parse_tidy_output(
-        &output.stdout,
-        &clang_params.database_json,
-    )?);
+    let mut tidy_advice = parse_tidy_output(&output.stdout, &clang_params.database_json)?;
     if clang_params.tidy_review {
-        if let Some(tidy_advice) = &mut file.tidy_advice {
-            // cache file changes in a buffer and restore the original contents for further analysis
-            tidy_advice.patched =
-                Some(fs::read(&file_name).with_context(|| {
-                    format!("Failed to read changes from clang-tidy: {file_name}")
-                })?);
-        }
+        // cache file changes in a buffer and restore the original contents for further analysis
+        tidy_advice.patched = Some(
+            fs::read(&file_name)
+                .with_context(|| format!("Failed to read changes from clang-tidy: {file_name}"))?,
+        );
         // original_content is guaranteed to be Some() value at this point
         fs::write(&file_name, original_content.unwrap())
             .with_context(|| format!("Failed to restore file's original content: {file_name}"))?;
+    }
+    {
+        let mut file = file
+            .lock()
+            .map_err(|e| anyhow!("Failed to lock mutex: {e:?}"))?;
+        file.tidy_advice = Some(tidy_advice);
     }
     Ok(logs)
 }
@@ -416,8 +426,8 @@ mod test {
         )
     }
 
-    #[test]
-    fn use_extra_args() {
+    #[tokio::test]
+    async fn use_extra_args() {
         let exe_path = ClangTool::ClangTidy
             .get_exe_path(
                 &RequestedVersion::from_str(
@@ -443,8 +453,8 @@ mod test {
             clang_tidy_command: Some(exe_path),
             clang_format_command: None,
         };
-        let mut file_lock = arc_file.lock().unwrap();
-        let logs = run_clang_tidy(&mut file_lock, &clang_params)
+        let logs = run_clang_tidy(&arc_file, &clang_params)
+            .await
             .unwrap()
             .into_iter()
             .filter_map(|(_lvl, msg)| {
