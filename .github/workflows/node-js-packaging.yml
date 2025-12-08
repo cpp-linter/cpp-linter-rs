@@ -99,14 +99,14 @@ jobs:
             .cargo-cache
             target/
           key: ${{ matrix.settings.target }}-cargo-${{ matrix.settings.host }}
-      - uses: mlugg/setup-zig@8d6198c65fb0feaa111df26e6b467fea8345e46f # v2.0.5
+      - uses: mlugg/setup-zig@fa65c4058643678a4e4a9a60513944a7d8d35440 # v2.1.0
         if: ${{ contains(matrix.settings.build, ' -x ') }}
         with:
           version: 0.14.1
           use-cache: true # zizmor: ignore[cache-poisoning]
       - name: Install cargo-binstall
         if: contains(matrix.settings.build, ' -x ') || contains(matrix.settings.build, '--use-cross ')
-        uses: cargo-bins/cargo-binstall@3fc81674af4165a753833a94cae9f91d8849049f # v1.16.2
+        uses: cargo-bins/cargo-binstall@8110b3aa84cb581a90696bc57469b0656f972494 # v1.16.3
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - name: Install ${{contains(matrix.settings.build, ' -x ') && 'cargo-zigbuild' || 'cargo-cross'}}
