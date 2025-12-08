@@ -17,7 +17,7 @@ __metadata:
   dependencies:
     "@napi-rs/cli": "npm:3.5.0"
     ava: "npm:^6.4.1"
-    oxlint: "npm:^1.31.0"
+    oxlint: "npm:^1.32.0"
   bin:
     cpp-linter: cli.js
   languageName: unknown
@@ -1058,58 +1058,58 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@oxlint/darwin-arm64@npm:1.31.0":
-  version: 1.31.0
-  resolution: "@oxlint/darwin-arm64@npm:1.31.0"
+"@oxlint/darwin-arm64@npm:1.32.0":
+  version: 1.32.0
+  resolution: "@oxlint/darwin-arm64@npm:1.32.0"
   conditions: os=darwin & cpu=arm64
   languageName: node
   linkType: hard
 
-"@oxlint/darwin-x64@npm:1.31.0":
-  version: 1.31.0
-  resolution: "@oxlint/darwin-x64@npm:1.31.0"
+"@oxlint/darwin-x64@npm:1.32.0":
+  version: 1.32.0
+  resolution: "@oxlint/darwin-x64@npm:1.32.0"
   conditions: os=darwin & cpu=x64
   languageName: node
   linkType: hard
 
-"@oxlint/linux-arm64-gnu@npm:1.31.0":
-  version: 1.31.0
-  resolution: "@oxlint/linux-arm64-gnu@npm:1.31.0"
+"@oxlint/linux-arm64-gnu@npm:1.32.0":
+  version: 1.32.0
+  resolution: "@oxlint/linux-arm64-gnu@npm:1.32.0"
   conditions: os=linux & cpu=arm64 & libc=glibc
   languageName: node
   linkType: hard
 
-"@oxlint/linux-arm64-musl@npm:1.31.0":
-  version: 1.31.0
-  resolution: "@oxlint/linux-arm64-musl@npm:1.31.0"
+"@oxlint/linux-arm64-musl@npm:1.32.0":
+  version: 1.32.0
+  resolution: "@oxlint/linux-arm64-musl@npm:1.32.0"
   conditions: os=linux & cpu=arm64 & libc=musl
   languageName: node
   linkType: hard
 
-"@oxlint/linux-x64-gnu@npm:1.31.0":
-  version: 1.31.0
-  resolution: "@oxlint/linux-x64-gnu@npm:1.31.0"
+"@oxlint/linux-x64-gnu@npm:1.32.0":
+  version: 1.32.0
+  resolution: "@oxlint/linux-x64-gnu@npm:1.32.0"
   conditions: os=linux & cpu=x64 & libc=glibc
   languageName: node
   linkType: hard
 
-"@oxlint/linux-x64-musl@npm:1.31.0":
-  version: 1.31.0
-  resolution: "@oxlint/linux-x64-musl@npm:1.31.0"
+"@oxlint/linux-x64-musl@npm:1.32.0":
+  version: 1.32.0
+  resolution: "@oxlint/linux-x64-musl@npm:1.32.0"
   conditions: os=linux & cpu=x64 & libc=musl
   languageName: node
   linkType: hard
 
-"@oxlint/win32-arm64@npm:1.31.0":
-  version: 1.31.0
-  resolution: "@oxlint/win32-arm64@npm:1.31.0"
+"@oxlint/win32-arm64@npm:1.32.0":
+  version: 1.32.0
+  resolution: "@oxlint/win32-arm64@npm:1.32.0"
   conditions: os=win32 & cpu=arm64
   languageName: node
   linkType: hard
 
-"@oxlint/win32-x64@npm:1.31.0":
-  version: 1.31.0
-  resolution: "@oxlint/win32-x64@npm:1.31.0"
+"@oxlint/win32-x64@npm:1.32.0":
+  version: 1.32.0
+  resolution: "@oxlint/win32-x64@npm:1.32.0"
   conditions: os=win32 & cpu=x64
   languageName: node
   linkType: hard
@@ -2188,18 +2188,18 @@ __metadata:
   languageName: node
   linkType: hard
 
-"oxlint@npm:^1.31.0":
-  version: 1.31.0
-  resolution: "oxlint@npm:1.31.0"
+"oxlint@npm:^1.32.0":
+  version: 1.32.0
+  resolution: "oxlint@npm:1.32.0"
   dependencies:
-    "@oxlint/darwin-arm64": "npm:1.31.0"
-    "@oxlint/darwin-x64": "npm:1.31.0"
-    "@oxlint/linux-arm64-gnu": "npm:1.31.0"
-    "@oxlint/linux-arm64-musl": "npm:1.31.0"
-    "@oxlint/linux-x64-gnu": "npm:1.31.0"
-    "@oxlint/linux-x64-musl": "npm:1.31.0"
-    "@oxlint/win32-arm64": "npm:1.31.0"
-    "@oxlint/win32-x64": "npm:1.31.0"
+    "@oxlint/darwin-arm64": "npm:1.32.0"
+    "@oxlint/darwin-x64": "npm:1.32.0"
+    "@oxlint/linux-arm64-gnu": "npm:1.32.0"
+    "@oxlint/linux-arm64-musl": "npm:1.32.0"
+    "@oxlint/linux-x64-gnu": "npm:1.32.0"
+    "@oxlint/linux-x64-musl": "npm:1.32.0"
+    "@oxlint/win32-arm64": "npm:1.32.0"
+    "@oxlint/win32-x64": "npm:1.32.0"
   peerDependencies:
     oxlint-tsgolint: ">=0.8.1"
   dependenciesMeta:
@@ -2225,7 +2225,7 @@ __metadata:
   bin:
     oxc_language_server: bin/oxc_language_server
     oxlint: bin/oxlint
-  checksum: 10c0/f8555b2549e8b93d5a7d628bc696220c7b82d243db8fecb7947fb2797b71e3c8caffe48a15d9ed370aff745aea5be7c72cfa49ec5a9c3f7c2e142b1cc5b89f49
+  checksum: 10c0/a87503f30b7f44d013f147c8c492c1b71f47045e7f45e03e5d3f042f55568b14a8856f944e393a9fdd0cf380e9544192e7e586fd8f52079143ff12ac5a628c4b
   languageName: node
   linkType: hard
 
