@@ -151,10 +151,7 @@ pub fn run_clang_format(
             format!("Failed to parse XML output from clang-format for {file_name}")
         })?
     } else {
-        FormatAdvice {
-            replacements: vec![],
-            patched: None,
-        }
+        FormatAdvice::default()
     };
     format_advice.patched = patched;
     if !format_advice.replacements.is_empty() {
@@ -203,10 +200,7 @@ mod tests {
 </replacements>"#
             .as_bytes()
             .to_vec();
-        let expected = FormatAdvice {
-            replacements: vec![],
-            patched: None,
-        };
+        let expected = FormatAdvice::default();
         let xml = String::from_utf8(xml_raw).unwrap();
         let document = quick_xml::de::from_str::<FormatAdvice>(&xml).unwrap();
         assert_eq!(expected, document);
