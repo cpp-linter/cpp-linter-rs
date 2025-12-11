@@ -122,8 +122,13 @@ export def run-hyperfine [
         --export-markdown ../benchmark.md
         --warmup 1
         --style color
-        --runs 3
+        --runs
     ]
+    if ($new_path | is-not-empty) {
+        $hyperfine_args = $hyperfine_args | append 3
+    } else {
+        $hyperfine_args = $hyperfine_args | append 4
+    }
     let common_args = "-l 0 -a 0 -i=|!src/libgit2 -p build -e c"
     if ($old_path | is-not-empty) {
         $hyperfine_args = $hyperfine_args | append [--command-name python-pure $"($old_path) ($common_args) -j 0"]
@@ -165,9 +170,9 @@ export def summarize [] {
 # 4. Clones the libgit2 repository if it does not exist.
 # 5. Runs benchmarks using hyperfine and saves the results to benchmark.json.
 export def main [
-    --new-py: string, # path to wheel of new version of cpp-linter (v2.x)
     --rust-bin: string, # path to rust binary of cpp-linter (v2.x)
     --prev-rust-bin: string, # path to previous commit's release build of rust binary (v2.x)
+    --new-py: string = "", # path to wheel of new version of cpp-linter (v2.x)
 ] {
     let is_on_win = sys host | get name | str starts-with "Windows"
     let rust_bin = if ($rust_bin | is-not-empty) {
@@ -182,7 +187,11 @@ export def main [
         run-cmd chmod +x $prev_rust_bin
     }
     let old_path = install-old
-    let new_path = install-py-binding $new_py
+    let new_path = if ($new_py | is-not-empty) {
+        install-py-binding $new_py
+    } else {
+        ""
+    }
     checkout-libgit2
     run-hyperfine $old_path $new_path $rust_bin $prev_rust_bin
     summarize
