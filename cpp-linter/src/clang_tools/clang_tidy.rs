@@ -18,7 +18,7 @@ use serde::Deserialize;
 use super::MakeSuggestions;
 use crate::{
     cli::{ClangParams, LinesChangedOnly},
-    common_fs::{normalize_path, FileObj},
+    common_fs::{FileObj, normalize_path},
 };
 
 /// Used to deserialize a json compilation database's translation unit.
@@ -205,21 +205,19 @@ fn parse_tidy_output(
             found_fix = false;
         } else if let Some(capture) = fixed_note.captures(line) {
             let fixed_line = capture[1].parse()?;
-            if let Some(note) = &mut notification {
-                if !note.fixed_lines.contains(&fixed_line) {
-                    note.fixed_lines.push(fixed_line);
-                }
+            if let Some(note) = &mut notification
+                && !note.fixed_lines.contains(&fixed_line)
+            {
+                note.fixed_lines.push(fixed_line);
             }
             // Suspend capturing subsequent lines as suggestions until
             // a new notification is constructed. If we found a note about applied fixes,
             // then the lines of suggestions for that notification have already been parsed.
             found_fix = true;
-        } else if !found_fix {
-            if let Some(note) = &mut notification {
-                // append lines of code that are part of
-                // the previous line's notification
-                note.suggestion.push(line.to_string());
-            }
+        } else if !found_fix && let Some(note) = &mut notification {
+            // append lines of code that are part of
+            // the previous line's notification
+            note.suggestion.push(line.to_string());
         }
     }
     if let Some(note) = notification {
@@ -358,7 +356,7 @@ mod test {
         common_fs::FileObj,
     };
 
-    use super::{run_clang_tidy, TidyNotification, NOTE_HEADER};
+    use super::{NOTE_HEADER, TidyNotification, run_clang_tidy};
 
     #[test]
     fn clang_diagnostic_link() {

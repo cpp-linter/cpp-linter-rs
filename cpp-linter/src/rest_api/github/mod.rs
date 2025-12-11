@@ -11,15 +11,15 @@ use std::sync::{Arc, Mutex};
 // non-std crates
 use anyhow::{Context, Result};
 use reqwest::{
-    header::{HeaderMap, HeaderValue, AUTHORIZATION},
     Client, Method, Url,
+    header::{AUTHORIZATION, HeaderMap, HeaderValue},
 };
 
 // project specific modules/crates
-use super::{send_api_request, RestApiClient, RestApiRateLimitHeaders};
+use super::{RestApiClient, RestApiRateLimitHeaders, send_api_request};
+use crate::clang_tools::ClangVersions;
 use crate::clang_tools::clang_format::tally_format_advice;
 use crate::clang_tools::clang_tidy::tally_tidy_advice;
-use crate::clang_tools::ClangVersions;
 use crate::cli::{FeedbackInput, LinesChangedOnly, ThreadComments};
 use crate::common_fs::{FileFilter, FileObj};
 use crate::git::{get_diff, open_repo, parse_diff, parse_diff_from_buf};
@@ -170,9 +170,9 @@ impl RestApiClient for GithubApiClient {
             }
         } else {
             // get diff from libgit2 API
-            let repo = open_repo(".").with_context(|| {
-                "Please ensure the repository is checked out before running cpp-linter."
-            })?;
+            let repo = open_repo(".").with_context(
+                || "Please ensure the repository is checked out before running cpp-linter.",
+            )?;
             let list = parse_diff(&get_diff(&repo)?, file_filter, lines_changed_only);
             Ok(list)
         }
@@ -261,14 +261,14 @@ mod test {
     };
 
     use regex::Regex;
-    use tempfile::{tempdir, NamedTempFile};
+    use tempfile::{NamedTempFile, tempdir};
 
     use super::GithubApiClient;
     use crate::{
         clang_tools::{
+            ClangVersions,
             clang_format::{FormatAdvice, Replacement},
             clang_tidy::{TidyAdvice, TidyNotification},
-            ClangVersions,
         },
         cli::{FeedbackInput, LinesChangedOnly},
         common_fs::{FileFilter, FileObj},
@@ -326,23 +326,25 @@ mod test {
             ..Default::default()
         };
         let mut step_summary_path = NamedTempFile::new_in(tmp_dir.path()).unwrap();
-        env::set_var(
-            "GITHUB_STEP_SUMMARY",
-            if fail_summary {
-                Path::new("not-a-file.txt")
-            } else {
-                step_summary_path.path()
-            },
-        );
         let mut gh_out_path = NamedTempFile::new_in(tmp_dir.path()).unwrap();
-        env::set_var(
-            "GITHUB_OUTPUT",
-            if fail_gh_out {
-                Path::new("not-a-file.txt")
-            } else {
-                gh_out_path.path()
-            },
-        );
+        unsafe {
+            env::set_var(
+                "GITHUB_STEP_SUMMARY",
+                if fail_summary {
+                    Path::new("not-a-file.txt")
+                } else {
+                    step_summary_path.path()
+                },
+            );
+            env::set_var(
+                "GITHUB_OUTPUT",
+                if fail_gh_out {
+                    Path::new("not-a-file.txt")
+                } else {
+                    gh_out_path.path()
+                },
+            );
+        }
         let clang_versions = ClangVersions {
             format_version: Some("x.y.z".to_string()),
             tidy_version: Some("x.y.z".to_string()),
@@ -387,7 +389,9 @@ mod test {
 
     #[tokio::test]
     async fn check_comment_lgtm() {
-        env::set_var("ACTIONS_STEP_DEBUG", "true");
+        unsafe {
+            env::set_var("ACTIONS_STEP_DEBUG", "true");
+        }
         let (comment, gh_out) = create_comment(true, false, false).await;
         assert!(comment.contains(":heavy_check_mark:\nNo problems need attention."));
         assert_eq!(
@@ -398,7 +402,9 @@ mod test {
 
     #[tokio::test]
     async fn fail_gh_output() {
-        env::set_var("ACTIONS_STEP_DEBUG", "true");
+        unsafe {
+            env::set_var("ACTIONS_STEP_DEBUG", "true");
+        }
         let (comment, gh_out) = create_comment(true, true, false).await;
         assert!(&comment.contains(":heavy_check_mark:\nNo problems need attention."));
         assert!(gh_out.is_empty());
@@ -406,7 +412,9 @@ mod test {
 
     #[tokio::test]
     async fn fail_gh_summary() {
-        env::set_var("ACTIONS_STEP_DEBUG", "true");
+        unsafe {
+            env::set_var("ACTIONS_STEP_DEBUG", "true");
+        }
         let (comment, gh_out) = create_comment(true, false, true).await;
         assert!(comment.is_empty());
         assert_eq!(
@@ -417,7 +425,9 @@ mod test {
 
     #[tokio::test]
     async fn fail_get_local_diff() {
-        env::set_var("CI", "false");
+        unsafe {
+            env::set_var("CI", "false");
+        }
         let tmp_dir = tempdir().unwrap();
         env::set_current_dir(tmp_dir.path()).unwrap();
         let rest_client = GithubApiClient::new().unwrap();

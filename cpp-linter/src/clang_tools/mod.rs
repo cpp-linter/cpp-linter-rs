@@ -11,7 +11,7 @@ use std::{
 };
 
 // non-std crates
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use git2::{DiffOptions, Patch};
 use regex::Regex;
 use semver::Version;
@@ -22,12 +22,12 @@ use which::{which, which_in};
 use super::common_fs::FileObj;
 use crate::{
     cli::{ClangParams, RequestedVersion},
-    rest_api::{RestApiClient, COMMENT_MARKER, USER_OUTREACH},
+    rest_api::{COMMENT_MARKER, RestApiClient, USER_OUTREACH},
 };
 pub mod clang_format;
 use clang_format::run_clang_format;
 pub mod clang_tidy;
-use clang_tidy::{run_clang_tidy, CompilationUnit};
+use clang_tidy::{CompilationUnit, run_clang_tidy};
 
 #[derive(Debug)]
 pub enum ClangTool {
@@ -229,14 +229,14 @@ pub async fn capture_clang_tools_output(
     }
 
     // parse database (if provided) to match filenames when parsing clang-tidy's stdout
-    if let Some(db_path) = &clang_params.database {
-        if let Ok(db_str) = fs::read(db_path.join("compile_commands.json")) {
-            clang_params.database_json = Some(
-                // A compilation database should be UTF-8 encoded, but file paths are not; use lossy conversion.
-                serde_json::from_str::<Vec<CompilationUnit>>(&String::from_utf8_lossy(&db_str))
-                    .with_context(|| "Failed to parse compile_commands.json")?,
-            )
-        }
+    if let Some(db_path) = &clang_params.database
+        && let Ok(db_str) = fs::read(db_path.join("compile_commands.json"))
+    {
+        clang_params.database_json = Some(
+            // A compilation database should be UTF-8 encoded, but file paths are not; use lossy conversion.
+            serde_json::from_str::<Vec<CompilationUnit>>(&String::from_utf8_lossy(&db_str))
+                .with_context(|| "Failed to parse compile_commands.json")?,
+        )
     };
 
     let mut executors = JoinSet::new();
@@ -503,24 +503,26 @@ mod tests {
         let req_version = RequestedVersion::from_str(requirement).unwrap();
         let tool_exe = CLANG_FORMAT.get_exe_path(&req_version);
         println!("tool_exe: {:?}", tool_exe);
-        assert!(tool_exe.is_ok_and(|val| val
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .to_string()
-            .contains(CLANG_FORMAT.as_str())));
+        assert!(tool_exe.is_ok_and(|val| {
+            val.file_name()
+                .unwrap()
+                .to_string_lossy()
+                .to_string()
+                .contains(CLANG_FORMAT.as_str())
+        }));
     }
 
     #[test]
     fn get_exe_by_default() {
         let tool_exe = CLANG_FORMAT.get_exe_path(&RequestedVersion::from_str("").unwrap());
         println!("tool_exe: {:?}", tool_exe);
-        assert!(tool_exe.is_ok_and(|val| val
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .to_string()
-            .contains(CLANG_FORMAT.as_str())));
+        assert!(tool_exe.is_ok_and(|val| {
+            val.file_name()
+                .unwrap()
+                .to_string_lossy()
+                .to_string()
+                .contains(CLANG_FORMAT.as_str())
+        }));
     }
 
     #[test]
@@ -531,12 +533,13 @@ mod tests {
         println!("binary exe path: {bin_path}");
         let tool_exe = CLANG_FORMAT.get_exe_path(&RequestedVersion::from_str(bin_path).unwrap());
         println!("tool_exe: {:?}", tool_exe);
-        assert!(tool_exe.is_ok_and(|val| val
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .to_string()
-            .contains(TOOL_NAME)));
+        assert!(tool_exe.is_ok_and(|val| {
+            val.file_name()
+                .unwrap()
+                .to_string_lossy()
+                .to_string()
+                .contains(TOOL_NAME)
+        }));
     }
 
     #[test]

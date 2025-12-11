@@ -2,10 +2,10 @@
 
 use std::{
     env,
-    io::{stdout, Write},
+    io::{Write, stdout},
 };
 
-use colored::{control::set_override, Colorize};
+use colored::{Colorize, control::set_override};
 use log::{Level, LevelFilter, Log, Metadata, Record};
 
 #[derive(Default)]
@@ -93,11 +93,13 @@ pub fn try_init() {
 mod test {
     use std::env;
 
-    use super::{try_init, SimpleLogger};
+    use super::{SimpleLogger, try_init};
 
     #[test]
     fn trace_log() {
-        env::set_var("CPP_LINTER_COLOR", "true");
+        unsafe {
+            env::set_var("CPP_LINTER_COLOR", "true");
+        }
         try_init();
         assert!(SimpleLogger::level_color(&log::Level::Trace).contains("TRACE"));
         log::set_max_level(log::LevelFilter::Trace);

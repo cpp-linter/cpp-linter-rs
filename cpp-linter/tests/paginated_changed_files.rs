@@ -8,7 +8,7 @@ use cpp_linter::{
     cli::LinesChangedOnly,
     common_fs::FileFilter,
     logger,
-    rest_api::{github::GithubApiClient, RestApiClient},
+    rest_api::{RestApiClient, github::GithubApiClient},
 };
 use std::{env, io::Write, path::Path};
 
@@ -37,29 +37,31 @@ const REMAINING_RATE_LIMIT_HEADER: &str = "x-ratelimit-remaining";
 const MALFORMED_RESPONSE_PAYLOAD: &str = "{\"message\":\"Resource not accessible by integration\"}";
 
 async fn get_paginated_changes(lib_root: &Path, test_params: &TestParams) {
-    env::set_var("GITHUB_REPOSITORY", REPO);
-    env::set_var("GITHUB_SHA", SHA);
-    env::set_var("GITHUB_TOKEN", TOKEN);
-    env::set_var("CI", "true");
-    env::set_var(
-        "GITHUB_EVENT_NAME",
-        if test_params.event_t == EventType::Push {
-            "push"
-        } else {
-            "pull_request"
-        },
-    );
     let tmp = TempDir::new().expect("Failed to create a temp dir for test");
     let mut event_payload = NamedTempFile::new_in(tmp.path())
         .expect("Failed to spawn a tmp file for test event payload");
-    env::set_var(
-        "GITHUB_EVENT_PATH",
-        if test_params.no_event_payload {
-            Path::new("no a file.txt")
-        } else {
-            event_payload.path()
-        },
-    );
+    unsafe {
+        env::set_var("GITHUB_REPOSITORY", REPO);
+        env::set_var("GITHUB_SHA", SHA);
+        env::set_var("GITHUB_TOKEN", TOKEN);
+        env::set_var("CI", "true");
+        env::set_var(
+            "GITHUB_EVENT_NAME",
+            if test_params.event_t == EventType::Push {
+                "push"
+            } else {
+                "pull_request"
+            },
+        );
+        env::set_var(
+            "GITHUB_EVENT_PATH",
+            if test_params.no_event_payload {
+                Path::new("no a file.txt")
+            } else {
+                event_payload.path()
+            },
+        );
+    }
     if EventType::PullRequest == test_params.event_t
         && !test_params.fail_serde_event_payload
         && !test_params.no_event_payload
@@ -73,7 +75,9 @@ async fn get_paginated_changes(lib_root: &Path, test_params: &TestParams) {
     let asset_path = format!("{}/tests/paginated_changes", lib_root.to_str().unwrap());
 
     let mut server = mock_server().await;
-    env::set_var("GITHUB_API_URL", server.url());
+    unsafe {
+        env::set_var("GITHUB_API_URL", server.url());
+    }
     env::set_current_dir(tmp.path()).unwrap();
     logger::try_init();
     log::set_max_level(log::LevelFilter::Debug);
@@ -151,13 +155,15 @@ async fn get_paginated_changes(lib_root: &Path, test_params: &TestParams) {
         Ok(files) => {
             assert_eq!(files.len(), 2);
             for file in files {
-                assert!(["src/demo.cpp", "src/demo.hpp"].contains(
-                    &file
-                        .name
-                        .as_path()
-                        .to_str()
-                        .expect("Failed to get file name from path")
-                ));
+                assert!(
+                    ["src/demo.cpp", "src/demo.hpp"].contains(
+                        &file
+                            .name
+                            .as_path()
+                            .to_str()
+                            .expect("Failed to get file name from path")
+                    )
+                );
             }
         }
     }

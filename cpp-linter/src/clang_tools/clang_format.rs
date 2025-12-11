@@ -15,7 +15,7 @@ use serde::Deserialize;
 use super::MakeSuggestions;
 use crate::{
     cli::ClangParams,
-    common_fs::{get_line_count_from_offset, FileObj},
+    common_fs::{FileObj, get_line_count_from_offset},
 };
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
@@ -71,10 +71,10 @@ pub fn tally_format_advice(files: &[Arc<Mutex<FileObj>>]) -> u64 {
     let mut total = 0;
     for file in files {
         let file = file.lock().unwrap();
-        if let Some(advice) = &file.format_advice {
-            if !advice.replacements.is_empty() {
-                total += 1;
-            }
+        if let Some(advice) = &file.format_advice
+            && !advice.replacements.is_empty()
+        {
+            total += 1;
         }
     }
     total
@@ -187,7 +187,7 @@ pub fn run_clang_format(
 
 #[cfg(test)]
 mod tests {
-    use super::{summarize_style, FormatAdvice, Replacement};
+    use super::{FormatAdvice, Replacement, summarize_style};
 
     #[test]
     fn parse_blank_xml() {
