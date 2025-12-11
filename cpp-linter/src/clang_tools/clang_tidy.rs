@@ -17,7 +17,7 @@ use serde::Deserialize;
 // project-specific modules/crates
 use super::MakeSuggestions;
 use crate::{
-    cli::{ClangParams, LinesChangedOnly},
+    cli::ClangParams,
     common_fs::{FileObj, normalize_path},
 };
 
@@ -263,19 +263,17 @@ pub fn run_clang_tidy(
         cmd.args(["--extra-arg", format!("\"{}\"", arg).as_str()]);
     }
     let file_name = file.name.to_string_lossy().to_string();
-    if clang_params.lines_changed_only != LinesChangedOnly::Off {
-        let ranges = file.get_ranges(&clang_params.lines_changed_only);
-        if !ranges.is_empty() {
-            let filter = format!(
-                "[{{\"name\":{:?},\"lines\":{:?}}}]",
-                &file_name.replace('/', if OS == "windows" { "\\" } else { "/" }),
-                ranges
-                    .iter()
-                    .map(|r| [r.start(), r.end()])
-                    .collect::<Vec<_>>()
-            );
-            cmd.args(["--line-filter", filter.as_str()]);
-        }
+    let ranges = file.get_ranges(&clang_params.lines_changed_only);
+    if !ranges.is_empty() {
+        let filter = format!(
+            "[{{\"name\":{:?},\"lines\":{:?}}}]",
+            &file_name.replace('/', if OS == "windows" { "\\" } else { "/" }),
+            ranges
+                .iter()
+                .map(|r| [r.start(), r.end()])
+                .collect::<Vec<_>>()
+        );
+        cmd.args(["--line-filter", filter.as_str()]);
     }
     let original_content = if !clang_params.tidy_review {
         None
@@ -429,7 +427,7 @@ mod test {
             )
             .unwrap();
         let file = FileObj::new(PathBuf::from("tests/demo/demo.cpp"));
-        let arc_ref = Arc::new(Mutex::new(file));
+        let arc_file = Arc::new(Mutex::new(file));
         let extra_args = vec!["-std=c++17".to_string(), "-Wall".to_string()];
         let clang_params = ClangParams {
             style: "".to_string(),
@@ -445,7 +443,7 @@ mod test {
             clang_tidy_command: Some(exe_path),
             clang_format_command: None,
         };
-        let mut file_lock = arc_ref.lock().unwrap();
+        let mut file_lock = arc_file.lock().unwrap();
         let logs = run_clang_tidy(&mut file_lock, &clang_params)
             .unwrap()
             .into_iter()
