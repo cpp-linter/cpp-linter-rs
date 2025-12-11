@@ -185,7 +185,7 @@ fn analyze_single_file(
 }
 
 /// A struct to contain the version numbers of the clang-tools used
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct ClangVersions {
     /// The clang-format version used.
     pub format_version: Option<String>,
@@ -199,9 +199,9 @@ pub struct ClangVersions {
 /// If `tidy_checks` is `"-*"` then clang-tidy is not executed.
 /// If `style` is a blank string (`""`), then clang-format is not executed.
 pub async fn capture_clang_tools_output(
-    files: &mut Vec<Arc<Mutex<FileObj>>>,
+    files: &[Arc<Mutex<FileObj>>],
     version: &RequestedVersion,
-    clang_params: &mut ClangParams,
+    mut clang_params: ClangParams,
     rest_api_client: &impl RestApiClient,
 ) -> Result<ClangVersions> {
     let mut clang_versions = ClangVersions::default();
@@ -240,10 +240,11 @@ pub async fn capture_clang_tools_output(
     };
 
     let mut executors = JoinSet::new();
+    let arc_params = Arc::new(clang_params);
     // iterate over the discovered files and run the clang tools
     for file in files {
-        let arc_params = Arc::new(clang_params.clone());
-        let arc_file = Arc::clone(file);
+        let arc_file = file.clone();
+        let arc_params = arc_params.clone();
         executors.spawn(async move { analyze_single_file(arc_file, arc_params) });
     }
 

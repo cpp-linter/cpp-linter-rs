@@ -138,9 +138,9 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
     clang_params.tidy_review &= is_pr;
     let user_inputs = FeedbackInput::from(&cli);
     let clang_versions = capture_clang_tools_output(
-        &mut arc_files,
+        &arc_files,
         &cli.general_options.version,
-        &mut clang_params,
+        clang_params,
         &rest_api_client,
     )
     .await?;
