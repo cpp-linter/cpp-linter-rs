@@ -165,7 +165,7 @@ mod test {
         unsafe {
             env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
         }
-        let result = run_main(vec![
+        run_main(vec![
             "cpp-linter".to_string(),
             "-l".to_string(),
             "false".to_string(),
@@ -173,8 +173,8 @@ mod test {
             "tests".to_string(),
             "demo/demo.cpp".to_string(),
         ])
-        .await;
-        assert!(result.is_ok());
+        .await
+        .unwrap();
     }
 
     #[tokio::test]
@@ -182,8 +182,9 @@ mod test {
         unsafe {
             env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
         }
-        let result = run_main(vec!["cpp-linter".to_string(), "version".to_string()]).await;
-        assert!(result.is_ok());
+        run_main(vec!["cpp-linter".to_string(), "version".to_string()])
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
@@ -191,15 +192,15 @@ mod test {
         unsafe {
             env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
         }
-        let result = run_main(vec![
+        run_main(vec![
             "cpp-linter".to_string(),
             "-l".to_string(),
             "false".to_string(),
             "-v".to_string(),
             "-i=target|benches/libgit2".to_string(),
         ])
-        .await;
-        assert!(result.is_ok());
+        .await
+        .unwrap();
     }
 
     #[tokio::test]
@@ -207,14 +208,14 @@ mod test {
         unsafe {
             env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
         }
-        let result = run_main(vec![
+        run_main(vec![
             "cpp-linter".to_string(),
             "-l".to_string(),
             "false".to_string(),
             "-V".to_string(),
         ])
-        .await;
-        assert!(result.is_ok());
+        .await
+        .unwrap();
     }
 
     #[tokio::test]
@@ -223,14 +224,14 @@ mod test {
             env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
             env::set_var("PRE_COMMIT", "1");
         }
-        let result = run_main(vec![
+        run_main(vec![
             "cpp-linter".to_string(),
             "--lines-changed-only".to_string(),
             "false".to_string(),
             "--ignore=target|benches/libgit2".to_string(),
         ])
-        .await;
-        assert!(result.is_err());
+        .await
+        .unwrap_err();
     }
 
     // Verifies that the system gracefully handles cases where all analysis is disabled.
@@ -240,7 +241,7 @@ mod test {
         unsafe {
             env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
         }
-        let result = run_main(vec![
+        run_main(vec![
             "cpp-linter".to_string(),
             "-l".to_string(),
             "false".to_string(),
@@ -248,8 +249,8 @@ mod test {
             String::new(),
             "--tidy-checks=-*".to_string(),
         ])
-        .await;
-        assert!(result.is_ok());
+        .await
+        .unwrap();
     }
 
     #[tokio::test]
@@ -257,12 +258,12 @@ mod test {
         unsafe {
             env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
         }
-        let result = run_main(vec![
+        run_main(vec![
             "cpp-linter".to_string(),
             "--repo-root".to_string(),
             "some-non-existent-dir".to_string(),
         ])
-        .await;
-        assert!(result.is_err());
+        .await
+        .unwrap_err();
     }
 }

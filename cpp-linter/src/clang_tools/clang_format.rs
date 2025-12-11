@@ -18,10 +18,10 @@ use crate::{
     common_fs::{FileObj, get_line_count_from_offset},
 };
 
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq, Default)]
 pub struct FormatAdvice {
     /// A list of [`Replacement`]s that clang-tidy wants to make.
-    #[serde(rename(deserialize = "replacement"))]
+    #[serde(rename(deserialize = "replacement"), default)]
     pub replacements: Vec<Replacement>,
 
     pub patched: Option<Vec<u8>>,
@@ -151,10 +151,7 @@ pub fn run_clang_format(
             format!("Failed to parse XML output from clang-format for {file_name}")
         })?
     } else {
-        FormatAdvice {
-            replacements: vec![],
-            patched: None,
-        }
+        FormatAdvice::default()
     };
     format_advice.patched = patched;
     if !format_advice.replacements.is_empty() {
@@ -194,6 +191,19 @@ mod tests {
         let xml = String::new();
         let result = quick_xml::de::from_str::<FormatAdvice>(&xml);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn parse_xml_no_replacements() {
+        let xml_raw = r#"<?xml version='1.0'?>
+<replacements xml:space='preserve' incomplete_format='false'>
+</replacements>"#
+            .as_bytes()
+            .to_vec();
+        let expected = FormatAdvice::default();
+        let xml = String::from_utf8(xml_raw).unwrap();
+        let document = quick_xml::de::from_str::<FormatAdvice>(&xml).unwrap();
+        assert_eq!(expected, document);
     }
 
     #[test]

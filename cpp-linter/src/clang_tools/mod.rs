@@ -248,14 +248,15 @@ pub async fn capture_clang_tools_output(
     }
 
     while let Some(output) = executors.join_next().await {
-        if let Ok(out) = output? {
-            let (file_name, logs) = out;
-            rest_api_client.start_log_group(format!("Analyzing {}", file_name.to_string_lossy()));
-            for (level, msg) in logs {
-                log::log!(level, "{}", msg);
-            }
-            rest_api_client.end_log_group();
+        // output?? acts as a fast-fail for any error encountered.
+        // This includes any `spawn()` error and any `analyze_single_file()` error.
+        // Any unresolved tasks are aborted and dropped when an error is returned here.
+        let (file_name, logs) = output??;
+        rest_api_client.start_log_group(format!("Analyzing {}", file_name.to_string_lossy()));
+        for (level, msg) in logs {
+            log::log!(level, "{}", msg);
         }
+        rest_api_client.end_log_group();
     }
     Ok(clang_versions)
 }

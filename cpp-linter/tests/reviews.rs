@@ -211,17 +211,19 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
         );
     }
 
-    let mut tool_ignore = "**/*.c".to_string();
+    let mut format_ignore = "**/*.c".to_string();
+    let mut tidy_ignore = format_ignore.clone();
     if test_params.force_lgtm {
-        tool_ignore.push_str("|**/*.cpp|**/*.h");
+        format_ignore.push_str("|**/*.cpp|**/*.h");
+        tidy_ignore.push_str("|**/*.hpp");
     }
     let mut args = vec![
         "cpp-linter".to_string(),
         "-v=debug".to_string(),
         format!("-V={}", clang_version),
         format!("-l={}", test_params.lines_changed_only),
-        format!("--ignore-tidy={}", tool_ignore),
-        format!("--ignore-format={}", tool_ignore),
+        format!("--ignore-tidy={}", tidy_ignore),
+        format!("--ignore-format={}", format_ignore),
         format!("--tidy-review={}", test_params.tidy_review),
         format!("--format-review={}", test_params.format_review),
         format!("--passive-reviews={}", test_params.passive_reviews),
