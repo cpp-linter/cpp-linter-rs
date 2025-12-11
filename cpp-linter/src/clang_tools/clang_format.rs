@@ -80,7 +80,7 @@ pub fn tally_format_advice(files: &[Arc<Mutex<FileObj>>]) -> u64 {
     total
 }
 
-/// Run clang-tidy for a specific `file`, then parse and return it's XML output.
+/// Run clang-format for a specific `file`, then parse and return it's XML output.
 pub fn run_clang_format(
     file: &mut MutexGuard<FileObj>,
     clang_params: &ClangParams,
