@@ -1,11 +1,11 @@
 [package]
 name = "cpp-linter-js"
-edition = "2021"
 readme = "README.md"
 keywords = ["clang-tidy", "clang-format", "linter"]
 categories = ["command-line-utilities", "development-tools", "filesystem"]
 repository = "https://github.com/cpp-linter/cpp-linter-rs"
 version.workspace = true
+edition.workspace = true
 authors.workspace = true
 description.workspace = true
 homepage.workspace = true

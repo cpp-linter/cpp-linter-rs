@@ -3,8 +3,9 @@ use std::{path::PathBuf, str::FromStr};
 
 // non-std crates
 use clap::{
+    ArgAction, Args, Parser, Subcommand, ValueEnum,
     builder::{FalseyValueParser, NonEmptyStringValueParser},
-    value_parser, ArgAction, Args, Parser, Subcommand, ValueEnum,
+    value_parser,
 };
 
 mod structs;
@@ -453,7 +454,7 @@ pub fn convert_extra_arg_val(args: &[String]) -> Vec<String> {
 
 #[cfg(test)]
 mod test {
-    use super::{convert_extra_arg_val, Cli};
+    use super::{Cli, convert_extra_arg_val};
     use clap::Parser;
 
     #[test]

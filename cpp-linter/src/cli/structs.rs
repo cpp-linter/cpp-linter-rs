@@ -1,13 +1,13 @@
 use std::{fmt::Display, path::PathBuf, str::FromStr};
 
-use anyhow::{anyhow, Error};
-use clap::{builder::PossibleValue, ValueEnum};
+use anyhow::{Error, anyhow};
+use clap::{ValueEnum, builder::PossibleValue};
 use semver::VersionReq;
 
 use super::Cli;
 use crate::{
     clang_tools::clang_tidy::CompilationUnit,
-    common_fs::{normalize_path, FileFilter},
+    common_fs::{FileFilter, normalize_path},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]

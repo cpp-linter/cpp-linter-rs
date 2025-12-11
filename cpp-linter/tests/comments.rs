@@ -62,28 +62,32 @@ impl Default for TestParams {
 }
 
 async fn setup(lib_root: &Path, test_params: &TestParams) {
-    env::set_var(
-        "GITHUB_EVENT_NAME",
-        test_params.event_t.to_string().as_str(),
-    );
-    env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
-    env::set_var("GITHUB_REPOSITORY", REPO);
-    env::set_var("GITHUB_SHA", SHA);
-    env::set_var("GITHUB_TOKEN", TOKEN);
-    env::set_var("CI", "true");
     let mut event_payload_path = NamedTempFile::new_in("./").unwrap();
-    if test_params.event_t == EventType::PullRequest {
-        event_payload_path
-            .write_all(EVENT_PAYLOAD.as_bytes())
-            .expect("Failed to create mock event payload.");
-        env::set_var("GITHUB_EVENT_PATH", event_payload_path.path());
+    unsafe {
+        env::set_var(
+            "GITHUB_EVENT_NAME",
+            test_params.event_t.to_string().as_str(),
+        );
+        env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
+        env::set_var("GITHUB_REPOSITORY", REPO);
+        env::set_var("GITHUB_SHA", SHA);
+        env::set_var("GITHUB_TOKEN", TOKEN);
+        env::set_var("CI", "true");
+        if test_params.event_t == EventType::PullRequest {
+            event_payload_path
+                .write_all(EVENT_PAYLOAD.as_bytes())
+                .expect("Failed to create mock event payload.");
+            env::set_var("GITHUB_EVENT_PATH", event_payload_path.path());
+        }
     }
 
     let reset_timestamp = (Utc::now().timestamp() + 60).to_string();
     let asset_path = format!("{}/{MOCK_ASSETS_PATH}", lib_root.to_str().unwrap());
 
     let mut server = mock_server().await;
-    env::set_var("GITHUB_API_URL", server.url());
+    unsafe {
+        env::set_var("GITHUB_API_URL", server.url());
+    }
     let mut mocks = vec![];
 
     if test_params.lines_changed_only != LinesChangedOnly::Off {

@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use fast_glob::glob_match;
 use std::{
     fs,
@@ -257,14 +257,16 @@ mod tests {
         let files = file_filter.list_source_files(".").unwrap();
         assert!(!files.is_empty());
         for file in files {
-            assert!(extensions.contains(
-                &file
-                    .name
-                    .extension()
-                    .unwrap_or_default()
-                    .to_string_lossy()
-                    .to_string()
-            ));
+            assert!(
+                extensions.contains(
+                    &file
+                        .name
+                        .extension()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .to_string()
+                )
+            );
         }
     }
 }

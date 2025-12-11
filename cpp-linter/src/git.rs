@@ -180,10 +180,10 @@ mod brute_force_parse_diff {
         if let Some(captures) = diff_file_name.captures(front_matter) {
             return Some(captures.get(1).unwrap().as_str());
         }
-        if front_matter.trim_start().starts_with("similarity") {
-            if let Some(captures) = diff_renamed_file.captures(front_matter) {
-                return Some(captures.get(1).unwrap().as_str());
-            }
+        if front_matter.trim_start().starts_with("similarity")
+            && let Some(captures) = diff_renamed_file.captures(front_matter)
+        {
+            return Some(captures.get(1).unwrap().as_str());
         }
         if !diff_binary_file.is_match(front_matter) {
             log::warn!("Unrecognized diff starting with:\n{}", front_matter);
@@ -311,11 +311,13 @@ rename to /tests/demo/some source.c
                 &LinesChangedOnly::Off,
             );
             assert!(!files.is_empty());
-            assert!(files
-                .first()
-                .unwrap()
-                .name
-                .ends_with("tests/demo/some source.c"));
+            assert!(
+                files
+                    .first()
+                    .unwrap()
+                    .name
+                    .ends_with("tests/demo/some source.c")
+            );
         }
 
         #[test]
@@ -415,12 +417,12 @@ mod test {
         }
     }
 
-    use tempfile::{tempdir, TempDir};
+    use tempfile::{TempDir, tempdir};
 
     use crate::{
         cli::LinesChangedOnly,
         common_fs::FileFilter,
-        rest_api::{github::GithubApiClient, RestApiClient},
+        rest_api::{RestApiClient, github::GithubApiClient},
     };
 
     fn get_temp_dir() -> TempDir {
@@ -445,7 +447,10 @@ mod test {
         let rest_api_client = GithubApiClient::new();
         let file_filter = FileFilter::new(&["target".to_string()], extensions.to_owned());
         set_current_dir(tmp).unwrap();
-        env::set_var("CI", "false"); // avoid use of REST API when testing in CI
+        // avoid use of REST API when testing in CI
+        unsafe {
+            env::set_var("CI", "false");
+        }
         rest_api_client
             .unwrap()
             .get_list_of_changed_files(&file_filter, &LinesChangedOnly::Off)

@@ -9,23 +9,23 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use reqwest::{Client, Method, Url};
 
 use crate::{
-    clang_tools::{clang_format::summarize_style, ClangVersions, ReviewComments},
+    clang_tools::{ClangVersions, ReviewComments, clang_format::summarize_style},
     cli::{FeedbackInput, LinesChangedOnly},
     common_fs::{FileFilter, FileObj},
     git::parse_diff_from_buf,
-    rest_api::{send_api_request, RestApiRateLimitHeaders, COMMENT_MARKER, USER_AGENT},
+    rest_api::{COMMENT_MARKER, RestApiRateLimitHeaders, USER_AGENT, send_api_request},
 };
 
 use super::{
-    serde_structs::{
-        FullReview, GithubChangedFile, PullRequestInfo, PushEventFiles, ReviewComment,
-        ReviewDiffComment, ThreadComment, REVIEW_DISMISSAL,
-    },
     GithubApiClient, RestApiClient,
+    serde_structs::{
+        FullReview, GithubChangedFile, PullRequestInfo, PushEventFiles, REVIEW_DISMISSAL,
+        ReviewComment, ReviewDiffComment, ThreadComment,
+    },
 };
 
 impl GithubApiClient {
@@ -100,15 +100,15 @@ impl GithubApiClient {
             url = Self::try_next_page(response.headers());
             let files_list = if self.event_name != "pull_request" {
                 let json_value: PushEventFiles = serde_json::from_str(&response.text().await?)
-                    .with_context(|| {
-                        "Failed to deserialize list of changed files from json response"
-                    })?;
+                    .with_context(
+                        || "Failed to deserialize list of changed files from json response",
+                    )?;
                 json_value.files
             } else {
                 serde_json::from_str::<Vec<GithubChangedFile>>(&response.text().await?)
-                    .with_context(|| {
-                        "Failed to deserialize list of file changes from Pull Request event."
-                    })?
+                    .with_context(
+                        || "Failed to deserialize list of file changes from Pull Request event.",
+                    )?
             };
             for file in files_list {
                 let ext = Path::new(&file.filename).extension().unwrap_or_default();
@@ -173,10 +173,14 @@ impl GithubApiClient {
                 // post annotation if any applicable lines were formatted
                 if !lines.is_empty() {
                     println!(
-                            "::notice file={name},title=Run clang-format on {name}::File {name} does not conform to {style_guide} style guidelines. (lines {line_set})",
-                            name = &file.name.to_string_lossy().replace('\\', "/"),
-                            line_set = lines.iter().map(|val| val.to_string()).collect::<Vec<_>>().join(","),
-                        );
+                        "::notice file={name},title=Run clang-format on {name}::File {name} does not conform to {style_guide} style guidelines. (lines {line_set})",
+                        name = &file.name.to_string_lossy().replace('\\', "/"),
+                        line_set = lines
+                            .iter()
+                            .map(|val| val.to_string())
+                            .collect::<Vec<_>>()
+                            .join(","),
+                    );
                 }
             } // end format_advice iterations
 
@@ -188,7 +192,11 @@ impl GithubApiClient {
                     if note.filename == file.name.to_string_lossy().replace('\\', "/") {
                         println!(
                             "::{severity} file={file},line={line},title={file}:{line}:{cols} [{diag}]::{info}",
-                            severity = if note.severity == *"note" { "notice".to_string() } else {note.severity.clone()},
+                            severity = if note.severity == *"note" {
+                                "notice".to_string()
+                            } else {
+                                note.severity.clone()
+                            },
                             file = note.filename,
                             line = note.line,
                             cols = note.cols,
@@ -485,44 +493,41 @@ impl GithubApiClient {
                         }
                         Ok(payload) => {
                             for review in payload {
-                                if let Some(body) = &review.body {
-                                    if body.starts_with(COMMENT_MARKER)
-                                        && !(["PENDING", "DISMISSED"]
-                                            .contains(&review.state.as_str()))
+                                if let Some(body) = &review.body
+                                    && body.starts_with(COMMENT_MARKER)
+                                    && !(["PENDING", "DISMISSED"].contains(&review.state.as_str()))
+                                {
+                                    // dismiss outdated review
+                                    if let Ok(dismiss_url) = url
+                                        .join(format!("reviews/{}/dismissals", review.id).as_str())
+                                        && let Ok(req) = Self::make_api_request(
+                                            &self.client,
+                                            dismiss_url,
+                                            Method::PUT,
+                                            Some(REVIEW_DISMISSAL.to_string()),
+                                            None,
+                                        )
                                     {
-                                        // dismiss outdated review
-                                        if let Ok(dismiss_url) = url.join(
-                                            format!("reviews/{}/dismissals", review.id).as_str(),
-                                        ) {
-                                            if let Ok(req) = Self::make_api_request(
-                                                &self.client,
-                                                dismiss_url,
-                                                Method::PUT,
-                                                Some(REVIEW_DISMISSAL.to_string()),
-                                                None,
-                                            ) {
-                                                match send_api_request(
-                                                    &self.client,
-                                                    req,
-                                                    &self.rate_limit_headers,
-                                                )
-                                                .await
-                                                {
-                                                    Ok(result) => {
-                                                        if !result.status().is_success() {
-                                                            Self::log_response(
-                                                                result,
-                                                                "Failed to dismiss outdated review",
-                                                            )
-                                                            .await;
-                                                        }
-                                                    }
-                                                    Err(e) => {
-                                                        log::error!(
-                                                            "Failed to dismiss outdated review: {e:}"
-                                                        );
-                                                    }
+                                        match send_api_request(
+                                            &self.client,
+                                            req,
+                                            &self.rate_limit_headers,
+                                        )
+                                        .await
+                                        {
+                                            Ok(result) => {
+                                                if !result.status().is_success() {
+                                                    Self::log_response(
+                                                        result,
+                                                        "Failed to dismiss outdated review",
+                                                    )
+                                                    .await;
                                                 }
+                                            }
+                                            Err(e) => {
+                                                log::error!(
+                                                    "Failed to dismiss outdated review: {e:}"
+                                                );
                                             }
                                         }
                                     }

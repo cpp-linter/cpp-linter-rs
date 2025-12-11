@@ -9,7 +9,7 @@ use anyhow::{Context, Result};
 
 use crate::clang_tools::clang_format::FormatAdvice;
 use crate::clang_tools::clang_tidy::TidyAdvice;
-use crate::clang_tools::{make_patch, MakeSuggestions, ReviewComments, Suggestion};
+use crate::clang_tools::{MakeSuggestions, ReviewComments, Suggestion, make_patch};
 use crate::cli::LinesChangedOnly;
 mod file_filter;
 pub use file_filter::FileFilter;
@@ -147,11 +147,11 @@ impl FileObj {
             fs::read(&self.name).with_context(|| "Failed to read original contents of file")?;
         let file_name = self.name.to_str().unwrap_or_default().replace("\\", "/");
         let file_path = Path::new(&file_name);
-        if let Some(advice) = &self.format_advice {
-            if let Some(patched) = &advice.patched {
-                let mut patch = make_patch(file_path, patched, &original_content)?;
-                advice.get_suggestions(review_comments, self, &mut patch, summary_only)?;
-            }
+        if let Some(advice) = &self.format_advice
+            && let Some(patched) = &advice.patched
+        {
+            let mut patch = make_patch(file_path, patched, &original_content)?;
+            advice.get_suggestions(review_comments, self, &mut patch, summary_only)?;
         }
 
         if let Some(advice) = &self.tidy_advice {
@@ -266,7 +266,7 @@ mod test {
     use std::path::PathBuf;
     use std::{env::current_dir, fs};
 
-    use super::{get_line_count_from_offset, normalize_path, FileObj};
+    use super::{FileObj, get_line_count_from_offset, normalize_path};
     use crate::cli::LinesChangedOnly;
 
     // *********************** tests for normalized paths

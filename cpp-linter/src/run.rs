@@ -10,9 +10,9 @@ use std::{
 };
 
 // non-std crates
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use clap::Parser;
-use log::{set_max_level, LevelFilter};
+use log::{LevelFilter, set_max_level};
 
 // project specific modules/crates
 use crate::{
@@ -20,7 +20,7 @@ use crate::{
     cli::{ClangParams, Cli, CliCommand, FeedbackInput, LinesChangedOnly, RequestedVersion},
     common_fs::FileFilter,
     logger,
-    rest_api::{github::GithubApiClient, RestApiClient},
+    rest_api::{RestApiClient, github::GithubApiClient},
 };
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -162,7 +162,9 @@ mod test {
 
     #[tokio::test]
     async fn normal() {
-        env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
+        unsafe {
+            env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
+        }
         let result = run_main(vec![
             "cpp-linter".to_string(),
             "-l".to_string(),
@@ -177,14 +179,18 @@ mod test {
 
     #[tokio::test]
     async fn version_command() {
-        env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
+        unsafe {
+            env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
+        }
         let result = run_main(vec!["cpp-linter".to_string(), "version".to_string()]).await;
         assert!(result.is_ok());
     }
 
     #[tokio::test]
     async fn force_debug_output() {
-        env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
+        unsafe {
+            env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
+        }
         let result = run_main(vec![
             "cpp-linter".to_string(),
             "-l".to_string(),
@@ -198,7 +204,9 @@ mod test {
 
     #[tokio::test]
     async fn no_version_input() {
-        env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
+        unsafe {
+            env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
+        }
         let result = run_main(vec![
             "cpp-linter".to_string(),
             "-l".to_string(),
@@ -211,8 +219,10 @@ mod test {
 
     #[tokio::test]
     async fn pre_commit_env() {
-        env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
-        env::set_var("PRE_COMMIT", "1");
+        unsafe {
+            env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
+            env::set_var("PRE_COMMIT", "1");
+        }
         let result = run_main(vec![
             "cpp-linter".to_string(),
             "--lines-changed-only".to_string(),
@@ -227,7 +237,9 @@ mod test {
     // This ensures no diagnostic comments are generated when analysis is explicitly skipped.
     #[tokio::test]
     async fn no_analysis() {
-        env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
+        unsafe {
+            env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
+        }
         let result = run_main(vec![
             "cpp-linter".to_string(),
             "-l".to_string(),
@@ -242,7 +254,9 @@ mod test {
 
     #[tokio::test]
     async fn bad_repo_root() {
-        env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
+        unsafe {
+            env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
+        }
         let result = run_main(vec![
             "cpp-linter".to_string(),
             "--repo-root".to_string(),

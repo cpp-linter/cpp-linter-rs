@@ -1,9 +1,9 @@
 [package]
 name = "cpp-linter-py"
-edition = "2021"
 readme = "README.md"
 repository = "https://github.com/cpp-linter/cpp-linter-rs/tree/main/bindings/python"
 version.workspace = true
+edition.workspace = true
 authors.workspace = true
 description.workspace = true
 homepage.workspace = true

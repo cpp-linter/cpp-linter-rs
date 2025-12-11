@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 // non-std crates
-use anyhow::{anyhow, Error, Result};
+use anyhow::{Error, Result, anyhow};
 use chrono::DateTime;
 use reqwest::header::{HeaderMap, HeaderValue};
 use reqwest::{Client, IntoUrl, Method, Request, Response, Url};
@@ -180,21 +180,21 @@ pub trait RestApiClient {
     ///
     /// Returns [`None`] if current response is the last page.
     fn try_next_page(headers: &HeaderMap) -> Option<Url> {
-        if let Some(links) = headers.get("link") {
-            if let Ok(pg_str) = links.to_str() {
-                let pages = pg_str.split(", ");
-                for page in pages {
-                    if page.ends_with("; rel=\"next\"") {
-                        if let Some(link) = page.split_once(">;") {
-                            let url = link.0.trim_start_matches("<").to_string();
-                            if let Ok(next) = Url::parse(&url) {
-                                return Some(next);
-                            } else {
-                                log::debug!("Failed to parse next page link from response header");
-                            }
+        if let Some(links) = headers.get("link")
+            && let Ok(pg_str) = links.to_str()
+        {
+            let pages = pg_str.split(", ");
+            for page in pages {
+                if page.ends_with("; rel=\"next\"") {
+                    if let Some(link) = page.split_once(">;") {
+                        let url = link.0.trim_start_matches("<").to_string();
+                        if let Ok(next) = Url::parse(&url) {
+                            return Some(next);
                         } else {
-                            log::debug!("Response header link for pagination is malformed");
+                            log::debug!("Failed to parse next page link from response header");
                         }
+                    } else {
+                        log::debug!("Response header link for pagination is malformed");
                     }
                 }
             }
@@ -244,8 +244,8 @@ pub async fn send_api_request(
                             requests_remaining = Some(value);
                         } else {
                             log::debug!(
-                                    "Failed to parse i64 from remaining attempts about rate limit: {count}"
-                                );
+                                "Failed to parse i64 from remaining attempts about rate limit: {count}"
+                            );
                         }
                     }
                 } else {
@@ -283,8 +283,8 @@ pub async fn send_api_request(
                             tokio::time::sleep(interval).await;
                         } else {
                             log::debug!(
-                                        "Failed to parse u64 from retry interval about rate limit: {retry_str}"
-                                    );
+                                "Failed to parse u64 from retry interval about rate limit: {retry_str}"
+                            );
                         }
                     }
                     continue;
@@ -314,13 +314,14 @@ fn make_format_comment(
     *remaining_length -= opener.len() as u64 + closer.len() as u64;
     for file in files {
         let file = file.lock().unwrap();
-        if let Some(format_advice) = &file.format_advice {
-            if !format_advice.replacements.is_empty() && *remaining_length > 0 {
-                let note = format!("- {}\n", file.name.to_string_lossy().replace('\\', "/"));
-                if (note.len() as u64) < *remaining_length {
-                    format_comment.push_str(&note.to_string());
-                    *remaining_length -= note.len() as u64;
-                }
+        if let Some(format_advice) = &file.format_advice
+            && !format_advice.replacements.is_empty()
+            && *remaining_length > 0
+        {
+            let note = format!("- {}\n", file.name.to_string_lossy().replace('\\', "/"));
+            if (note.len() as u64) < *remaining_length {
+                format_comment.push_str(&note.to_string());
+                *remaining_length -= note.len() as u64;
             }
         }
     }
@@ -384,13 +385,13 @@ fn make_tidy_comment(
 mod test {
     use std::sync::{Arc, Mutex};
 
-    use anyhow::{anyhow, Result};
+    use anyhow::{Result, anyhow};
     use chrono::Utc;
     use mockito::{Matcher, Server};
     use reqwest::Method;
     use reqwest::{
-        header::{HeaderMap, HeaderValue},
         Client,
+        header::{HeaderMap, HeaderValue},
     };
 
     use crate::cli::LinesChangedOnly;
@@ -401,7 +402,7 @@ mod test {
         logger,
     };
 
-    use super::{send_api_request, RestApiClient, RestApiRateLimitHeaders};
+    use super::{RestApiClient, RestApiRateLimitHeaders, send_api_request};
 
     /// A dummy struct to impl RestApiClient
     #[derive(Default)]
@@ -453,14 +454,18 @@ mod test {
         let dummy = TestClient::default();
         dummy.start_log_group("Dummy test".to_string());
         assert_eq!(dummy.set_exit_code(1, None, None), 0);
-        assert!(dummy
-            .get_list_of_changed_files(&FileFilter::new(&[], vec![]), &LinesChangedOnly::Off)
-            .await
-            .is_err());
-        assert!(dummy
-            .post_feedback(&[], FeedbackInput::default(), ClangVersions::default())
-            .await
-            .is_err());
+        assert!(
+            dummy
+                .get_list_of_changed_files(&FileFilter::new(&[], vec![]), &LinesChangedOnly::Off)
+                .await
+                .is_err()
+        );
+        assert!(
+            dummy
+                .post_feedback(&[], FeedbackInput::default(), ClangVersions::default())
+                .await
+                .is_err()
+        );
         dummy.end_log_group();
     }
 
@@ -469,9 +474,11 @@ mod test {
     #[test]
     fn bad_link_header() {
         let mut headers = HeaderMap::with_capacity(1);
-        assert!(headers
-            .insert("link", HeaderValue::from_str("; rel=\"next\"").unwrap())
-            .is_none());
+        assert!(
+            headers
+                .insert("link", HeaderValue::from_str("; rel=\"next\"").unwrap())
+                .is_none()
+        );
         logger::try_init();
         log::set_max_level(log::LevelFilter::Debug);
         let result = TestClient::try_next_page(&headers);
@@ -481,12 +488,14 @@ mod test {
     #[test]
     fn bad_link_domain() {
         let mut headers = HeaderMap::with_capacity(1);
-        assert!(headers
-            .insert(
-                "link",
-                HeaderValue::from_str("<not a domain>; rel=\"next\"").unwrap()
-            )
-            .is_none());
+        assert!(
+            headers
+                .insert(
+                    "link",
+                    HeaderValue::from_str("<not a domain>; rel=\"next\"").unwrap()
+                )
+                .is_none()
+        );
         logger::try_init();
         log::set_max_level(log::LevelFilter::Debug);
         let result = TestClient::try_next_page(&headers);
