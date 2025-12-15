@@ -114,7 +114,7 @@ jobs:
 
       - name: Install cargo-binstall
         if: matrix.cross
-        uses: cargo-bins/cargo-binstall@3fc81674af4165a753833a94cae9f91d8849049f # v1.16.2
+        uses: cargo-bins/cargo-binstall@ea60fcf749c6a52a729e0eaabb5eb33391d44823 # v1.16.4
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - name: Install cross (cargo cross compiler)
@@ -153,7 +153,7 @@ jobs:
           tar -a -c -v -f "${arc_name}" ${tgt} LICENSE
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: cpp-linter-${{ matrix.target }}
           path: cpp-linter-${{ matrix.target }}*
@@ -176,7 +176,7 @@ jobs:
         with:
           python-version: 3.x
       - name: Download built assets
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           pattern: cpp-linter-*
           path: dist
