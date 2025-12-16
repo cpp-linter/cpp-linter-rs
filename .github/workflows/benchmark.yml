@@ -44,7 +44,7 @@ jobs:
           ref: ${{ matrix.commit }}
           persist-credentials: false
       - name: Cache base ref build
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         id: cache
         with:
           key: bin-cache-${{ hashFiles('cpp-linter/src/**', 'Cargo.toml', 'Cargo.lock', 'cpp-linter/Cargo.toml') }}
@@ -63,7 +63,7 @@ jobs:
       - run: cargo build --bin cpp-linter --release
         if: steps.cache.outputs.cache-hit != 'true' || steps.validate.outputs.cache-valid == 'false'
       - name: Upload build artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.name }}
           path: ${{ env.BIN }}
@@ -90,7 +90,7 @@ jobs:
   #           yum update -y
   #           yum install -y openssl openssl-devel
   #     - name: Upload wheels
-  #       uses: actions/upload-artifact@v5
+  #       uses: actions/upload-artifact@v6
   #       with:
   #         name: wheel
   #         path: dist/cpp_linter-*-cp3*-abi3-*.whl
@@ -113,10 +113,10 @@ jobs:
           persist-credentials: false
 
       - name: Download built binaries
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
 
       - name: Install cargo-binstall
-        uses: cargo-bins/cargo-binstall@3fc81674af4165a753833a94cae9f91d8849049f # v1.16.2
+        uses: cargo-bins/cargo-binstall@ea60fcf749c6a52a729e0eaabb5eb33391d44823 # v1.16.4
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - name: Install hyperfine
@@ -124,9 +124,9 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: cargo binstall -y hyperfine
       - name: Install nushell
-        uses: hustcer/setup-nu@3a97c8160c2bb5af321a03336e7addc28f94444e # v3.21
+        uses: hustcer/setup-nu@920172d92eb04671776f3ba69d605d3b09351c30 # v3.22
       - name: Install uv
-        uses: astral-sh/setup-uv@1e862dfacbd1d6d858c55d9b792c756523627244 # v7.1.4
+        uses: astral-sh/setup-uv@681c641aba71e4a1c380be3ab5e12ad51f415867 # v7.1.6
 
       - name: Run benchmark script
         working-directory: benchmark
