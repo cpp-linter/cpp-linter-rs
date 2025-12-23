@@ -74,21 +74,26 @@ pub struct TidyNotification {
 
 impl TidyNotification {
     pub fn diagnostic_link(&self) -> String {
-        if self.diagnostic.starts_with("clang-diagnostic") {
+        if self.diagnostic.starts_with("clang-diagnostic-") {
             return self.diagnostic.clone();
         }
-        let (category, name) = if self.diagnostic.starts_with("clang-analyzer-") {
-            (
-                "clang-analyzer",
-                self.diagnostic.strip_prefix("clang-analyzer-").unwrap(),
+        if let Some((category, name)) = if self.diagnostic.starts_with("clang-analyzer-") {
+            self.diagnostic
+                .strip_prefix("clang-analyzer-")
+                .map(|n| ("clang-analyzer", n))
+        } else {
+            self.diagnostic.split_once('-')
+        } {
+            // In production, both category and name should be non-empty strings.
+            // Clang does not actually have a diagnostic name whose category or name is empty.
+            debug_assert!(!category.is_empty() && !name.is_empty());
+            format!(
+                "[{}](https://clang.llvm.org/extra/clang-tidy/checks/{category}/{name}.html)",
+                self.diagnostic
             )
         } else {
-            self.diagnostic.split_once('-').unwrap()
-        };
-        format!(
-            "[{}](https://clang.llvm.org/extra/clang-tidy/checks/{category}/{name}.html)",
-            self.diagnostic
-        )
+            self.diagnostic.clone()
+        }
     }
 }
 
@@ -389,6 +394,22 @@ mod test {
             "[{}](https://clang.llvm.org/extra/clang-tidy/checks/{}/{}.html)",
             note.diagnostic, "clang-analyzer", "core.NullDereference",
         );
+        assert_eq!(note.diagnostic_link(), expected);
+    }
+
+    #[test]
+    fn invalid_diagnostic_link() {
+        let expected = "no_diagnostic_name".to_string();
+        let note = TidyNotification {
+            filename: String::from("some_src.cpp"),
+            line: 1504,
+            cols: 9,
+            rationale: String::from("some rationale"),
+            severity: String::from("warning"),
+            diagnostic: expected.clone(),
+            suggestion: vec![],
+            fixed_lines: vec![],
+        };
         assert_eq!(note.diagnostic_link(), expected);
     }
 
