@@ -75,6 +75,8 @@ pub struct TidyNotification {
 impl TidyNotification {
     pub fn diagnostic_link(&self) -> String {
         if self.diagnostic.starts_with("clang-diagnostic-") {
+            // clang-diagnostic-* diagnostics are compiler diagnostics and don't have
+            // dedicated clang-tidy documentation pages, so return the name as-is.
             return self.diagnostic.clone();
         }
         if let Some((category, name)) = if self.diagnostic.starts_with("clang-analyzer-") {
