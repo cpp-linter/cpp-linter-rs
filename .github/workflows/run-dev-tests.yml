@@ -55,7 +55,7 @@ jobs:
       #   if: runner.os == 'Windows'
       #   run: vcpkg install openssl
 
-      - uses: cargo-bins/cargo-binstall@ea60fcf749c6a52a729e0eaabb5eb33391d44823 # v1.16.4
+      - uses: cargo-bins/cargo-binstall@80aaafe04903087c333980fa2686259ddd34b2d9 # v1.16.6
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - name: Install third-party binaries
