@@ -19,6 +19,7 @@ words:
   - cstdio
   - cstdlib
   - DCMAKE
+  - declval
   - devel
   - Doherty
   - dtolnay

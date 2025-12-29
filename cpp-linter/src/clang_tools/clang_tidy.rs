@@ -157,59 +157,69 @@ fn parse_tidy_output(
     let cur_dir = current_dir().unwrap();
     for line in String::from_utf8(tidy_stdout.to_vec()).unwrap().lines() {
         if let Some(captured) = note_header.captures(line) {
-            if let Some(note) = notification {
-                result.push(note);
-            }
-
-            // normalize the filename path and try to make it relative to the repo root
-            let mut filename = PathBuf::from(&captured[1]);
-            // if database was given try to use that first
-            if let Some(db_json) = &database_json {
-                let mut found_unit = false;
-                for unit in db_json {
-                    let unit_path =
-                        PathBuf::from_iter([unit.directory.as_str(), unit.file.as_str()]);
-                    if unit_path == filename {
-                        filename =
-                            normalize_path(&PathBuf::from_iter([&unit.directory, &unit.file]));
-                        found_unit = true;
-                        break;
-                    }
+            // First check that the diagnostic name is a actual diagnostic name.
+            // Sometimes clang-tidy uses square brackets to enclose additional context
+            // about the diagnostic rationale. For example: '[with auto = typename ...]'
+            // We need to ignore such cases as they do not start a diagnostic report.
+            if captured
+                .get(6)
+                .is_some_and(|diag| !diag.as_str().contains(' ') && diag.as_str().contains('-'))
+            {
+                // starting a new TidyNotification; store the previous one (if any) to results
+                if let Some(note) = notification {
+                    result.push(note);
                 }
-                if !found_unit {
-                    // file was not a named unit in the database;
-                    // try to normalize path as if relative to working directory.
-                    // NOTE: This shouldn't happen with a properly formed JSON database
+
+                // normalize the filename path and try to make it relative to the repo root
+                let mut filename = PathBuf::from(&captured[1]);
+                // if database was given try to use that first
+                if let Some(db_json) = &database_json {
+                    let mut found_unit = false;
+                    for unit in db_json {
+                        let unit_path =
+                            PathBuf::from_iter([unit.directory.as_str(), unit.file.as_str()]);
+                        if unit_path == filename {
+                            filename =
+                                normalize_path(&PathBuf::from_iter([&unit.directory, &unit.file]));
+                            found_unit = true;
+                            break;
+                        }
+                    }
+                    if !found_unit {
+                        // file was not a named unit in the database;
+                        // try to normalize path as if relative to working directory.
+                        // NOTE: This shouldn't happen with a properly formed JSON database
+                        filename = normalize_path(&PathBuf::from_iter([&cur_dir, &filename]));
+                    }
+                } else {
+                    // still need to normalize the relative path despite missing database info.
+                    // let's assume the file is relative to current working directory.
                     filename = normalize_path(&PathBuf::from_iter([&cur_dir, &filename]));
                 }
-            } else {
-                // still need to normalize the relative path despite missing database info.
-                // let's assume the file is relative to current working directory.
-                filename = normalize_path(&PathBuf::from_iter([&cur_dir, &filename]));
-            }
-            assert!(filename.is_absolute());
-            if filename.is_absolute() && filename.starts_with(&cur_dir) {
-                // if this filename can't be made into a relative path, then it is
-                // likely not a member of the project's sources (ie /usr/include/stdio.h)
-                filename = filename
-                    .strip_prefix(&cur_dir)
-                    // we already checked above that filename.starts_with(current_directory)
-                    .unwrap()
-                    .to_path_buf();
-            }
+                debug_assert!(filename.is_absolute());
+                if filename.is_absolute() && filename.starts_with(&cur_dir) {
+                    // if this filename can't be made into a relative path, then it is
+                    // likely not a member of the project's sources (ie /usr/include/stdio.h)
+                    filename = filename
+                        .strip_prefix(&cur_dir)
+                        // we already checked above that filename.starts_with(current_directory)
+                        .unwrap()
+                        .to_path_buf();
+                }
 
-            notification = Some(TidyNotification {
-                filename: filename.to_string_lossy().to_string().replace('\\', "/"),
-                line: captured[2].parse()?,
-                cols: captured[3].parse()?,
-                severity: String::from(&captured[4]),
-                rationale: String::from(&captured[5]).trim().to_string(),
-                diagnostic: String::from(&captured[6]),
-                suggestion: Vec::new(),
-                fixed_lines: Vec::new(),
-            });
-            // begin capturing subsequent lines as suggestions
-            found_fix = false;
+                notification = Some(TidyNotification {
+                    filename: filename.to_string_lossy().to_string().replace('\\', "/"),
+                    line: captured[2].parse()?,
+                    cols: captured[3].parse()?,
+                    severity: String::from(&captured[4]),
+                    rationale: String::from(&captured[5]).trim().to_string(),
+                    diagnostic: String::from(&captured[6]),
+                    suggestion: Vec::new(),
+                    fixed_lines: Vec::new(),
+                });
+                // begin capturing subsequent lines as suggestions
+                found_fix = false;
+            }
         } else if let Some(capture) = fixed_note.captures(line) {
             let fixed_line = capture[1].parse()?;
             if let Some(note) = &mut notification
@@ -356,7 +366,7 @@ mod test {
     use regex::Regex;
 
     use crate::{
-        clang_tools::ClangTool,
+        clang_tools::{ClangTool, clang_tidy::parse_tidy_output},
         cli::{ClangParams, LinesChangedOnly, RequestedVersion},
         common_fs::FileObj,
     };
@@ -486,6 +496,57 @@ mod test {
         for arg in &extra_args {
             let extra_arg = format!("\"{arg}\"");
             assert!(args.contains(&extra_arg.as_str()));
+        }
+    }
+
+    #[test]
+    fn skip_parse_tidy_diagnostic_rationale() {
+        let tidy_out = r#"
+TrenchBroom/TrenchBroom/common/test/src/mdl/tst_ReadFreeImageTexture.cpp:46:19: error: use of undeclared identifier 'readFreeImageTexture' [clang-diagnostic-error]
+   46 |            return readFreeImageTexture(reader);
+      |                   ^
+TrenchBroom/TrenchBroom/lib/KdLib/include/kd/result.h:659:32: note: in instantiation of function template specialization 'tb::mdl::(anonymous namespace)::loadTexture(const std::string &)::(anonymous class)::operator()<std::shared_ptr<tb::fs::File>>' requested here
+  659 |     using Fn_Result = decltype(f(std::declval<Value&&>()));
+      |                                ^
+TrenchBroom/TrenchBroom/lib/KdLib/include/kd/result.h:2949:29: note: in instantiation of function template specialization 'kdl::result<std::shared_ptr<tb::fs::File>, kdl::result_error>::and_then<(lambda at TrenchBroom/TrenchBroom/common/test/src/mdl/tst_ReadFreeImageTexture.cpp:44:48)>' requested here
+ 2949 |   return std::forward<R>(r).and_then(t.and_then);
+      |                             ^
+TrenchBroom/TrenchBroom/common/test/src/mdl/tst_ReadFreeImageTexture.cpp:44:32: note: in instantiation of function template specialization 'kdl::detail::operator|<kdl::result<std::shared_ptr<tb::fs::File>, kdl::result_error>, (lambda at TrenchBroom/TrenchBroom/common/test/src/mdl/tst_ReadFreeImageTexture.cpp:44:48)>' requested here
+   44 |   return diskFS.openFile(name) | kdl::and_then([](const auto& file) {
+      |                                ^
+TrenchBroom/TrenchBroom/lib/KdLib/include/kd/result.h:661:19: error: static assertion failed due to requirement 'is_result_v<int>': Function must return a result type [clang-diagnostic-error]
+  661 |     static_assert(is_result_v<Fn_Result>, "Function must return a result type");
+      |                   ^~~~~~~~~~~~~~~~~~~~~~
+TrenchBroom/TrenchBroom/lib/KdLib/include/kd/result.h:2949:29: note: in instantiation of function template specialization 'kdl::result<std::shared_ptr<tb::fs::File>, kdl::result_error>::and_then<(lambda at TrenchBroom/TrenchBroom/common/test/src/mdl/tst_ReadFreeImageTexture.cpp:44:48)>' requested here
+ 2949 |   return std::forward<R>(r).and_then(t.and_then);
+      |                             ^
+TrenchBroom/TrenchBroom/common/test/src/mdl/tst_ReadFreeImageTexture.cpp:44:32: note: in instantiation of function template specialization 'kdl::detail::operator|<kdl::result<std::shared_ptr<tb::fs::File>, kdl::result_error>, (lambda at TrenchBroom/TrenchBroom/common/test/src/mdl/tst_ReadFreeImageTexture.cpp:44:48)>' requested here
+   44 |   return diskFS.openFile(name) | kdl::and_then([](const auto& file) {
+      |                                ^
+TrenchBroom/TrenchBroom/lib/KdLib/include/kd/result.h:663:77: error: no type named 'type' in 'kdl::detail::chain_results<kdl::result<std::shared_ptr<tb::fs::File>, kdl::result_error>, int>' [clang-diagnostic-error]
+  663 |     using Cm_Result = typename detail::chain_results<My_Result, Fn_Result>::type;
+      |                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~
+TrenchBroom/TrenchBroom/lib/KdLib/include/kd/result.h:667:48: error: no matching function for call to object of type 'const (lambda at TrenchBroom/TrenchBroom/common/test/src/mdl/tst_ReadFreeImageTexture.cpp:44:48)' [clang-diagnostic-error]
+  667 |         [&](value_type&& v) { return Cm_Result{f(std::move(v))}; },
+      |                                                ^
+TrenchBroom/TrenchBroom/lib/KdLib/include/kd/result.h:667:29: note: while substituting into a lambda expression here
+  667 |         [&](value_type&& v) { return Cm_Result{f(std::move(v))}; },
+      |                             ^
+TrenchBroom/TrenchBroom/lib/KdLib/include/kd/result.h:2949:29: note: in instantiation of function template specialization 'kdl::result<std::shared_ptr<tb::fs::File>, kdl::result_error>::and_then<(lambda at TrenchBroom/TrenchBroom/common/test/src/mdl/tst_ReadFreeImageTexture.cpp:44:48)>' requested here
+ 2949 |   return std::forward<R>(r).and_then(t.and_then);
+      |                             ^
+TrenchBroom/TrenchBroom/common/test/src/mdl/tst_ReadFreeImageTexture.cpp:44:32: note: in instantiation of function template specialization 'kdl::detail::operator|<kdl::result<std::shared_ptr<tb::fs::File>, kdl::result_error>, (lambda at TrenchBroom/TrenchBroom/common/test/src/mdl/tst_ReadFreeImageTexture.cpp:44:48)>' requested here
+   44 |   return diskFS.openFile(name) | kdl::and_then([](const auto& file) {
+      |                                ^
+TrenchBroom/TrenchBroom/common/test/src/mdl/tst_ReadFreeImageTexture.cpp:44:48: note: candidate template ignored: substitution failure [with file:auto = typename std::remove_reference<shared_ptr<File> &>::type]
+   44 |   return diskFS.openFile(name) | kdl::and_then([](const auto& file) {
+      |                                                ^
+"#;
+        let advice = parse_tidy_output(tidy_out.as_bytes(), &None).unwrap();
+        assert_eq!(advice.notes.len(), 4);
+        for note in advice.notes {
+            assert!(note.diagnostic.contains('-'));
+            assert!(!note.diagnostic.contains(' '));
         }
     }
 }
