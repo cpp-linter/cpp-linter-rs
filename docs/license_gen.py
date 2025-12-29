@@ -50,6 +50,8 @@ class TreeGetter:
             "cpp-linter",
             "--depth",
             "1",
+            "--color",
+            "never",
         ]
 
     def package(self, value: str) -> None:
