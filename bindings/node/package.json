@@ -23,7 +23,7 @@
   "devDependencies": {
     "@napi-rs/cli": "3.5.0",
     "ava": "^6.4.1",
-    "oxlint": "^1.31.0"
+    "oxlint": "^1.36.0"
   },
   "ava": {
     "timeout": "3m"
