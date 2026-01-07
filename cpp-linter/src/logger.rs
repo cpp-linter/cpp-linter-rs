@@ -1,3 +1,4 @@
+#![deny(clippy::unwrap_used)]
 //! A module to initialize and customize the logger object used in (most) stdout.
 
 use std::{
@@ -36,7 +37,7 @@ impl Log for SimpleLogger {
             writeln!(stdout, "{}", record.args()).expect("Failed to write log command to stdout");
             stdout
                 .flush()
-                .expect("Failed to flush log command to stdout");
+                .expect("Failed to flush log command in stdout");
         } else if self.enabled(record.metadata()) {
             let module = record.module_path();
             if module.is_none_or(|v| v.starts_with("cpp_linter")) {
@@ -47,12 +48,12 @@ impl Log for SimpleLogger {
                     record.args()
                 )
                 .expect("Failed to write log message to stdout");
-            } else {
+            } else if let Some(module) = module {
                 writeln!(
                     stdout,
                     "[{}]{{{}:{}}}: {}",
                     Self::level_color(&record.level()),
-                    module.unwrap(), // safe to unwrap here because the None case is caught above
+                    module,
                     record.line().unwrap_or_default(),
                     record.args()
                 )
@@ -60,7 +61,7 @@ impl Log for SimpleLogger {
             }
             stdout
                 .flush()
-                .expect("Failed to flush log message to stdout");
+                .expect("Failed to flush log message in stdout");
         }
     }
 

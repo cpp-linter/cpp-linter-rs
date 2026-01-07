@@ -10,7 +10,7 @@ use std::{
 };
 
 // non-std crates
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow};
 use regex::Regex;
 use serde::Deserialize;
 
@@ -148,14 +148,18 @@ fn parse_tidy_output(
     tidy_stdout: &[u8],
     database_json: &Option<Vec<CompilationUnit>>,
 ) -> Result<TidyAdvice> {
-    let note_header = Regex::new(NOTE_HEADER).unwrap();
-    let fixed_note =
-        Regex::new(r"^.+:(\d+):\d+:\snote: FIX-IT applied suggested code changes$").unwrap();
+    let note_header = Regex::new(NOTE_HEADER)
+        .with_context(|| "Failed to compile RegExp pattern for note header")?;
+    let fixed_note = Regex::new(r"^.+:(\d+):\d+:\snote: FIX-IT applied suggested code changes$")
+        .with_context(|| "Failed to compile RegExp pattern for fixed note")?;
     let mut found_fix = false;
     let mut notification = None;
     let mut result = Vec::new();
-    let cur_dir = current_dir().unwrap();
-    for line in String::from_utf8(tidy_stdout.to_vec()).unwrap().lines() {
+    let cur_dir = current_dir().with_context(|| "Failed to access current working directory")?;
+    for line in String::from_utf8(tidy_stdout.to_vec())
+        .with_context(|| "Failed to convert clang-tidy stdout to UTF-8 string")?
+        .lines()
+    {
         if let Some(captured) = note_header.captures(line) {
             // First check that the diagnostic name is a actual diagnostic name.
             // Sometimes clang-tidy uses square brackets to enclose additional context
@@ -197,14 +201,12 @@ fn parse_tidy_output(
                     filename = normalize_path(&PathBuf::from_iter([&cur_dir, &filename]));
                 }
                 debug_assert!(filename.is_absolute());
-                if filename.is_absolute() && filename.starts_with(&cur_dir) {
+                if filename.is_absolute()
+                    && let Ok(file_n) = filename.strip_prefix(&cur_dir)
+                {
                     // if this filename can't be made into a relative path, then it is
                     // likely not a member of the project's sources (ie /usr/include/stdio.h)
-                    filename = filename
-                        .strip_prefix(&cur_dir)
-                        // we already checked above that filename.starts_with(current_directory)
-                        .unwrap()
-                        .to_path_buf();
+                    filename = file_n.to_path_buf();
                 }
 
                 notification = Some(TidyNotification {
@@ -247,10 +249,12 @@ fn parse_tidy_output(
 }
 
 /// Get a total count of clang-tidy advice from the given list of [FileObj]s.
-pub fn tally_tidy_advice(files: &[Arc<Mutex<FileObj>>]) -> u64 {
+pub fn tally_tidy_advice(files: &[Arc<Mutex<FileObj>>]) -> Result<u64> {
     let mut total = 0;
     for file in files {
-        let file = file.lock().unwrap();
+        let file = file
+            .lock()
+            .map_err(|_| anyhow!("Failed to acquire lock on mutex for a source file"))?;
         if let Some(advice) = &file.tidy_advice {
             for tidy_note in &advice.notes {
                 let file_path = PathBuf::from(&tidy_note.filename);
@@ -260,7 +264,7 @@ pub fn tally_tidy_advice(files: &[Arc<Mutex<FileObj>>]) -> u64 {
             }
         }
     }
-    total
+    Ok(total)
 }
 
 /// Run clang-tidy, then parse and return it's output.
@@ -268,7 +272,11 @@ pub fn run_clang_tidy(
     file: &mut MutexGuard<FileObj>,
     clang_params: &ClangParams,
 ) -> Result<Vec<(log::Level, std::string::String)>> {
-    let mut cmd = Command::new(clang_params.clang_tidy_command.as_ref().unwrap());
+    let cmd_path = clang_params
+        .clang_tidy_command
+        .as_ref()
+        .ok_or(anyhow!("clang-tidy command not located"))?;
+    let mut cmd = Command::new(cmd_path);
     let mut logs = vec![];
     if !clang_params.tidy_checks.is_empty() {
         cmd.args(["-checks", &clang_params.tidy_checks]);
@@ -318,7 +326,12 @@ pub fn run_clang_tidy(
                 .join(" ")
         ),
     ));
-    let output = cmd.output().unwrap();
+    let output = cmd.output().with_context(|| {
+        format!(
+            "Failed to execute clang-tidy on file: {}",
+            file_name.clone()
+        )
+    })?;
     logs.push((
         log::Level::Debug,
         format!(
@@ -339,7 +352,9 @@ pub fn run_clang_tidy(
         &output.stdout,
         &clang_params.database_json,
     )?);
-    if clang_params.tidy_review {
+    if clang_params.tidy_review
+        && let Some(original_content) = &original_content
+    {
         if let Some(tidy_advice) = &mut file.tidy_advice {
             // cache file changes in a buffer and restore the original contents for further analysis
             tidy_advice.patched =
@@ -348,7 +363,7 @@ pub fn run_clang_tidy(
                 })?);
         }
         // original_content is guaranteed to be Some() value at this point
-        fs::write(&file_name, original_content.unwrap())
+        fs::write(&file_name, original_content)
             .with_context(|| format!("Failed to restore file's original content: {file_name}"))?;
     }
     Ok(logs)
