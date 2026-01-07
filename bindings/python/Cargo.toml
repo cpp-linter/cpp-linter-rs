@@ -19,7 +19,7 @@ bench = false
 [dependencies]
 pyo3 = { version = "0.27.2", features = ["extension-module", "abi3-py39"] }
 cpp-linter = { path = "../../cpp-linter" }
-tokio = "1.48.0"
+tokio = "1.49.0"
 
 [features]
 openssl-vendored = ["cpp-linter/openssl-vendored"]

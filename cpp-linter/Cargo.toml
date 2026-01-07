@@ -16,7 +16,7 @@ license.workspace = true
 [dependencies]
 anyhow = "1.0.100"
 chrono = "0.4.42"
-clap = { version = "4.5.53", features = ["derive"] }
+clap = { version = "4.5.54", features = ["derive"] }
 colored = "3.0.0"
 fast-glob = "1.0.0"
 futures = "0.3.31"
@@ -24,22 +24,22 @@ git2 = "0.20.3"
 log = { version = "0.4.29", features = ["std"] }
 quick-xml = { version = "0.38.4", features = ["serialize"] }
 regex = "1.12.2"
-reqwest = "0.12.24"
+reqwest = { version = "0.13.1", default-features = false, features = ["native-tls", "http2", "charset"] }
 semver = "1.0.27"
 serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.145"
-tokio = { version = "1.48.0", features = ["macros", "rt-multi-thread"] }
+serde_json = "1.0.148"
+tokio = { version = "1.49.0", features = ["macros", "rt-multi-thread"] }
 tokio-macros = "2.5.0"
-tokio-stream = "0.1.17"
+tokio-stream = "0.1.18"
 which = "8.0.0"
 
 [dev-dependencies]
 mockito = "1.7.1"
-tempfile = "3.23.0"
+tempfile = "3.24.0"
 git2 = { version = "0.20.3", features = ["https"]}
 
 [features]
-openssl-vendored = ["git2/vendored-openssl"]
+openssl-vendored = ["git2/vendored-openssl", "reqwest/native-tls-vendored"]
 
 [lib]
 bench = false
