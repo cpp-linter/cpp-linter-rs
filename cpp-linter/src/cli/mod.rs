@@ -1,3 +1,5 @@
+#![deny(clippy::unwrap_used)]
+
 //! This module holds the Command Line Interface design.
 use std::{path::PathBuf, str::FromStr};
 
@@ -437,17 +439,17 @@ pub struct FeedbackOptions {
 /// the value will be split at spaces.
 pub fn convert_extra_arg_val(args: &[String]) -> Vec<String> {
     let mut val = args.iter();
-    if val.len() == 1 {
+    if args.len() == 1
+        && let Some(v) = val.next()
+    {
         // specified once; split and return result
-        val.next()
-            .unwrap()
-            .trim_matches('\'')
+        v.trim_matches('\'')
             .trim_matches('"')
             .split(' ')
             .map(|i| i.to_string())
             .collect()
     } else {
-        // specified multiple times; just return
+        // specified multiple times; just return a clone of the values
         val.map(|i| i.to_string()).collect()
     }
 }

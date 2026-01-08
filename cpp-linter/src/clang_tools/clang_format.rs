@@ -7,7 +7,7 @@ use std::{
     sync::{Arc, Mutex, MutexGuard},
 };
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow};
 use log::Level;
 use serde::Deserialize;
 
@@ -54,11 +54,12 @@ pub struct Replacement {
 
 /// Get a string that summarizes the given `--style`
 pub fn summarize_style(style: &str) -> String {
-    if ["google", "chromium", "microsoft", "mozilla", "webkit"].contains(&style) {
+    let mut char_iter = style.chars();
+    if ["google", "chromium", "microsoft", "mozilla", "webkit"].contains(&style)
+        && let Some(first_char) = char_iter.next()
+    {
         // capitalize the first letter
-        let mut char_iter = style.chars();
-        let first_char = char_iter.next().unwrap();
-        first_char.to_uppercase().collect::<String>() + char_iter.as_str()
+        first_char.to_ascii_uppercase().to_string() + char_iter.as_str()
     } else if style == "llvm" || style == "gnu" {
         style.to_ascii_uppercase()
     } else {
@@ -67,17 +68,19 @@ pub fn summarize_style(style: &str) -> String {
 }
 
 /// Get a total count of clang-format advice from the given list of [FileObj]s.
-pub fn tally_format_advice(files: &[Arc<Mutex<FileObj>>]) -> u64 {
+pub fn tally_format_advice(files: &[Arc<Mutex<FileObj>>]) -> Result<u64> {
     let mut total = 0;
     for file in files {
-        let file = file.lock().unwrap();
+        let file = file
+            .lock()
+            .map_err(|_| anyhow!("Failed to acquire lock on mutex for a source file"))?;
         if let Some(advice) = &file.format_advice
             && !advice.replacements.is_empty()
         {
             total += 1;
         }
     }
-    total
+    Ok(total)
 }
 
 /// Run clang-format for a specific `file`, then parse and return it's XML output.
@@ -85,7 +88,11 @@ pub fn run_clang_format(
     file: &mut MutexGuard<FileObj>,
     clang_params: &ClangParams,
 ) -> Result<Vec<(log::Level, String)>> {
-    let mut cmd = Command::new(clang_params.clang_format_command.as_ref().unwrap());
+    let cmd_path = clang_params
+        .clang_format_command
+        .as_ref()
+        .ok_or(anyhow!("clang-format path unknown"))?;
+    let mut cmd = Command::new(cmd_path);
     let mut logs = vec![];
     cmd.args(["--style", &clang_params.style]);
     let ranges = file.get_ranges(&clang_params.lines_changed_only);
@@ -101,12 +108,7 @@ pub fn run_clang_format(
             Level::Info,
             format!(
                 "Getting format fixes with \"{} {}\"",
-                clang_params
-                    .clang_format_command
-                    .as_ref()
-                    .unwrap()
-                    .to_str()
-                    .unwrap_or_default(),
+                cmd.get_program().to_string_lossy(),
                 cmd.get_args()
                     .map(|a| a.to_string_lossy())
                     .collect::<Vec<_>>()

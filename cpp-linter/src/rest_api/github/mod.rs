@@ -184,8 +184,8 @@ impl RestApiClient for GithubApiClient {
         feedback_inputs: FeedbackInput,
         clang_versions: ClangVersions,
     ) -> Result<u64> {
-        let tidy_checks_failed = tally_tidy_advice(files);
-        let format_checks_failed = tally_format_advice(files);
+        let tidy_checks_failed = tally_tidy_advice(files)?;
+        let format_checks_failed = tally_format_advice(files)?;
         let mut comment = None;
 
         if feedback_inputs.file_annotations {

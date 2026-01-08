@@ -1,3 +1,4 @@
+#![deny(clippy::unwrap_used)]
 //! This module holds the functionality related to running clang-format and/or
 //! clang-tidy.
 
@@ -60,10 +61,12 @@ impl ClangTool {
     pub fn get_exe_path(&self, version: &RequestedVersion) -> Result<PathBuf> {
         let name = self.as_str();
         match version {
-            RequestedVersion::Path(path_buf) => {
-                which_in(name, Some(path_buf), current_dir().unwrap())
-                    .map_err(|_| anyhow!("Could not find {self} by path"))
-            }
+            RequestedVersion::Path(path_buf) => which_in(
+                name,
+                Some(path_buf),
+                current_dir().with_context(|| "Failed to access current working directory.")?,
+            )
+            .map_err(|_| anyhow!("Could not find {self} by path")),
             // Thus, we should use whatever is installed and added to $PATH.
             RequestedVersion::SystemDefault | RequestedVersion::NoValue => {
                 which(name).map_err(|_| anyhow!("Could not find clang tool by name"))
@@ -118,12 +121,17 @@ impl ClangTool {
     fn capture_version(clang_tool: &PathBuf) -> Result<String> {
         let output = Command::new(clang_tool).arg("--version").output()?;
         let stdout = String::from_utf8_lossy(&output.stdout);
-        let version_pattern = Regex::new(r"(?i)version[^\d]*([\d.]+)").unwrap();
+        let version_pattern = Regex::new(r"(?i)version[^\d]*([\d.]+)")
+            .with_context(|| "Failed to allocate RegExp pattern (for clang version parsing) ")?;
         let captures = version_pattern.captures(&stdout).ok_or(anyhow!(
             "Failed to find version number in `{} --version` output",
             clang_tool.to_string_lossy()
         ))?;
-        Ok(captures.get(1).unwrap().as_str().to_string())
+        Ok(captures
+            .get(1)
+            .ok_or(anyhow!("Failed to get version capture group"))?
+            .as_str()
+            .to_string())
     }
 }
 
@@ -434,52 +442,53 @@ pub trait MakeSuggestions {
             })?;
             hunks_in_patch += 1;
             let hunk_range = file_obj.is_hunk_in_diff(&hunk);
-            if hunk_range.is_none() {
-                continue;
-            }
-            let (start_line, end_line) = hunk_range.unwrap();
-            let mut suggestion = String::new();
-            let suggestion_help = self.get_suggestion_help(start_line, end_line);
-            let mut removed = vec![];
-            for line_index in 0..line_count {
-                let diff_line = patch
-                    .line_in_hunk(hunk_id, line_index)
-                    .with_context(|| format!("Failed to get line {line_index} in a hunk {hunk_id} of patch for {file_name}"))?;
-                let line = String::from_utf8(diff_line.content().to_owned())
-                    .with_context(|| format!("Failed to convert line {line_index} buffer to string in hunk {hunk_id} of patch for {file_name}"))?;
-                if ['+', ' '].contains(&diff_line.origin()) {
-                    suggestion.push_str(line.as_str());
-                } else {
-                    removed.push(
-                        diff_line
-                            .old_lineno()
-                            .expect("Removed line should have a line number"),
-                    );
+            match hunk_range {
+                None => continue,
+                Some((start_line, end_line)) => {
+                    let mut suggestion = String::new();
+                    let suggestion_help = self.get_suggestion_help(start_line, end_line);
+                    let mut removed = vec![];
+                    for line_index in 0..line_count {
+                        let diff_line = patch
+                            .line_in_hunk(hunk_id, line_index)
+                            .with_context(|| format!("Failed to get line {line_index} in a hunk {hunk_id} of patch for {file_name}"))?;
+                        let line = String::from_utf8(diff_line.content().to_owned())
+                            .with_context(|| format!("Failed to convert line {line_index} buffer to string in hunk {hunk_id} of patch for {file_name}"))?;
+                        if ['+', ' '].contains(&diff_line.origin()) {
+                            suggestion.push_str(line.as_str());
+                        } else {
+                            removed.push(
+                                diff_line
+                                    .old_lineno()
+                                    .expect("Removed line should have a line number"),
+                            );
+                        }
+                    }
+                    if suggestion.is_empty() && !removed.is_empty() {
+                        suggestion.push_str(
+                            format!(
+                                "Please remove the line(s)\n- {}",
+                                removed
+                                    .iter()
+                                    .map(|l| l.to_string())
+                                    .collect::<Vec<String>>()
+                                    .join("\n- ")
+                            )
+                            .as_str(),
+                        )
+                    } else {
+                        suggestion = format!("```suggestion\n{suggestion}```");
+                    }
+                    let comment = Suggestion {
+                        line_start: start_line,
+                        line_end: end_line,
+                        suggestion: format!("{suggestion_help}\n{suggestion}"),
+                        path: file_name.clone(),
+                    };
+                    if !review_comments.is_comment_in_suggestions(&comment) {
+                        review_comments.comments.push(comment);
+                    }
                 }
-            }
-            if suggestion.is_empty() && !removed.is_empty() {
-                suggestion.push_str(
-                    format!(
-                        "Please remove the line(s)\n- {}",
-                        removed
-                            .iter()
-                            .map(|l| l.to_string())
-                            .collect::<Vec<String>>()
-                            .join("\n- ")
-                    )
-                    .as_str(),
-                )
-            } else {
-                suggestion = format!("```suggestion\n{suggestion}```");
-            }
-            let comment = Suggestion {
-                line_start: start_line,
-                line_end: end_line,
-                suggestion: format!("{suggestion_help}\n{suggestion}"),
-                path: file_name.clone(),
-            };
-            if !review_comments.is_comment_in_suggestions(&comment) {
-                review_comments.comments.push(comment);
             }
         }
         review_comments.tool_total[is_tidy_tool] =
