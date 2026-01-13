@@ -22,7 +22,7 @@ fast-glob = "1.0.0"
 futures = "0.3.31"
 git2 = "0.20.3"
 log = { version = "0.4.29", features = ["std"] }
-quick-xml = { version = "0.38.4", features = ["serialize"] }
+quick-xml = { version = "0.39.0", features = ["serialize"] }
 regex = "1.12.2"
 reqwest = { version = "0.13.1", default-features = false, features = ["native-tls", "http2", "charset"] }
 semver = "1.0.27"
