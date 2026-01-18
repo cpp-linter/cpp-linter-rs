@@ -116,7 +116,7 @@ jobs:
         uses: actions/download-artifact@v7
 
       - name: Install cargo-binstall
-        uses: cargo-bins/cargo-binstall@ea60fcf749c6a52a729e0eaabb5eb33391d44823 # v1.16.4
+        uses: cargo-bins/cargo-binstall@80aaafe04903087c333980fa2686259ddd34b2d9 # v1.16.6
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - name: Install hyperfine
@@ -126,7 +126,7 @@ jobs:
       - name: Install nushell
         uses: hustcer/setup-nu@920172d92eb04671776f3ba69d605d3b09351c30 # v3.22
       - name: Install uv
-        uses: astral-sh/setup-uv@681c641aba71e4a1c380be3ab5e12ad51f415867 # v7.1.6
+        uses: astral-sh/setup-uv@61cb8a9741eeb8a550a1b8544337180c0fc8476b # v7.2.0
 
       - name: Run benchmark script
         working-directory: benchmark
