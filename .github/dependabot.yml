@@ -9,6 +9,8 @@ updates:
     directory: /
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
     groups:
       actions:
         patterns:
@@ -17,6 +19,8 @@ updates:
     directory: /
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
     groups:
       uv-pip:
         patterns:
@@ -25,6 +29,8 @@ updates:
     directory: /
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
     ignore:
       - dependency-name: cpp-linter
     groups:
@@ -35,6 +41,8 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
     groups:
       npm:
         patterns:
