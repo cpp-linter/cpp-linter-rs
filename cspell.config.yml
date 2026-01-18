@@ -15,6 +15,7 @@ words:
   - codecov
   - codspeed
   - consts
+  - cooldown
   - cppcoreguidelines
   - cstdio
   - cstdlib
