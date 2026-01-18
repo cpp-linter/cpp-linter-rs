@@ -53,11 +53,11 @@ manifest-path = "bindings/python/Cargo.toml"
 
 [dependency-groups]
 dev = [
-    "maturin==1.10.1",
-    "mypy==1.18.2",
+    "maturin==1.11.5",
+    "mypy==1.19.1",
     "patchelf==0.17.2.2 ; sys_platform == 'linux'",
-    "pre-commit>=4.2.0",
-    "ruff==0.14.4",
+    "pre-commit>=4.3.0",
+    "ruff==0.14.13",
 ]
 test = [
     "meson==1.9.1",

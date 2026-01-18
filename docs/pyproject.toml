@@ -16,17 +16,17 @@ dynamic = ["version"]
 
 [dependency-groups]
 dev = [
-    "maturin==1.10.1",
-    "mypy==1.18.2",
+    "maturin==1.11.5",
+    "mypy==1.19.1",
     "patchelf==0.17.2.2 ; sys_platform == 'linux'",
-    "ruff==0.14.4",
+    "ruff==0.14.13",
 ]
 docs = [
-    "markdown-gfm-admonition==0.1.1",
+    "markdown-gfm-admonition==0.3.0",
     "mkdocs==1.6.1",
-    "mkdocs-gen-files==0.5.0",
+    "mkdocs-gen-files==0.6.0",
     "mkdocs-include-markdown-plugin==7.2.0",
-    "mkdocs-material==9.7.0",
+    "mkdocs-material==9.7.1",
     "pyyaml==6.0.3",
 ]
 
