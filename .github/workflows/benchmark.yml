@@ -126,7 +126,7 @@ jobs:
       - name: Install nushell
         uses: hustcer/setup-nu@920172d92eb04671776f3ba69d605d3b09351c30 # v3.22
       - name: Install uv
-        uses: astral-sh/setup-uv@681c641aba71e4a1c380be3ab5e12ad51f415867 # v7.1.6
+        uses: astral-sh/setup-uv@61cb8a9741eeb8a550a1b8544337180c0fc8476b # v7.2.0
 
       - name: Run benchmark script
         working-directory: benchmark
