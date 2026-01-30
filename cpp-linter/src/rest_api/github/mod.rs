@@ -125,17 +125,15 @@ impl RestApiClient for GithubApiClient {
         lines_changed_only: &LinesChangedOnly,
     ) -> Result<Vec<FileObj>> {
         if env::var("CI").is_ok_and(|val| val.as_str() == "true")
-            && self.repo.is_some()
-            && self.sha.is_some()
+            && let Some(repo) = self.repo.as_ref()
         {
             // get diff from Github REST API
             let is_pr = self.event_name == "pull_request";
             let pr = self.pull_request.to_string();
-            let sha = self.sha.clone().unwrap();
+            let sha = self.sha.clone().unwrap_or_default();
             let url = self
                 .api_url
-                .join("repos/")?
-                .join(format!("{}/", self.repo.as_ref().unwrap()).as_str())?
+                .join(format!("repos/{repo}/").as_str())?
                 .join(if is_pr { "pulls/" } else { "commits/" })?
                 .join(if is_pr { pr.as_str() } else { sha.as_str() })?;
             let mut diff_header = HeaderMap::new();
