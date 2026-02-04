@@ -20,7 +20,7 @@ clap = { version = "4.5.54", features = ["derive"] }
 colored = "3.0.0"
 fast-glob = "1.0.0"
 futures = "0.3.31"
-git2 = "0.20.3"
+git2 = "0.20.4"
 log = { version = "0.4.29", features = ["std"] }
 quick-xml = { version = "0.38.4", features = ["serialize"] }
 regex = "1.12.2"
@@ -36,7 +36,7 @@ which = "8.0.0"
 [dev-dependencies]
 mockito = "1.7.1"
 tempfile = "3.24.0"
-git2 = { version = "0.20.3", features = ["https"]}
+git2 = { version = "0.20.4", features = ["https"]}
 
 [features]
 openssl-vendored = ["git2/vendored-openssl", "reqwest/native-tls-vendored"]
