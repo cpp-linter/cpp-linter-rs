@@ -3,7 +3,7 @@
 //!
 //! Currently, only Github is supported.
 
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use std::future::Future;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -103,10 +103,16 @@ pub trait RestApiClient {
     ///
     /// The context of the file changes are subject to the type of event in which
     /// cpp_linter package is used.
-    fn get_list_of_changed_files(
+    ///
+    /// See [`get_diff()`](crate::git::get_diff()) for explanation of
+    /// `diff_base` and `ignore_index` parameters, which only applies to a
+    /// local (non-CI) environment.
+    fn get_list_of_changed_files<T: Display>(
         &self,
         file_filter: &FileFilter,
         lines_changed_only: &LinesChangedOnly,
+        diff_base: &Option<T>,
+        ignore_index: bool,
     ) -> impl Future<Output = Result<Vec<FileObj>>>;
 
     /// Makes a comment in MarkDown syntax based on the concerns in `format_advice` and
@@ -383,6 +389,7 @@ fn make_tidy_comment(
 /// from `try_next_page()` and `send_api_request()` functions.
 #[cfg(test)]
 mod test {
+    use std::fmt::Display;
     use std::sync::{Arc, Mutex};
 
     use anyhow::{Result, anyhow};
@@ -422,10 +429,12 @@ mod test {
             Err(anyhow!("Not implemented"))
         }
 
-        async fn get_list_of_changed_files(
+        async fn get_list_of_changed_files<T: Display>(
             &self,
             _file_filter: &FileFilter,
             _lines_changed_only: &LinesChangedOnly,
+            _diff_base: &Option<T>,
+            _ignore_index: bool,
         ) -> Result<Vec<FileObj>> {
             Err(anyhow!("Not implemented"))
         }
@@ -456,7 +465,12 @@ mod test {
         assert_eq!(dummy.set_exit_code(1, None, None), 0);
         assert!(
             dummy
-                .get_list_of_changed_files(&FileFilter::new(&[], vec![]), &LinesChangedOnly::Off)
+                .get_list_of_changed_files(
+                    &FileFilter::new(&[], vec![]),
+                    &LinesChangedOnly::Off,
+                    &None::<u8>,
+                    false
+                )
                 .await
                 .is_err()
         );
