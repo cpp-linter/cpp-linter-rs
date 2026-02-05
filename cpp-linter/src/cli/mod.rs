@@ -199,7 +199,7 @@ pub struct SourceOptions {
     /// The git reference to use as the base for diffing changed files.
     ///
     /// This can be any valid git ref, such as a branch name, tag name, or commit SHA.
-    /// If it in integer, then it is treated as the number of parent commits from HEAD.
+    /// If it is an integer, then it is treated as the number of parent commits from HEAD.
     ///
     /// This option only applies to non-CI contexts (eg. local CLI use).
     #[arg(
