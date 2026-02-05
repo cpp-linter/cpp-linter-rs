@@ -49,6 +49,10 @@ inputs:
     required-permission: 'pull-requests: write #pull-request-reviews'
   jobs:
     minimum-version: '1.8.1'
+  diff-base:
+    minimum-version: '1.12.0'
+  ignore-index:
+    minimum-version: '1.12.0'
 outputs:
   checks-failed:
     minimum-version: '1.4.6'

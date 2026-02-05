@@ -104,14 +104,24 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
     {
         // parse_diff(github_rest_api_payload)
         rest_api_client
-            .get_list_of_changed_files(&file_filter, &cli.source_options.lines_changed_only)
+            .get_list_of_changed_files(
+                &file_filter,
+                &cli.source_options.lines_changed_only,
+                &cli.source_options.diff_base,
+                cli.source_options.ignore_index,
+            )
             .await?
     } else {
         // walk the folder and look for files with specified extensions according to ignore values.
         let mut all_files = file_filter.list_source_files(".")?;
         if is_pr && (cli.feedback_options.tidy_review || cli.feedback_options.format_review) {
             let changed_files = rest_api_client
-                .get_list_of_changed_files(&file_filter, &LinesChangedOnly::Off)
+                .get_list_of_changed_files(
+                    &file_filter,
+                    &LinesChangedOnly::Off,
+                    &cli.source_options.diff_base,
+                    cli.source_options.ignore_index,
+                )
                 .await?;
             for changed_file in changed_files {
                 for file in &mut all_files {

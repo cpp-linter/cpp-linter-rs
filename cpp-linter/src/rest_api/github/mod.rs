@@ -4,6 +4,7 @@
 //! In other (private) submodules we implement behavior specific to Github's REST API.
 
 use std::env;
+use std::fmt::Display;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::sync::{Arc, Mutex};
@@ -119,10 +120,12 @@ impl RestApiClient for GithubApiClient {
         Ok(headers)
     }
 
-    async fn get_list_of_changed_files(
+    async fn get_list_of_changed_files<T: Display>(
         &self,
         file_filter: &FileFilter,
         lines_changed_only: &LinesChangedOnly,
+        diff_base: &Option<T>,
+        ignore_index: bool,
     ) -> Result<Vec<FileObj>> {
         if env::var("CI").is_ok_and(|val| val.as_str() == "true")
             && let Some(repo) = self.repo.as_ref()
@@ -171,7 +174,11 @@ impl RestApiClient for GithubApiClient {
             let repo = open_repo(".").with_context(
                 || "Please ensure the repository is checked out before running cpp-linter.",
             )?;
-            let list = parse_diff(&get_diff(&repo)?, file_filter, lines_changed_only);
+            let list = parse_diff(
+                &get_diff(&repo, diff_base, ignore_index)?,
+                file_filter,
+                lines_changed_only,
+            );
             Ok(list)
         }
     }
@@ -430,7 +437,12 @@ mod test {
         env::set_current_dir(tmp_dir.path()).unwrap();
         let rest_client = GithubApiClient::new().unwrap();
         let files = rest_client
-            .get_list_of_changed_files(&FileFilter::new(&[], vec![]), &LinesChangedOnly::Off)
+            .get_list_of_changed_files(
+                &FileFilter::new(&[], vec![]),
+                &LinesChangedOnly::Off,
+                &None::<u8>,
+                false,
+            )
             .await;
         assert!(files.is_err())
     }

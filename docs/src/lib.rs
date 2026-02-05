@@ -84,17 +84,11 @@ fn generate_cli_doc(metadata: HashMap<String, HashMap<String, Py<PyAny>>>) -> Py
                 "Failed to get long name of argument with id {}",
                 arg_id.as_str()
             )))?;
-            out.push_str(
-                format!(
-                    "\n### `-{}, --{}`\n\n",
-                    arg.get_short().ok_or(PyValueError::new_err(format!(
-                        "Failed to get short name for argument with id {}",
-                        arg_id.as_str()
-                    )))?,
-                    long_name
-                )
-                .as_str(),
-            );
+            let short_name = arg
+                .get_short()
+                .map(|c| format!("-{}, ", c))
+                .unwrap_or_default();
+            out.push_str(format!("\n### `{}--{}`\n\n", short_name, long_name).as_str());
             if let Some(map) = metadata.get(long_name) {
                 if let Some(val) = map.get("minimum-version") {
                     out.push_str(format!("<!-- md:version {} -->\n", val).as_str());

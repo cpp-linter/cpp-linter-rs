@@ -195,6 +195,27 @@ pub struct SourceOptions {
         verbatim_doc_comment
     )]
     pub ignore: Vec<String>,
+
+    /// The git reference to use as the base for diffing changed files.
+    ///
+    /// This can be any valid git ref, such as a branch name, tag name, or commit SHA.
+    /// If it in integer, then it is treated as the number of parent commits from HEAD.
+    ///
+    /// This option only applies to non-CI contexts (eg. local CLI use).
+    #[arg(
+        short = 'b',
+        long,
+        value_name = "REF",
+        help_heading = "Source options",
+        verbatim_doc_comment
+    )]
+    pub diff_base: Option<String>,
+
+    /// Assert this switch to ignore any staged changes when
+    /// generating a diff of changed files.
+    /// Useful when used with [`--diff-base`](#-b-diff-base).
+    #[arg(default_value_t = false, long, help_heading = "Source options")]
+    pub ignore_index: bool,
 }
 
 #[derive(Debug, Clone, Args)]

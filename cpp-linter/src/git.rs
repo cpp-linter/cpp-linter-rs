@@ -8,7 +8,7 @@
 //! (str or bytes) only happens in CI or when libgit2 cannot be used to initialize a
 //! repository.
 
-use std::{ops::RangeInclusive, path::PathBuf};
+use std::{fmt::Display, ops::RangeInclusive, path::PathBuf};
 
 use anyhow::{Context, Result};
 // non-std crates
@@ -33,9 +33,18 @@ pub fn open_repo(path: &str) -> Result<Repository, Error> {
 ///
 /// The optionally specified `depth` can be used to traverse the tree a number of times
 /// since the current `"HEAD"`.
-fn get_sha(repo: &Repository, depth: Option<u32>) -> Result<git2::Object<'_>, Error> {
+fn get_sha<'d, T: Display>(
+    repo: &'d Repository,
+    depth: &Option<T>,
+) -> Result<git2::Object<'d>, Error> {
     match depth {
-        Some(int) => repo.revparse_single(format!("HEAD~{}", int).as_str()),
+        Some(base) => {
+            if base.to_string().parse::<u32>().is_ok() {
+                repo.revparse_single(format!("HEAD~{}", base).as_str())
+            } else {
+                repo.revparse_single(format!("{base}").as_str())
+            }
+        }
         None => repo.revparse_single("HEAD"),
     }
 }
@@ -43,40 +52,76 @@ fn get_sha(repo: &Repository, depth: Option<u32>) -> Result<git2::Object<'_>, Er
 /// Fetch the [`git2::Diff`] about a given [`git2::Repository`].
 ///
 /// This is actually not used in CI for file permissions and ownership reasons.
-/// Rather this is only (supposed to be) used when executed on a local developer
+/// Rather, this is only (supposed to be) used when executed on a local developer
 /// machine.
 ///
-/// If there are files staged for a commit, then the resulting [`Diff`] will describe
-/// the staged changes. However, if there are no staged changes, then the last commit's
-/// [`Diff`] is returned.
-pub fn get_diff(repo: &'_ Repository) -> Result<git2::Diff<'_>> {
-    let head = get_sha(repo, None).unwrap().peel_to_tree().unwrap();
-    let mut has_staged_files = false;
-    for entry in repo.statuses(None).unwrap().iter() {
-        if entry.status().bits()
-            & (git2::Status::INDEX_NEW.bits()
-                | git2::Status::INDEX_MODIFIED.bits()
-                | git2::Status::INDEX_RENAMED.bits())
-            > 0
-        {
-            has_staged_files = true;
-            break;
-        }
-    }
+/// ## Using `diff_base` and `ignore_index`
+///
+/// The `diff_base` is a commit or ref to use as the base of the diff.
+/// Use `ignore_index` to exclude any staged changes in the local index.
+///
+/// | Parameter Value | Git index state | Scope of diff |
+/// |-----------------|-----------------|----------------|
+/// | `None` (the default) | No staged changes | `HEAD~1..HEAD` |
+/// | `None` (the default) | Has staged changes | `HEAD..index` |
+/// | `int` (eg `2`) or `str` (eg `HEAD~2`) | No staged changes | `HEAD~2..HEAD` |
+/// | `int` (eg `2`) or `str` (eg `HEAD~2`) | Has staged changes | `HEAD~2..index` |
+pub fn get_diff<'d, T: Display>(
+    repo: &'d Repository,
+    diff_base: &Option<T>,
+    ignore_index: bool,
+) -> Result<git2::Diff<'d>> {
+    let use_staged_files = if ignore_index {
+        false
+    } else {
+        // check if there are staged file changes
+        repo.statuses(None)
+            .with_context(|| "Could not get repo statuses")?
+            .iter()
+            .any(|entry| {
+                entry.status().bits()
+                    & (git2::Status::INDEX_NEW.bits()
+                        | git2::Status::INDEX_MODIFIED.bits()
+                        | git2::Status::INDEX_RENAMED.bits())
+                    > 0
+            })
+    };
+    let base = if diff_base.is_some() {
+        // diff base is specified (regardless of staged changes)
+        get_sha(repo, diff_base)
+    } else if !use_staged_files && !ignore_index {
+        // diff base is unspecified, when the repo has
+        // no staged changes (and they are not ignored),
+        // then focus on just the last commit
+        get_sha(repo, &Some(1))
+    } else {
+        // diff base is unspecified and there are staged changes, so
+        // let base be set to HEAD.
+        get_sha(repo, &None::<u8>)
+    }?
+    .peel_to_tree()?;
 
     // RARE BUG when `head` is the first commit in the repo! Affects local-only runs.
-    // > panicked at cpp-linter\src\git.rs:73:43:
-    // > called `Result::unwrap()` on an `Err` value:
     // > Error { code: -3, class: 3, message: "parent 0 does not exist" }
-    if has_staged_files {
-        // get diff for staged files only
-        repo.diff_tree_to_index(Some(&head), None, None)
-            .with_context(|| "Could not get diff for current changes in local repo index")
+    if use_staged_files {
+        // get diff including staged files
+        repo.diff_tree_to_index(Some(&base), None, None)
+            .with_context(|| {
+                format!(
+                    "Could not get diff for {}..index",
+                    &base.id().to_string()[..7]
+                )
+            })
     } else {
-        // get diff for last commit only
-        let base = get_sha(repo, Some(1)).unwrap().peel_to_tree().unwrap();
+        // get diff for range of commits between base..HEAD
+        let head = get_sha(repo, &None::<u8>)?.peel_to_tree()?;
         repo.diff_tree_to_tree(Some(&base), Some(&head), None)
-            .with_context(|| "Could not get diff for last commit")
+            .with_context(|| {
+                format!(
+                    "Could not get diff for {}..HEAD",
+                    &base.id().to_string()[..7]
+                )
+            })
     }
 }
 
@@ -105,8 +150,10 @@ fn parse_patch(patch: &Patch) -> (Vec<u32>, Vec<RangeInclusive<u32>>) {
 
 /// Parses a given [`git2::Diff`] and returns a list of [`FileObj`]s.
 ///
-/// The specified list of `extensions`, `ignored` and `not_ignored` files are used as
-/// filters to expedite the process and only focus on the data cpp_linter can use.
+/// The `lines_changed_only`, parameter is used to expedite the process and only
+/// focus on files that have relevant changes. The `file_filter` parameter applies
+/// a filter to only include source files (or ignored files) based on the
+/// extensions and ignore patterns specified.
 pub fn parse_diff(
     diff: &git2::Diff,
     file_filter: &FileFilter,
@@ -393,19 +440,30 @@ mod test {
         fs::read,
     };
 
-    use git2::build::CheckoutBuilder;
-    use git2::{ApplyLocation, Diff, IndexAddOption, Repository};
+    use git2::{ApplyLocation, Diff, IndexAddOption, Repository, build::CheckoutBuilder};
+    use tempfile::{TempDir, tempdir};
+
+    use super::get_sha;
+    use crate::{
+        cli::LinesChangedOnly,
+        common_fs::FileFilter,
+        rest_api::{RestApiClient, github::GithubApiClient},
+    };
+
+    const TEST_REPO_URL: &str = "https://github.com/cpp-linter/cpp-linter";
 
     // used to setup a testing stage
-    fn clone_repo(url: &str, sha: &str, path: &str, patch_path: Option<&str>) {
-        let repo = Repository::clone(url, path).unwrap();
-        let commit = repo.revparse_single(sha).unwrap();
-        repo.checkout_tree(
-            &commit,
-            Some(CheckoutBuilder::new().force().recreate_missing(true)),
-        )
-        .unwrap();
-        repo.set_head_detached(commit.id()).unwrap();
+    fn clone_repo(sha: Option<&str>, path: &str, patch_path: Option<&str>) -> Repository {
+        let repo = Repository::clone(TEST_REPO_URL, path).unwrap();
+        if let Some(sha) = sha {
+            let commit = repo.revparse_single(sha).unwrap();
+            repo.checkout_tree(
+                &commit,
+                Some(CheckoutBuilder::new().force().recreate_missing(true)),
+            )
+            .unwrap();
+            repo.set_head_detached(commit.id()).unwrap();
+        }
         if let Some(patch) = patch_path {
             let diff = Diff::from_buffer(&read(patch).unwrap()).unwrap();
             repo.apply(&diff, ApplyLocation::Both, None).unwrap();
@@ -415,15 +473,8 @@ mod test {
                 .unwrap();
             index.write().unwrap();
         }
+        repo
     }
-
-    use tempfile::{TempDir, tempdir};
-
-    use crate::{
-        cli::LinesChangedOnly,
-        common_fs::FileFilter,
-        rest_api::{RestApiClient, github::GithubApiClient},
-    };
 
     fn get_temp_dir() -> TempDir {
         let tmp = tempdir().unwrap();
@@ -436,11 +487,10 @@ mod test {
         extensions: &[String],
         tmp: &TempDir,
         patch_path: Option<&str>,
+        ignore_staged: bool,
     ) -> Vec<crate::common_fs::FileObj> {
-        let url = "https://github.com/cpp-linter/cpp-linter";
         clone_repo(
-            url,
-            sha,
+            Some(sha),
             tmp.path().as_os_str().to_str().unwrap(),
             patch_path,
         );
@@ -453,7 +503,12 @@ mod test {
         }
         rest_api_client
             .unwrap()
-            .get_list_of_changed_files(&file_filter, &LinesChangedOnly::Off)
+            .get_list_of_changed_files(
+                &file_filter,
+                &LinesChangedOnly::Off,
+                if ignore_staged { &Some(0) } else { &None::<u8> },
+                ignore_staged,
+            )
             .await
             .unwrap()
     }
@@ -465,7 +520,7 @@ mod test {
         let cur_dir = current_dir().unwrap();
         let tmp = get_temp_dir();
         let extensions = vec!["cpp".to_string(), "hpp".to_string()];
-        let files = checkout_cpp_linter_py_repo(sha, &extensions, &tmp, None).await;
+        let files = checkout_cpp_linter_py_repo(sha, &extensions, &tmp, None, false).await;
         println!("files = {:?}", files);
         assert!(files.is_empty());
         set_current_dir(cur_dir).unwrap(); // prep to delete temp_folder
@@ -479,7 +534,7 @@ mod test {
         let cur_dir = current_dir().unwrap();
         let tmp = get_temp_dir();
         let extensions = vec!["cpp".to_string(), "hpp".to_string()];
-        let files = checkout_cpp_linter_py_repo(sha, &extensions.clone(), &tmp, None).await;
+        let files = checkout_cpp_linter_py_repo(sha, &extensions.clone(), &tmp, None, false).await;
         println!("files = {:?}", files);
         assert!(files.len() >= 2);
         for file in files {
@@ -503,6 +558,7 @@ mod test {
             &extensions.clone(),
             &tmp,
             Some("tests/git_status_test_assets/cpp-linter/cpp-linter/test_git_lib.patch"),
+            false,
         )
         .await;
         println!("files = {:?}", files);
@@ -514,5 +570,38 @@ mod test {
         }
         set_current_dir(cur_dir).unwrap(); // prep to delete temp_folder
         drop(tmp); // delete temp_folder
+    }
+
+    #[tokio::test]
+    async fn with_ignored_staged_changes() {
+        // commit with no modified C/C++ sources
+        let sha = "0c236809891000b16952576dc34de082d7a40bf3";
+        let cur_dir = current_dir().unwrap();
+        let tmp = get_temp_dir();
+        let extensions = vec!["cpp".to_string(), "hpp".to_string()];
+        let files = checkout_cpp_linter_py_repo(
+            sha,
+            &extensions.clone(),
+            &tmp,
+            Some("tests/git_status_test_assets/cpp-linter/cpp-linter/test_git_lib.patch"),
+            true,
+        )
+        .await;
+        println!("files = {:?}", files);
+        assert!(files.is_empty());
+        set_current_dir(cur_dir).unwrap(); // prep to delete temp_folder
+        drop(tmp); // delete temp_folder
+    }
+
+    #[test]
+    fn repo_get_sha() {
+        let tmp_dir = get_temp_dir();
+        let repo = clone_repo(None, tmp_dir.path().to_str().unwrap(), None);
+        for (ours, theirs) in [(None::<u8>, "HEAD"), (Some(2), "HEAD~2")] {
+            let our_obj = get_sha(&repo, &ours).unwrap();
+            let their_obj = get_sha(&repo, &Some(theirs)).unwrap();
+            assert_eq!(our_obj.id(), their_obj.id());
+        }
+        drop(tmp_dir); // delete temp_folder
     }
 }
