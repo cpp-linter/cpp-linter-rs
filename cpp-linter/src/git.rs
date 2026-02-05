@@ -610,6 +610,8 @@ mod test {
             let their_obj = get_sha(&repo, &Some(theirs)).unwrap();
             assert_eq!(our_obj.id(), their_obj.id());
         }
+        // test an invalid ref for coverage measurement
+        assert!(get_sha(&repo, &Some("1.0")).is_err());
         drop(tmp_dir); // delete temp_folder
     }
 }
