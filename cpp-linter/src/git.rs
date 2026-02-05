@@ -40,10 +40,17 @@ fn get_sha<'d, T: Display>(
     match depth {
         Some(base) => {
             let base = base.to_string();
-            if base.chars().all(|c| c.is_ascii_digit()) {
-                repo.revparse_single(format!("HEAD~{}", base).as_str())
-            } else {
-                repo.revparse_single(base.as_str())
+            // First treat base as an explicit refs/SHAs. If that fails, then
+            // fall back to `HEAD~<base>` if `base` is purely numeric.
+            match repo.revparse_single(base.as_str()) {
+                Ok(obj) => Ok(obj),
+                Err(err) => {
+                    if base.chars().all(|c| c.is_ascii_digit()) {
+                        repo.revparse_single(format!("HEAD~{}", base).as_str())
+                    } else {
+                        Err(err)
+                    }
+                }
             }
         }
         None => repo.revparse_single("HEAD"),
@@ -61,12 +68,12 @@ fn get_sha<'d, T: Display>(
 /// The `diff_base` is a commit or ref to use as the base of the diff.
 /// Use `ignore_index` to exclude any staged changes in the local index.
 ///
-/// | Parameter Value | Git index state | Scope of diff |
-/// |-----------------|-----------------|----------------|
-/// | `None` (the default) | No staged changes | `HEAD~1..HEAD` |
-/// | `None` (the default) | Has staged changes | `HEAD..index` |
-/// | `int` (eg `2`) or `str` (eg `HEAD~2`) | No staged changes | `HEAD~2..HEAD` |
-/// | `int` (eg `2`) or `str` (eg `HEAD~2`) | Has staged changes | `HEAD~2..index` |
+/// | `diff_base` value | Git index state | Scope of diff |
+/// |-------------------|-----------------|---------------|
+/// | `None` | No staged changes | `HEAD~1..HEAD` |
+/// | `None` | Has staged changes | `HEAD..index` |
+/// | `Some(2)` or `Some("HEAD~2")` | No staged changes | `HEAD~2..HEAD` |
+/// | `Some(2)` or `Some("HEAD~2")` | Has staged changes | `HEAD~2..index` |
 pub fn get_diff<'d, T: Display>(
     repo: &'d Repository,
     diff_base: &Option<T>,
@@ -151,7 +158,7 @@ fn parse_patch(patch: &Patch) -> (Vec<u32>, Vec<RangeInclusive<u32>>) {
 
 /// Parses a given [`git2::Diff`] and returns a list of [`FileObj`]s.
 ///
-/// The `lines_changed_only`, parameter is used to expedite the process and only
+/// The `lines_changed_only` parameter is used to expedite the process and only
 /// focus on files that have relevant changes. The `file_filter` parameter applies
 /// a filter to only include source files (or ignored files) based on the
 /// extensions and ignore patterns specified.
