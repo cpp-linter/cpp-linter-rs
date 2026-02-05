@@ -39,10 +39,11 @@ fn get_sha<'d, T: Display>(
 ) -> Result<git2::Object<'d>, Error> {
     match depth {
         Some(base) => {
-            if base.to_string().parse::<u32>().is_ok() {
+            let base = base.to_string();
+            if base.chars().all(|c| c.is_digit(10)) {
                 repo.revparse_single(format!("HEAD~{}", base).as_str())
             } else {
-                repo.revparse_single(format!("{base}").as_str())
+                repo.revparse_single(base.as_str())
             }
         }
         None => repo.revparse_single("HEAD"),
