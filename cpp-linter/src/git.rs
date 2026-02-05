@@ -40,7 +40,7 @@ fn get_sha<'d, T: Display>(
     match depth {
         Some(base) => {
             let base = base.to_string();
-            if base.chars().all(|c| c.is_digit(10)) {
+            if base.chars().all(|c| c.is_ascii_digit()) {
                 repo.revparse_single(format!("HEAD~{}", base).as_str())
             } else {
                 repo.revparse_single(base.as_str())
@@ -90,7 +90,7 @@ pub fn get_diff<'d, T: Display>(
     let base = if diff_base.is_some() {
         // diff base is specified (regardless of staged changes)
         get_sha(repo, diff_base)
-    } else if !use_staged_files && !ignore_index {
+    } else if !use_staged_files {
         // diff base is unspecified, when the repo has
         // no staged changes (and they are not ignored),
         // then focus on just the last commit
