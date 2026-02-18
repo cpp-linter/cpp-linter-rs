@@ -293,14 +293,15 @@ jobs:
         if: ${{ contains(matrix.target, 'armv7') }}
       - name: Test bindings
         if: matrix.target != 'x86_64-unknown-linux-gnu'
-        uses: addnab/docker-run-action@4f65fabd2431ebc8d299f8e5a018d79a769ae185 # v3
+        uses: tj-actions/docker-run@1d25a677da8f1243a138dc5db21e307e92986ffe # v2.2.1
         with:
           image: ${{ steps.docker.outputs.IMAGE }}
+          name: test-${{ matrix.target }}
           options: >- # zizmor: ignore[template-injection]
             -v ${{ github.workspace }}:${{ github.workspace }}
             -w ${{ github.workspace }}
             --platform ${{ steps.docker.outputs.PLATFORM }}
-          run: yarn test
+          args: yarn test
       - name: Test x86_64-unknown-linux-gnu
         if: matrix.target == 'x86_64-unknown-linux-gnu'
         run: yarn test
