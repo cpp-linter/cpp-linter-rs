@@ -133,3 +133,5 @@ ignorePaths:
   - .vscode/extensions.json
   - .yarn/releases/*
   - "*.lock"
+  # generated file out of our control
+  - bindings/node/index.js
