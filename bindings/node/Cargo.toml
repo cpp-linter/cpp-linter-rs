@@ -17,10 +17,10 @@ bench = false
 
 [dependencies]
 # Default enable napi4 feature, see https://nodejs.org/api/n-api.html#node-api-version-matrix
-napi = { version = "3.8.1", default-features = false, features = ["napi4", "async"] }
-napi-derive = "3.5.0"
+napi = { version = "3.8.2", default-features = false, features = ["napi4", "async"] }
+napi-derive = "3.5.2"
 cpp-linter = { path = "../../cpp-linter" }
-anyhow = "1.0.100"
+anyhow = "1.0.101"
 
 [features]
 openssl-vendored = ["cpp-linter/openssl-vendored"]
