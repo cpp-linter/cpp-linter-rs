@@ -1,7 +1,7 @@
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [workspace]
-members = ["cpp-linter", "bindings/python", "bindings/node", "docs"]
+members = ["cpp-linter", "bindings/python", "bindings/node", "docs", "clang-installer"]
 resolver = "2"
 
 [workspace.package]
@@ -14,7 +14,24 @@ description = "Run clang-format and clang-tidy on a batch of files."
 homepage = "https://cpp-linter.github.io/cpp-linter-rs"
 license = "MIT"
 edition = "2024"
+repository = "https://github.com/cpp-linter/cpp-linter-rs"
 
 [profile.release]
 lto = true
 strip = "symbols"
+
+[workspace.dependencies]
+anyhow = "1.0.102"
+clap = { version = "4.5.60", features = ["derive"] }
+colored = "3.1.1"
+log = { version = "0.4.29", features = ["std"] }
+mockito = "1.7.2"
+pyo3 = {version = "0.28.2", features = ["extension-module"] }
+regex = "1.12.3"
+reqwest = { version = "0.13.2", default-features = false, features = ["http2", "charset"] }
+thiserror = "2.0.18"
+semver = "1.0.27"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+tempfile = "3.26.0"
+tokio = "1.50.0"
