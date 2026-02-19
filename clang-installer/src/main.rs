@@ -1,16 +1,15 @@
-#![deny(clippy::unwrap_used)]
-#![cfg(feature = "bin")]
-//! A module to initialize and customize the logger object used in (most) stdout.
+use anyhow::Result;
+use clang_installer::{CliOptions, RequestedVersion};
+use clap::Parser;
+use colored::{Colorize, control::set_override};
+use log::{Level, LevelFilter, Log, Metadata, Record};
 
 use std::{
+    collections::HashMap,
     env,
     io::{Write, stdout},
 };
 
-use colored::{Colorize, control::set_override};
-use log::{Level, LevelFilter, Log, Metadata, Record};
-
-#[derive(Default)]
 struct SimpleLogger;
 
 impl SimpleLogger {
@@ -41,7 +40,9 @@ impl Log for SimpleLogger {
                 .expect("Failed to flush log command in stdout");
         } else if self.enabled(record.metadata()) {
             let module = record.module_path();
-            if module.is_none_or(|v| v.starts_with("cpp_linter")) {
+            if module
+                .is_none_or(|v| v.starts_with("clang_installer") || v.starts_with("clang_tools"))
+            {
                 writeln!(
                     stdout,
                     "[{}]: {}",
@@ -74,12 +75,12 @@ impl Log for SimpleLogger {
 /// The logging level defaults to [`LevelFilter::Info`].
 /// This logs a debug message about [`SetLoggerError`](struct@log::SetLoggerError)
 /// if the `LOGGER` is already initialized.
-pub fn try_init() {
+pub fn initialize_logger() {
     let logger: SimpleLogger = SimpleLogger;
-    if matches!(
-        env::var("CPP_LINTER_COLOR").as_deref(),
-        Ok("on" | "1" | "true")
-    ) {
+    if env::var("CPP_LINTER_COLOR")
+        .as_deref()
+        .is_ok_and(|v| matches!(v, "on" | "1" | "true"))
+    {
         set_override(true);
     }
     if let Err(e) =
@@ -91,20 +92,31 @@ pub fn try_init() {
     }
 }
 
-#[cfg(test)]
-mod test {
-    use std::env;
+#[tokio::main]
+async fn main() -> Result<()> {
+    initialize_logger();
+    let options = CliOptions::parse();
+    log::debug!("{:?}", options);
 
-    use super::{SimpleLogger, try_init};
-
-    #[test]
-    fn trace_log() {
-        unsafe {
-            env::set_var("CPP_LINTER_COLOR", "true");
+    let tool = options
+        .tool
+        .expect("--tool should have a default value: [clang-format, clang-tidy]");
+    match options.version.unwrap_or(RequestedVersion::default()) {
+        RequestedVersion::NoValue => {
+            log::info!(
+                "clang-tools(-installer) version: {}",
+                env!("CARGO_PKG_VERSION")
+            );
         }
-        try_init();
-        assert!(SimpleLogger::level_color(&log::Level::Trace).contains("TRACE"));
-        log::set_max_level(log::LevelFilter::Trace);
-        log::trace!("A dummy log statement for code coverage");
+        req_ver => {
+            let mut map_tools = HashMap::new();
+            for t in tool {
+                if let Some(version) = req_ver.eval_tool(&t, options.force).await? {
+                    map_tools.entry(t).or_insert(version);
+                }
+            }
+            log::info!("Finished! \n{map_tools:#?}");
+        }
     }
+    Ok(())
 }

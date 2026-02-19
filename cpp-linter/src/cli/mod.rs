@@ -4,6 +4,7 @@
 use std::{path::PathBuf, str::FromStr};
 
 // non-std crates
+use clang_installer::RequestedVersion;
 use clap::{
     ArgAction, Args, Parser, Subcommand, ValueEnum,
     builder::{FalseyValueParser, NonEmptyStringValueParser},
@@ -11,7 +12,7 @@ use clap::{
 };
 
 mod structs;
-pub use structs::{ClangParams, FeedbackInput, LinesChangedOnly, RequestedVersion, ThreadComments};
+pub use structs::{ClangParams, FeedbackInput, LinesChangedOnly, ThreadComments};
 
 #[derive(Debug, Clone, PartialEq, Eq, ValueEnum)]
 pub enum Verbosity {
