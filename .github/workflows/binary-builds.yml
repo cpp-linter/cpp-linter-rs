@@ -131,7 +131,7 @@ jobs:
           --bin cpp-linter
           --release
           --target ${{ matrix.target }}
-          ${{ matrix.vendored && '--features openssl-vendored' || '' }}
+          --features ${{ matrix.vendored && 'bin,openssl-vendored' || 'bin' }}
 
       - name: Prepare artifacts (unix)
         if: runner.os != 'Windows'

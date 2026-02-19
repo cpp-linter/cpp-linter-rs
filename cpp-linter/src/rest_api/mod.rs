@@ -144,7 +144,7 @@ pub trait RestApiClient {
                     &mut comment,
                     format_checks_failed,
                     // tidy_version should be `Some()` value at this point.
-                    clang_versions.tidy_version.as_ref().unwrap(),
+                    &clang_versions.tidy_version.as_ref().unwrap().to_string(),
                     &mut remaining_length,
                 );
             }
@@ -154,7 +154,7 @@ pub trait RestApiClient {
                     &mut comment,
                     tidy_checks_failed,
                     // format_version should be `Some()` value at this point.
-                    clang_versions.format_version.as_ref().unwrap(),
+                    &clang_versions.format_version.as_ref().unwrap().to_string(),
                     &mut remaining_length,
                 );
             }

@@ -60,7 +60,7 @@ jobs:
           fi
       - run: rustup update --no-self-update
         if: steps.cache.outputs.cache-hit != 'true' || steps.validate.outputs.cache-valid == 'false'
-      - run: cargo build --bin cpp-linter --release
+      - run: cargo build --bin cpp-linter --features bin --release
         if: steps.cache.outputs.cache-hit != 'true' || steps.validate.outputs.cache-valid == 'false'
       - name: Upload build artifact
         uses: actions/upload-artifact@v7

@@ -266,6 +266,7 @@ mod test {
     };
 
     use regex::Regex;
+    use semver::Version;
     use tempfile::{NamedTempFile, tempdir};
 
     use super::GithubApiClient;
@@ -351,8 +352,8 @@ mod test {
             );
         }
         let clang_versions = ClangVersions {
-            format_version: Some("x.y.z".to_string()),
-            tidy_version: Some("x.y.z".to_string()),
+            format_version: Some(Version::new(1, 2, 3)),
+            tidy_version: Some(Version::new(1, 2, 3)),
         };
         rest_api_client
             .post_feedback(&files, feedback_inputs, clang_versions)
