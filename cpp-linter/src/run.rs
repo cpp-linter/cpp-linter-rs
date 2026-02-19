@@ -11,13 +11,14 @@ use std::{
 
 // non-std crates
 use anyhow::{Result, anyhow};
+use clang_installer::RequestedVersion;
 use clap::Parser;
 use log::{LevelFilter, set_max_level};
 
 // project specific modules/crates
 use crate::{
     clang_tools::capture_clang_tools_output,
-    cli::{ClangParams, Cli, CliCommand, FeedbackInput, LinesChangedOnly, RequestedVersion},
+    cli::{ClangParams, Cli, CliCommand, FeedbackInput, LinesChangedOnly},
     common_fs::FileFilter,
     logger,
     rest_api::{RestApiClient, github::GithubApiClient},

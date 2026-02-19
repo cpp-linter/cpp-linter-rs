@@ -3,7 +3,7 @@ name = "cpp-linter"
 readme = "README.md"
 keywords = ["clang-tidy", "clang-format", "linter"]
 categories = ["command-line-utilities", "development-tools", "filesystem"]
-repository = "https://github.com/cpp-linter/cpp-linter-rs"
+repository.workspace = true
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -16,30 +16,31 @@ license.workspace = true
 [dependencies]
 anyhow = "1.0.101"
 chrono = "0.4.43"
+clang-installer = { path = "../clang-installer", version = "0.1.0" }
 clap = { version = "4.5.57", features = ["derive"] }
 colored = "3.1.1"
 fast-glob = "1.0.0"
 futures = "0.3.31"
 git2 = "0.20.4"
-log = { version = "0.4.29", features = ["std"] }
+log = { workspace = true }
 quick-xml = { version = "0.39.0", features = ["serialize"] }
-regex = "1.12.3"
-reqwest = { version = "0.13.2", default-features = false, features = ["native-tls", "http2", "charset"] }
-semver = "1.0.27"
-serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.148"
+regex = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
 tokio = { version = "1.49.0", features = ["macros", "rt-multi-thread"] }
 tokio-macros = "2.5.0"
 tokio-stream = "0.1.18"
-which = "8.0.0"
 
 [dev-dependencies]
 mockito = "1.7.2"
-tempfile = "3.25.0"
+tempfile = { workspace = true }
 git2 = { version = "0.20.4", features = ["https"]}
 
 [features]
 openssl-vendored = ["git2/vendored-openssl", "reqwest/native-tls-vendored"]
+bin = ["reqwest/native-tls"]
 
 [lib]
 bench = false
@@ -49,3 +50,4 @@ name = "cpp-linter"
 path = "src/main.rs"
 test = false
 bench = false
+required-features = ["bin"]

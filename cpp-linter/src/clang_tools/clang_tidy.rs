@@ -11,15 +11,13 @@ use std::{
 
 // non-std crates
 use anyhow::{Context, Result, anyhow};
+use clang_installer::utils::normalize_path;
 use regex::Regex;
 use serde::Deserialize;
 
 // project-specific modules/crates
 use super::MakeSuggestions;
-use crate::{
-    cli::ClangParams,
-    common_fs::{FileObj, normalize_path},
-};
+use crate::{cli::ClangParams, common_fs::FileObj};
 
 /// Used to deserialize a json compilation database's translation unit.
 ///
@@ -378,11 +376,12 @@ mod test {
         sync::{Arc, Mutex},
     };
 
+    use clang_installer::RequestedVersion;
     use regex::Regex;
 
     use crate::{
         clang_tools::{ClangTool, clang_tidy::parse_tidy_output},
-        cli::{ClangParams, LinesChangedOnly, RequestedVersion},
+        cli::{ClangParams, LinesChangedOnly},
         common_fs::FileObj,
     };
 

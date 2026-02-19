@@ -1,74 +1,9 @@
-use std::{fmt::Display, path::PathBuf, str::FromStr};
+use std::{fmt::Display, path::PathBuf};
 
-use anyhow::{Error, anyhow};
 use clap::{ValueEnum, builder::PossibleValue};
-use semver::VersionReq;
 
 use super::Cli;
-use crate::{
-    clang_tools::clang_tidy::CompilationUnit,
-    common_fs::{FileFilter, normalize_path},
-};
-
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub enum RequestedVersion {
-    /// A specific path to the clang tool binary.
-    Path(PathBuf),
-
-    /// Whatever the system default uses (if any).
-    #[default]
-    SystemDefault,
-
-    /// A specific version requirement for the clang tool binary.
-    ///
-    /// For example, `=12.0.1`, `>=10.0.0, <13.0.0`.
-    Requirement(VersionReq),
-
-    /// A sentinel when no value is given.
-    ///
-    /// This is used internally to differentiate when the user intended
-    /// to invoke the `version` subcommand instead.
-    NoValue,
-}
-
-impl FromStr for RequestedVersion {
-    type Err = Error;
-
-    fn from_str(input: &str) -> Result<Self, Self::Err> {
-        if input.is_empty() {
-            Ok(Self::SystemDefault)
-        } else if input == "CPP-LINTER-VERSION" {
-            Ok(Self::NoValue)
-        } else if let Ok(req) = VersionReq::parse(input) {
-            Ok(Self::Requirement(req))
-        } else if let Ok(req) = VersionReq::parse(format!("={input}").as_str()) {
-            Ok(Self::Requirement(req))
-        } else {
-            let path = PathBuf::from(input);
-            if !path.exists() {
-                return Err(anyhow!(
-                    "The specified version is not a proper requirement or a valid path: {}",
-                    input
-                ));
-            }
-            let path = if !path.is_dir() {
-                path.parent()
-                    .ok_or(anyhow!(
-                        "Unknown parent directory of the given file path for `--version`: {}",
-                        input
-                    ))?
-                    .to_path_buf()
-            } else {
-                path
-            };
-            let path = match path.canonicalize() {
-                Ok(p) => Ok(normalize_path(&p)),
-                Err(e) => Err(anyhow!("Failed to canonicalize path '{input}': {e:?}")),
-            }?;
-            Ok(Self::Path(path))
-        }
-    }
-}
+use crate::{clang_tools::clang_tidy::CompilationUnit, common_fs::FileFilter};
 
 /// An enum to describe `--lines-changed-only` CLI option's behavior.
 #[derive(PartialEq, Clone, Debug, Default)]
@@ -304,14 +239,9 @@ impl Default for FeedbackInput {
 
 #[cfg(test)]
 mod test {
-    // use crate::cli::get_arg_parser;
-
-    use std::{path::PathBuf, str::FromStr};
-
-    use crate::{cli::RequestedVersion, common_fs::normalize_path};
+    use clap::{Parser, ValueEnum};
 
     use super::{Cli, LinesChangedOnly, ThreadComments};
-    use clap::{Parser, ValueEnum};
 
     #[test]
     fn parse_positional() {
@@ -349,20 +279,5 @@ mod test {
             ThreadComments::from_str(input, false).unwrap(),
             ThreadComments::Off
         );
-    }
-
-    #[test]
-    fn validate_version_path() {
-        let this_path_str = "src/cli/structs.rs";
-        let this_path = PathBuf::from(this_path_str);
-        let this_canonical = this_path.canonicalize().unwrap();
-        let parent = this_canonical.parent().unwrap();
-        let expected = normalize_path(parent);
-        let req_ver = RequestedVersion::from_str(this_path_str).unwrap();
-        if let RequestedVersion::Path(parsed) = req_ver {
-            assert_eq!(&parsed, &expected);
-        }
-
-        assert!(RequestedVersion::from_str("file.rs").is_err());
     }
 }

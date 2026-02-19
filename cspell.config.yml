@@ -57,6 +57,7 @@ words:
   - msvc
   - multiarch
   - musleabihf
+  - musllinux
   - mypy
   - napi
   - nextest
@@ -102,6 +103,7 @@ words:
   - serde
   - Shen
   - shenxianpeng
+  - splitn
   - startswith
   - superfences
   - tada
@@ -109,6 +111,7 @@ words:
   - tasklist
   - tempdir
   - tempfile
+  - thiserror
   - timeit
   - topo
   - twemoji
@@ -128,10 +131,10 @@ ignorePaths:
   - target/**
   - "**/.gitignore"
   - cpp-linter/tests/**/*.json
+  - clang-installer/tests/**/*.json
   - cpp-linter/tests/**/*.diff
   - cpp-linter/tests/**/.clang-tidy
   - .vscode/extensions.json
   - .yarn/releases/*
   - "*.lock"
-  # generated file out of our control
   - bindings/node/index.js

@@ -1,0 +1,22 @@
+[package]
+name = "clang-installer"
+version = "0.1.0"
+description = "A utility for installing specific versions of clang-format and clang-tidy, used by cpp-linter."
+readme = "README.md"
+keywords = ["clang-tidy", "clang-format"]
+categories = ["command-line-utilities", "development-tools", "filesystem"]
+authors.workspace = true
+homepage.workspace = true
+license.workspace = true
+edition.workspace = true
+repository.workspace = true
+
+[dependencies]
+log = { workspace = true }
+regex = { workspace = true }
+reqwest = { workspace = true }
+semver = "1.0.27"
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+which = "8.0.0"

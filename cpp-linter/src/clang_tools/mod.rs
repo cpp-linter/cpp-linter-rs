@@ -3,137 +3,27 @@
 //! clang-tidy.
 
 use std::{
-    env::current_dir,
-    fmt::{self, Display},
     fs,
     path::{Path, PathBuf},
-    process::Command,
     sync::{Arc, Mutex},
 };
 
 // non-std crates
 use anyhow::{Context, Result, anyhow};
+use clang_installer::{ClangTool, RequestedVersion};
 use git2::{DiffOptions, Patch};
-use regex::Regex;
-use semver::Version;
 use tokio::task::JoinSet;
-use which::{which, which_in};
 
 // project-specific modules/crates
 use super::common_fs::FileObj;
 use crate::{
-    cli::{ClangParams, RequestedVersion},
+    cli::ClangParams,
     rest_api::{COMMENT_MARKER, RestApiClient, USER_OUTREACH},
 };
 pub mod clang_format;
 use clang_format::run_clang_format;
 pub mod clang_tidy;
 use clang_tidy::{CompilationUnit, run_clang_tidy};
-
-#[derive(Debug)]
-pub enum ClangTool {
-    ClangTidy,
-    ClangFormat,
-}
-
-impl Display for ClangTool {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.as_str())
-    }
-}
-
-impl ClangTool {
-    /// Get the string representation of the clang tool's name.
-    pub const fn as_str(&self) -> &'static str {
-        match self {
-            ClangTool::ClangTidy => "clang-tidy",
-            ClangTool::ClangFormat => "clang-format",
-        }
-    }
-
-    /// Fetch the path to an executable clang tool for the specified `version`.
-    ///
-    /// If the executable is not found using the specified `version`, then the tool is
-    /// sought only by it's name ([`Self::as_str()`]).
-    ///
-    /// The only reason this function would return an error is if the specified tool is not
-    /// installed or present on the system (nor in the `PATH` environment variable).
-    pub fn get_exe_path(&self, version: &RequestedVersion) -> Result<PathBuf> {
-        let name = self.as_str();
-        match version {
-            RequestedVersion::Path(path_buf) => which_in(
-                name,
-                Some(path_buf),
-                current_dir().with_context(|| "Failed to access current working directory.")?,
-            )
-            .map_err(|_| anyhow!("Could not find {self} by path")),
-            // Thus, we should use whatever is installed and added to $PATH.
-            RequestedVersion::SystemDefault | RequestedVersion::NoValue => {
-                which(name).map_err(|_| anyhow!("Could not find clang tool by name"))
-            }
-            RequestedVersion::Requirement(req) => {
-                // `req.comparators` has at least a major version number for each comparator.
-                // We need to start with the highest major version number first, then
-                // decrement to the lowest that satisfies the requirement.
-
-                // find the highest major version from requirement's boundaries.
-                let mut it = req.comparators.iter();
-                let mut highest_major = it.next().map(|v| v.major).unwrap_or_default() + 1;
-                for n in it {
-                    if n.major > highest_major {
-                        // +1 because we aren't checking the comparator's operator here.
-                        highest_major = n.major + 1;
-                    }
-                }
-
-                // aggregate by decrementing through major versions that satisfy the requirement.
-                let mut majors = vec![];
-                while highest_major > 0 {
-                    // check if the current major version satisfies the requirement.
-                    if req.matches(&Version::new(highest_major, 0, 0)) {
-                        majors.push(highest_major);
-                    }
-                    highest_major -= 1;
-                }
-
-                // now we're ready to search for the binary exe with the major version suffixed.
-                for major in majors {
-                    if let Ok(cmd) = which(format!("{self}-{major}")) {
-                        return Ok(cmd);
-                    }
-                }
-                // failed to find a binary where the major version number is suffixed to the tool name.
-
-                // USERS SHOULD MAKE SURE THE PROPER VERSION IS INSTALLED BEFORE USING CPP-LINTER!!!
-                // This line essentially ignores the version specified as a fail-safe.
-                //
-                // On Windows, the version's major number is typically not appended to the name of
-                // the executable (or symlink for executable), so this is useful in that scenario.
-                // On Unix systems, this line is not likely reached. Typically, installing clang
-                // will produce a symlink to the executable with the major version appended to the
-                // name.
-                which(name).map_err(|_| anyhow!("Could not find {self} by version"))
-            }
-        }
-    }
-
-    /// Run `clang-tool --version`, then extract and return the version number.
-    fn capture_version(clang_tool: &PathBuf) -> Result<String> {
-        let output = Command::new(clang_tool).arg("--version").output()?;
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let version_pattern = Regex::new(r"(?i)version[^\d]*([\d.]+)")
-            .with_context(|| "Failed to allocate RegExp pattern (for clang version parsing) ")?;
-        let captures = version_pattern.captures(&stdout).ok_or(anyhow!(
-            "Failed to find version number in `{} --version` output",
-            clang_tool.to_string_lossy()
-        ))?;
-        Ok(captures
-            .get(1)
-            .ok_or(anyhow!("Failed to get version capture group"))?
-            .as_str()
-            .to_string())
-    }
-}
 
 /// This creates a task to run clang-tidy and clang-format on a single file.
 ///
@@ -494,69 +384,5 @@ pub trait MakeSuggestions {
         review_comments.tool_total[is_tidy_tool] =
             Some(review_comments.tool_total[is_tidy_tool].unwrap_or_default() + hunks_in_patch);
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::{path::PathBuf, str::FromStr};
-
-    use which::which;
-
-    use super::ClangTool;
-    use crate::cli::RequestedVersion;
-
-    const CLANG_FORMAT: ClangTool = ClangTool::ClangFormat;
-
-    #[test]
-    fn get_exe_by_version() {
-        let requirement = ">=9, <22";
-        let req_version = RequestedVersion::from_str(requirement).unwrap();
-        let tool_exe = CLANG_FORMAT.get_exe_path(&req_version);
-        println!("tool_exe: {:?}", tool_exe);
-        assert!(tool_exe.is_ok_and(|val| {
-            val.file_name()
-                .unwrap()
-                .to_string_lossy()
-                .to_string()
-                .contains(CLANG_FORMAT.as_str())
-        }));
-    }
-
-    #[test]
-    fn get_exe_by_default() {
-        let tool_exe = CLANG_FORMAT.get_exe_path(&RequestedVersion::from_str("").unwrap());
-        println!("tool_exe: {:?}", tool_exe);
-        assert!(tool_exe.is_ok_and(|val| {
-            val.file_name()
-                .unwrap()
-                .to_string_lossy()
-                .to_string()
-                .contains(CLANG_FORMAT.as_str())
-        }));
-    }
-
-    #[test]
-    fn get_exe_by_path() {
-        static TOOL_NAME: &'static str = CLANG_FORMAT.as_str();
-        let clang_version = which(TOOL_NAME).unwrap();
-        let bin_path = clang_version.parent().unwrap().to_str().unwrap();
-        println!("binary exe path: {bin_path}");
-        let tool_exe = CLANG_FORMAT.get_exe_path(&RequestedVersion::from_str(bin_path).unwrap());
-        println!("tool_exe: {:?}", tool_exe);
-        assert!(tool_exe.is_ok_and(|val| {
-            val.file_name()
-                .unwrap()
-                .to_string_lossy()
-                .to_string()
-                .contains(TOOL_NAME)
-        }));
-    }
-
-    #[test]
-    fn get_exe_by_invalid_path() {
-        let tool_exe =
-            CLANG_FORMAT.get_exe_path(&RequestedVersion::Path(PathBuf::from("non-existent-path")));
-        assert!(tool_exe.is_err());
     }
 }
