@@ -16,13 +16,13 @@ license.workspace = true
 [dependencies]
 anyhow = "1.0.101"
 chrono = "0.4.43"
-clap = { version = "4.5.57", features = ["derive"] }
+clap = { version = "4.5.58", features = ["derive"] }
 colored = "3.1.1"
 fast-glob = "1.0.0"
-futures = "0.3.31"
+futures = "0.3.32"
 git2 = "0.20.4"
 log = { version = "0.4.29", features = ["std"] }
-quick-xml = { version = "0.39.0", features = ["serialize"] }
+quick-xml = { version = "0.39.1", features = ["serialize"] }
 regex = "1.12.3"
 reqwest = { version = "0.13.2", default-features = false, features = ["native-tls", "http2", "charset"] }
 semver = "1.0.27"
