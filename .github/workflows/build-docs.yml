@@ -57,7 +57,7 @@ jobs:
           path: ~/.cargo
           key: ${{ runner.os }}-docs-cargo-${{ hashFiles('Cargo.lock') }}
       - name: Install uv
-        uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7.3.0
+        uses: astral-sh/setup-uv@5a095e7a2014a4212f075830d4f7277575a9d098 # v7.3.1
       - name: Install cargo-binstall
         uses: cargo-bins/cargo-binstall@ea60fcf749c6a52a729e0eaabb5eb33391d44823 # v1.16.4
         env:
@@ -88,7 +88,7 @@ jobs:
           path: ~/.cargo
           key: ${{ runner.os }}-docs-cargo-${{ hashFiles('Cargo.lock') }}
       - name: Install uv
-        uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7.3.0
+        uses: astral-sh/setup-uv@5a095e7a2014a4212f075830d4f7277575a9d098 # v7.3.1
       - name: Install cargo-binstall
         uses: cargo-bins/cargo-binstall@ea60fcf749c6a52a729e0eaabb5eb33391d44823 # v1.16.4
         env:
@@ -99,7 +99,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
       - run: nur docs rs
       - name: upload rustdoc build as artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           path: target/doc
           name: cpp-linter-api_docs

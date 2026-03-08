@@ -63,7 +63,7 @@ jobs:
       - run: cargo build --bin cpp-linter --release
         if: steps.cache.outputs.cache-hit != 'true' || steps.validate.outputs.cache-valid == 'false'
       - name: Upload build artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.name }}
           path: ${{ env.BIN }}
@@ -90,7 +90,7 @@ jobs:
   #           yum update -y
   #           yum install -y openssl openssl-devel
   #     - name: Upload wheels
-  #       uses: actions/upload-artifact@v6
+  #       uses: actions/upload-artifact@v7
   #       with:
   #         name: wheel
   #         path: dist/cpp_linter-*-cp3*-abi3-*.whl
@@ -113,7 +113,7 @@ jobs:
           persist-credentials: false
 
       - name: Download built binaries
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
 
       - name: Install cargo-binstall
         uses: cargo-bins/cargo-binstall@ea60fcf749c6a52a729e0eaabb5eb33391d44823 # v1.16.4
@@ -126,7 +126,7 @@ jobs:
       - name: Install nushell
         uses: hustcer/setup-nu@920172d92eb04671776f3ba69d605d3b09351c30 # v3.22
       - name: Install uv
-        uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7.3.0
+        uses: astral-sh/setup-uv@5a095e7a2014a4212f075830d4f7277575a9d098 # v7.3.1
 
       - name: Run benchmark script
         working-directory: benchmark
