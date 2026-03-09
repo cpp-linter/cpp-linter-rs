@@ -60,7 +60,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
       - name: Install third-party binaries
         run: >-
-          cargo binstall -y cargo-nextest cargo-llvm-cov nur
+          cargo binstall -y --locked cargo-nextest cargo-llvm-cov nur nu
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
@@ -92,26 +92,6 @@ jobs:
 
       - if: runner.os == 'Linux'
         run: sudo apt-get update
-
-      - name: Install clang v9
-        uses: ./.github/install-clang-action
-        with:
-          version: '9'
-
-      - name: Collect Coverage for clang v9
-        env:
-          CLANG_VERSION: '9'
-        run: nur test --profile ci
-
-      - name: Install clang v10
-        uses: ./.github/install-clang-action
-        with:
-          version: '10'
-
-      - name: Collect Coverage for clang v10
-        env:
-          CLANG_VERSION: '10'
-        run: nur test --profile ci
 
       - name: Install clang 11
         uses: ./.github/install-clang-action
@@ -221,6 +201,16 @@ jobs:
       - name: Collect Coverage for clang v21
         env:
           CLANG_VERSION: '21'
+        run: nur test --profile ci
+
+      - name: Install clang v22
+        uses: ./.github/install-clang-action
+        with:
+          version: '22'
+
+      - name: Collect Coverage for clang v22
+        env:
+          CLANG_VERSION: '22'
         run: nur test --profile all
 
       - name: Generate Coverage HTML report
