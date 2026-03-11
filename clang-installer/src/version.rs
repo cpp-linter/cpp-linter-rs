@@ -101,10 +101,22 @@ impl RequestedVersion {
                 Ok(Some(ClangVersion { version, path }))
             }
             RequestedVersion::Requirement(version_req) => {
+                if let Ok(path) =
+                    tool.get_exe_path(&RequestedVersion::Requirement(version_req.clone()))
+                {
+                    let version = tool.capture_version(&path)?;
+                    if version_req.matches(&version) {
+                        log::info!(
+                            "Found {tool} version {version} at path: {:?}",
+                            path.to_string_lossy()
+                        );
+                        return Ok(Some(ClangVersion { version, path }));
+                    }
+                }
                 let bin = match PyPiDownloader::download_tool(tool, version_req).await {
                     Ok(bin) => bin,
                     Err(e) => {
-                        log::error!("Failed to download {tool} from PyPi: {e}");
+                        log::error!("Failed to download {tool} {version_req} from PyPi: {e}");
                         if let Some(result) = try_install_package(tool, version_req)? {
                             return Ok(Some(result));
                         }

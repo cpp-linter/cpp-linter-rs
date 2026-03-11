@@ -96,7 +96,7 @@ impl ProgressBar {
                 write!(&mut self.stdout_handle, "{}", out)?;
             } else {
                 // only write chars to line (without new line)
-                let mut out = if self.current == 0 {
+                let mut out = if self.steps == 0 {
                     format!("{}{} ", Self::LOG_INDENT, self.prompt)
                 } else {
                     String::new()

@@ -108,7 +108,7 @@ pub async fn capture_clang_tools_output(
     // info as debugging output.
     if clang_params.tidy_checks != "-*" {
         let tool = ClangTool::ClangTidy;
-        let tool_info = version.eval_tool(&tool, true).await?.ok_or(anyhow!(
+        let tool_info = version.eval_tool(&tool, false).await?.ok_or(anyhow!(
             "Failed to find {tool} or install a suitable version"
         ))?;
         clang_versions.tidy_version = Some(tool_info.version);
@@ -116,7 +116,7 @@ pub async fn capture_clang_tools_output(
     }
     if !clang_params.style.is_empty() {
         let tool = ClangTool::ClangFormat;
-        let tool_info = version.eval_tool(&tool, true).await?.ok_or(anyhow!(
+        let tool_info = version.eval_tool(&tool, false).await?.ok_or(anyhow!(
             "Failed to find {tool} or install a suitable version"
         ))?;
         clang_versions.format_version = Some(tool_info.version);
