@@ -461,6 +461,12 @@ impl PyPiDownloader {
         for i in 0..archive.len() {
             let mut file = archive.by_index(i)?;
             if file.name() == expected_zip_path {
+                if extracted_bin.exists() {
+                    let meta = fs::metadata(extracted_bin)?;
+                    if meta.len() == file.size() {
+                        return Ok(());
+                    }
+                }
                 if let Some(parent) = extracted_bin.parent() {
                     fs::create_dir_all(parent)?;
                 }
@@ -474,6 +480,7 @@ impl PyPiDownloader {
                 let mut total_extracted = 0;
                 let mut progress_bar =
                     ProgressBar::new(Some(file_size), "Extracting binary from wheel");
+                progress_bar.render()?;
                 while total_extracted < file_size {
                     let bytes_read = file.read(&mut buffer)?;
                     if bytes_read == 0 {

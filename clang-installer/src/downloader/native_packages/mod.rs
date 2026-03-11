@@ -74,6 +74,10 @@ pub fn try_install_package(
     } else {
         let min_version = get_min_ver(version_req).ok_or(GetToolError::VersionMajorRequired)?;
         for mgr in os_pkg_managers {
+            if !mgr.is_installed() {
+                log::debug!("Skipping {mgr} package manager as it is not installed.");
+                continue;
+            }
             log::info!("Trying to install {tool} v{min_version} using {mgr} package manager.");
             let pkg_name = mgr.get_package_name(tool);
             if mgr.is_installed_package(&pkg_name, Some(&min_version)) {

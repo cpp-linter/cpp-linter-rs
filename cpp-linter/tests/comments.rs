@@ -244,8 +244,7 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
     if test_params.force_lgtm {
         args.push("-e=c".to_string());
     }
-    let result = run_main(args).await;
-    assert!(result.is_ok());
+    run_main(args).await.unwrap();
     for mock in mocks {
         mock.assert();
     }
