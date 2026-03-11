@@ -48,8 +48,10 @@ def "nur docs rs" [
         "doc",
         "--no-deps",
         "--lib",
-        "--manifest-path",
-        "cpp-linter/Cargo.toml",
+        "--package",
+        "cpp-linter",
+        "--package",
+        "clang-installer",
     ]
     if $open {
         $cmd = $cmd | append "--open"
@@ -163,7 +165,7 @@ export def "nur test lcov" [] {
 export def "nur lint" [
     --check (-c), # Only check, do not fix
 ] {
-    mut clippy = [cargo clippy]
+    mut clippy = [cargo clippy --features bin]
     if $check {
         $clippy = $clippy | append [-- -D warnings]
     } else {

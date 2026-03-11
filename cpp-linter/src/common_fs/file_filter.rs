@@ -7,6 +7,7 @@ use std::{
 
 use super::FileObj;
 
+/// A filter for files based on their path and extension.
 #[derive(Debug, Clone)]
 pub struct FileFilter {
     pub ignored: Vec<String>,
@@ -14,6 +15,12 @@ pub struct FileFilter {
     pub extensions: Vec<String>,
 }
 impl FileFilter {
+    /// Creates a new `FileFilter` from a list of ignore patterns and a list of extensions.
+    ///
+    /// The `ignore` parameter is a list of glob patterns that should be ignored.
+    /// These can be explicitly not ignored by prefixing them with `!`.
+    ///
+    /// The `extensions` parameter is a list of file extensions that should be included.
     pub fn new(ignore: &[String], extensions: Vec<String>) -> Self {
         let (ignored, not_ignored) = Self::parse_ignore(ignore);
         Self {

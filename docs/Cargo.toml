@@ -9,7 +9,7 @@ authors.workspace = true
 license.workspace = true
 
 [dependencies]
-cpp-linter = { path = "../cpp-linter" }
+cpp-linter = { path = "../cpp-linter", features = ["bin"] }
 pyo3.workspace = true
 clap.workspace = true
 

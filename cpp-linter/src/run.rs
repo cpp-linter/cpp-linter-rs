@@ -3,6 +3,7 @@
 //! In python, this module is exposed as `cpp_linter.run` that has 1 function exposed:
 //! `main()`.
 #![deny(clippy::unwrap_used)]
+#![cfg(feature = "bin")]
 use std::{
     env,
     path::Path,
