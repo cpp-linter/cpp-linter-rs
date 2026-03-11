@@ -1,7 +1,9 @@
 use std::{fmt::Display, path::PathBuf};
 
+#[cfg(feature = "bin")]
 use clap::{ValueEnum, builder::PossibleValue};
 
+#[cfg(feature = "bin")]
 use super::Cli;
 use crate::{clang_tools::clang_tidy::CompilationUnit, common_fs::FileFilter};
 
@@ -17,6 +19,7 @@ pub enum LinesChangedOnly {
     On,
 }
 
+#[cfg(feature = "bin")]
 impl ValueEnum for LinesChangedOnly {
     /// Get a list possible value variants for display in `--help` output.
     fn value_variants<'a>() -> &'a [Self] {
@@ -94,6 +97,7 @@ pub enum ThreadComments {
     Update,
 }
 
+#[cfg(feature = "bin")]
 impl ValueEnum for ThreadComments {
     /// Get a list possible value variants for display in `--help` output.
     fn value_variants<'a>() -> &'a [Self] {
@@ -164,6 +168,7 @@ pub struct ClangParams {
     pub format_review: bool,
 }
 
+#[cfg(feature = "bin")]
 impl From<&Cli> for ClangParams {
     /// Construct a [`ClangParams`] instance from a [`Cli`] instance.
     fn from(args: &Cli) -> Self {
@@ -205,6 +210,7 @@ pub struct FeedbackInput {
     pub passive_reviews: bool,
 }
 
+#[cfg(feature = "bin")]
 impl From<&Cli> for FeedbackInput {
     /// Construct a [`FeedbackInput`] instance from a [`Cli`] instance.
     fn from(args: &Cli) -> Self {
@@ -239,11 +245,13 @@ impl Default for FeedbackInput {
 
 #[cfg(test)]
 mod test {
+    #[cfg(feature = "bin")]
     use clap::{Parser, ValueEnum};
 
     use super::{Cli, LinesChangedOnly, ThreadComments};
 
     #[test]
+    #[cfg(feature = "bin")]
     fn parse_positional() {
         let cli = Cli::parse_from(["cpp-linter", "file1.c", "file2.h"]);
         let not_ignored = cli.not_ignored.expect("failed to parse positional args");

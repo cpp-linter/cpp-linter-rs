@@ -286,6 +286,7 @@ pub fn make_patch<'buffer>(
     Ok(patch)
 }
 
+/// A trait for generating suggestions from a [`FileObj`]'s advice's generated `patched` buffer.
 pub trait MakeSuggestions {
     /// Create some user-facing helpful info about what the suggestion aims to resolve.
     fn get_suggestion_help(&self, start_line: u32, end_line: u32) -> String;

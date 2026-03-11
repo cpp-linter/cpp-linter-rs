@@ -52,6 +52,7 @@ pub enum GetClangVersionError {
     SemVerParse(#[from] semver::Error),
 }
 
+/// A enumeration of supported clang tools.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 pub enum ClangTool {

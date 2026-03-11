@@ -21,8 +21,5 @@ pub mod utils;
 mod version;
 pub use version::RequestedVersion;
 
-mod cli;
-pub use cli::CliOptions;
-
 mod progress_bar;
 pub use progress_bar::ProgressBar;
