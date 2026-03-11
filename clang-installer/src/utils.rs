@@ -1,3 +1,4 @@
+//! A utility module for path normalization.
 use std::path::{Component, Path, PathBuf};
 
 /// This was copied from [cargo source code](https://github.com/rust-lang/cargo/blob/8cc0cb136772b8f54eafe0d163fcb7226a06af0c/crates/cargo-util/src/paths.rs#L84).

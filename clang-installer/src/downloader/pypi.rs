@@ -14,6 +14,7 @@ use std::{
 use url::Url;
 use zip::{ZipArchive, result::ZipError};
 
+/// Errors that occur during PyPI downloads.
 #[derive(Debug, thiserror::Error)]
 pub enum PyPiDownloadError {
     /// Errors that occur during HTTP requests.
@@ -335,6 +336,8 @@ impl WheelTags {
         self.platform.is_compatible_with_system()
     }
 }
+
+/// A downloader for PyPI releases.
 pub struct PyPiDownloader;
 
 impl Cacher for PyPiDownloader {}

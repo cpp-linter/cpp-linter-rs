@@ -17,8 +17,8 @@ license.workspace = true
 anyhow = { workspace = true }
 chrono = "0.4.44"
 clang-installer = { path = "../clang-installer", version = "0.1.0" }
-clap = { workspace = true }
-colored = { workspace = true }
+clap = { workspace = true, optional = true }
+colored = { workspace = true, optional = true }
 fast-glob = "1.0.1"
 futures = "0.3.32"
 git2 = "0.20.4"
@@ -39,7 +39,7 @@ git2 = { version = "0.20.4", features = ["https"]}
 
 [features]
 openssl-vendored = ["git2/vendored-openssl", "reqwest/native-tls-vendored"]
-bin = ["reqwest/native-tls"]
+bin = ["reqwest/native-tls", "dep:clap", "dep:colored"]
 
 [lib]
 bench = false

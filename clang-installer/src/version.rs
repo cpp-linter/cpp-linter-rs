@@ -14,6 +14,7 @@ pub struct ClangVersion {
     pub path: PathBuf,
 }
 
+/// An enumeration of the possible requested versions of the clang tool binary.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum RequestedVersion {
     /// A specific path to the clang tool binary.
@@ -31,26 +32,42 @@ pub enum RequestedVersion {
     /// A sentinel when no value is given.
     ///
     /// This is used internally to differentiate when the user intended
-    /// to invoke the `version` subcommand instead.
+    /// to invoke the `version` CLI subcommand instead.
     NoValue,
 }
 
+/// Errors that occur when getting the clang tool binary.
 #[derive(Debug, thiserror::Error)]
 pub enum GetToolError {
+    /// No executable found for the specified version requirement.
     #[error("No executable found for the specified version requirement")]
     NotFound,
+
+    /// Failed to parse the version string.
     #[error("Failed to parse version: {0}")]
     VersionParseError(String),
+
+    /// The version requirement does not specify a major version.
     #[error("The version requirement does not specify a major version")]
     VersionMajorRequired,
+
+    /// Binary executable in cache has no parent directory.
     #[error("Binary executable in cache has no parent directory")]
     ExecutablePathNoParent,
+
+    /// Failed to capture the clang version from `--version` output.
     #[error("Failed to capture the clang version from `--version` output: {0}")]
     GetClangVersion(#[from] GetClangVersionError),
+
+    /// Failed to get the clang executable path.
     #[error("Failed to get the clang executable path: {0}")]
     GetClangPathError(#[from] GetClangPathError),
+
+    /// Failed to create symlink for the downloaded binary.
     #[error("Failed to create symlink for the downloaded binary: {0}")]
     SymlinkError(std::io::Error),
+
+    /// Failed to download tool from PyPi.
     #[error("Failed to download tool from PyPi: {0}")]
     PyPiDownloadError(#[from] PyPiDownloadError),
 }
@@ -123,12 +140,18 @@ impl RequestedVersion {
     }
 }
 
+/// Represents an error that occurred while parsing a requested version.
 #[derive(Debug, thiserror::Error)]
 pub enum RequestedVersionParsingError {
+    /// The specified version is not a proper version requirement or a valid path.
     #[error("The specified version is not a proper version requirement or a valid path: {0}")]
     InvalidInput(String),
+
+    /// Unknown parent directory of the given file path for `--version`.
     #[error("Unknown parent directory of the given file path for `--version`: {0}")]
     InvalidPath(String),
+
+    /// Failed to canonicalize path '{0}'.
     #[error("Failed to canonicalize path '{0}': {1:?}")]
     NonCanonicalPath(String, std::io::Error),
 }

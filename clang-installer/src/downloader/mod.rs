@@ -15,12 +15,18 @@ pub mod native_packages;
 pub mod pypi;
 pub mod static_dist;
 
+/// An enumeration of possible errors during download operations.
 #[derive(Debug, thiserror::Error)]
 pub enum DownloadError {
+    /// An error that occurred while making a request or handling the response.
     #[error("Request error: {0}")]
     RequestError(#[from] reqwest::Error),
+
+    /// An error that occurred during interaction with the file system.
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
+
+    /// An error that describes the mismatch between the expected and actual hash of the downloaded file.
     #[error("Hash mismatch for downloaded file. Expected: {expected}, Actual: {actual}")]
     HashMismatch { expected: String, actual: String },
 }

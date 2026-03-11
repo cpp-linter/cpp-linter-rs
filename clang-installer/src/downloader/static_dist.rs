@@ -15,22 +15,36 @@ use crate::{
     downloader::{download, hashing::HashAlgorithm},
 };
 
+/// An error that can occur while downloading a static binary.
 #[derive(Debug, thiserror::Error)]
 pub enum StaticDistDownloadError {
+    /// An error that occurred while downloading the binary.
     #[error("Failed to download static binary: {0}")]
     DownloadError(#[from] DownloadError),
+
+    /// The requested version does not match any available versions.
     #[error("The requested version does not match any available versions")]
     UnsupportedVersion,
+
+    /// The static binaries are only built for x86_64 (amd64) architecture.
     #[error("The static binaries are only built for x86_64 (amd64) architecture")]
     UnsupportedArchitecture,
+
+    /// Failed to parse a URL.
     #[error("Failed to parse the URL: {0}")]
     UrlParseError(#[from] url::ParseError),
+
+    /// Failed to read or write a cache file.
     #[error("Failed to read or write cache file: {0}")]
     IoError(#[from] std::io::Error),
+
+    /// Failed to parse the SHA512 sum file.
     #[error("Failed to parse the SHA512 sum file")]
     Sha512Corruption,
 }
 
+/// A downloader that uses statically linked binary distribution files
+/// provided by the cpp-linter team.
 pub struct StaticDistDownloader;
 
 impl Cacher for StaticDistDownloader {}
@@ -81,7 +95,7 @@ impl StaticDistDownloader {
 
     /// Downloads the `requested_version` of the specified `tool` from a distribution of statically linked binaries.
     ///
-    /// The distribution is maintained at https://github.com/cpp-linter/clang-tools-static-binaries.
+    /// The distribution is maintained at <https://github.com/cpp-linter/clang-tools-static-binaries>.
     /// Supported platforms includes Windows, Linux, and MacOS.
     /// Supported architectures is limited to `x86_64` (`amd64`).
     pub async fn download_tool(
