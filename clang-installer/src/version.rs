@@ -1,7 +1,7 @@
 use std::{path::PathBuf, str::FromStr};
 
 use crate::{
-    ClangTool, PyPiDownloadError, PyPiDownloader,
+    Cacher, ClangTool, PyPiDownloadError, PyPiDownloader,
     downloader::{native_packages::try_install_package, static_dist::StaticDistDownloader},
     tool::{GetClangPathError, GetClangVersionError},
     utils::normalize_path,
@@ -92,7 +92,7 @@ impl RequestedVersion {
                 }))
             }
             RequestedVersion::SystemDefault => {
-                let path = tool.get_exe_path(&RequestedVersion::SystemDefault)?;
+                let path = tool.get_exe_path(&Self::SystemDefault)?;
                 let version = tool.capture_version(&path)?;
                 log::info!(
                     "Found {tool} version {version} at path: {:?}",
@@ -101,9 +101,8 @@ impl RequestedVersion {
                 Ok(Some(ClangVersion { version, path }))
             }
             RequestedVersion::Requirement(version_req) => {
-                if let Ok(path) =
-                    tool.get_exe_path(&RequestedVersion::Requirement(version_req.clone()))
-                {
+                // check default available version first (if any)
+                if let Ok(path) = tool.get_exe_path(&Self::Requirement(version_req.clone())) {
                     let version = tool.capture_version(&path)?;
                     if version_req.matches(&version) {
                         log::info!(
@@ -113,11 +112,33 @@ impl RequestedVersion {
                         return Ok(Some(ClangVersion { version, path }));
                     }
                 }
+
+                // check if cache has a suitable version
+                let bin_ext = if cfg!(windows) { ".exe" } else { "" };
+                let min_ver = get_min_ver(version_req).ok_or(GetToolError::VersionMajorRequired)?;
+                let cached_bin = StaticDistDownloader::get_cache_dir()
+                    .join("bin")
+                    .join(format!("{tool}-{min_ver}{bin_ext}"));
+                if cached_bin.exists() {
+                    let version = tool.capture_version(&cached_bin)?;
+                    if version_req.matches(&version) {
+                        log::info!(
+                            "Found {tool} version {version} in cache at path: {:?}",
+                            cached_bin.to_string_lossy()
+                        );
+                        return Ok(Some(ClangVersion {
+                            version,
+                            path: cached_bin,
+                        }));
+                    }
+                }
+
+                // try to download a suitable version
                 let bin = match PyPiDownloader::download_tool(tool, version_req).await {
                     Ok(bin) => bin,
                     Err(e) => {
                         log::error!("Failed to download {tool} {version_req} from PyPi: {e}");
-                        if let Some(result) = try_install_package(tool, version_req)? {
+                        if let Some(result) = try_install_package(tool, version_req, &min_ver)? {
                             return Ok(Some(result));
                         }
                         log::info!("Falling back to downloading {tool} static binaries.");
@@ -132,9 +153,10 @@ impl RequestedVersion {
                         }
                     }
                 };
+
+                // create a symlink
                 let bin_dir = bin.parent().ok_or(GetToolError::ExecutablePathNoParent)?;
-                let symlink_path =
-                    bin_dir.join(format!("{tool}{}", if cfg!(windows) { ".exe" } else { "" }));
+                let symlink_path = bin_dir.join(format!("{tool}{bin_ext}"));
                 tool.symlink_bin(&bin, &symlink_path, overwrite_symlink)
                     .map_err(GetToolError::SymlinkError)?;
                 let version = tool.capture_version(&bin)?;
@@ -150,6 +172,25 @@ impl RequestedVersion {
             }
         }
     }
+}
+
+pub fn get_min_ver(version_req: &VersionReq) -> Option<Version> {
+    let mut result = None;
+    for cmp in &version_req.comparators {
+        if matches!(cmp.op, semver::Op::Exact | semver::Op::Caret) {
+            let ver = Version {
+                major: cmp.major,
+                minor: cmp.minor.unwrap_or(0),
+                patch: cmp.patch.unwrap_or(0),
+                pre: cmp.pre.clone(),
+                build: Default::default(),
+            };
+            if result.as_ref().is_none_or(|r| ver < *r) {
+                result = Some(ver);
+            }
+        }
+    }
+    result
 }
 
 /// Represents an error that occurred while parsing a requested version.
@@ -272,13 +313,10 @@ mod tests {
     /// It is designed to use the system's package manager to install clang-tidy.
     /// If successful, clang-tidy will be installed globally, which may be undesirable.
     #[tokio::test]
-    async fn eval_static_dist() {
-        let tmp_cache_dir = TempDir::new().unwrap();
-        unsafe {
-            std::env::set_var("CPP_LINTER_CACHE", tmp_cache_dir.path());
-        }
+    async fn eval_version() {
+        let clang_version = option_env!("CLANG_VERSION").unwrap_or("12.0.1");
         let tool = ClangTool::ClangTidy;
-        let version_req = VersionReq::parse("=12.0.1").unwrap();
+        let version_req = VersionReq::parse(clang_version).unwrap();
         let clang_path = RequestedVersion::Requirement(version_req.clone())
             .eval_tool(&tool, false)
             .await

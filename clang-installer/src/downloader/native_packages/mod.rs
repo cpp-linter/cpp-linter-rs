@@ -66,13 +66,13 @@ pub fn get_available_package_managers() -> Vec<impl PackageManager + Display> {
 pub fn try_install_package(
     tool: &ClangTool,
     version_req: &VersionReq,
+    min_version: &Version,
 ) -> Result<Option<ClangVersion>, GetToolError> {
     let os_pkg_managers = get_available_package_managers();
     if os_pkg_managers.is_empty() {
         log::error!("No supported package managers found on the system.");
         return Ok(None);
     } else {
-        let min_version = get_min_ver(version_req).ok_or(GetToolError::VersionMajorRequired)?;
         for mgr in os_pkg_managers {
             if !mgr.is_installed() {
                 log::debug!("Skipping {mgr} package manager as it is not installed.");
@@ -80,7 +80,7 @@ pub fn try_install_package(
             }
             log::info!("Trying to install {tool} v{min_version} using {mgr} package manager.");
             let pkg_name = mgr.get_package_name(tool);
-            if mgr.is_installed_package(&pkg_name, Some(&min_version)) {
+            if mgr.is_installed_package(&pkg_name, Some(min_version)) {
                 let path =
                     tool.get_exe_path(&RequestedVersion::Requirement(version_req.clone()))?;
                 let version = tool.capture_version(&path)?;
@@ -92,7 +92,7 @@ pub fn try_install_package(
                 log::info!(
                     "{mgr} package manager does not have a version of {tool} matching {version_req} installed."
                 );
-                match mgr.install_package(&pkg_name, Some(&min_version)) {
+                match mgr.install_package(&pkg_name, Some(min_version)) {
                     Ok(()) => {
                         log::info!(
                             "Successfully installed {tool} v{min_version} using {mgr} package manager."
@@ -120,23 +120,4 @@ pub fn try_install_package(
         }
     }
     Ok(None)
-}
-
-fn get_min_ver(version_req: &VersionReq) -> Option<Version> {
-    let mut result = None;
-    for cmp in &version_req.comparators {
-        if matches!(cmp.op, semver::Op::Exact | semver::Op::Caret) {
-            let ver = Version {
-                major: cmp.major,
-                minor: cmp.minor.unwrap_or(0),
-                patch: cmp.patch.unwrap_or(0),
-                pre: cmp.pre.clone(),
-                build: Default::default(),
-            };
-            if result.as_ref().is_none_or(|r| ver < *r) {
-                result = Some(ver);
-            }
-        }
-    }
-    result
 }
