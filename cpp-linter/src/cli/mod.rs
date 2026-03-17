@@ -1,9 +1,14 @@
 #![deny(clippy::unwrap_used)]
 
 //! This module holds the Command Line Interface design.
-use std::{path::PathBuf, str::FromStr};
+use std::path::PathBuf;
+#[cfg(feature = "bin")]
+use std::str::FromStr;
 
 // non-std crates
+#[cfg(feature = "bin")]
+use clang_installer::RequestedVersion;
+#[cfg(feature = "bin")]
 use clap::{
     ArgAction, Args, Parser, Subcommand, ValueEnum,
     builder::{FalseyValueParser, NonEmptyStringValueParser},
@@ -11,21 +16,26 @@ use clap::{
 };
 
 mod structs;
-pub use structs::{ClangParams, FeedbackInput, LinesChangedOnly, RequestedVersion, ThreadComments};
+pub use structs::{ClangParams, FeedbackInput, LinesChangedOnly, ThreadComments};
 
+/// An enumeration of possible verbosity levels.
+#[cfg(feature = "bin")]
 #[derive(Debug, Clone, PartialEq, Eq, ValueEnum)]
 pub enum Verbosity {
     Info,
     Debug,
 }
 
+#[cfg(feature = "bin")]
 impl Verbosity {
+    /// Returns `true` if the verbosity level (`self`) is [`Self::Debug`].
     pub fn is_debug(&self) -> bool {
         matches!(self, Verbosity::Debug)
     }
 }
 
 /// A structure to contain parsed CLI options.
+#[cfg(feature = "bin")]
 #[derive(Debug, Clone, Parser)]
 #[command(author, about)]
 pub struct Cli {
@@ -61,12 +71,16 @@ pub struct Cli {
     pub commands: Option<CliCommand>,
 }
 
-#[derive(Debug, Subcommand, Clone)]
+/// A subcommand for the CLI.
+#[cfg(feature = "bin")]
+#[derive(Debug, Clone, Subcommand)]
 pub enum CliCommand {
     /// Display the version of cpp-linter and exit.
     Version,
 }
 
+/// A struct to describe the CLI's general options.
+#[cfg(feature = "bin")]
 #[derive(Debug, Clone, Args)]
 #[group(id = "General options", multiple = true, required = false)]
 pub struct GeneralOptions {
@@ -82,15 +96,18 @@ pub struct GeneralOptions {
     ///   All paths specified here are converted to absolute.
     /// - If this option is specified without a value, then
     ///   the cpp-linter version is printed and the program exits.
-    #[arg(
-        short = 'V',
-        long,
-        default_missing_value = "CPP-LINTER-VERSION",
-        num_args = 0..=1,
-        value_parser = RequestedVersion::from_str,
-        default_value = "",
-        help_heading = "General options",
-        verbatim_doc_comment
+    #[cfg_attr(
+        feature = "bin",
+        arg(
+            short = 'V',
+            long,
+            default_missing_value = "CPP-LINTER-VERSION",
+            num_args = 0..=1,
+            value_parser = RequestedVersion::from_str,
+            default_value = "",
+            help_heading = "General options",
+            verbatim_doc_comment
+        )
     )]
     pub version: RequestedVersion,
 
@@ -98,28 +115,39 @@ pub struct GeneralOptions {
     ///
     /// This option does not affect the verbosity of resulting
     /// thread comments or file annotations.
-    #[arg(
-        short = 'v',
-        long,
-        default_value = "info",
-        default_missing_value = "debug",
-        num_args = 0..=1,
-        help_heading = "General options"
+    #[cfg_attr(
+        feature = "bin",
+        arg(
+            short = 'v',
+            long,
+            default_value = "info",
+            default_missing_value = "debug",
+            num_args = 0..=1,
+            help_heading = "General options"
+        )
     )]
     pub verbosity: Verbosity,
 }
 
-#[derive(Debug, Clone, Args)]
-#[group(id = "Source options", multiple = true, required = false)]
+/// A struct to describe the CLI's source options.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "bin", derive(Args))]
+#[cfg_attr(
+    feature = "bin",
+    group(id = "Source options", multiple = true, required = false)
+)]
 pub struct SourceOptions {
     /// A comma-separated list of file extensions to analyze.
-    #[arg(
-        short,
-        long,
-        value_delimiter = ',',
-        default_value = "c,h,C,H,cpp,hpp,cc,hh,c++,h++,cxx,hxx",
-        value_parser = NonEmptyStringValueParser::new(),
-        help_heading = "Source options"
+    #[cfg_attr(
+        feature = "bin",
+        arg(
+            short,
+            long,
+            value_delimiter = ',',
+            default_value = "c,h,C,H,cpp,hpp,cc,hh,c++,h++,cxx,hxx",
+            value_parser = NonEmptyStringValueParser::new(),
+            help_heading = "Source options"
+        )
     )]
     pub extensions: Vec<String>,
 
@@ -128,17 +156,23 @@ pub struct SourceOptions {
     /// This path is relative to the runner's `GITHUB_WORKSPACE`
     /// environment variable (or the current working directory if
     /// not using a CI runner).
-    #[arg(short, long, default_value = ".", help_heading = "Source options")]
+    #[cfg_attr(
+        feature = "bin",
+        arg(short, long, default_value = ".", help_heading = "Source options")
+    )]
     pub repo_root: String,
 
     /// This controls what part of the files are analyzed.
-    #[arg(
-        short,
-        long,
-        default_value = "true",
-        help_heading = "Source options",
-        ignore_case = true,
-        verbatim_doc_comment
+    #[cfg_attr(
+        feature = "bin",
+        arg(
+            short,
+            long,
+            default_value = "true",
+            help_heading = "Source options",
+            ignore_case = true,
+            verbatim_doc_comment
+        )
     )]
     pub lines_changed_only: LinesChangedOnly,
 
@@ -154,22 +188,25 @@ pub struct SourceOptions {
     /// >
     /// > See [Authenticating with the `GITHUB_TOKEN`](
     /// > https://docs.github.com/en/actions/reference/authentication-in-a-workflow).
-    #[arg(
-        short,
-        long,
-        default_value = "false",
-        default_missing_value = "true",
-        default_value_ifs = [
-            ("lines-changed-only", "true", "true"),
-            ("lines-changed-only", "on", "true"),
-            ("lines-changed-only", "1", "true"),
-            ("lines-changed-only", "diff", "true"),
-        ],
-        num_args = 0..=1,
-        action = ArgAction::Set,
-        value_parser = FalseyValueParser::new(),
-        help_heading = "Source options",
-        verbatim_doc_comment,
+    #[cfg_attr(
+        feature = "bin",
+        arg(
+            short,
+            long,
+            default_value = "false",
+            default_missing_value = "true",
+            default_value_ifs = [
+                ("lines-changed-only", "true", "true"),
+                ("lines-changed-only", "on", "true"),
+                ("lines-changed-only", "1", "true"),
+                ("lines-changed-only", "diff", "true"),
+            ],
+            num_args = 0..=1,
+            action = ArgAction::Set,
+            value_parser = FalseyValueParser::new(),
+            help_heading = "Source options",
+            verbatim_doc_comment,
+        )
     )]
     pub files_changed_only: bool,
 
@@ -186,13 +223,16 @@ pub struct SourceOptions {
     ///   applied to a submodule's path (if desired) but not hidden directories.
     /// - Glob patterns are supported here. Path separators in glob patterns should
     ///   use `/` because `\` represents an escaped literal.
-    #[arg(
-        short,
-        long,
-        value_delimiter = '|',
-        default_value = ".github|target",
-        help_heading = "Source options",
-        verbatim_doc_comment
+    #[cfg_attr(
+        feature = "bin",
+        arg(
+            short,
+            long,
+            value_delimiter = '|',
+            default_value = ".github|target",
+            help_heading = "Source options",
+            verbatim_doc_comment
+        )
     )]
     pub ignore: Vec<String>,
 
@@ -202,24 +242,35 @@ pub struct SourceOptions {
     /// If it is an integer, then it is treated as the number of parent commits from HEAD.
     ///
     /// This option only applies to non-CI contexts (eg. local CLI use).
-    #[arg(
-        short = 'b',
-        long,
-        value_name = "REF",
-        help_heading = "Source options",
-        verbatim_doc_comment
+    #[cfg_attr(
+        feature = "bin",
+        arg(
+            short = 'b',
+            long,
+            value_name = "REF",
+            help_heading = "Source options",
+            verbatim_doc_comment
+        )
     )]
     pub diff_base: Option<String>,
 
     /// Assert this switch to ignore any staged changes when
     /// generating a diff of changed files.
     /// Useful when used with [`--diff-base`](#-b-diff-base).
-    #[arg(default_value_t = false, long, help_heading = "Source options")]
+    #[cfg_attr(
+        feature = "bin",
+        arg(default_value_t = false, long, help_heading = "Source options")
+    )]
     pub ignore_index: bool,
 }
 
-#[derive(Debug, Clone, Args)]
-#[group(id = "Clang-format options", multiple = true, required = false)]
+/// A struct to describe the CLI's clang-format options.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "bin", derive(Args))]
+#[cfg_attr(
+    feature = "bin",
+    group(id = "Clang-format options", multiple = true, required = false)
+)]
 pub struct FormatOptions {
     /// The style rules to use.
     ///
@@ -233,38 +284,52 @@ pub struct FormatOptions {
     /// > (if [`--tidy_checks`](#-c-tidy-checks) is not `-*`).
     /// > This is done to ensure suggestions from both clang-tidy and
     /// > clang-format are consistent.
-    #[arg(
-        short,
-        long,
-        default_value = "llvm",
-        default_missing_value = "file",
-        num_args = 0..=1,
-        help_heading = "Clang-format options",
-        verbatim_doc_comment
+    #[cfg_attr(
+        feature = "bin",
+        arg(
+            short,
+            long,
+            default_value = "llvm",
+            default_missing_value = "file",
+            num_args = 0..=1,
+            help_heading = "Clang-format options",
+            verbatim_doc_comment
+        )
     )]
     pub style: String,
 
     /// Similar to [`--ignore`](#-i-ignore) but applied
     /// exclusively to files analyzed by clang-format.
-    #[arg(
-        short = 'M',
-        long,
-        value_delimiter = '|',
-        help_heading = "Clang-format options"
+    #[cfg_attr(
+        feature = "bin",
+        arg(
+            short = 'M',
+            long,
+            value_delimiter = '|',
+            help_heading = "Clang-format options"
+        )
     )]
     pub ignore_format: Option<Vec<String>>,
 }
 
-#[derive(Debug, Clone, Args)]
-#[group(id = "Clang-tidy options", multiple = true, required = false)]
+/// A struct to describe the CLI's clang-tidy options.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "bin", derive(Args))]
+#[cfg_attr(
+    feature = "bin",
+    group(id = "Clang-tidy options", multiple = true, required = false)
+)]
 pub struct TidyOptions {
     /// Similar to [`--ignore`](#-i-ignore) but applied
     /// exclusively to files analyzed by clang-tidy.
-    #[arg(
-        short = 'D',
-        long,
-        value_delimiter = '|',
-        help_heading = "Clang-tidy options"
+    #[cfg_attr(
+        feature = "bin",
+        arg(
+            short = 'D',
+            long,
+            value_delimiter = '|',
+            help_heading = "Clang-tidy options"
+        )
     )]
     pub ignore_tidy: Option<Vec<String>>,
 
@@ -282,7 +347,7 @@ pub struct TidyOptions {
     ///   specifying this option as a blank string (`''`).
     ///
     /// See also clang-tidy docs for more info.
-    #[arg(
+    #[cfg_attr(feature = "bin", arg(
         short = 'c',
         long,
         default_value = "boost-*,bugprone-*,performance-*,readability-*,portability-*,modernize-*,clang-analyzer-*,cppcoreguidelines-*",
@@ -290,7 +355,7 @@ pub struct TidyOptions {
         num_args = 0..=1,
         help_heading = "Clang-tidy options",
         verbatim_doc_comment
-    )]
+    ))]
     pub tidy_checks: String,
 
     /// The path that is used to read a compile command database.
@@ -301,13 +366,13 @@ pub struct TidyOptions {
     /// attempted through all parent paths of the first input file. See [LLVM docs about
     /// setup tooling](https://clang.llvm.org/docs/HowToSetupToolingForLLVM.html)
     /// for an example of setting up Clang Tooling on a source tree.
-    #[arg(
+    #[cfg_attr(feature = "bin", arg(
         short = 'p',
         long,
         value_name = "PATH",
         value_parser = value_parser!(PathBuf),
         help_heading = "Clang-tidy options",
-    )]
+    ))]
     pub database: Option<PathBuf>,
 
     /// A string of extra arguments passed to clang-tidy for use as compiler arguments.
@@ -319,18 +384,23 @@ pub struct TidyOptions {
     /// ```shell
     /// cpp-linter --extra-arg="-std=c++17" --extra-arg="-Wall"
     /// ```
-    #[arg(
+    #[cfg_attr(feature = "bin", arg(
         short = 'x',
         long,
         action = ArgAction::Append,
         help_heading = "Clang-tidy options",
         verbatim_doc_comment
-    )]
+    ))]
     pub extra_arg: Vec<String>,
 }
 
-#[derive(Debug, Clone, Args)]
-#[group(id = "Feedback options", multiple = true, required = false)]
+/// A struct to describe the CLI's feedback options.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "bin", derive(Args))]
+#[cfg_attr(
+    feature = "bin",
+    group(id = "Feedback options", multiple = true, required = false)
+)]
 pub struct FeedbackOptions {
     /// Set this option to true to enable the use of thread comments as feedback.
     ///
@@ -341,7 +411,7 @@ pub struct FeedbackOptions {
     /// >
     /// > See [Authenticating with the `GITHUB_TOKEN`](
     /// > https://docs.github.com/en/actions/reference/authentication-in-a-workflow).
-    #[arg(
+    #[cfg_attr(feature = "bin", arg(
         short = 'g',
         long,
         default_value = "false",
@@ -350,7 +420,7 @@ pub struct FeedbackOptions {
         help_heading = "Feedback options",
         ignore_case = true,
         verbatim_doc_comment
-    )]
+    ))]
     pub thread_comments: ThreadComments,
 
     /// Set this option to true or false to enable or disable the use of a
@@ -359,7 +429,7 @@ pub struct FeedbackOptions {
     /// > [!IMPORTANT]
     /// > The [`--thread-comments`](#-g-thread-comments)
     /// > option also notes further implications.
-    #[arg(
+    #[cfg_attr(feature = "bin", arg(
         short = 't',
         long,
         default_value_t = true,
@@ -367,12 +437,12 @@ pub struct FeedbackOptions {
         value_parser = FalseyValueParser::new(),
         help_heading = "Feedback options",
         verbatim_doc_comment,
-    )]
+    ))]
     pub no_lgtm: bool,
 
     /// Set this option to true or false to enable or disable the use of
     /// a workflow step summary when the run has concluded.
-    #[arg(
+    #[cfg_attr(feature = "bin", arg(
         short = 'w',
         long,
         default_value_t = false,
@@ -381,23 +451,23 @@ pub struct FeedbackOptions {
         action = ArgAction::Set,
         value_parser = FalseyValueParser::new(),
         help_heading = "Feedback options",
-    )]
+    ))]
     pub step_summary: bool,
 
     /// Set this option to false to disable the use of
     /// file annotations as feedback.
-    #[arg(
+    #[cfg_attr(feature = "bin", arg(
         short = 'a',
         long,
         default_value_t = true,
         action = ArgAction::Set,
         value_parser = FalseyValueParser::new(),
         help_heading = "Feedback options",
-    )]
+    ))]
     pub file_annotations: bool,
 
     /// Set to `true` to enable Pull Request reviews from clang-tidy.
-    #[arg(
+    #[cfg_attr(feature = "bin", arg(
         short = 'd',
         long,
         default_value_t = false,
@@ -406,11 +476,11 @@ pub struct FeedbackOptions {
         action = ArgAction::Set,
         value_parser = FalseyValueParser::new(),
         help_heading = "Feedback options",
-    )]
+    ))]
     pub tidy_review: bool,
 
     /// Set to `true` to enable Pull Request reviews from clang-format.
-    #[arg(
+    #[cfg_attr(feature = "bin", arg(
         short = 'm',
         long,
         default_value_t = false,
@@ -419,12 +489,12 @@ pub struct FeedbackOptions {
         action = ArgAction::Set,
         value_parser = FalseyValueParser::new(),
         help_heading = "Feedback options",
-    )]
+    ))]
     pub format_review: bool,
 
     /// Set to `true` to prevent Pull Request reviews from
     /// approving or requesting changes.
-    #[arg(
+    #[cfg_attr(feature = "bin", arg(
         short = 'R',
         long,
         default_value_t = false,
@@ -433,7 +503,7 @@ pub struct FeedbackOptions {
         action = ArgAction::Set,
         value_parser = FalseyValueParser::new(),
         help_heading = "Feedback options",
-    )]
+    ))]
     pub passive_reviews: bool,
 }
 
@@ -475,7 +545,7 @@ pub fn convert_extra_arg_val(args: &[String]) -> Vec<String> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "bin"))]
 mod test {
     use super::{Cli, convert_extra_arg_val};
     use clap::Parser;
