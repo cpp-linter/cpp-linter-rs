@@ -11,7 +11,7 @@ license.workspace = true
 [dependencies]
 cpp-linter = { path = "../cpp-linter" }
 pyo3 = {version = "0.28.2", features = ["extension-module"] }
-clap = { version = "4.5.60", features = ["derive"] }
+clap = { version = "4.6.0", features = ["derive"] }
 
 [lib]
 name = "cli_gen"
