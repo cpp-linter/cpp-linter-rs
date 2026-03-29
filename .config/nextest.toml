@@ -16,16 +16,9 @@ slow-timeout = "10s"
 # show which tests were skipped
 status-level = "skip"
 
-[test-groups]
-# keep cache-setup group serialized to avoid race conditions installing clang tools.
-cache-setup = { max-threads = 1 }
-
-[[profile.default.overrides]]
-# Run these tests with the highest priority.
-filter = 'test(#*eval_version)'
-priority = 100
-# assign it to a test group so that it can be run separately
-test-group = 'cache-setup'
+[profile.warmup]
+# Run this profile before other tests to warmup the cache of clang tools binaries.
+default-filter = 'test(#*eval_version)'
 
 [profile.ci]
 # A profile to run only tests that use clang-tidy and/or clang-format
@@ -40,7 +33,7 @@ failure-output = "immediate-final"
 
 [profile.all]
 # A profile to run all tests (including tests that run longer than 10 seconds)
-default-filter = "all()"
+default-filter = "all() - test(#*eval_version)"
 
 # Revert slow-timeout to nextest default value.
 # Otherwise, default profile value (10s) is inherited.
