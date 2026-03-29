@@ -297,16 +297,21 @@ mod tests {
         }
         let tool = ClangTool::ClangFormat;
         let version_req = VersionReq::parse("17").unwrap();
-        let clang_path = RequestedVersion::Requirement(version_req.clone())
+        let downloaded_clang = RequestedVersion::Requirement(version_req.clone())
             .eval_tool(&tool, false)
             .await
             .unwrap()
             .unwrap();
-        let req_ver = RequestedVersion::Path(clang_path.path.parent().unwrap().to_owned());
+        println!("Downloaded clang-format: {downloaded_clang:?}");
+        let req_ver = RequestedVersion::Path(downloaded_clang.path.parent().unwrap().to_owned());
         let result = req_ver.eval_tool(&tool, false).await.unwrap().unwrap();
-        assert!(version_req.matches(&result.version));
-        assert_eq!(result.version, clang_path.version);
-        assert_eq!(result.path.parent(), clang_path.path.parent());
+        println!("Evaluated clang-format from path: {result:?}");
+        assert!(
+            version_req.matches(&result.version),
+            "Expected {downloaded_clang:?} does not match {result:?}",
+        );
+        assert_eq!(result.version, downloaded_clang.version);
+        assert_eq!(result.path.parent(), downloaded_clang.path.parent());
     }
 
     /// WARNING: This test should only run in CI.
