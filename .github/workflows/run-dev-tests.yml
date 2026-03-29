@@ -107,6 +107,7 @@ jobs:
           for $ver in ($min_ver..$max_ver) {
             print $"::group::Testing with clang v($ver)"
             with-env { CLANG_VERSION: $"($ver)" } {
+              nur test --profile warmup
               let test_profile = (
                 if ($ver == $max_ver) { "all" } else { "ci" }
               )
