@@ -20,6 +20,13 @@ pub enum PackageManagerError {
         package: String,
         stderr: String,
     },
+    #[cfg(target_os = "linux")]
+    #[error("Failed to add LLVM PPA repository (for `apt`): {0}")]
+    LlvmPpaError(String),
+    #[error("Failed parsing URL: {0}")]
+    UrlParseError(#[from] url::ParseError),
+    #[error(transparent)]
+    DownloadError(#[from] crate::downloader::DownloadError),
 }
 
 pub trait PackageManager {
@@ -46,7 +53,7 @@ pub trait PackageManager {
         &self,
         package_name: &str,
         version: Option<&Version>,
-    ) -> Result<(), PackageManagerError>;
+    ) -> impl Future<Output = Result<(), PackageManagerError>>;
 }
 
 pub fn get_available_package_managers() -> Vec<impl PackageManager + Display> {
@@ -63,7 +70,7 @@ pub fn get_available_package_managers() -> Vec<impl PackageManager + Display> {
     managers
 }
 
-pub fn try_install_package(
+pub async fn try_install_package(
     tool: &ClangTool,
     version_req: &VersionReq,
     min_version: &Version,
@@ -92,12 +99,13 @@ pub fn try_install_package(
                 log::info!(
                     "{mgr} package manager does not have a version of {tool} matching {version_req} installed."
                 );
-                match mgr.install_package(&pkg_name, Some(min_version)) {
+                match mgr.install_package(&pkg_name, Some(min_version)).await {
                     Ok(()) => {
                         log::info!(
                             "Successfully installed {tool} v{min_version} using {mgr} package manager."
                         );
-                        let path = tool.get_exe_path(&RequestedVersion::SystemDefault)?;
+                        let path =
+                            tool.get_exe_path(&RequestedVersion::Requirement(version_req.clone()))?;
                         let version = tool.capture_version(&path)?;
                         if version_req.matches(&version) {
                             log::info!(
