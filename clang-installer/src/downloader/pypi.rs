@@ -416,6 +416,7 @@ impl PyPiDownloader {
     pub async fn download_tool(
         clang_tool: &ClangTool,
         version: &VersionReq,
+        directory: Option<&PathBuf>,
     ) -> Result<PathBuf, PyPiDownloadError> {
         let info = Self::get_pypi_release_info(clang_tool).await?;
         let (ver, info) = Self::get_best_pypi_release(clang_tool, &info, version)?;
@@ -435,11 +436,15 @@ impl PyPiDownloader {
             log::info!("Verifying wheel file integrity with digest: {digest:?}");
             digest.verify(&cached_wheel)?;
         }
-        let extracted_bin = cached_dir.join(format!(
-            "bin/{clang_tool}-{}{}",
+        let bin_name = format!(
+            "{clang_tool}-{}{}",
             ver.major,
             if cfg!(windows) { ".exe" } else { "" }
-        ));
+        );
+        let extracted_bin = match directory {
+            None => cached_dir.join(format!("bin/{bin_name}",)),
+            Some(dir) => dir.join(&bin_name),
+        };
         Self::extract_bin(clang_tool, &cached_wheel, &extracted_bin)?;
         Ok(extracted_bin)
     }

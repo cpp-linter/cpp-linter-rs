@@ -42,6 +42,10 @@ pub enum StaticDistDownloadError {
     #[error("Failed to parse the SHA512 sum file")]
     Sha512Corruption,
 }
+const MIN_CLANG_TOOLS_VERSION: &str = "9";
+const MAX_CLANG_TOOLS_VERSION: &str = "21";
+const CLANG_TOOLS_REPO: &str = "https://github.com/cpp-linter/clang-tools-static-binaries";
+const CLANG_TOOLS_TAG: &str = "master-6e612956";
 
 /// A downloader that uses statically linked binary distribution files
 /// provided by the cpp-linter team.
@@ -56,11 +60,11 @@ impl StaticDistDownloader {
     /// `MAX_CLANG_TOOLS_VERSION` environment variables (inclusive) at compile time.
     fn find_suitable_version(req_ver: &VersionReq) -> Option<Version> {
         let min_clang_tools_version: u8 = option_env!("MIN_CLANG_TOOLS_VERSION")
-            .unwrap_or("9")
+            .unwrap_or(MIN_CLANG_TOOLS_VERSION)
             .parse()
             .expect("Invalid MIN_CLANG_TOOLS_VERSION env var value");
         let max_clang_tools_version: u8 = option_env!("MAX_CLANG_TOOLS_VERSION")
-            .unwrap_or("21")
+            .unwrap_or(MAX_CLANG_TOOLS_VERSION)
             .parse()
             .expect("Invalid MAX_CLANG_TOOLS_VERSION env var value");
         let clang_tools_versions: RangeInclusive<u8> =
@@ -101,6 +105,7 @@ impl StaticDistDownloader {
     pub async fn download_tool(
         tool: &ClangTool,
         requested_version: &VersionReq,
+        directory: Option<&PathBuf>,
     ) -> Result<PathBuf, StaticDistDownloadError> {
         if consts::ARCH != "x86_64" {
             return Err(StaticDistDownloadError::UnsupportedArchitecture);
@@ -117,9 +122,8 @@ impl StaticDistDownloader {
         } else {
             ""
         };
-        let clang_tools_repo: &str = option_env!("CLANG_TOOLS_REPO")
-            .unwrap_or("https://github.com/cpp-linter/clang-tools-static-binaries");
-        let clang_tools_tag: &str = option_env!("CLANG_TOOLS_TAG").unwrap_or("master-6e612956");
+        let clang_tools_repo: &str = option_env!("CLANG_TOOLS_REPO").unwrap_or(CLANG_TOOLS_REPO);
+        let clang_tools_tag: &str = option_env!("CLANG_TOOLS_TAG").unwrap_or(CLANG_TOOLS_TAG);
 
         let base_url = format!(
             "{clang_tools_repo}/releases/download/{clang_tools_tag}/{tool}-{ver_str}_{}-amd64",
@@ -133,9 +137,11 @@ impl StaticDistDownloader {
         );
         let url = Url::parse(format!("{base_url}{suffix}").as_str())?;
         let cache_path = Self::get_cache_dir();
-        let download_path = cache_path
-            .join("bin")
-            .join(format!("{tool}-{ver_str}{suffix}").as_str());
+        let bin_name = format!("{tool}-{ver_str}{suffix}");
+        let download_path = match directory {
+            None => cache_path.join("bin").join(&bin_name),
+            Some(dir) => dir.join(&bin_name),
+        };
         if download_path.exists() {
             log::info!(
                 "Using cached static binary for {tool} version {ver_str} from {:?}",

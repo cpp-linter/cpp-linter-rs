@@ -19,7 +19,7 @@ async fn setup() {
     let tool = ClangTool::ClangFormat;
     let version_req = VersionReq::parse("17").unwrap();
 
-    let result = PyPiDownloader::download_tool(&tool, &version_req)
+    let result = PyPiDownloader::download_tool(&tool, &version_req, None)
         .await
         .unwrap();
     println!(
@@ -36,7 +36,7 @@ async fn setup() {
     );
 
     // retry using cache
-    let cache_result = PyPiDownloader::download_tool(&tool, &version_req)
+    let cache_result = PyPiDownloader::download_tool(&tool, &version_req, None)
         .await
         .unwrap();
     assert_eq!(result, cache_result);
