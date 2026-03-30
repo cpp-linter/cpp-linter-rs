@@ -36,9 +36,6 @@ impl Display for UnixPackageManager {
     }
 }
 
-#[cfg(target_os = "linux")]
-impl crate::downloader::caching::Cacher for UnixPackageManager {}
-
 impl UnixPackageManager {
     fn as_str(&self) -> &'static str {
         match self {
@@ -60,28 +57,15 @@ impl UnixPackageManager {
         match self {
             #[cfg(target_os = "linux")]
             UnixPackageManager::Apt | UnixPackageManager::Dnf => {
-                if let Some(ver) = version {
-                    format!("{package_name}-{}", ver.major)
-                } else {
-                    package_name.to_string()
-                }
+                version.map(|ver| format!("{package_name}-{}", ver.major))
             }
             #[cfg(target_os = "linux")]
-            UnixPackageManager::PacMan => {
-                if let Some(ver) = version {
-                    format!("{package_name}{}", ver.major)
-                } else {
-                    package_name.to_string()
-                }
-            }
+            UnixPackageManager::PacMan => version.map(|ver| format!("{package_name}{}", ver.major)),
             UnixPackageManager::Homebrew => {
-                if let Some(ver) = version {
-                    format!("{package_name}@{}", ver.major)
-                } else {
-                    package_name.to_string()
-                }
+                version.map(|ver| format!("{package_name}@{}", ver.major))
             }
         }
+        .unwrap_or(package_name.to_string())
     }
 }
 
@@ -160,13 +144,10 @@ impl PackageManager for UnixPackageManager {
             if matches!(self, UnixPackageManager::Apt)
                 && let Some(version) = version
             {
-                use crate::downloader::caching::Cacher;
-
                 log::info!(
                     "trying to install from official LLVM PPA repository (for Debian-based `apt` package manager)"
                 );
                 return llvm_apt_install::install_llvm_via_apt(
-                    Self::get_cache_dir().as_path(),
                     version.major.to_string(),
                     package_id.as_str(),
                 )
@@ -216,11 +197,14 @@ impl PackageManager for UnixPackageManager {
 #[cfg(target_os = "linux")]
 mod llvm_apt_install {
     use crate::downloader::{
+        caching::Cacher,
         chmod_file, download,
         native_packages::{PackageManagerError, unix::UnixPackageManager},
     };
-    use std::{path::Path, process::Command};
+    use std::{process::Command, time::Duration};
     use url::Url;
+
+    impl Cacher for UnixPackageManager {}
 
     const LLVM_INSTALL_SCRIPT_URL: &str = "https://apt.llvm.org/llvm.sh";
 
@@ -228,12 +212,13 @@ mod llvm_apt_install {
     ///
     /// This is required to install specific versions of clang tools on Debian-based distributions using `apt`.}
     pub async fn install_llvm_via_apt(
-        cache_path: &Path,
         ver_major: String,
         package_name: &str,
     ) -> Result<(), PackageManagerError> {
-        let download_path = cache_path.join("llvm_apt_install.sh");
-        if !download_path.exists() {
+        let download_path = UnixPackageManager::get_cache_dir().join("llvm_apt_install.sh");
+        if !download_path.exists()
+            || !UnixPackageManager::is_cache_valid(&download_path, Some(Duration::from_hours(24)))
+        {
             log::info!(
                 "Downloading LLVM APT repository installation script from {LLVM_INSTALL_SCRIPT_URL}"
             );
