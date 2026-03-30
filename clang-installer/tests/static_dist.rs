@@ -18,7 +18,7 @@ async fn setup(ver_spec: &str) {
     let tool = ClangTool::ClangFormat;
     let version_req = VersionReq::parse(ver_spec).unwrap();
 
-    let result = StaticDistDownloader::download_tool(&tool, &version_req)
+    let result = StaticDistDownloader::download_tool(&tool, &version_req, None)
         .await
         .unwrap();
     println!(
@@ -35,7 +35,7 @@ async fn setup(ver_spec: &str) {
     );
 
     // retry using cache
-    let cache_result = StaticDistDownloader::download_tool(&tool, &version_req)
+    let cache_result = StaticDistDownloader::download_tool(&tool, &version_req, None)
         .await
         .unwrap();
     assert_eq!(result, cache_result);

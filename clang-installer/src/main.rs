@@ -107,6 +107,7 @@ pub struct CliOptions {
             default_value = "",
     )]
     pub version: Option<RequestedVersion>,
+
     /// The clang tool to install.
     #[arg(
         short,
@@ -115,9 +116,11 @@ pub struct CliOptions {
         default_value = "clang-format clang-tidy"
     )]
     pub tool: Option<Vec<ClangTool>>,
+
     /// The directory where the clang tools should be installed.
     #[arg(short, long)]
     pub directory: Option<PathBuf>,
+
     /// Force overwriting symlink to the installed binary.
     ///
     /// This will only overwrite an existing symlink.
@@ -144,7 +147,10 @@ async fn main() -> Result<()> {
         req_ver => {
             let mut map_tools = HashMap::new();
             for t in tool {
-                if let Some(version) = req_ver.eval_tool(&t, options.force).await? {
+                if let Some(version) = req_ver
+                    .eval_tool(&t, options.force, options.directory.as_ref())
+                    .await?
+                {
                     map_tools.entry(t).or_insert(version);
                 }
             }
