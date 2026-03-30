@@ -141,7 +141,7 @@ impl PackageManager for WindowsPackageManager {
         }
     }
 
-    fn install_package(
+    async fn install_package(
         &self,
         package_name: &str,
         version: Option<&Version>,

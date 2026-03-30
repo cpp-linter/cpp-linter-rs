@@ -139,7 +139,9 @@ impl RequestedVersion {
                     Ok(bin) => bin,
                     Err(e) => {
                         log::error!("Failed to download {tool} {version_req} from PyPi: {e}");
-                        if let Some(result) = try_install_package(tool, version_req, &min_ver)? {
+                        if let Some(result) =
+                            try_install_package(tool, version_req, &min_ver).await?
+                        {
                             return Ok(Some(result));
                         }
                         log::info!("Falling back to downloading {tool} static binaries.");

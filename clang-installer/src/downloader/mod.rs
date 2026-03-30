@@ -72,6 +72,27 @@ async fn download(url: &Url, cache_path: &Path, timeout: u64) -> Result<(), Down
     Ok(())
 }
 
+/// On Unix-like systems, this changes the permissions of the file at `path`.
+///
+/// If `mode` is `Some`, then the permissions will be set to the bitwise OR of
+/// the existing permissions and given `mode`.
+/// If `mode` is `None`, then the permissions will be set to `0o755`.
+#[cfg(unix)]
+fn chmod_file(path: &Path, mode: Option<u32>) -> std::io::Result<()> {
+    // Make the extracted binary executable on Unix-like systems.
+    use std::os::unix::fs::PermissionsExt;
+    let out = fs::OpenOptions::new().write(true).open(path)?;
+    let mut perms = out.metadata()?.permissions();
+    match mode {
+        Some(mode) => {
+            let prev = perms.mode();
+            perms.set_mode(prev | mode);
+        }
+        None => perms.set_mode(0o755),
+    }
+    out.set_permissions(perms)
+}
+
 #[cfg(test)]
 mod tests {
     use crate::DownloadError;

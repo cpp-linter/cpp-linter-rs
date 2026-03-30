@@ -151,14 +151,7 @@ impl StaticDistDownloader {
             log::info!("Downloading static binary for {tool} version {ver_str} from {url}");
             download(&url, &download_path, 60 * 2).await?;
             #[cfg(unix)]
-            {
-                // Make the extracted binary executable on Unix-like systems.
-                use std::os::unix::fs::PermissionsExt;
-                let out = fs::OpenOptions::new().write(true).open(&download_path)?;
-                let mut perms = out.metadata()?.permissions();
-                perms.set_mode(0o755);
-                out.set_permissions(perms)?;
-            }
+            super::chmod_file(&download_path, None)?;
         }
         let sha512_cache_path = cache_path
             .join("static_dist")

@@ -36,6 +36,9 @@ impl Display for UnixPackageManager {
     }
 }
 
+#[cfg(target_os = "linux")]
+impl crate::downloader::caching::Cacher for UnixPackageManager {}
+
 impl UnixPackageManager {
     fn as_str(&self) -> &'static str {
         match self {
@@ -47,6 +50,10 @@ impl UnixPackageManager {
             UnixPackageManager::PacMan => "pacman",
             UnixPackageManager::Homebrew => "brew",
         }
+    }
+
+    fn has_sudo() -> bool {
+        which::which("sudo").is_ok()
     }
 
     fn pkg_name_with_version(&self, package_name: &str, version: Option<&Version>) -> String {
@@ -114,7 +121,7 @@ impl PackageManager for UnixPackageManager {
         }
     }
 
-    fn install_package(
+    async fn install_package(
         &self,
         package_name: &str,
         version: Option<&Version>,
@@ -134,13 +141,37 @@ impl PackageManager for UnixPackageManager {
                 args.push("install");
             }
         }
-        let output = Command::new(self.as_str())
-            .args(args)
-            .arg(package_id.as_str())
-            .output()?;
+        let output = if Self::has_sudo() {
+            Command::new("sudo")
+                .arg(self.as_str())
+                .args(args)
+                .arg(package_id.as_str())
+                .output()?
+        } else {
+            Command::new(self.as_str())
+                .args(args)
+                .arg(package_id.as_str())
+                .output()?
+        };
         if output.status.success() {
             Ok(())
         } else {
+            #[cfg(target_os = "linux")]
+            if matches!(self, UnixPackageManager::Apt)
+                && let Some(version) = version
+            {
+                use crate::downloader::caching::Cacher;
+
+                log::info!(
+                    "trying to install from official LLVM PPA repository (for Debian-based `apt` package manager)"
+                );
+                return llvm_apt_install::install_llvm_via_apt(
+                    Self::get_cache_dir().as_path(),
+                    version.major.to_string(),
+                    package_id.as_str(),
+                )
+                .await;
+            }
             Err(PackageManagerError::InstallationError {
                 manager: self.as_str().to_string(),
                 package: package_id,
@@ -179,5 +210,77 @@ impl PackageManager for UnixPackageManager {
                 output.is_ok_and(|out| out.status.success())
             }
         }
+    }
+}
+
+#[cfg(target_os = "linux")]
+mod llvm_apt_install {
+    use crate::downloader::{
+        chmod_file, download,
+        native_packages::{PackageManagerError, unix::UnixPackageManager},
+    };
+    use std::{path::Path, process::Command};
+    use url::Url;
+
+    const LLVM_INSTALL_SCRIPT_URL: &str = "https://apt.llvm.org/llvm.sh";
+
+    /// Installs the official LLVM APT repository and its GPG key.
+    ///
+    /// This is required to install specific versions of clang tools on Debian-based distributions using `apt`.}
+    pub async fn install_llvm_via_apt(
+        cache_path: &Path,
+        ver_major: String,
+        package_name: &str,
+    ) -> Result<(), PackageManagerError> {
+        let download_path = cache_path.join("llvm_apt_install.sh");
+        if !download_path.exists() {
+            log::info!(
+                "Downloading LLVM APT repository installation script from {LLVM_INSTALL_SCRIPT_URL}"
+            );
+            download(
+                &Url::parse(LLVM_INSTALL_SCRIPT_URL)?,
+                &download_path,
+                60 * 2,
+            )
+            .await?;
+            chmod_file(&download_path, Some(0o111))?;
+        }
+        let has_sudo = UnixPackageManager::has_sudo();
+
+        let output = if has_sudo {
+            Command::new("sudo")
+                .arg("bash")
+                .arg(download_path.as_os_str())
+                .arg(ver_major)
+                .output()?
+        } else {
+            Command::new("bash")
+                .arg(download_path.as_os_str())
+                .arg(ver_major)
+                .output()?
+        };
+        if !output.status.success() {
+            return Err(PackageManagerError::LlvmPpaError(
+                String::from_utf8_lossy(&output.stderr).to_string(),
+            ));
+        }
+        let output = if has_sudo {
+            Command::new("sudo")
+                .arg("apt")
+                .args(["install", "-y", package_name])
+                .output()
+        } else {
+            Command::new("apt")
+                .args(["install", "-y", package_name])
+                .output()
+        }?;
+        if !output.status.success() {
+            return Err(PackageManagerError::InstallationError {
+                manager: "apt (with LLVM PPA)".to_string(),
+                package: package_name.to_string(),
+                stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+            });
+        }
+        Ok(())
     }
 }
