@@ -289,6 +289,8 @@ mod tests {
         assert!(result.is_none());
     }
 
+    /// The idea for this test is to make sure the desired clang-tool is downloaded and
+    /// the download path can be used to identify the location of the clang tool.
     #[tokio::test]
     async fn eval_download_path() {
         let tmp_cache_dir = TempDir::new().unwrap();
@@ -296,7 +298,10 @@ mod tests {
             std::env::set_var("CPP_LINTER_CACHE", tmp_cache_dir.path());
         }
         let tool = ClangTool::ClangFormat;
-        let version_req = VersionReq::parse("17").unwrap();
+        // for this test we should use the oldest supported clang version
+        // because that would be most likely to require downloading.
+        let version_req =
+            VersionReq::parse(option_env!("MIN_CLANG_TOOLS_VERSION").unwrap_or("11")).unwrap();
         let downloaded_clang = RequestedVersion::Requirement(version_req.clone())
             .eval_tool(&tool, false)
             .await
