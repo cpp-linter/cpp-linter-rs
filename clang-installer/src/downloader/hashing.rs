@@ -34,7 +34,8 @@ impl HashAlgorithm {
                 use sha2::{Digest, Sha256};
 
                 let mut hasher = Sha256::new();
-                while let Ok(bytes_read) = file_reader.read(&mut buf) {
+                loop {
+                    let bytes_read = file_reader.read(&mut buf)?;
                     if bytes_read == 0 {
                         break;
                     }
@@ -54,7 +55,8 @@ impl HashAlgorithm {
                 use blake2::{Blake2b, Digest, digest::consts::U32};
 
                 let mut hasher = Blake2b::<U32>::new();
-                while let Ok(bytes_read) = file_reader.read(&mut buf) {
+                loop {
+                    let bytes_read = file_reader.read(&mut buf)?;
                     if bytes_read == 0 {
                         break;
                     }
@@ -74,7 +76,9 @@ impl HashAlgorithm {
                 use sha2::{Digest, Sha512};
 
                 let mut hasher = Sha512::new();
-                while let Ok(bytes_read) = file_reader.read(&mut buf) {
+
+                loop {
+                    let bytes_read = file_reader.read(&mut buf)?;
                     if bytes_read == 0 {
                         break;
                     }
