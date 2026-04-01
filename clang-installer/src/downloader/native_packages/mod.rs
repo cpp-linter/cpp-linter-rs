@@ -91,10 +91,12 @@ pub async fn try_install_package(
                 let path =
                     tool.get_exe_path(&RequestedVersion::Requirement(version_req.clone()))?;
                 let version = tool.capture_version(&path)?;
-                log::info!(
-                    "Found {tool} version matching {version_req} installed via {mgr} package manager."
-                );
-                return Ok(Some(ClangVersion { version, path }));
+                if version_req.matches(&version) {
+                    log::info!(
+                        "Found {tool} version matching {version_req} installed via {mgr} package manager."
+                    );
+                    return Ok(Some(ClangVersion { version, path }));
+                }
             } else {
                 log::info!(
                     "{mgr} package manager does not have a version of {tool} matching {version_req} installed."
