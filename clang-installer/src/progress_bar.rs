@@ -1,4 +1,4 @@
-use std::io::{IsTerminal, Result, Write, stdin, stdout};
+use std::io::{IsTerminal, Result, Write, stdout};
 
 /// A simple progress bar implementation that supports both interactive and non-interactive terminals.
 pub struct ProgressBar {
@@ -44,12 +44,14 @@ impl ProgressBar {
     /// // stdout lock is released when `progress_bar` goes out of scope
     /// ```
     pub fn new(total: Option<u64>, prompt: &str) -> Self {
+        let stdout_handle = stdout().lock();
+        let is_interactive = stdout_handle.is_terminal();
         Self {
             total,
             current: 0,
             steps: 0,
-            stdout_handle: stdout().lock(),
-            is_interactive: stdin().is_terminal(),
+            stdout_handle,
+            is_interactive,
             prompt: prompt.to_string(),
         }
     }
