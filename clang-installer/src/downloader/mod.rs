@@ -29,6 +29,10 @@ pub enum DownloadError {
     /// An error that describes the mismatch between the expected and actual hash of the downloaded file.
     #[error("Hash mismatch for downloaded file. Expected: {expected}, Actual: {actual}")]
     HashMismatch { expected: String, actual: String },
+
+    /// An error that occurred while moving/persisting a temporary file into a cache path.
+    #[error("Error persisting temporary file: {0}")]
+    TempFilePersistence(#[from] tempfile::PersistError),
 }
 
 /// Downloads data from the specified URL and returns the response.
@@ -42,11 +46,6 @@ async fn download(url: &Url, cache_path: &Path, timeout: u64) -> Result<(), Down
     if let Some(cache_parent) = cache_path.parent() {
         fs::create_dir_all(cache_parent)?;
     }
-    let mut cache_file = fs::OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open(cache_path)?;
     let mut response = client.get(url.clone()).send().await?;
     if let Err(e) = response.error_for_status_ref() {
         if let Ok(body) = response.text().await
@@ -58,17 +57,19 @@ async fn download(url: &Url, cache_path: &Path, timeout: u64) -> Result<(), Down
         }
         return Err(e.into());
     }
+    let mut tmp_file = tempfile::NamedTempFile::new()?;
     let content_len = response.content_length();
     let mut progress_bar = ProgressBar::new(content_len, "Downloading");
     progress_bar.render()?;
     while let Some(chunk) = response.chunk().await? {
         let chunk_len = chunk.len() as u64;
         progress_bar.inc(chunk_len)?;
-        cache_file.write_all(&chunk)?;
+        tmp_file.write_all(&chunk)?;
     }
     progress_bar.finish()?;
-    cache_file.flush()?;
-    cache_file.set_modified(SystemTime::now())?;
+    tmp_file.flush()?;
+    tmp_file.as_file_mut().set_modified(SystemTime::now())?;
+    tmp_file.persist(cache_path)?;
     Ok(())
 }
 
