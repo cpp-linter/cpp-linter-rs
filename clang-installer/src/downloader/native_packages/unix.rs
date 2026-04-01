@@ -119,13 +119,14 @@ impl PackageManager for UnixPackageManager {
             }
             #[cfg(target_os = "linux")]
             UnixPackageManager::PacMan => {
-                args.extend(["-S", "-y"]);
+                // spell-checker: disable-next-line
+                args.extend(["-S", "--noconfirm"]);
             }
             UnixPackageManager::Homebrew => {
                 args.push("install");
             }
         }
-        let output = if Self::has_sudo() {
+        let output = if Self::has_sudo() && !matches!(self, UnixPackageManager::Homebrew) {
             Command::new("sudo")
                 .arg(self.as_str())
                 .args(args)
