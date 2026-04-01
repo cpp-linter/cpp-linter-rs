@@ -47,9 +47,9 @@ pub enum GetToolError {
     #[error("Failed to parse version: {0}")]
     VersionParseError(String),
 
-    /// The version requirement does not specify a major version.
-    #[error("The version requirement does not specify a major version")]
-    VersionMajorRequired,
+    /// The version requirement does satisfy any known/supported clang version
+    #[error("The version requirement does satisfy any known/supported clang version")]
+    UnsupportedVersion,
 
     /// Binary executable in cache has no parent directory.
     #[error("Binary executable in cache has no parent directory")]
@@ -116,7 +116,7 @@ impl RequestedVersion {
 
                 // check if cache has a suitable version
                 let bin_ext = if cfg!(windows) { ".exe" } else { "" };
-                let min_ver = get_min_ver(version_req).ok_or(GetToolError::VersionMajorRequired)?;
+                let min_ver = get_min_ver(version_req).ok_or(GetToolError::UnsupportedVersion)?;
                 let cached_bin = StaticDistDownloader::get_cache_dir()
                     .join("bin")
                     .join(format!("{tool}-{min_ver}{bin_ext}"));
@@ -181,18 +181,11 @@ impl RequestedVersion {
 
 pub fn get_min_ver(version_req: &VersionReq) -> Option<Version> {
     let mut result = None;
-    for cmp in &version_req.comparators {
-        if matches!(cmp.op, semver::Op::Exact | semver::Op::Caret) {
-            let ver = Version {
-                major: cmp.major,
-                minor: cmp.minor.unwrap_or(0),
-                patch: cmp.patch.unwrap_or(0),
-                pre: cmp.pre.clone(),
-                build: Default::default(),
-            };
-            if result.as_ref().is_none_or(|r| ver < *r) {
-                result = Some(ver);
-            }
+    let supported_version_range = StaticDistDownloader::get_major_version_range();
+    for major in supported_version_range.rev() {
+        let ver = Version::new(major as u64, 0, 0);
+        if version_req.matches(&ver) {
+            result = Some(ver);
         }
     }
     result
