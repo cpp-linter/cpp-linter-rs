@@ -175,7 +175,10 @@ impl PackageManager for UnixPackageManager {
             }
             #[cfg(target_os = "linux")]
             UnixPackageManager::Dnf => {
-                let output = cmd.arg("list").arg(package_id.as_str()).output();
+                let output = cmd
+                    .args(["list", "installed"])
+                    .arg(package_id.as_str())
+                    .output();
                 output.is_ok_and(|out| out.status.success())
             }
             #[cfg(target_os = "linux")]
