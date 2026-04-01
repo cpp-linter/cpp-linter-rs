@@ -73,7 +73,7 @@ impl PackageManager for WindowsPackageManager {
                     let lines = stdout.lines().skip(1);
                     for line in lines {
                         // packages are listed as `<name> <version>`
-                        let mut l = line.split(' ');
+                        let mut l = line.split_ascii_whitespace();
                         if let Some(name) = l.next()
                             && name == package_name
                         {
@@ -106,7 +106,7 @@ impl PackageManager for WindowsPackageManager {
                     let lines = stdout.lines().skip(2);
                     for line in lines {
                         // packages are listed as `<name> <id> <version> <source>`
-                        let mut l = line.split(' ').skip(1);
+                        let mut l = line.split_ascii_whitespace().skip(1);
                         if let Some(name) = l.next()
                             && name == package_name
                         {
