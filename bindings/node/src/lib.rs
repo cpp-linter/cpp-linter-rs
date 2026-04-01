@@ -8,7 +8,7 @@ pub fn main(args: Vec<String>) -> Result<()> {
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
-        .unwrap()
+        .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?
         .block_on(run_main(args))
         .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))
 }
