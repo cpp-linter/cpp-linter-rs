@@ -179,8 +179,8 @@ impl PlatformTag {
                     _ => false,
                 },
                 "macos" => match sys_arch {
-                    "x86_64" => self.arch == "x86_64",
-                    "aarch64" => self.arch == "arm64",
+                    "x86_64" => self.arch == "x86_64" || self.arch == "universal2",
+                    "aarch64" => self.arch == "arm64" || self.arch == "universal2",
                     _ => false,
                 },
                 "linux" => self.arch == sys_arch,
