@@ -42,8 +42,8 @@ pub enum StaticDistDownloadError {
     #[error("Failed to parse the SHA512 sum file")]
     Sha512Corruption,
 }
-const MIN_CLANG_TOOLS_VERSION: &str = "9";
-const MAX_CLANG_TOOLS_VERSION: &str = "21";
+const MIN_CLANG_TOOLS_VERSION: u8 = 9;
+pub(crate) const MAX_CLANG_TOOLS_VERSION: u8 = 21;
 const CLANG_TOOLS_REPO: &str = "https://github.com/cpp-linter/clang-tools-static-binaries";
 const CLANG_TOOLS_TAG: &str = "master-6e612956";
 
@@ -54,21 +54,34 @@ pub struct StaticDistDownloader;
 impl Cacher for StaticDistDownloader {}
 
 impl StaticDistDownloader {
+    pub fn get_major_version_range() -> RangeInclusive<u8> {
+        let min_clang_tools_version: u8 = option_env!("MIN_CLANG_TOOLS_VERSION")
+            .and_then(|v| match v.parse::<u8>() {
+                Ok(parsed) => Some(parsed),
+                Err(e) => {
+                    log::error!("Invalid MIN_CLANG_TOOLS_VERSION env var value: {v}. Error: {e}");
+                    None
+                }
+            })
+            .unwrap_or(MIN_CLANG_TOOLS_VERSION);
+        let max_clang_tools_version: u8 = option_env!("MAX_CLANG_TOOLS_VERSION")
+            .and_then(|v| match v.parse::<u8>() {
+                Ok(parsed) => Some(parsed),
+                Err(e) => {
+                    log::error!("Invalid MAX_CLANG_TOOLS_VERSION env var value: {v}. Error: {e}");
+                    None
+                }
+            })
+            .unwrap_or(MAX_CLANG_TOOLS_VERSION);
+        min_clang_tools_version..=max_clang_tools_version
+    }
+
     /// Finds a suitable version from `req_ver` within the range of available clang tools versions.
     ///
     /// The available versions are determined by the `MIN_CLANG_TOOLS_VERSION` and
     /// `MAX_CLANG_TOOLS_VERSION` environment variables (inclusive) at compile time.
     fn find_suitable_version(req_ver: &VersionReq) -> Option<Version> {
-        let min_clang_tools_version: u8 = option_env!("MIN_CLANG_TOOLS_VERSION")
-            .unwrap_or(MIN_CLANG_TOOLS_VERSION)
-            .parse()
-            .expect("Invalid MIN_CLANG_TOOLS_VERSION env var value");
-        let max_clang_tools_version: u8 = option_env!("MAX_CLANG_TOOLS_VERSION")
-            .unwrap_or(MAX_CLANG_TOOLS_VERSION)
-            .parse()
-            .expect("Invalid MAX_CLANG_TOOLS_VERSION env var value");
-        let clang_tools_versions: RangeInclusive<u8> =
-            min_clang_tools_version..=max_clang_tools_version;
+        let clang_tools_versions: RangeInclusive<u8> = Self::get_major_version_range();
         let outlier = Version::new(12, 0, 1);
         for ver in clang_tools_versions
             .map(|v| Version::new(v as u64, 0, 0))
