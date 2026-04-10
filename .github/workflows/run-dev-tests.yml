@@ -31,7 +31,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ['windows-latest', ubuntu-latest]
+        os: ["windows-latest", ubuntu-latest]
 
     runs-on: ${{ matrix.os }}
     steps:
@@ -93,125 +93,28 @@ jobs:
       - if: runner.os == 'Linux'
         run: sudo apt-get update
 
-      - name: Install clang 11
-        uses: ./.github/install-clang-action
-        with:
-          version: '11'
+      - name: Install nushell
+        uses: hustcer/setup-nu@920172d92eb04671776f3ba69d605d3b09351c30 # v3.22
 
-      - name: Collect Coverage for clang v11
+      - name: Run test suite
         env:
-          CLANG_VERSION: '11'
-        run: nur test --profile ci
-
-      - name: Install clang 12
-        uses: ./.github/install-clang-action
-        with:
-          version: '12'
-
-      - name: Collect Coverage for clang v12
-        env:
-          CLANG_VERSION: '12'
-        run: nur test --profile ci
-
-      - name: Install clang 13
-        uses: ./.github/install-clang-action
-        with:
-          version: '13'
-
-      - name: Collect Coverage for clang v13
-        env:
-          CLANG_VERSION: '13'
-        run: nur test --profile ci
-
-      - name: Install clang 14
-        uses: ./.github/install-clang-action
-        with:
-          version: '14'
-
-      - name: Collect Coverage for clang v14
-        env:
-          CLANG_VERSION: '14'
-        run: nur test --profile ci
-
-      - name: Install clang 15
-        uses: ./.github/install-clang-action
-        with:
-          version: '15'
-
-      - name: Collect Coverage for clang v15
-        env:
-          CLANG_VERSION: '15'
-        run: nur test --profile ci
-
-      - name: Install clang 16
-        uses: ./.github/install-clang-action
-        with:
-          version: '16'
-
-      - name: Collect Coverage for clang v16
-        env:
-          CLANG_VERSION: '16'
-        run: nur test --profile ci
-
-      - name: Install clang 17
-        uses: ./.github/install-clang-action
-        with:
-          version: '17'
-
-      - name: Collect Coverage for clang v17
-        env:
-          CLANG_VERSION: '17'
-        run: nur test --profile ci
-
-      - name: Install clang 18
-        uses: ./.github/install-clang-action
-        with:
-          version: '18'
-
-      - name: Collect Coverage for clang v18
-        env:
-          CLANG_VERSION: '18'
-        run: nur test --profile ci
-
-      - name: Install clang v19
-        uses: ./.github/install-clang-action
-        with:
-          version: '19'
-
-      - name: Collect Coverage for clang v19
-        env:
-          CLANG_VERSION: '19'
-        run: nur test --profile ci
-
-      - name: Install clang v20
-        uses: ./.github/install-clang-action
-        with:
-          version: '20'
-
-      - name: Collect Coverage for clang v20
-        env:
-          CLANG_VERSION: '20'
-        run: nur test --profile ci
-
-      - name: Install clang v21
-        uses: ./.github/install-clang-action
-        with:
-          version: '21'
-
-      - name: Collect Coverage for clang v21
-        env:
-          CLANG_VERSION: '21'
-        run: nur test --profile ci
-
-      - name: Install clang v22
-        uses: ./.github/install-clang-action
-        with:
-          version: '22'
-
-      - name: Collect Coverage for clang v22
-        env:
-          CLANG_VERSION: '22'
-        run: nur test --profile all
+          MIN_CLANG_VERSION: "11"
+          MAX_CLANG_VERSION: "22"
+        shell: nu {0}
+        run: |-
+          let max_ver = $env.MAX_CLANG_VERSION | into int
+          let min_ver = $env.MIN_CLANG_VERSION | into int
+          for $ver in ($min_ver..$max_ver) {
+            print $"::group::Testing with clang v($ver)"
+            with-env { CLANG_VERSION: $"($ver)" } {
+              nur test --profile warmup
+              let test_profile = (
+                if ($ver == $max_ver) { "all" } else { "ci" }
+              )
+              nur test --profile $test_profile
+            }
+            print "::endgroup::"
+          }
 
       - name: Generate Coverage HTML report
         run: nur test llvm-cov
