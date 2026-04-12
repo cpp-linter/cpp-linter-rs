@@ -16,26 +16,26 @@ license.workspace = true
 [dependencies]
 anyhow = "1.0.102"
 chrono = "0.4.44"
-clap = { version = "4.5.60", features = ["derive"] }
+clap = { version = "4.6.0", features = ["derive"] }
 colored = "3.1.1"
-fast-glob = "1.0.0"
+fast-glob = "1.0.1"
 futures = "0.3.32"
 git2 = "0.20.4"
 log = { version = "0.4.29", features = ["std"] }
 quick-xml = { version = "0.39.2", features = ["serialize"] }
 regex = "1.12.3"
 reqwest = { version = "0.13.2", default-features = false, features = ["native-tls", "http2", "charset"] }
-semver = "1.0.27"
+semver = "1.0.28"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.148"
-tokio = { version = "1.49.0", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1.51.0", features = ["macros", "rt-multi-thread"] }
 tokio-macros = "2.5.0"
 tokio-stream = "0.1.18"
-which = "8.0.0"
+which = "8.0.2"
 
 [dev-dependencies]
 mockito = "1.7.2"
-tempfile = "3.26.0"
+tempfile = "3.27.0"
 git2 = { version = "0.20.4", features = ["https"]}
 
 [features]
