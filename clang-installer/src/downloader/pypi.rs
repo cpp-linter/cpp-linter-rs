@@ -7,6 +7,7 @@ use std::{
     collections::HashMap,
     fs,
     io::{Read, Write},
+    num::NonZero,
     path::PathBuf,
     str::FromStr,
     time::Duration,
@@ -475,7 +476,7 @@ impl PyPiDownloader {
                 if let Some(parent) = extracted_bin.parent() {
                     fs::create_dir_all(parent)?;
                 }
-                let file_size = file.size();
+                let file_size = NonZero::new(file.size());
                 let mut out = fs::OpenOptions::new()
                     .write(true)
                     .create(true)
@@ -483,10 +484,9 @@ impl PyPiDownloader {
                     .open(extracted_bin)?;
                 let mut buffer = [0; EXTRACTED_CHUNK_SIZE as usize];
                 let mut total_extracted = 0;
-                let mut progress_bar =
-                    ProgressBar::new(Some(file_size), "Extracting binary from wheel");
+                let mut progress_bar = ProgressBar::new(file_size, "Extracting binary from wheel");
                 progress_bar.render()?;
-                while total_extracted < file_size {
+                loop {
                     let bytes_read = file.read(&mut buffer)?;
                     if bytes_read == 0 {
                         break;
@@ -494,6 +494,11 @@ impl PyPiDownloader {
                     total_extracted += bytes_read as u64;
                     out.write_all(&buffer[..bytes_read])?;
                     progress_bar.inc(bytes_read as u64)?;
+                    if let Some(total_size) = file_size
+                        && total_extracted >= total_size.get()
+                    {
+                        break;
+                    }
                 }
                 progress_bar.finish()?;
                 #[cfg(unix)]

@@ -1,9 +1,12 @@
-use std::io::{IsTerminal, Result, Write, stdout};
+use std::{
+    io::{IsTerminal, Result, Write, stdout},
+    num::NonZero,
+};
 
 /// A simple progress bar implementation that supports both interactive and non-interactive terminals.
 pub struct ProgressBar {
     /// The `total` size of the task being tracked, if known.
-    total: Option<u64>,
+    total: Option<NonZero<u64>>,
     /// The `current` progress towards the `total`.
     current: u64,
     /// The number of `steps` completed in the progress bar.
@@ -34,16 +37,20 @@ impl ProgressBar {
     /// Creates a new `ProgressBar` instance.
     ///
     /// This is considered infallible, but it is recommended to call [`Self::render()`] immediately after instantiation.
+    ///
     /// ```
+    /// use std::num::NonZero;
     /// use clang_installer::ProgressBar;
-    /// let mut progress_bar = ProgressBar::new(Some(100), "Downloading");
+    ///
+    /// let total = NonZero::new(100);
+    /// let mut progress_bar = ProgressBar::new(total, "Downloading");
     /// progress_bar.render().unwrap(); // render 0% state
     /// progress_bar.inc(50).unwrap(); // render 50% state
     /// progress_bar.inc(50).unwrap(); // render 100% state
     /// progress_bar.finish().unwrap(); // clean up and write a line break (move to next line)
     /// // stdout lock is released when `progress_bar` goes out of scope
     /// ```
-    pub fn new(total: Option<u64>, prompt: &str) -> Self {
+    pub fn new(total: Option<NonZero<u64>>, prompt: &str) -> Self {
         let stdout_handle = stdout().lock();
         let is_interactive = stdout_handle.is_terminal();
         Self {
@@ -61,7 +68,7 @@ impl ProgressBar {
     /// If the `total` is known, then the progress bar will be updated based on the percentage of `current` to `total`.
     /// If the `total` is unknown, then the progress bar will simply increment by one step for each call to this method.
     pub fn inc(&mut self, delta: u64) -> Result<()> {
-        self.current += delta;
+        self.current = self.current.saturating_add(delta);
         self.render()
     }
 
@@ -77,7 +84,8 @@ impl ProgressBar {
     /// Subsequent updates should be made using [`Self::inc()`], which will call this method internally.
     pub fn render(&mut self) -> Result<()> {
         let advance_bar = self.total.map(|total| {
-            let progress = self.current as f64 / total as f64;
+            let total = total.get();
+            let progress = self.current.min(total) as f64 / total as f64;
 
             (progress * Self::MAX_BAR_WIDTH as f64).floor() as u32
         });
@@ -142,6 +150,8 @@ impl ProgressBar {
 
 #[cfg(test)]
 mod tests {
+    use std::num::NonZero;
+
     use super::ProgressBar;
 
     #[test]
@@ -155,7 +165,7 @@ mod tests {
 
     #[test]
     fn with_total() {
-        let mut progress_bar = ProgressBar::new(Some(100), "Processing");
+        let mut progress_bar = ProgressBar::new(Some(NonZero::new(100).unwrap()), "Processing");
         for _ in 0..100 {
             progress_bar.inc(1).unwrap();
         }

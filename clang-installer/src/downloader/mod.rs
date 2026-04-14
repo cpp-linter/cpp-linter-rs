@@ -2,6 +2,7 @@ use reqwest::ClientBuilder;
 use std::{
     fs,
     io::Write,
+    num::NonZero,
     path::Path,
     time::{Duration, SystemTime},
 };
@@ -58,7 +59,7 @@ async fn download(url: &Url, cache_path: &Path, timeout: u64) -> Result<(), Down
         return Err(e.into());
     }
     let mut tmp_file = tempfile::NamedTempFile::new()?;
-    let content_len = response.content_length();
+    let content_len = response.content_length().and_then(NonZero::new);
     let mut progress_bar = ProgressBar::new(content_len, "Downloading");
     progress_bar.render()?;
     while let Some(chunk) = response.chunk().await? {
