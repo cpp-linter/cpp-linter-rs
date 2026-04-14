@@ -42,8 +42,8 @@ pub enum StaticDistDownloadError {
     #[error("Failed to parse the SHA512 sum file")]
     Sha512Corruption,
 }
-const MIN_CLANG_TOOLS_VERSION: u8 = 9;
-pub(crate) const MAX_CLANG_TOOLS_VERSION: u8 = 21;
+const MIN_CLANG_TOOLS_VERSION: u8 = 11;
+pub(crate) const MAX_CLANG_TOOLS_VERSION: u8 = 22;
 const CLANG_TOOLS_REPO: &str = "https://github.com/cpp-linter/clang-tools-static-binaries";
 const CLANG_TOOLS_TAG: &str = "master-6e612956";
 

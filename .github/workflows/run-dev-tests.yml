@@ -98,12 +98,12 @@ jobs:
 
       - name: Run test suite
         env:
-          MIN_CLANG_VERSION: "11"
-          MAX_CLANG_VERSION: "22"
+          MIN_CLANG_TOOLS_VERSION: "11"
+          MAX_CLANG_TOOLS_VERSION: "22"
         shell: nu {0}
         run: |-
-          let max_ver = $env.MAX_CLANG_VERSION | into int
-          let min_ver = $env.MIN_CLANG_VERSION | into int
+          let max_ver = $env.MAX_CLANG_TOOLS_VERSION | into int
+          let min_ver = $env.MIN_CLANG_TOOLS_VERSION | into int
           for $ver in ($min_ver..$max_ver) {
             print $"::group::Testing with clang v($ver)"
             with-env { CLANG_VERSION: $"($ver)" } {

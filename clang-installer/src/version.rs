@@ -329,6 +329,7 @@ mod tests {
         let clang_version = option_env!("CLANG_VERSION").unwrap_or("12.0.1");
         for tool in [ClangTool::ClangFormat, ClangTool::ClangTidy] {
             let version_req = VersionReq::parse(clang_version).unwrap();
+            println!("Installing {tool} with version requirement: {version_req}");
             let clang_path = RequestedVersion::Requirement(version_req.clone())
                 .eval_tool(&tool, false, None)
                 .await
