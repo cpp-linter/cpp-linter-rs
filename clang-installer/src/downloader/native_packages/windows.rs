@@ -112,8 +112,6 @@ impl PackageManager for WindowsPackageManager {
                         {
                             // found the package, check version
                             if let Some(ver_cmp) = ver_cmp.clone() {
-                                // skip id and get version
-                                l.next();
                                 if let Some(ver_str) = l.next()
                                     && let Ok(ver) = Version::parse(ver_str)
                                 {
