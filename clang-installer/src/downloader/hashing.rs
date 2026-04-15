@@ -44,7 +44,7 @@ impl HashAlgorithm {
         }
         progress_bar.finish()?;
         let actual = format!("{:x}", hasher.finalize());
-        if actual == *expected {
+        if actual == expected.to_ascii_lowercase() {
             Ok(())
         } else {
             Err(DownloadError::HashMismatch {
