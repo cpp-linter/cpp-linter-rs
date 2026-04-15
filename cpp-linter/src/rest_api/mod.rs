@@ -21,11 +21,16 @@ use crate::clang_tools::ClangVersions;
 use crate::cli::{FeedbackInput, LinesChangedOnly};
 use crate::common_fs::{FileFilter, FileObj};
 
+/// The comment marker used to identify bot comments from other comments (from users or other bots).
 pub static COMMENT_MARKER: &str = "<!-- cpp linter action -->\n";
+
+/// The user outreach message displayed in bot comments.
 pub static USER_OUTREACH: &str = concat!(
     "\n\nHave any feedback or feature suggestions? [Share it here.]",
     "(https://github.com/cpp-linter/cpp-linter-action/issues)"
 );
+
+/// The user agent string used for HTTP requests.
 pub static USER_AGENT: &str = concat!("cpp-linter/", env!("CARGO_PKG_VERSION"));
 
 /// A structure to contain the different forms of headers that
@@ -144,7 +149,7 @@ pub trait RestApiClient {
                     &mut comment,
                     format_checks_failed,
                     // tidy_version should be `Some()` value at this point.
-                    clang_versions.tidy_version.as_ref().unwrap(),
+                    &clang_versions.tidy_version.as_ref().unwrap().to_string(),
                     &mut remaining_length,
                 );
             }
@@ -154,7 +159,7 @@ pub trait RestApiClient {
                     &mut comment,
                     tidy_checks_failed,
                     // format_version should be `Some()` value at this point.
-                    clang_versions.format_version.as_ref().unwrap(),
+                    &clang_versions.format_version.as_ref().unwrap().to_string(),
                     &mut remaining_length,
                 );
             }

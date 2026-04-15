@@ -3,20 +3,29 @@ nextest-version = "0.9.77"
 
 [profile.default]
 # A profile to run most tests, except tests that run longer than 10 seconds
-default-filter = "not test(#*rate_limit_secondary) - test(#git::test::with_*) - test(#repo_get_sha)"
+default-filter = """\
+    not test(#*rate_limit_secondary) \
+    - test(#git::test::with_*) \
+    - test(#git::test::repo_get_sha) \
+    - test(#*eval_version)
+"""
 
 # This will flag any test that runs longer than 10 seconds. Useful when writing new tests.
 slow-timeout = "10s"
+
+# show which tests were skipped
+status-level = "skip"
+
+[profile.warmup]
+# Run this profile before other tests to warmup the cache of clang tools binaries.
+default-filter = 'test(#*eval_version)'
 
 [profile.ci]
 # A profile to run only tests that use clang-tidy and/or clang-format
 # NOTE: This profile is intended to keep CI runtime low. Locally, use default or all profiles
 
 # This is all tests in tests/ folder + unit test for --extra-args.
-default-filter = "kind(test) + test(#*use_extra_args)"
-
-# show which tests were skipped
-status-level = "skip"
+default-filter = "kind(test) + test(#*use_extra_args) + test(#*eval_version)"
 
 # show log output from each test
 success-output = "final"
@@ -24,7 +33,7 @@ failure-output = "immediate-final"
 
 [profile.all]
 # A profile to run all tests (including tests that run longer than 10 seconds)
-default-filter = "all()"
+default-filter = "all() - test(#*eval_version)"
 
 # Revert slow-timeout to nextest default value.
 # Otherwise, default profile value (10s) is inherited.

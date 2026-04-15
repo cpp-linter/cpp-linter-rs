@@ -1,0 +1,52 @@
+[package]
+name = "clang-installer"
+version = "0.1.0"
+description = "A utility for installing specific versions of clang-format and clang-tidy, used by cpp-linter."
+readme = "README.md"
+keywords = ["clang-tidy", "clang-format", "cpp-linter"]
+categories = ["command-line-utilities", "development-tools", "filesystem"]
+authors.workspace = true
+homepage.workspace = true
+license.workspace = true
+edition.workspace = true
+repository.workspace = true
+
+[[bin]]
+path = "src/main.rs"
+name = "clang-tools"
+test = false
+bench = false
+required-features = ["bin"]
+
+[dependencies]
+anyhow = { workspace = true, optional = true }
+blake2 = "0.10.6"
+clap = { workspace = true, features = ["derive"], optional = true }
+colored = { workspace = true, optional = true }
+directories = "6.0.0"
+log = { workspace = true }
+regex = { workspace = true }
+reqwest = { workspace = true }
+semver =  { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = "0.10.9"
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["macros"], optional = true }
+url = "2.5.8"
+which = "8.0.2"
+zip = { version = "8.2.0", default-features = false, features = ["deflate"] }
+tempfile = { workspace = true }
+
+[dev-dependencies]
+colored = { workspace = true }
+mockito = { workspace = true }
+reqwest = { workspace = true, default-features = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+
+[features]
+bin = ["clap", "tokio", "anyhow", "colored"]
+clap = ["dep:clap"]
+tokio = ["dep:tokio"]
+anyhow = ["dep:anyhow"]
+colored = ["dep:colored"]

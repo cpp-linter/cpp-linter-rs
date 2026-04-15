@@ -67,10 +67,10 @@ jobs:
             os: ubuntu-latest
             vendored: true
             cross: true
-          - target: powerpc64-unknown-linux-gnu
-            os: ubuntu-latest
-            vendored: true
-            cross: true
+          # - target: powerpc64-unknown-linux-gnu
+          #   os: ubuntu-latest
+          #   vendored: true
+          #   cross: true
           - target: powerpc64le-unknown-linux-gnu
             os: ubuntu-latest
             vendored: true
@@ -131,7 +131,7 @@ jobs:
           --bin cpp-linter
           --release
           --target ${{ matrix.target }}
-          ${{ matrix.vendored && '--features openssl-vendored' || '' }}
+          --features ${{ matrix.vendored && 'bin,openssl-vendored' || 'bin' }}
 
       - name: Prepare artifacts (unix)
         if: runner.os != 'Windows'
