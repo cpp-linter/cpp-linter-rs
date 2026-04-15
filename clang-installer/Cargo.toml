@@ -30,12 +30,12 @@ reqwest = { workspace = true }
 semver =  { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-sha2 = "0.10.9"
+sha2 = "0.11.0"
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["macros"], optional = true }
 url = "2.5.8"
 which = "8.0.2"
-zip = { version = "8.2.0", default-features = false, features = ["deflate"] }
+zip = { version = "8.5.1", default-features = false, features = ["deflate"] }
 tempfile = { workspace = true }
 
 [dev-dependencies]
