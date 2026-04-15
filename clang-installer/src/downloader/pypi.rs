@@ -185,12 +185,12 @@ impl LinuxLibC {
             LinuxLibC::Musl {
                 version: pkg_musl_version,
             } => Self::get_musl_version()
-                .map(|sys_musl_version| *pkg_musl_version >= sys_musl_version)
+                .map(|sys_musl_version| sys_musl_version >= *pkg_musl_version)
                 .unwrap_or(false),
             LinuxLibC::Glibc {
                 version: pkg_glibc_version,
             } => Self::get_glibc_version()
-                .map(|sys_glibc_version| *pkg_glibc_version >= sys_glibc_version)
+                .map(|sys_glibc_version| sys_glibc_version >= *pkg_glibc_version)
                 .unwrap_or(false),
         }
     }

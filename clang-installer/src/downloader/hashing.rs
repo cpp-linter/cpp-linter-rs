@@ -1,6 +1,9 @@
-use super::DownloadError;
+use sha2::digest::{Digest, OutputSizeUser, generic_array::ArrayLength};
 
-use std::{fs, io::Read, path::Path};
+use super::DownloadError;
+use crate::progress_bar::ProgressBar;
+
+use std::{fs, io::Read, num::NonZero, path::Path};
 
 /// Represents the supported hash algorithms for file integrity checking.
 ///
@@ -20,6 +23,37 @@ pub enum HashAlgorithm {
 }
 
 impl HashAlgorithm {
+    fn hash_file<H>(mut hasher: H, file_path: &Path, expected: &str) -> Result<(), DownloadError>
+    where
+        H: Digest + OutputSizeUser,
+        <H as OutputSizeUser>::OutputSize: std::ops::Add,
+        <<H as OutputSizeUser>::OutputSize as std::ops::Add>::Output: ArrayLength<u8>,
+    {
+        let mut file_reader = fs::OpenOptions::new().read(true).open(file_path)?;
+        let file_size = file_reader.metadata()?.len();
+        let mut progress_bar =
+            ProgressBar::new(NonZero::new(file_size), "Verifying file integrity");
+        let mut buf = [0u8; 1024];
+        loop {
+            let bytes_read = file_reader.read(&mut buf)?;
+            if bytes_read == 0 {
+                break;
+            }
+            progress_bar.inc(bytes_read as u64)?;
+            hasher.update(&buf[..bytes_read]);
+        }
+        progress_bar.finish()?;
+        let actual = format!("{:x}", hasher.finalize());
+        if actual == *expected {
+            Ok(())
+        } else {
+            Err(DownloadError::HashMismatch {
+                expected: expected.to_owned(),
+                actual,
+            })
+        }
+    }
+
     /// Verify a given file (located at `file_path`) against the expected checksum value.
     ///
     /// This method reads the file in chunks (of 1024 bytes) to compute the hash,
@@ -27,72 +61,24 @@ impl HashAlgorithm {
     ///
     /// Note, a progress bar is displayed to stdout.
     pub fn verify(&self, file_path: &Path) -> Result<(), DownloadError> {
-        let mut file_reader = fs::OpenOptions::new().read(true).open(file_path)?;
-        let mut buf = [0u8; 1024];
         match self {
             HashAlgorithm::Sha256(expected) => {
                 use sha2::{Digest, Sha256};
 
-                let mut hasher = Sha256::new();
-                loop {
-                    let bytes_read = file_reader.read(&mut buf)?;
-                    if bytes_read == 0 {
-                        break;
-                    }
-                    hasher.update(&buf[..bytes_read]);
-                }
-                let actual = format!("{:x}", hasher.finalize());
-                if actual == *expected {
-                    Ok(())
-                } else {
-                    Err(DownloadError::HashMismatch {
-                        expected: expected.clone(),
-                        actual,
-                    })
-                }
+                let hasher = Sha256::new();
+                Self::hash_file(hasher, file_path, expected)
             }
             HashAlgorithm::Blake2b256(expected) => {
                 use blake2::{Blake2b, Digest, digest::consts::U32};
 
-                let mut hasher = Blake2b::<U32>::new();
-                loop {
-                    let bytes_read = file_reader.read(&mut buf)?;
-                    if bytes_read == 0 {
-                        break;
-                    }
-                    hasher.update(&buf[..bytes_read]);
-                }
-                let actual = format!("{:x}", hasher.finalize());
-                if actual == *expected {
-                    Ok(())
-                } else {
-                    Err(DownloadError::HashMismatch {
-                        expected: expected.clone(),
-                        actual,
-                    })
-                }
+                let hasher = Blake2b::<U32>::new();
+                Self::hash_file(hasher, file_path, expected)
             }
             HashAlgorithm::Sha512(expected) => {
                 use sha2::{Digest, Sha512};
 
-                let mut hasher = Sha512::new();
-
-                loop {
-                    let bytes_read = file_reader.read(&mut buf)?;
-                    if bytes_read == 0 {
-                        break;
-                    }
-                    hasher.update(&buf[..bytes_read]);
-                }
-                let actual = format!("{:x}", hasher.finalize());
-                if actual == *expected {
-                    Ok(())
-                } else {
-                    Err(DownloadError::HashMismatch {
-                        expected: expected.clone(),
-                        actual,
-                    })
-                }
+                let hasher = Sha512::new();
+                Self::hash_file(hasher, file_path, expected)
             }
         }
     }

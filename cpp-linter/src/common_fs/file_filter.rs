@@ -19,6 +19,8 @@ impl FileFilter {
     ///
     /// The `ignore` parameter is a list of glob patterns that should be ignored.
     /// These can be explicitly not ignored by prefixing them with `!`.
+    /// Hidden files/folders (patterns that start with a ".") cannot be explicitly not
+    /// ignored; they are always ignored.
     ///
     /// The `extensions` parameter is a list of file extensions that should be included.
     pub fn new(ignore: &[String], extensions: Vec<String>) -> Self {

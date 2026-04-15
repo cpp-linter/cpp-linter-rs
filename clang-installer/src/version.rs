@@ -47,8 +47,8 @@ pub enum GetToolError {
     #[error("Failed to parse version: {0}")]
     VersionParseError(String),
 
-    /// The version requirement does satisfy any known/supported clang version
-    #[error("The version requirement does satisfy any known/supported clang version")]
+    /// The version requirement does not satisfy any known/supported clang version
+    #[error("The version requirement does not satisfy any known/supported clang version")]
     UnsupportedVersion,
 
     /// Binary executable in cache has no parent directory.

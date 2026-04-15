@@ -43,7 +43,7 @@ impl PackageManager for WindowsPackageManager {
         Command::new(self.as_str())
             .arg("--version")
             .output()
-            .is_ok()
+            .is_ok_and(|output| output.status.success())
     }
 
     fn list_managers() -> Vec<impl PackageManager + Display>
@@ -170,7 +170,7 @@ impl PackageManager for WindowsPackageManager {
                     // is already installed (with a newer version). So use `--force` to reinstall the specified version.
                     cmd.arg("--version").arg(version.to_string()).arg("--force");
                 }
-                let output = cmd.output().map_err(PackageManagerError::Io)?;
+                let output = cmd.output()?;
                 if output.status.success() {
                     Ok(())
                 } else {

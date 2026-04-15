@@ -151,7 +151,7 @@ export def summarize [] {
     let data = open benchmark.json
     let results = $data | get results | reject "times" "exit_codes"
     let summary = open --raw benchmark.md
-    let summary_file = if ($env | get --optional GITHUB_STEP_SUMMARY | is-not-empty) {
+    if ($env | get --optional GITHUB_STEP_SUMMARY | is-not-empty) {
         $"\n# Results\n\n($summary)" | save --append $env.GITHUB_STEP_SUMMARY
     } else {
         $"# Results\n\n($summary)" | save --force benchmark.md

@@ -168,7 +168,7 @@ impl StaticDistDownloader {
         }
         let sha512_cache_path = cache_path
             .join("static_dist")
-            .join(format!("{tool}-{ver_str}.sha512").as_str());
+            .join(format!("{tool}-{ver_str}.sha512"));
         if sha512_cache_path.exists() {
             log::info!(
                 "Using cached SHA512 checksum for {tool} version {ver_str} from {:?}",

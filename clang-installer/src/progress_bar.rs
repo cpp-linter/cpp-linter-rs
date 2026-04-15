@@ -80,7 +80,7 @@ impl ProgressBar {
 
     /// Renders the progress bar based on the current state.
     ///
-    /// This should only be invoked once after [`Self::new()`].
+    /// This should be invoked once after [`Self::new()`] to render the initial 0% state.
     /// Subsequent updates should be made using [`Self::inc()`], which will call this method internally.
     pub fn render(&mut self) -> Result<()> {
         let advance_bar = self.total.map(|total| {
