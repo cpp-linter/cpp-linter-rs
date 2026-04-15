@@ -13,6 +13,7 @@ use url::Url;
 use crate::{
     Cacher, ClangTool, DownloadError,
     downloader::{download, hashing::HashAlgorithm},
+    utils::lock_path,
 };
 
 /// An error that can occur while downloading a static binary.
@@ -155,6 +156,7 @@ impl StaticDistDownloader {
             None => cache_path.join("bin").join(&bin_name),
             Some(dir) => dir.join(&bin_name),
         };
+        let file_lock = lock_path(&download_path)?;
         if download_path.exists() {
             log::info!(
                 "Using cached static binary for {tool} version {ver_str} from {:?}",
@@ -182,6 +184,7 @@ impl StaticDistDownloader {
             download(&sha512_url, &sha512_cache_path, 10).await?;
         }
         Self::verify_sha512(&download_path, &sha512_cache_path)?;
+        file_lock.unlock()?;
         Ok(download_path)
     }
 }

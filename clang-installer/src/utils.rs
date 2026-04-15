@@ -1,5 +1,8 @@
 //! A utility module for path normalization.
-use std::path::{Component, Path, PathBuf};
+use std::{
+    fs::{self, File, OpenOptions},
+    path::{Component, Path, PathBuf},
+};
 
 /// This was copied from [cargo source code](https://github.com/rust-lang/cargo/blob/8cc0cb136772b8f54eafe0d163fcb7226a06af0c/crates/cargo-util/src/paths.rs#L84).
 ///
@@ -29,6 +32,32 @@ pub fn normalize_path(path: &Path) -> PathBuf {
         }
     }
     ret
+}
+
+/// Creates (and returns) a lock [`File`] for the given `path` and locks it.
+///
+/// This function will create a lock file with `.lock` appended to the
+/// given `path`'s extension. It will then acquire an exclusive lock on
+/// the file to prevent concurrent access.
+///
+/// Note, This will block until a lock is obtained.
+///
+/// The caller is responsible for cleanup, which includes
+///
+/// 1. unlocking the returned file and
+/// 2. deleting the file when done (if desired).
+pub fn lock_path(path: &Path) -> Result<File, std::io::Error> {
+    let lock_path = path.with_added_extension("lock");
+    if let Some(parent) = lock_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let file_lock = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(&lock_path)?;
+    file_lock.lock()?;
+    Ok(file_lock)
 }
 
 #[cfg(test)]

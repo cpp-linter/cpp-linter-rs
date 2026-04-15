@@ -1,5 +1,5 @@
 use super::{DownloadError, caching::Cacher, download, hashing::HashAlgorithm};
-use crate::{ClangTool, progress_bar::ProgressBar};
+use crate::{ClangTool, progress_bar::ProgressBar, utils::lock_path};
 
 use semver::{Version, VersionReq};
 use serde::{Deserialize, de::Visitor};
@@ -452,7 +452,7 @@ impl PyPiDownloader {
         let cache_file = Self::get_cache_dir()
             .join("pypi")
             .join(format!("{clang_tool}_pypi.json"));
-
+        let file_lock = lock_path(&cache_file)?;
         // PyPI package info cache should not be refreshed unless it is more than 10 minutes old.
         // This is behavior recommended by PyPI response header `Cache-Control: max-age=600`.
         // Instead of caching the `Cache-Control` header, we'll just check the cached file's "last modified" time.
@@ -462,14 +462,15 @@ impl PyPiDownloader {
                 "Using cached PyPI info for {clang_tool} from {}",
                 cache_file.to_string_lossy()
             );
-            std::fs::read_to_string(cache_file)?
+            std::fs::read_to_string(&cache_file)?
         } else {
             let api_url = format!("{PYPI_JSON_API_URL}/pypi/{clang_tool}/");
             let endpoint = Url::parse(&api_url)?.join("json")?;
             log::info!("Fetching PyPI info for {clang_tool} from {endpoint}");
             download(&endpoint, &cache_file, 10).await?;
-            std::fs::read_to_string(cache_file)?
+            std::fs::read_to_string(&cache_file)?
         };
+        file_lock.unlock()?;
         Ok(serde_json::from_str(body.as_str())?)
     }
 
@@ -487,6 +488,7 @@ impl PyPiDownloader {
         let cached_filename = format!("{clang_tool}_{ver}.whl");
         let cached_dir = Self::get_cache_dir();
         let cached_wheel = cached_dir.join("pypi").join(&cached_filename);
+        let file_lock = lock_path(&cached_wheel)?;
         if Self::is_cache_valid(&cached_wheel, None) {
             log::info!(
                 "Using cached wheel for {clang_tool} version {ver} from {}",
@@ -510,6 +512,7 @@ impl PyPiDownloader {
             Some(dir) => dir.join(&bin_name),
         };
         Self::extract_bin(clang_tool, &cached_wheel, &extracted_bin)?;
+        file_lock.unlock()?;
         Ok(extracted_bin)
     }
 
