@@ -9,6 +9,7 @@ use std::{
     io::{Read, Write},
     num::NonZero,
     path::PathBuf,
+    process::Command,
     str::FromStr,
     time::Duration,
 };
@@ -121,14 +122,76 @@ enum LinuxLibC {
 }
 
 impl LinuxLibC {
+    fn get_musl_version() -> Option<Version> {
+        // This is a simplified check for musl version.
+        // In practice, determining the musl version may require more complex logic,
+        // such as parsing the output of `ldd --version` or checking for specific symbols in the C library.
+        if let Ok(output) = Command::new("ldd").arg("--version").output() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let mut is_musl = false;
+            for line in stdout.lines() {
+                let line = line.trim().to_lowercase();
+                // Output of `ldd --version` on musl typically looks like:
+                // ```shell
+                // musl libc (x86_64)
+                // Version 1.2.2
+                // Dynamic Program Loader
+                // ```
+                // So, first look for "musl" in the output.
+                // Then, look for a version number if "musl" is found.
+                if !is_musl && line.contains("musl") {
+                    is_musl = true;
+                }
+                if is_musl
+                    && line.contains("version")
+                    && let Some(version_str) = line.split_whitespace().last()
+                    && let Ok(version) = Version::parse(version_str)
+                {
+                    return Some(version);
+                }
+            }
+        }
+        // If we can't determine the musl version, assume it's compatible with musllinux wheels.
+        None
+    }
+
+    fn get_glibc_version() -> Option<Version> {
+        if let Ok(output) = Command::new("ldd").arg("--version").output() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            for line in stdout.lines() {
+                let line = line.trim().to_lowercase();
+                // Output of `ldd --version` on glibc typically looks like:
+                // ```shell
+                // ldd (Ubuntu GLIBC 2.39-0ubuntu8.7) 2.39
+                // Copyright (C) 2024 Free Software Foundation, Inc.
+                // ```
+                // So, look for the version on the line that contains "glibc" in the output.
+                if line.contains("glibc")
+                    && let Some(version_str) = line.split_whitespace().last()
+                    && let Some((major, minor)) = version_str.split_once('.')
+                    && let Ok(major) = major.parse::<u64>()
+                    && let Ok(minor) = minor.parse::<u64>()
+                {
+                    return Some(Version::new(major, minor, 0));
+                }
+            }
+        }
+        None
+    }
+
     /// Checks if the [LinuxLibC] is compatible with the current system.
     pub fn is_compatible_with_system(&self) -> bool {
         match self {
-            #[cfg(target_env = "musl")]
-            LinuxLibC::Musl { .. } => true,
-            #[cfg(not(target_env = "musl"))]
-            LinuxLibC::Glibc { .. } => true,
-            _ => false,
+            LinuxLibC::Musl {
+                version: pkg_musl_version,
+            } => Self::get_musl_version()
+                .map(|sys_musl_version| *pkg_musl_version >= sys_musl_version)
+                .unwrap_or(false),
+            LinuxLibC::Glibc {
+                version: pkg_glibc_version,
+            } => Self::get_glibc_version()
+                .map(|sys_glibc_version| *pkg_glibc_version >= sys_glibc_version)
+                .unwrap_or(false),
         }
     }
 }
@@ -145,10 +208,10 @@ impl PlatformOs {
     /// Checks if the [PlatformOs] is compatible with the current system.
     pub fn is_compatible_with_system(&self) -> bool {
         match self {
-            PlatformOs::Windows => std::env::consts::OS == "windows",
-            PlatformOs::MacOS => std::env::consts::OS == "macos",
+            PlatformOs::Windows => cfg!(target_os = "windows"),
+            PlatformOs::MacOS => cfg!(target_os = "macos"),
             PlatformOs::Linux { lib_c } => {
-                std::env::consts::OS == "linux" && lib_c.is_compatible_with_system()
+                cfg!(target_os = "linux") && lib_c.is_compatible_with_system()
             }
         }
     }
