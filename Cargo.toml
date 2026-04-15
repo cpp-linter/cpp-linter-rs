@@ -22,16 +22,16 @@ strip = "symbols"
 
 [workspace.dependencies]
 anyhow = "1.0.102"
-clap = { version = "4.5.60", features = ["derive"] }
+clap = { version = "4.6.0", features = ["derive"] }
 colored = "3.1.1"
 log = { version = "0.4.29", features = ["std"] }
 mockito = "1.7.2"
-pyo3 = {version = "0.28.2", features = ["extension-module"] }
+pyo3 = {version = "0.28.3", features = ["extension-module"] }
 regex = "1.12.3"
 reqwest = { version = "0.13.2", default-features = false, features = ["http2", "charset"] }
 thiserror = "2.0.18"
-semver = "1.0.27"
+semver = "1.0.28"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
-tempfile = "3.26.0"
-tokio = "1.50.0"
+tempfile = "3.27.0"
+tokio = "1.51.1"
