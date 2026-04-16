@@ -75,7 +75,7 @@ jobs:
     if: github.event_name != 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     outputs:
-      pkgs: ${{ steps.set-pkgs.outputs.pkgs }}
+      pkgs: ${{ steps.get-pkgs.outputs.pkgs }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -84,15 +84,17 @@ jobs:
       - name: Install nushell
         uses: hustcer/setup-nu@92c296ba1ba2ba04cc948ab64ddefe192dc13f0c # v3.23
       - name: Get changed packages
-        id: set-pkgs
+        id: get-pkgs
         shell: nu {0}
         run: |-
-          source .github/workflows/bump-n-release.nu
-          let pkgs = get-changed-pkgs.nu
-          "pkgs=($pkgs)\n" | save --append $env.GITHUB_OUTPUT
+          print (pwd)
+          use ("./.github/workflows/bump-n-release.nu" | path expand) get-changed-pkgs
+          let pkgs = (get-changed-pkgs)
+          $"pkgs=($pkgs)\n" | save --append $env.GITHUB_OUTPUT
+
   update-changelog:
     if: github.event_name != 'workflow_dispatch'
-    needs: get-changed-pkgs
+    needs: [get-changed-pkgs]
     permissions:
       contents: read
       pull-requests: read
@@ -120,7 +122,7 @@ jobs:
           GIT_CLIFF_CONFIG: .config/cliff.toml
         shell: nu {0}
         run: |-
-          source .github/workflows/bump-n-release.nu
+          use ("./.github/workflows/bump-n-release.nu" | path expand) gen-changes
           gen-changes $env.PKG --unreleased
           let out = open --raw .config/ReleaseNotes.md
           $"## ($env.PKG)\n\n($out)" | save --append $env.GITHUB_STEP_SUMMARY

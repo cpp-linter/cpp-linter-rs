@@ -142,13 +142,17 @@ jobs:
         if: runner.os != 'Windows'
         shell: bash
         run: |-
+          mkdir dist
+          cp LICENSE dist/LICENSE
+          cd dist
+
           tgt="cpp-linter"
-          mv "target/${{ matrix.target }}/release/${tgt}" "${tgt}"
+          mv "../target/${{ matrix.target }}/release/${tgt}" "./${tgt}"
           arc_name="${tgt}-${{ matrix.target }}.tar.gz"
           tar -a -c -v -z -f "${arc_name}" ${tgt} LICENSE
 
           tgt="clang-tools"
-          mv "target/${{ matrix.target }}/release/${tgt}" "${tgt}"
+          mv "../target/${{ matrix.target }}/release/${tgt}" "./${tgt}"
           arc_name="${tgt}-${{ matrix.target }}.tar.gz"
           tar -a -c -v -z -f "${arc_name}" ${tgt} LICENSE
       - name: Prepare artifacts (windows)
@@ -157,26 +161,30 @@ jobs:
         # `tar.exe` in powershell is different from `tar` in bash.
         # need to use `tar.exe` in powershell to create a valid zip file.
         run: |-
+          mkdir dist
+          Copy-Item ./LICENSE ./dist/LICENSE
+          cd dist
+
           $tgt = "cpp-linter"
-          mv "target/${{ matrix.target }}/release/${tgt}.exe" "${tgt}.exe"
+          mv "../target/${{ matrix.target }}/release/${tgt}.exe" "./${tgt}.exe"
           $arc_name = "${tgt}-${{ matrix.target }}.zip"
-          tar -a -c -v -f "${arc_name}" ${tgt} LICENSE
+          tar -a -c -v -f "${arc_name}" ${tgt}.exe LICENSE
 
           $tgt = "clang-tools"
-          mv "target/${{ matrix.target }}/release/${tgt}.exe" "${tgt}.exe"
+          mv "../target/${{ matrix.target }}/release/${tgt}.exe" "./${tgt}.exe"
           $arc_name = "${tgt}-${{ matrix.target }}.zip"
-          tar -a -c -v -f "${arc_name}" ${tgt} LICENSE
+          tar -a -c -v -f "${arc_name}" ${tgt}.exe LICENSE
       - name: Upload cpp-linter artifacts
         uses: actions/upload-artifact@v7
         with:
           name: cpp-linter-${{ matrix.target }}
-          path: cpp-linter-${{ matrix.target }}*
+          path: dist/cpp-linter-${{ matrix.target }}*
           if-no-files-found: error
       - name: Upload clang-tools artifacts
         uses: actions/upload-artifact@v7
         with:
           name: clang-tools-${{ matrix.target }}
-          path: clang-tools-${{ matrix.target }}*
+          path: dist/clang-tools-${{ matrix.target }}*
           if-no-files-found: error
 
   publish:
