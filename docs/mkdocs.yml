@@ -11,7 +11,11 @@ nav:
   - permissions.md
   - python.md
   - node.md
-  - changelog.md
+  - Changes:
+    - changelog/cpp-linter.md
+    - changelog/cpp-linter-py.md
+    - changelog/cpp-linter-js.md
+    - changelog/clang-installer.md
   - contributing.md
   - other-licenses.md
 

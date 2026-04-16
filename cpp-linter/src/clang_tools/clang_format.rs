@@ -186,6 +186,8 @@ pub fn run_clang_format(
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used)]
+
     use super::{FormatAdvice, Replacement, summarize_style};
 
     #[test]

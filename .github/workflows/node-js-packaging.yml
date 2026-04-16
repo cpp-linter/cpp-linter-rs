@@ -13,7 +13,7 @@ on:
       - yarn.lock
       - .github/workflows/node-js-packaging.yml
     tags:
-      - '*'
+      - 'cpp-linter-js/v*'
   pull_request:
     branches: [main]
     paths:
@@ -340,6 +340,6 @@ jobs:
         working-directory: bindings/node
         shell: bash
       - name: Publish
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/cpp-linter-js/v')
         working-directory: bindings/node
         run: npm publish ${{ contains(github.ref_name, '-rc') && '--tag next' || '' }}

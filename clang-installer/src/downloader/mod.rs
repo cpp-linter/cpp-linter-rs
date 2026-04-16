@@ -145,7 +145,7 @@ mod tests {
             .create();
         let tmp_file = NamedTempFile::new().unwrap();
         let err = download(&url, tmp_file.path(), 1).await.unwrap_err();
-        println!("{}", err.to_string());
+        println!("{}", err);
         assert!(matches!(err, DownloadError::RequestError(_)));
         mock.assert();
         log::logger().flush();
@@ -168,7 +168,7 @@ mod tests {
             .create();
         let tmp_file = NamedTempFile::new().unwrap();
         let err = download(&url, tmp_file.path(), 1).await.unwrap_err();
-        println!("{}", err.to_string());
+        println!("{}", err);
         assert!(matches!(err, DownloadError::RequestError(_)));
         mock.assert();
     }

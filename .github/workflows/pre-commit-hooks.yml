@@ -32,7 +32,7 @@ jobs:
           path: ~/.cargo
           key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
       - name: cargo clippy
-        run: cargo clippy -- -D warnings
+        run: cargo clippy --all-features --all-targets -- -D warnings
       - name: cargo fmt
         run: cargo fmt --check
 

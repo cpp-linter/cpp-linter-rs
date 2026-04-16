@@ -9,7 +9,7 @@
 #   nu benchmark/benchmark.nu
 # To use this script in CI, see .github/workflows/benchmark.yml.
 
-use "../nurfile" run-cmd
+use "../.github/common.nu" run-cmd
 
 # Build release version of cpp-linter (rust) binary
 #

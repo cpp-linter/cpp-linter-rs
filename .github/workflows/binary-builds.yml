@@ -6,15 +6,20 @@ on:
     paths:
       - cpp-linter/src/**
       - cpp-linter/Cargo.toml
+      - clang-installer/src/**
+      - clang-installer/Cargo.toml
       - Cargo.toml
       - Cargo.lock
     tags:
-      - v*
+      - cpp-linter/v*
+      - clang-installer/v*
   pull_request:
     branches: [main]
     paths:
       - cpp-linter/src/**
       - cpp-linter/Cargo.toml
+      - clang-installer/src/**
+      - clang-installer/Cargo.toml
       - Cargo.toml
       - Cargo.lock
 
@@ -127,8 +132,8 @@ jobs:
         run: >-
           ${{ matrix.cross && 'cross' || 'cargo '}}
           build
-          --manifest-path cpp-linter/Cargo.toml
           --bin cpp-linter
+          --bin clang-tools
           --release
           --target ${{ matrix.target }}
           --features ${{ matrix.vendored && 'bin,openssl-vendored' || 'bin' }}
@@ -137,9 +142,18 @@ jobs:
         if: runner.os != 'Windows'
         shell: bash
         run: |-
+          mkdir dist
+          cp LICENSE dist/LICENSE
+          cd dist
+
           tgt="cpp-linter"
-          mv "target/${{ matrix.target }}/release/${tgt}" "${tgt}"
-          arc_name="cpp-linter-${{ matrix.target }}.tar.gz"
+          mv "../target/${{ matrix.target }}/release/${tgt}" "./${tgt}"
+          arc_name="${tgt}-${{ matrix.target }}.tar.gz"
+          tar -a -c -v -z -f "${arc_name}" ${tgt} LICENSE
+
+          tgt="clang-tools"
+          mv "../target/${{ matrix.target }}/release/${tgt}" "./${tgt}"
+          arc_name="${tgt}-${{ matrix.target }}.tar.gz"
           tar -a -c -v -z -f "${arc_name}" ${tgt} LICENSE
       - name: Prepare artifacts (windows)
         if: runner.os == 'Windows'
@@ -147,20 +161,34 @@ jobs:
         # `tar.exe` in powershell is different from `tar` in bash.
         # need to use `tar.exe` in powershell to create a valid zip file.
         run: |-
-          $tgt = "cpp-linter.exe"
-          mv "target/${{ matrix.target }}/release/${tgt}" "${tgt}"
-          $arc_name = "cpp-linter-${{ matrix.target }}.zip"
-          tar -a -c -v -f "${arc_name}" ${tgt} LICENSE
+          mkdir dist
+          Copy-Item ./LICENSE ./dist/LICENSE
+          cd dist
 
-      - name: Upload artifacts
+          $tgt = "cpp-linter"
+          mv "../target/${{ matrix.target }}/release/${tgt}.exe" "./${tgt}.exe"
+          $arc_name = "${tgt}-${{ matrix.target }}.zip"
+          tar -a -c -v -f "${arc_name}" ${tgt}.exe LICENSE
+
+          $tgt = "clang-tools"
+          mv "../target/${{ matrix.target }}/release/${tgt}.exe" "./${tgt}.exe"
+          $arc_name = "${tgt}-${{ matrix.target }}.zip"
+          tar -a -c -v -f "${arc_name}" ${tgt}.exe LICENSE
+      - name: Upload cpp-linter artifacts
         uses: actions/upload-artifact@v7
         with:
           name: cpp-linter-${{ matrix.target }}
-          path: cpp-linter-${{ matrix.target }}*
+          path: dist/cpp-linter-${{ matrix.target }}*
+          if-no-files-found: error
+      - name: Upload clang-tools artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: clang-tools-${{ matrix.target }}
+          path: dist/clang-tools-${{ matrix.target }}*
           if-no-files-found: error
 
   publish:
-    if: startswith(github.ref, 'refs/tags')
+    if: startswith(github.ref, 'refs/tags/cpp-linter/v') || startswith(github.ref, 'refs/tags/clang-installer/v')
     runs-on: ubuntu-latest
     needs: [create-assets]
     permissions:
@@ -172,26 +200,25 @@ jobs:
           persist-credentials: false
       - name: Install Rust
         run: rustup update stable --no-self-update
-      - uses: actions/setup-python@v6
-        with:
-          python-version: 3.x
       - name: Download built assets
         uses: actions/download-artifact@v8
         with:
-          pattern: cpp-linter-*
+          pattern: ${{ startsWith(github.ref_name, 'cpp-linter') && 'cpp-linter' || 'clang-tools' }}-*
           path: dist
           merge-multiple: true
       - name: Create a Github Release
         env:
+          BIN_NAME: ${{ startsWith(github.ref_name, 'cpp-linter') && 'cpp-linter' || 'clang-tools' }}
           GH_TOKEN: ${{ github.token }}
           GIT_REF: ${{ github.ref_name }}
         run: |
-          files=$(ls dist/cpp-linter*)
-          gh release upload "$GIT_REF" $files
+          files=$(ls dist/${BIN_NAME}*)
+          gh release upload "${GIT_REF}" ${files}
       - name: Establish provenance
         id: auth
         uses: rust-lang/crates-io-auth-action@bbd81622f20ce9e2dd9622e3218b975523e45bbe # v1.0.4
       - name: Publish package
         env:
+          PKG_NAME: ${{ startsWith(github.ref_name, 'cpp-linter') && 'cpp-linter' || 'clang-installer' }}
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
-        run: cargo publish -p cpp-linter
+        run: cargo publish -p ${PKG_NAME}
