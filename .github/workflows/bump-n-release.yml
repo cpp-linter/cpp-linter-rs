@@ -11,6 +11,16 @@ on:
       - "main"
   workflow_dispatch:
     inputs:
+      package:
+        description: The package to release
+        type: choice
+        required: true
+        default: cpp-linter
+        options:
+          - cpp-linter
+          - cpp-linter-js
+          - cpp-linter-py
+          - clang-installer
       component:
         description: The version component to increase
         type: choice
@@ -37,46 +47,80 @@ jobs:
           fetch-tags: true
           persist-credentials: true # needed for `git push`
       - name: Set up Python
+        if: inputs.package == 'cpp-linter-py'
         uses: actions/setup-python@v6
         with:
           python-version: 3.x
       - name: Install Node.js
+        if: inputs.package == 'cpp-linter-js'
         uses: actions/setup-node@v6
         with:
           node-version: 24.x
       - run: yarn install
+        if: inputs.package == 'cpp-linter-js'
       - uses: cargo-bins/cargo-binstall@f8ce4d55b131f4a1e373b8747ca6b6a54133ae5a # v1.18.0
       - run: cargo binstall -y git-cliff
         env:
           GITHUB_TOKEN: ${{ github.token }}
+      - name: Install nushell
+        uses: hustcer/setup-nu@92c296ba1ba2ba04cc948ab64ddefe192dc13f0c # v3.23
       - name: Bump ${{ inputs.component }} version
         env:
           GITHUB_TOKEN: ${{ secrets.BUMP_N_RELEASE }}
           GH_TOKEN: ${{ secrets.BUMP_N_RELEASE }}
-        run: python .github/workflows/bump_version.py ${{ inputs.component }}
+        run: nu .github/workflows/bump-n-release.nu ${{ inputs.package }} ${{ inputs.component }}
         id: tagged
 
+  get-changed-pkgs:
+    if: github.event_name != 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    outputs:
+      pkgs: ${{ steps.set-pkgs.outputs.pkgs }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install nushell
+        uses: hustcer/setup-nu@92c296ba1ba2ba04cc948ab64ddefe192dc13f0c # v3.23
+      - name: Get changed packages
+        id: set-pkgs
+        shell: nu {0}
+        run: |-
+          source .github/workflows/bump-n-release.nu
+          let pkgs = get-changed-pkgs.nu
+          "pkgs=($pkgs)\n" | save --append $env.GITHUB_OUTPUT
   update-changelog:
     if: github.event_name != 'workflow_dispatch'
+    needs: get-changed-pkgs
     permissions:
       contents: read
       pull-requests: read
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        pkg: ${{ fromJSON(needs.get-changed-pkgs.outputs.pkgs) }}
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           fetch-tags: true
           persist-credentials: false
-      - uses: actions/setup-python@v6
-        with:
-          python-version: 3.x
+      - uses: cargo-bins/cargo-binstall@f8ce4d55b131f4a1e373b8747ca6b6a54133ae5a # v1.18.0
+      - run: cargo binstall -y git-cliff
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Install nushell
+        uses: hustcer/setup-nu@92c296ba1ba2ba04cc948ab64ddefe192dc13f0c # v3.23
       - name: Generate a release notes
         env:
+          PKG: ${{ matrix.pkg }}
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPO: ${{ github.repository }}
           GIT_CLIFF_CONFIG: .config/cliff.toml
-        run: >-
-          pipx run git-cliff
-          --unreleased
-          --output "$GITHUB_STEP_SUMMARY"
+        shell: nu {0}
+        run: |-
+          source .github/workflows/bump-n-release.nu
+          gen-changes $env.PKG --unreleased
+          let out = open --raw .config/ReleaseNotes.md
+          $"## ($env.PKG)\n\n($out)" | save --append $env.GITHUB_STEP_SUMMARY

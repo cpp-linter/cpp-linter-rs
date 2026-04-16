@@ -547,6 +547,8 @@ pub fn convert_extra_arg_val(args: &[String]) -> Vec<String> {
 
 #[cfg(all(test, feature = "bin"))]
 mod test {
+    #![allow(clippy::unwrap_used)]
+
     use super::{Cli, convert_extra_arg_val};
     use clap::Parser;
 

@@ -245,6 +245,8 @@ impl Default for FeedbackInput {
 
 #[cfg(test)]
 mod test {
+    #![allow(clippy::unwrap_used)]
+
     #[cfg(feature = "bin")]
     use clap::{Parser, ValueEnum};
 
@@ -264,13 +266,13 @@ mod test {
     fn display_lines_changed_only_enum() {
         let input = "Diff";
         assert_eq!(
-            LinesChangedOnly::from_str(&input, true).unwrap(),
+            LinesChangedOnly::from_str(input, true).unwrap(),
             LinesChangedOnly::Diff
         );
         assert_eq!(format!("{}", LinesChangedOnly::Diff), input.to_lowercase());
 
         assert_eq!(
-            LinesChangedOnly::from_str(&input, false).unwrap(),
+            LinesChangedOnly::from_str(input, false).unwrap(),
             LinesChangedOnly::Off
         );
     }

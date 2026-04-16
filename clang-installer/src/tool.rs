@@ -234,7 +234,7 @@ mod tests {
 
     #[test]
     fn get_exe_by_path() {
-        static TOOL_NAME: &'static str = CLANG_FORMAT.as_str();
+        static TOOL_NAME: &str = CLANG_FORMAT.as_str();
         let clang_version = which(TOOL_NAME).unwrap();
         let bin_path = clang_version.parent().unwrap().to_str().unwrap();
         println!("binary exe path: {bin_path}");

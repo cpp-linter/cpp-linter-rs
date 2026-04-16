@@ -169,6 +169,8 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
 
 #[cfg(test)]
 mod test {
+    #![allow(clippy::unwrap_used)]
+
     use super::run_main;
     use std::env;
 

@@ -369,6 +369,8 @@ pub fn run_clang_tidy(
 
 #[cfg(test)]
 mod test {
+    #![allow(clippy::unwrap_used)]
+
     use std::{
         env,
         path::PathBuf,

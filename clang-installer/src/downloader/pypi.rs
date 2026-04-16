@@ -603,7 +603,7 @@ mod test {
         }
         "#;
         let result = serde_json::from_str::<PyPiReleaseInfo>(json).unwrap_err();
-        println!("{}", result.to_string());
+        println!("{}", result);
     }
 
     #[test]
@@ -614,14 +614,14 @@ mod test {
 
         let bad_tag = "manylinux1-x86-64";
         let err = PlatformTag::from_str(bad_tag).unwrap_err();
-        println!("{}", err.to_string());
+        println!("{}", err);
     }
 
     #[test]
     fn unknown_platform_tag() {
         let bad_tag = "unknown_platform";
         let err = PlatformTag::from_str(bad_tag).unwrap_err();
-        println!("{}", err.to_string());
+        println!("{}", err);
     }
 
     #[test]
@@ -629,6 +629,6 @@ mod test {
         // should have at least 5 hyphenated segments.
         let bad_wheel_name = "clang_format-17.0.0-py3-none_manylinux_2_17_x86_64.whl";
         let err = WheelTags::from_str(bad_wheel_name).unwrap_err();
-        println!("{}", err.to_string());
+        println!("{}", err);
     }
 }

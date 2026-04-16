@@ -13,6 +13,16 @@ INTRO = """# Third-party Licenses
 
 TABLE_HEADER = "| Dependency | License |\n|:------------|:-------|\n"
 
+CPP_LINTER_DEPS = f"""## cpp-linter's dependencies
+
+{TABLE_HEADER}\
+"""
+
+CLANG_INSTALLER_DEPS = f"""## clang-installer's dependencies
+
+{TABLE_HEADER}\
+"""
+
 OPTIONAL_DEPS = f"""## Optional dependencies
 
 The following are conditionally included in binaries (using the `openssl-vendored`
@@ -82,7 +92,7 @@ class TreeGetter:
 with mkdocs_gen_files.open(FILENAME, "w") as io_doc:
     tg = TreeGetter()
     print(INTRO, file=io_doc)
-    doc = TABLE_HEADER
+    doc = CPP_LINTER_DEPS
     doc += tg.get_output()
     # print(doc)
     print(doc, file=io_doc)
@@ -93,5 +103,8 @@ with mkdocs_gen_files.open(FILENAME, "w") as io_doc:
     tg.package("cpp-linter-js")
     doc = tg.get_output()
     print(f"\n{JS_BINDING_HEADER}{doc}", file=io_doc)
+    tg.package("clang-installer")
+    doc = tg.get_output()
+    print(f"\n{CLANG_INSTALLER_DEPS}{doc}", file=io_doc)
 
 mkdocs_gen_files.set_edit_path(FILENAME, "license-gen.py")

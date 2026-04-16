@@ -50,3 +50,6 @@ clap = ["dep:clap"]
 tokio = ["dep:tokio"]
 anyhow = ["dep:anyhow"]
 colored = ["dep:colored"]
+
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/{ name }/v{ version }/{ bin }-{ target }{ archive-suffix }"

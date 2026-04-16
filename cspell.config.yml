@@ -123,6 +123,7 @@ words:
   - Werror
   - winget
   - Xianpeng
+  - yarnrc
   - zigbuild
   - zizmor
 ignorePaths:
@@ -140,3 +141,4 @@ ignorePaths:
   - .yarn/releases/*
   - "*.lock"
   - bindings/node/index.js
+  - "**/*/CHANGELOG*.md"

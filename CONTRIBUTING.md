@@ -4,7 +4,8 @@ This project requires the following tools installed:
 
 - :simple-rust: [rust](https://rustup.rs/)
 - :simple-uv: [`uv` (Python Project management tool)](https://docs.astral.sh/uv/)
-- :simple-nushell: [nushell](https://www.nushell.sh/) (for running tasks via `nur`)
+- :simple-nushell: [nur] for running tasks via [nushell](https://www.nushell.sh/)
+- :simple-yarn: [`yarn` (Node.js package management tool)](https://yarnpkg.com/)
 
 ## Getting started
 
@@ -27,13 +28,22 @@ for more detailed usage.
 > uv run pre-commit install
 > ```
 
+You can quickly run pre-commit hooks using our [nur] task as well:
+
+```sh
+nur pre-commit
+```
+
+See `nur pre-commit -h` for more detail.
+
 ## Running tests
 
 First ensure that the following cargo-managed binaries are installed:
 
 - [`cargo-llvm-cov`](https://github.com/taiki-e/cargo-llvm-cov)
 - [`cargo-nextest`](https://nexte.st/docs/installation/pre-built-binaries/)
-Use `nur` to run tests:
+
+Use [nur] to run tests:
 
 ```sh
 nur test
@@ -52,7 +62,8 @@ To generate a coverage report:
 nur test llvm-cov --open
 ```
 
-The `--open` flag is optional. It opens the built coverage report in your default browser.
+The `--open` flag is optional. It opens the built coverage report in your
+default browser.
 
 The uploaded codecov report is generated with
 
@@ -62,7 +73,7 @@ nur test lcov
 
 ## Generating docs
 
-To view the docs locally, use
+To view the docs locally, use our [nur] task:
 
 ```sh
 nur docs --open
@@ -75,3 +86,5 @@ In CI, docs are built using
 ```sh
 nur docs --build
 ```
+
+[nur]: https://nur-taskrunner.github.io/docs/
