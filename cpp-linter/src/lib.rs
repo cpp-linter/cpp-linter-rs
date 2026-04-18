@@ -10,7 +10,8 @@
 pub mod clang_tools;
 pub mod cli;
 pub mod common_fs;
+pub mod error;
 pub mod git;
 pub mod logger;
-pub mod rest_api;
+pub mod rest_client;
 pub mod run;

@@ -1,15 +1,12 @@
+#![cfg(feature = "bin")]
 mod common;
 use chrono::Utc;
 use common::{create_test_space, mock_server};
+use git_bot_feedback::{FileFilter, LinesChangedOnly};
 use mockito::Matcher;
 use tempfile::{NamedTempFile, TempDir};
 
-use cpp_linter::{
-    cli::LinesChangedOnly,
-    common_fs::FileFilter,
-    logger,
-    rest_api::{RestApiClient, github::GithubApiClient},
-};
+use cpp_linter::{logger, rest_client::RestClient};
 use std::{env, io::Write, path::Path};
 
 #[derive(PartialEq, Default)]
@@ -31,7 +28,6 @@ const REPO: &str = "cpp-linter/test-cpp-linter-action";
 const SHA: &str = "DEADBEEF";
 const PR: u8 = 42;
 const TOKEN: &str = "123456";
-const EVENT_PAYLOAD: &str = r#"{"number": 42}"#;
 const RESET_RATE_LIMIT_HEADER: &str = "x-ratelimit-reset";
 const REMAINING_RATE_LIMIT_HEADER: &str = "x-ratelimit-remaining";
 const MALFORMED_RESPONSE_PAYLOAD: &str = "{\"message\":\"Resource not accessible by integration\"}";
@@ -41,6 +37,7 @@ async fn get_paginated_changes(lib_root: &Path, test_params: &TestParams) {
     let mut event_payload = NamedTempFile::new_in(tmp.path())
         .expect("Failed to spawn a tmp file for test event payload");
     unsafe {
+        env::set_var("GITHUB_ACTIONS", "true");
         env::set_var("GITHUB_REPOSITORY", REPO);
         env::set_var("GITHUB_SHA", SHA);
         env::set_var("GITHUB_TOKEN", TOKEN);
@@ -66,8 +63,17 @@ async fn get_paginated_changes(lib_root: &Path, test_params: &TestParams) {
         && !test_params.fail_serde_event_payload
         && !test_params.no_event_payload
     {
+        let payload = serde_json::json!({
+            "pull_request": {
+                "draft": false,
+                "state": "open",
+                "number": PR,
+                "locked": false,
+            }
+        })
+        .to_string();
         event_payload
-            .write_all(EVENT_PAYLOAD.as_bytes())
+            .write_all(payload.as_bytes())
             .expect("Failed to write data to test event payload file")
     }
 
@@ -81,7 +87,7 @@ async fn get_paginated_changes(lib_root: &Path, test_params: &TestParams) {
     env::set_current_dir(tmp.path()).unwrap();
     logger::try_init();
     log::set_max_level(log::LevelFilter::Debug);
-    let gh_client = GithubApiClient::new();
+    let gh_client = RestClient::new();
     if test_params.fail_serde_event_payload || test_params.no_event_payload {
         assert!(gh_client.is_err());
         return;
@@ -96,16 +102,6 @@ async fn get_paginated_changes(lib_root: &Path, test_params: &TestParams) {
         } else {
             format!("commits/{SHA}")
         }
-    );
-    mocks.push(
-        server
-            .mock("GET", diff_end_point.as_str())
-            .match_header("Accept", "application/vnd.github.diff")
-            .match_header("Authorization", format!("token {TOKEN}").as_str())
-            .with_header(REMAINING_RATE_LIMIT_HEADER, "50")
-            .with_header(RESET_RATE_LIMIT_HEADER, reset_timestamp.as_str())
-            .with_status(403)
-            .create(),
     );
     let pg_end_point = if test_params.event_t == EventType::Push {
         diff_end_point.clone()
@@ -142,9 +138,9 @@ async fn get_paginated_changes(lib_root: &Path, test_params: &TestParams) {
         mocks.push(mock.create());
     }
 
-    let file_filter = FileFilter::new(&[], vec!["cpp".to_string(), "hpp".to_string()]);
+    let file_filter = FileFilter::new(&[], &["cpp", "hpp"], None);
     let files = client
-        .get_list_of_changed_files(&file_filter, &LinesChangedOnly::Off, &None::<u8>, false)
+        .get_list_of_changed_files(&file_filter, &LinesChangedOnly::Off, &None::<String>, false)
         .await;
     match files {
         Err(e) => {

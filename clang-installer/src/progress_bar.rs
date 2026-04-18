@@ -59,7 +59,7 @@ impl ProgressBar {
             steps: 0,
             stdout_handle,
             is_interactive,
-            prompt: prompt.to_string(),
+            prompt: prompt.trim().to_string(),
         }
     }
 

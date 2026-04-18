@@ -5,7 +5,9 @@ use clap::{ValueEnum, builder::PossibleValue};
 
 #[cfg(feature = "bin")]
 use super::Cli;
-use crate::{clang_tools::clang_tidy::CompilationUnit, common_fs::FileFilter};
+use crate::clang_tools::clang_tidy::CompilationUnit;
+
+use git_bot_feedback::FileFilter;
 
 /// An enum to describe `--lines-changed-only` CLI option's behavior.
 #[derive(PartialEq, Clone, Debug, Default)]
@@ -17,6 +19,16 @@ pub enum LinesChangedOnly {
     Diff,
     /// Only lines in the diff with additions are scanned.
     On,
+}
+
+impl From<LinesChangedOnly> for git_bot_feedback::LinesChangedOnly {
+    fn from(val: LinesChangedOnly) -> Self {
+        match val {
+            LinesChangedOnly::Off => git_bot_feedback::LinesChangedOnly::Off,
+            LinesChangedOnly::Diff => git_bot_feedback::LinesChangedOnly::Diff,
+            LinesChangedOnly::On => git_bot_feedback::LinesChangedOnly::On,
+        }
+    }
 }
 
 #[cfg(feature = "bin")]
@@ -172,6 +184,24 @@ pub struct ClangParams {
 impl From<&Cli> for ClangParams {
     /// Construct a [`ClangParams`] instance from a [`Cli`] instance.
     fn from(args: &Cli) -> Self {
+        let extensions: Vec<&str> = args
+            .source_options
+            .extensions
+            .iter()
+            .map(|ext| ext.as_str())
+            .collect();
+        let tidy_filter = args.tidy_options.ignore_tidy.as_ref().map(|ignore_tidy| {
+            let ignore_tidy: Vec<&str> = ignore_tidy.iter().map(|s| s.as_str()).collect();
+            FileFilter::new(&ignore_tidy, &extensions.clone(), Some("clang-tidy"))
+        });
+        let format_filter = args
+            .format_options
+            .ignore_format
+            .as_ref()
+            .map(|ignore_format| {
+                let ignore_format: Vec<&str> = ignore_format.iter().map(|s| s.as_str()).collect();
+                FileFilter::new(&ignore_format, &extensions, Some("clang-format"))
+            });
         ClangParams {
             tidy_checks: args.tidy_options.tidy_checks.clone(),
             lines_changed_only: args.source_options.lines_changed_only.clone(),
@@ -181,16 +211,8 @@ impl From<&Cli> for ClangParams {
             style: args.format_options.style.clone(),
             clang_tidy_command: None,
             clang_format_command: None,
-            tidy_filter: args.tidy_options.ignore_tidy.as_ref().map(|ignore_tidy| {
-                FileFilter::new(ignore_tidy, args.source_options.extensions.clone())
-            }),
-            format_filter: args
-                .format_options
-                .ignore_format
-                .as_ref()
-                .map(|ignore_format| {
-                    FileFilter::new(ignore_format, args.source_options.extensions.clone())
-                }),
+            tidy_filter,
+            format_filter,
             tidy_review: args.feedback_options.tidy_review,
             format_review: args.feedback_options.format_review,
         }
@@ -243,17 +265,15 @@ impl Default for FeedbackInput {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "bin"))]
 mod test {
     #![allow(clippy::unwrap_used)]
 
-    #[cfg(feature = "bin")]
     use clap::{Parser, ValueEnum};
 
     use super::{Cli, LinesChangedOnly, ThreadComments};
 
     #[test]
-    #[cfg(feature = "bin")]
     fn parse_positional() {
         let cli = Cli::parse_from(["cpp-linter", "file1.c", "file2.h"]);
         let not_ignored = cli.not_ignored.expect("failed to parse positional args");
