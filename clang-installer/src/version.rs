@@ -56,7 +56,7 @@ pub enum GetToolError {
     ExecutablePathNoParent,
 
     /// Failed to capture the clang version from `--version` output.
-    #[error("Failed to capture the clang version from `--version` output: {0}")]
+    #[error(transparent)]
     GetClangVersion(#[from] GetClangVersionError),
 
     /// Failed to get the clang executable path.
@@ -299,7 +299,7 @@ mod tests {
         // for this test we should use the oldest supported clang version
         // because that would be most likely to require downloading.
         let version_req =
-            VersionReq::parse(option_env!("MIN_CLANG_TOOLS_VERSION").unwrap_or("11")).unwrap();
+            VersionReq::parse(option_env!("MIN_CLANG_TOOLS_VERSION").unwrap_or("16")).unwrap();
         let downloaded_clang = RequestedVersion::Requirement(version_req.clone())
             .eval_tool(&tool, false, Some(&PathBuf::from(tmp_cache_dir.path())))
             .await

@@ -1,11 +1,11 @@
+#![cfg(feature = "bin")]
 use chrono::Utc;
 use cpp_linter::{
-    cli::LinesChangedOnly,
-    rest_api::{COMMENT_MARKER, USER_OUTREACH},
+    rest_client::{COMMENT_MARKER, USER_OUTREACH},
     run::run_main,
 };
+use git_bot_feedback::LinesChangedOnly;
 use mockito::Matcher;
-use serde_json::json;
 use std::{env, io::Write, path::Path};
 use tempfile::NamedTempFile;
 
@@ -17,7 +17,6 @@ const REPO: &str = "cpp-linter/test-cpp-linter-action";
 const PR: i64 = 27;
 const TOKEN: &str = "123456";
 const MOCK_ASSETS_PATH: &str = "tests/reviews_test_assets/";
-const EVENT_PAYLOAD: &str = "{\"number\": 27}";
 
 const RESET_RATE_LIMIT_HEADER: &str = "x-ratelimit-reset";
 const REMAINING_RATE_LIMIT_HEADER: &str = "x-ratelimit-remaining";
@@ -73,11 +72,22 @@ fn generate_tool_summary(review_enabled: bool, force_lgtm: bool, tool_name: &str
 
 async fn setup(lib_root: &Path, test_params: &TestParams) {
     let mut event_payload_path = NamedTempFile::new_in("./").unwrap();
+    let event_payload = serde_json::json!({
+        "pull_request": {
+            "draft": test_params.pr_draft,
+            "state": test_params.pr_state,
+            "number": PR,
+            "locked": false,
+        }
+    })
+    .to_string();
     event_payload_path
-        .write_all(EVENT_PAYLOAD.as_bytes())
+        .write_all(event_payload.as_bytes())
         .expect("Failed to create mock event payload.");
+    let tmp_out = NamedTempFile::new().unwrap();
     unsafe {
-        env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
+        env::set_var("GITHUB_ACTIONS", "true");
+        env::set_var("GITHUB_OUTPUT", tmp_out.path());
         env::set_var("GITHUB_EVENT_NAME", "pull_request");
         env::set_var("GITHUB_REPOSITORY", REPO);
         env::set_var("GITHUB_SHA", SHA);
@@ -101,24 +111,11 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
     let pr_endpoint = format!("/repos/{REPO}/pulls/{PR}");
     mocks.push(
         server
-            .mock("GET", pr_endpoint.as_str())
-            .match_header("Accept", "application/vnd.github.diff")
-            .match_header("Authorization", format!("token {TOKEN}").as_str())
-            .with_body_from_file(format!("{asset_path}pr_{PR}.diff"))
-            .with_header(REMAINING_RATE_LIMIT_HEADER, "50")
-            .with_header(RESET_RATE_LIMIT_HEADER, reset_timestamp.as_str())
-            .create(),
-    );
-    mocks.push(
-        server
-            .mock("GET", pr_endpoint.as_str())
+            .mock("GET", format!("{pr_endpoint}/files").as_str())
             .match_header("Accept", "application/vnd.github.raw+json")
             .match_header("Authorization", format!("token {TOKEN}").as_str())
-            .with_body(if test_params.bad_pr_info {
-                String::new()
-            } else {
-                json!({"state": test_params.pr_state, "draft": test_params.pr_draft}).to_string()
-            })
+            .match_query(Matcher::Any)
+            .with_body_from_file(format!("{asset_path}pr_27.json"))
             .with_header(REMAINING_RATE_LIMIT_HEADER, "50")
             .with_header(RESET_RATE_LIMIT_HEADER, reset_timestamp.as_str())
             .create(),
@@ -126,35 +123,40 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
 
     let reviews_endpoint = format!("/repos/{REPO}/pulls/{PR}/reviews");
 
-    let mut mock = server
-        .mock("GET", reviews_endpoint.as_str())
-        .match_header("Accept", "application/vnd.github.raw+json")
-        .match_header("Authorization", format!("token {TOKEN}").as_str())
-        .match_body(Matcher::Any)
-        .match_query(Matcher::UrlEncoded("page".to_string(), "1".to_string()))
-        .with_header(REMAINING_RATE_LIMIT_HEADER, "50")
-        .with_header(RESET_RATE_LIMIT_HEADER, reset_timestamp.as_str())
-        .with_status(if test_params.fail_get_existing_reviews {
-            403
+    if test_params.pr_state != "closed" {
+        let mut mock = server
+            .mock("GET", reviews_endpoint.as_str())
+            .match_header("Accept", "application/vnd.github.raw+json")
+            .match_header("Authorization", format!("token {TOKEN}").as_str())
+            .match_body(Matcher::Any)
+            .match_query(Matcher::UrlEncoded("page".to_string(), "1".to_string()))
+            .with_header(REMAINING_RATE_LIMIT_HEADER, "50")
+            .with_header(RESET_RATE_LIMIT_HEADER, reset_timestamp.as_str())
+            .with_status(if test_params.fail_get_existing_reviews {
+                403
+            } else {
+                200
+            });
+        if test_params.bad_existing_reviews {
+            mock = mock.with_body(String::new()).create();
         } else {
-            200
-        });
-    if test_params.bad_existing_reviews {
-        mock = mock.with_body(String::new()).create();
-    } else {
-        mock = mock
-            .with_body_from_file(format!("{asset_path}pr_reviews.json"))
-            .create()
+            mock = mock
+                .with_body_from_file(format!("{asset_path}pr_reviews.json"))
+                .create()
+        }
+        mocks.push(mock);
     }
-    mocks.push(mock);
-    if !test_params.fail_get_existing_reviews && !test_params.bad_existing_reviews {
+    if !test_params.fail_get_existing_reviews
+        && !test_params.bad_existing_reviews
+        && test_params.pr_state != "closed"
+    {
         mocks.push(
             server
                 .mock(
                     "PUT",
                     format!("{reviews_endpoint}/1807607546/dismissals").as_str(),
                 )
-                .match_body(r#"{"event":"DISMISS","message":"outdated suggestion"}"#)
+                .match_body(r#"{"event":"DISMISS","message":"outdated review"}"#)
                 .match_header("Authorization", format!("token {TOKEN}").as_str())
                 .with_header(REMAINING_RATE_LIMIT_HEADER, "50")
                 .with_header(RESET_RATE_LIMIT_HEADER, reset_timestamp.as_str())
@@ -243,8 +245,18 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
     } else {
         args.push("--style=file".to_string()); // use .clang-format file
     }
-    let result = run_main(args).await;
-    assert!(result.is_ok());
+    match run_main(args).await {
+        Ok(_) => {
+            if test_params.bad_existing_reviews {
+                panic!("Expected failure, but it succeeded");
+            }
+        }
+        Err(e) => {
+            if !test_params.bad_existing_reviews {
+                panic!("Failed unexpectedly: {e:?}");
+            }
+        }
+    }
     for mock in mocks {
         mock.assert();
     }

@@ -68,12 +68,10 @@ pub fn summarize_style(style: &str) -> String {
 }
 
 /// Get a total count of clang-format advice from the given list of [FileObj]s.
-pub fn tally_format_advice(files: &[Arc<Mutex<FileObj>>]) -> Result<u64> {
+pub fn tally_format_advice(files: &[Arc<Mutex<FileObj>>]) -> Result<u64, String> {
     let mut total = 0;
     for file in files {
-        let file = file
-            .lock()
-            .map_err(|_| anyhow!("Failed to acquire lock on mutex for a source file"))?;
+        let file = file.lock().map_err(|e| e.to_string())?;
         if let Some(advice) = &file.format_advice
             && !advice.replacements.is_empty()
         {

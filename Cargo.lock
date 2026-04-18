@@ -99,6 +99,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-trait"
+version = "0.1.89"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9035ad2d096bed7955a320ee7e2230574d28fd3c3a0f186cbea1ff3c7eed5dbb"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "atomic-waker"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -365,12 +376,14 @@ name = "cpp-linter"
 version = "2.0.0-rc15"
 dependencies = [
  "anyhow",
+ "async-trait",
  "chrono",
  "clang-installer",
  "clap",
  "colored",
  "fast-glob",
  "futures",
+ "git-bot-feedback",
  "git2",
  "log",
  "mockito",
@@ -747,6 +760,25 @@ dependencies = [
  "r-efi 6.0.0",
  "wasip2",
  "wasip3",
+]
+
+[[package]]
+name = "git-bot-feedback"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2dde52ca9dc5b3d9227c79b910a804036f0599a563767015683d9b3fa6842874"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "fast-glob",
+ "log",
+ "regex",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "url",
 ]
 
 [[package]]

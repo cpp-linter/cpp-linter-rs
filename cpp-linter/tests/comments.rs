@@ -1,6 +1,8 @@
+#![cfg(feature = "bin")]
 use chrono::Utc;
-use cpp_linter::cli::{LinesChangedOnly, ThreadComments};
+use cpp_linter::cli::ThreadComments;
 use cpp_linter::run::run_main;
+use git_bot_feedback::LinesChangedOnly;
 use mockito::Matcher;
 use std::{env, fmt::Display, io::Write, path::Path};
 use tempfile::NamedTempFile;
@@ -8,12 +10,11 @@ use tempfile::NamedTempFile;
 mod common;
 use common::{create_test_space, mock_server};
 
-const SHA: &str = "8d68756375e0483c7ac2b4d6bbbece420dbbb495";
+const SHA: &str = "01e2ebf010b949986fa3e6d6e81e7f7c8da90001";
 const REPO: &str = "cpp-linter/test-cpp-linter-action";
-const PR: i64 = 22;
+const PR: i64 = 42;
 const TOKEN: &str = "123456";
 const MOCK_ASSETS_PATH: &str = "tests/comment_test_assets/";
-const EVENT_PAYLOAD: &str = "{\"number\": 22}";
 
 const RESET_RATE_LIMIT_HEADER: &str = "x-ratelimit-reset";
 const REMAINING_RATE_LIMIT_HEADER: &str = "x-ratelimit-remaining";
@@ -63,19 +64,30 @@ impl Default for TestParams {
 
 async fn setup(lib_root: &Path, test_params: &TestParams) {
     let mut event_payload_path = NamedTempFile::new_in("./").unwrap();
+    let tmp_out_file = NamedTempFile::new().unwrap();
     unsafe {
+        env::set_var("GITHUB_ACTIONS", "true");
         env::set_var(
             "GITHUB_EVENT_NAME",
             test_params.event_t.to_string().as_str(),
         );
-        env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
+        env::set_var("GITHUB_OUTPUT", tmp_out_file.path());
         env::set_var("GITHUB_REPOSITORY", REPO);
         env::set_var("GITHUB_SHA", SHA);
         env::set_var("GITHUB_TOKEN", TOKEN);
         env::set_var("CI", "true");
         if test_params.event_t == EventType::PullRequest {
+            let event_payload = serde_json::json!({
+                "pull_request": {
+                    "draft": false,
+                    "state": "open",
+                    "number": PR,
+                    "locked": false,
+                }
+            })
+            .to_string();
             event_payload_path
-                .write_all(EVENT_PAYLOAD.as_bytes())
+                .write_all(event_payload.as_bytes())
                 .expect("Failed to create mock event payload.");
             env::set_var("GITHUB_EVENT_PATH", event_payload_path.path());
         }
@@ -91,17 +103,18 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
     let mut mocks = vec![];
 
     if test_params.lines_changed_only != LinesChangedOnly::Off {
-        let diff_end_point = if test_params.event_t == EventType::PullRequest {
-            format!("pulls/{PR}")
+        let (asset_prefix, diff_end_point) = if test_params.event_t == EventType::PullRequest {
+            ("pr".to_string(), format!("pulls/{PR}/files"))
         } else {
-            format!("commits/{SHA}")
+            ("push".to_string(), format!("commits/{SHA}"))
         };
         mocks.push(
             server
                 .mock("GET", format!("/repos/{REPO}/{diff_end_point}").as_str())
-                .match_header("Accept", "application/vnd.github.diff")
+                .match_header("Accept", "application/vnd.github.raw+json")
                 .match_header("Authorization", format!("token {TOKEN}").as_str())
-                .with_body_from_file(format!("{asset_path}patch.diff"))
+                .match_query(Matcher::Any)
+                .with_body_from_file(format!("{asset_path}{asset_prefix}_diff.json"))
                 .with_header(REMAINING_RATE_LIMIT_HEADER, "50")
                 .with_header(RESET_RATE_LIMIT_HEADER, reset_timestamp.as_str())
                 .create(),
@@ -127,7 +140,7 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
         if test_params.bad_existing_comments {
             mock = mock.with_body(String::new());
         } else {
-            mock = mock.with_body_from_file(format!("{asset_path}push_comments_{SHA}.json"));
+            mock = mock.with_body_from_file(format!("{asset_path}push_comments.json"));
         }
         mock = mock.create();
         mocks.push(mock);
@@ -232,7 +245,7 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
     let mut args = vec![
         "cpp-linter".to_string(),
         "-v=debug".to_string(),
-        format!("-V={}", env::var("CLANG_VERSION").unwrap_or("".to_string())),
+        format!("-V={}", env::var("CLANG_VERSION").unwrap_or_default()),
         format!("-l={}", test_params.lines_changed_only),
         "--ignore-tidy=src/some source.c".to_string(),
         "--ignore-format=src/some source.c".to_string(),
@@ -244,7 +257,19 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
     if test_params.force_lgtm {
         args.push("-e=c".to_string());
     }
-    run_main(args).await.unwrap();
+    let result = run_main(args).await;
+    match result {
+        Ok(_) => {
+            if test_params.bad_existing_comments {
+                panic!("Expected failure but got success");
+            }
+        }
+        Err(e) => {
+            if !test_params.bad_existing_comments {
+                panic!("Expected success but got failure: {e}");
+            }
+        }
+    }
     for mock in mocks {
         mock.assert();
     }
