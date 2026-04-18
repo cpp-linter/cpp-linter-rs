@@ -1,1 +1,0 @@
-This file is here for completeness when testing file filters.

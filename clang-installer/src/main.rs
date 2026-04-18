@@ -132,7 +132,6 @@ pub struct CliOptions {
 async fn main() -> Result<()> {
     logging::initialize_logger();
     let options = CliOptions::parse();
-    log::debug!("{:?}", options);
 
     let tool = options
         .tool
