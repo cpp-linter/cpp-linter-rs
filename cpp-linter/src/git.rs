@@ -15,10 +15,8 @@ use anyhow::{Context, Result};
 use git2::{Diff, Error, Patch, Repository};
 
 // project specific modules/crates
-use crate::{
-    cli::LinesChangedOnly,
-    common_fs::{FileFilter, FileObj},
-};
+use crate::{cli::LinesChangedOnly, common_fs::FileObj};
+use git_bot_feedback::{FileFilter, error::DiffError};
 
 /// This (re-)initializes the repository located in the specified `path`.
 ///
@@ -174,7 +172,7 @@ pub fn parse_diff(
         if matches!(
             diff_delta.status(),
             git2::Delta::Added | git2::Delta::Modified | git2::Delta::Renamed,
-        ) && file_filter.is_source_or_ignored(&file_path)
+        ) && file_filter.is_qualified(&file_path)
         {
             let (added_lines, diff_chunks) =
                 parse_patch(&Patch::from_diff(diff, file_idx).unwrap().unwrap());
@@ -198,246 +196,30 @@ pub fn parse_diff_from_buf(
     buff: &[u8],
     file_filter: &FileFilter,
     lines_changed_only: &LinesChangedOnly,
-) -> Vec<FileObj> {
+) -> Result<Vec<FileObj>, DiffError> {
     if let Ok(diff_obj) = &Diff::from_buffer(buff) {
-        parse_diff(diff_obj, file_filter, lines_changed_only)
+        Ok(parse_diff(diff_obj, file_filter, lines_changed_only))
     } else {
         log::warn!("libgit2 failed to parse the diff");
-        brute_force_parse_diff::parse_diff(
+        Ok(git_bot_feedback::parse_diff(
             &String::from_utf8_lossy(buff),
             file_filter,
-            lines_changed_only,
-        )
-    }
-}
-
-mod brute_force_parse_diff {
-    //! A private module to house the brute force algorithms of parsing a diff as a string.
-    //! This module is only intended as a fall back mechanism when [super::parse_diff_from_buf]
-    //! fails to use libgit2 C bindings.
-    //!
-    //! Since this is a fail safe, there are log messages that indicate when it is used.
-    //! Any instance where this mechanism is used should be reported as it is likely a bug
-    //! in libgit2 source.
-
-    use regex::Regex;
-    use std::{ops::RangeInclusive, path::PathBuf};
-
-    use crate::{
-        cli::LinesChangedOnly,
-        common_fs::{FileFilter, FileObj},
-    };
-
-    fn get_filename_from_front_matter(front_matter: &str) -> Option<&str> {
-        let diff_file_name = Regex::new(r"(?m)^\+\+\+\sb?/(.*)$").unwrap();
-        let diff_renamed_file = Regex::new(r"(?m)^rename to (.*)$").unwrap();
-        let diff_binary_file = Regex::new(r"(?m)^Binary\sfiles\s").unwrap();
-        if let Some(captures) = diff_file_name.captures(front_matter) {
-            return Some(captures.get(1).unwrap().as_str());
-        }
-        if front_matter.trim_start().starts_with("similarity")
-            && let Some(captures) = diff_renamed_file.captures(front_matter)
-        {
-            return Some(captures.get(1).unwrap().as_str());
-        }
-        if !diff_binary_file.is_match(front_matter) {
-            log::warn!("Unrecognized diff starting with:\n{}", front_matter);
-        }
-        None
-    }
-
-    /// A regex pattern used in multiple functions
-    static HUNK_INFO_PATTERN: &str = r"(?m)@@\s\-\d+,\d+\s\+(\d+,\d+)\s@@";
-
-    /// Parses a single file's patch containing one or more hunks
-    /// Returns a 3-item tuple:
-    /// - the line numbers that contain additions
-    /// - the ranges of lines that span each hunk
-    fn parse_patch(patch: &str) -> (Vec<u32>, Vec<RangeInclusive<u32>>) {
-        let mut diff_chunks = Vec::new();
-        let mut additions = Vec::new();
-
-        let hunk_info = Regex::new(HUNK_INFO_PATTERN).unwrap();
-        if let Some(hunk_headers) = hunk_info.captures(patch) {
-            for (index, (hunk, header)) in
-                hunk_info.split(patch).zip(hunk_headers.iter()).enumerate()
-            {
-                if index == 0 {
-                    continue; // we don't need the whole match, just the capture groups
-                }
-                let new_range: Vec<u32> = header
-                    .unwrap()
-                    .as_str()
-                    .split(',')
-                    .take(2)
-                    .map(|val| val.parse::<u32>().unwrap())
-                    .collect();
-                let start_line = new_range[0];
-                let end_range = new_range[1];
-                let mut line_numb_in_diff = start_line;
-                diff_chunks.push(RangeInclusive::new(start_line, start_line + end_range));
-                for (line_index, line) in hunk.split('\n').enumerate() {
-                    if line.starts_with('+') {
-                        additions.push(line_numb_in_diff);
-                    }
-                    if line_index > 0 && !line.starts_with('-') {
-                        line_numb_in_diff += 1;
-                    }
-                }
-            }
-        }
-        (additions, diff_chunks)
-    }
-
-    pub fn parse_diff(
-        diff: &str,
-        file_filter: &FileFilter,
-        lines_changed_only: &LinesChangedOnly,
-    ) -> Vec<FileObj> {
-        log::error!("Using brute force diff parsing!");
-        let mut results = Vec::new();
-        let diff_file_delimiter = Regex::new(r"(?m)^diff --git a/.*$").unwrap();
-        let hunk_info = Regex::new(HUNK_INFO_PATTERN).unwrap();
-
-        let file_diffs = diff_file_delimiter.split(diff);
-        for file_diff in file_diffs {
-            if file_diff.is_empty() || file_diff.starts_with("deleted file") {
-                continue;
-            }
-            let hunk_start = if let Some(first_hunk) = hunk_info.find(file_diff) {
-                first_hunk.start()
-            } else {
-                file_diff.len()
-            };
-            let front_matter = &file_diff[..hunk_start];
-            if let Some(file_name) = get_filename_from_front_matter(front_matter) {
-                let file_path = PathBuf::from(file_name);
-                if file_filter.is_source_or_ignored(&file_path) {
-                    let (added_lines, diff_chunks) = parse_patch(&file_diff[hunk_start..]);
-                    if lines_changed_only
-                        .is_change_valid(!added_lines.is_empty(), !diff_chunks.is_empty())
-                    {
-                        results.push(FileObj::from(file_path, added_lines, diff_chunks));
-                    }
-                }
-            }
-            // } else {
-            //     // file has no changed content. moving on
-            //     continue;
-            // }
-        }
-        results
-    }
-
-    // ******************* UNIT TESTS ***********************
-    #[cfg(test)]
-    mod test {
-
-        use super::parse_diff;
-        use crate::{
-            cli::LinesChangedOnly,
-            common_fs::{FileFilter, FileObj},
-            git::parse_diff_from_buf,
-        };
-
-        static RENAMED_DIFF: &str = r#"diff --git a/tests/demo/some source.cpp b/tests/demo/some source.c
-similarity index 100%
-rename from /tests/demo/some source.cpp
-rename to /tests/demo/some source.c
-diff --git a/some picture.png b/some picture.png
-new file mode 100644
-Binary files /dev/null and b/some picture.png differ
-"#;
-
-        static RENAMED_DIFF_WITH_CHANGES: &str = r#"diff --git a/tests/demo/some source.cpp b/tests/demo/some source.c
-similarity index 99%
-rename from /tests/demo/some source.cpp
-rename to /tests/demo/some source.c
-@@ -3,7 +3,7 @@
-\n \n \n-#include "iomanip"
-+#include <cstdlib>\n \n \n \n"#;
-
-        #[test]
-        fn parse_renamed_diff() {
-            let diff_buf = RENAMED_DIFF.as_bytes();
-            let files = parse_diff_from_buf(
-                diff_buf,
-                &FileFilter::new(&["target".to_string()], vec!["c".to_string()]),
-                &LinesChangedOnly::Off,
-            );
-            assert!(!files.is_empty());
-            assert!(
-                files
-                    .first()
-                    .unwrap()
-                    .name
-                    .ends_with("tests/demo/some source.c")
-            );
-        }
-
-        #[test]
-        fn parse_renamed_diff_with_patch() {
-            let diff_buf = RENAMED_DIFF_WITH_CHANGES.as_bytes();
-            let files = parse_diff_from_buf(
-                diff_buf,
-                &FileFilter::new(&["target".to_string()], vec!["c".to_string()]),
-                &LinesChangedOnly::Off,
-            );
-            assert!(!files.is_empty());
-        }
-
-        /// Used to parse the same string buffer using both libgit2 and brute force regex.
-        /// Returns 2 vectors of [FileObj] that should be equivalent.
-        fn setup_parsed(buf: &str, extensions: &[String]) -> (Vec<FileObj>, Vec<FileObj>) {
-            let ignore = ["target".to_string()];
-            (
-                parse_diff_from_buf(
-                    buf.as_bytes(),
-                    &FileFilter::new(&ignore, extensions.to_owned()),
-                    &LinesChangedOnly::Off,
-                ),
-                parse_diff(
-                    buf,
-                    &FileFilter::new(&ignore, extensions.to_owned()),
-                    &LinesChangedOnly::Off,
-                ),
+            &lines_changed_only.clone().into(),
+        )?
+        .iter()
+        .map(|(name, diff_lines)| {
+            let diff_chunks = diff_lines
+                .diff_hunks
+                .iter()
+                .map(|hunk| hunk.start..=hunk.end)
+                .collect();
+            FileObj::from(
+                PathBuf::from(&name),
+                diff_lines.added_lines.clone(),
+                diff_chunks,
             )
-        }
-
-        fn assert_files_eq(files_from_a: &[FileObj], files_from_b: &[FileObj]) {
-            assert_eq!(files_from_a.len(), files_from_b.len());
-            for (a, b) in files_from_a.iter().zip(files_from_b) {
-                assert_eq!(a.name, b.name);
-                assert_eq!(a.added_lines, b.added_lines);
-                assert_eq!(a.added_ranges, b.added_ranges);
-                assert_eq!(a.diff_chunks, b.diff_chunks);
-            }
-        }
-
-        #[test]
-        fn parse_typical_diff() {
-            let diff_buf = "diff --git a/path/for/Some file.cpp b/path/to/Some file.cpp\n\
-                            --- a/path/for/Some file.cpp\n\
-                            +++ b/path/to/Some file.cpp\n\
-                            @@ -3,7 +3,7 @@\n \n \n \n\
-                            -#include <some_lib/render/animation.hpp>\n\
-                            +#include <some_lib/render/animations.hpp>\n \n \n \n";
-
-            let (files_from_buf, files_from_str) = setup_parsed(diff_buf, &[String::from("cpp")]);
-            assert!(!files_from_buf.is_empty());
-            assert_files_eq(&files_from_buf, &files_from_str);
-        }
-
-        #[test]
-        fn parse_binary_diff() {
-            let diff_buf = "diff --git a/some picture.png b/some picture.png\n\
-                new file mode 100644\n\
-                Binary files /dev/null and b/some picture.png differ\n";
-
-            let (files_from_buf, files_from_str) = setup_parsed(diff_buf, &[String::from("png")]);
-            assert!(files_from_buf.is_empty());
-            assert_files_eq(&files_from_buf, &files_from_str);
-        }
+        })
+        .collect())
     }
 }
 
@@ -452,11 +234,8 @@ mod test {
     use tempfile::{TempDir, tempdir};
 
     use super::get_sha;
-    use crate::{
-        cli::LinesChangedOnly,
-        common_fs::FileFilter,
-        rest_api::{RestApiClient, github::GithubApiClient},
-    };
+    use crate::{cli::LinesChangedOnly, rest_client::RestClient};
+    use git_bot_feedback::FileFilter;
 
     const TEST_REPO_URL: &str = "https://github.com/cpp-linter/cpp-linter";
 
@@ -502,19 +281,28 @@ mod test {
             tmp.path().as_os_str().to_str().unwrap(),
             patch_path,
         );
-        let rest_api_client = GithubApiClient::new();
-        let file_filter = FileFilter::new(&["target".to_string()], extensions.to_owned());
-        set_current_dir(tmp).unwrap();
         // avoid use of REST API when testing in CI
         unsafe {
+            env::set_var("GITHUB_ACTIONS", "false");
             env::set_var("CI", "false");
         }
+        let rest_api_client = RestClient::new().unwrap();
+        let file_filter = FileFilter::new(
+            &["target"],
+            &extensions.iter().map(|s| s.as_str()).collect::<Vec<&str>>(),
+            None,
+        );
+        set_current_dir(tmp).unwrap();
+        let base_diff = if ignore_staged {
+            Some("0".to_string())
+        } else {
+            None::<String>
+        };
         rest_api_client
-            .unwrap()
             .get_list_of_changed_files(
                 &file_filter,
-                &LinesChangedOnly::Off,
-                if ignore_staged { &Some(0) } else { &None::<u8> },
+                &LinesChangedOnly::Off.into(),
+                &base_diff,
                 ignore_staged,
             )
             .await

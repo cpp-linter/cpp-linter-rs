@@ -1,18 +1,20 @@
 //! A module to hold all common file system functionality.
 
-use std::fmt::Debug;
-use std::fs;
-use std::path::Path;
-use std::{ops::RangeInclusive, path::PathBuf};
+use std::{
+    fmt::Debug,
+    fs,
+    ops::RangeInclusive,
+    path::{Path, PathBuf},
+};
 
-use anyhow::{Context, Result};
-
-use crate::clang_tools::clang_format::FormatAdvice;
-use crate::clang_tools::clang_tidy::TidyAdvice;
-use crate::clang_tools::{MakeSuggestions, ReviewComments, Suggestion, make_patch};
-use crate::cli::LinesChangedOnly;
-mod file_filter;
-pub use file_filter::FileFilter;
+use crate::{
+    clang_tools::{
+        MakeSuggestions, ReviewComments, Suggestion, clang_format::FormatAdvice,
+        clang_tidy::TidyAdvice, make_patch,
+    },
+    cli::LinesChangedOnly,
+    error::FileObjError,
+};
 use git2::DiffHunk;
 
 /// A structure to represent a file's path and line changes.
@@ -142,21 +144,22 @@ impl FileObj {
         &self,
         review_comments: &mut ReviewComments,
         summary_only: bool,
-    ) -> Result<()> {
-        let original_content =
-            fs::read(&self.name).with_context(|| "Failed to read original contents of file")?;
+    ) -> Result<(), FileObjError> {
+        let original_content = fs::read(&self.name).map_err(FileObjError::ReadFile)?;
         let file_name = self.name.to_str().unwrap_or_default().replace("\\", "/");
         let file_path = Path::new(&file_name);
         if let Some(advice) = &self.format_advice
             && let Some(patched) = &advice.patched
         {
-            let mut patch = make_patch(file_path, patched, &original_content)?;
+            let mut patch = make_patch(file_path, patched, &original_content)
+                .map_err(|e| FileObjError::MakePatchFailed(file_name.clone(), e))?;
             advice.get_suggestions(review_comments, self, &mut patch, summary_only)?;
         }
 
         if let Some(advice) = &self.tidy_advice {
             if let Some(patched) = &advice.patched {
-                let mut patch = make_patch(file_path, patched, &original_content)?;
+                let mut patch = make_patch(file_path, patched, &original_content)
+                    .map_err(|e| FileObjError::MakePatchFailed(file_name.clone(), e))?;
                 advice.get_suggestions(review_comments, self, &mut patch, summary_only)?;
             }
 

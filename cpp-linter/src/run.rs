@@ -6,7 +6,7 @@
 #![cfg(feature = "bin")]
 use std::{
     env,
-    path::Path,
+    path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
 
@@ -20,10 +20,11 @@ use log::{LevelFilter, set_max_level};
 use crate::{
     clang_tools::capture_clang_tools_output,
     cli::{ClangParams, Cli, CliCommand, FeedbackInput, LinesChangedOnly},
-    common_fs::FileFilter,
+    common_fs::FileObj,
     logger,
-    rest_api::{RestApiClient, github::GithubApiClient},
+    rest_client::RestClient,
 };
+use git_bot_feedback::FileFilter;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -67,20 +68,31 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
         })?;
     }
 
-    let rest_api_client = GithubApiClient::new()?;
+    let mut rest_api_client = RestClient::new()?;
     set_max_level(
-        if cli.general_options.verbosity.is_debug() || rest_api_client.debug_enabled {
+        if cli.general_options.verbosity.is_debug()
+        /* || rest_api_client.debug_enabled */
+        {
             LevelFilter::Debug
         } else {
             LevelFilter::Info
         },
     );
-    log::info!("Processing event {}", rest_api_client.event_name);
-    let is_pr = rest_api_client.event_name == "pull_request";
+    // log::info!("Processing event {}", rest_api_client.event_name);
+    let is_pr = rest_api_client.is_pr();
 
     let mut file_filter = FileFilter::new(
-        &cli.source_options.ignore,
-        cli.source_options.extensions.clone(),
+        &cli.source_options
+            .ignore
+            .iter()
+            .map(|s| s.as_str())
+            .collect::<Vec<&str>>(),
+        &cli.source_options
+            .extensions
+            .iter()
+            .map(|s| s.as_str())
+            .collect::<Vec<&str>>(),
+        None,
     );
     file_filter.parse_submodules();
     if let Some(files) = &cli.not_ignored {
@@ -100,7 +112,7 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
         }
     }
 
-    rest_api_client.start_log_group(String::from("Get list of specified source files"));
+    rest_api_client.start_log_group("Get list of specified source files");
     let files = if !matches!(cli.source_options.lines_changed_only, LinesChangedOnly::Off)
         || cli.source_options.files_changed_only
     {
@@ -108,19 +120,23 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
         rest_api_client
             .get_list_of_changed_files(
                 &file_filter,
-                &cli.source_options.lines_changed_only,
+                &cli.source_options.lines_changed_only.clone().into(),
                 &cli.source_options.diff_base,
                 cli.source_options.ignore_index,
             )
             .await?
     } else {
         // walk the folder and look for files with specified extensions according to ignore values.
-        let mut all_files = file_filter.list_source_files(".")?;
+        let mut all_files: Vec<FileObj> = file_filter
+            .walk_dir(".")?
+            .into_iter()
+            .map(|file_name| FileObj::new(PathBuf::from(&file_name)))
+            .collect();
         if is_pr && (cli.feedback_options.tidy_review || cli.feedback_options.format_review) {
             let changed_files = rest_api_client
                 .get_list_of_changed_files(
                     &file_filter,
-                    &LinesChangedOnly::Off,
+                    &LinesChangedOnly::Off.into(),
                     &cli.source_options.diff_base,
                     cli.source_options.ignore_index,
                 )
@@ -143,7 +159,7 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
         log::info!("  ./{}", file.name.to_string_lossy().replace('\\', "/"));
         arc_files.push(Arc::new(Mutex::new(file)));
     }
-    rest_api_client.end_log_group();
+    rest_api_client.end_log_group("Get list of specified source files");
 
     let mut clang_params = ClangParams::from(&cli);
     clang_params.format_review &= is_pr;
@@ -156,11 +172,11 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
         &rest_api_client,
     )
     .await?;
-    rest_api_client.start_log_group(String::from("Posting feedback"));
+    rest_api_client.start_log_group("Posting feedback");
     let checks_failed = rest_api_client
         .post_feedback(&arc_files, user_inputs, clang_versions)
         .await?;
-    rest_api_client.end_log_group();
+    rest_api_client.end_log_group("Posting feedback");
     if env::var("PRE_COMMIT").is_ok_and(|v| v == "1") && checks_failed > 1 {
         return Err(anyhow!("Some checks did not pass"));
     }

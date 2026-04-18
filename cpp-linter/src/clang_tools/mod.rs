@@ -11,15 +11,17 @@ use std::{
 // non-std crates
 use anyhow::{Context, Result, anyhow};
 use clang_installer::{ClangTool, RequestedVersion};
+use git_bot_feedback::ReviewComment;
 use git2::{DiffOptions, Patch};
 use semver::Version;
 use tokio::task::JoinSet;
 
 // project-specific modules/crates
 use super::common_fs::FileObj;
+use crate::error::SuggestionError;
 use crate::{
     cli::ClangParams,
-    rest_api::{COMMENT_MARKER, RestApiClient, USER_OUTREACH},
+    rest_client::{RestClient, USER_OUTREACH},
 };
 pub mod clang_format;
 use clang_format::run_clang_format;
@@ -46,7 +48,7 @@ fn analyze_single_file(
         if clang_params
             .format_filter
             .as_ref()
-            .is_some_and(|f| f.is_source_or_ignored(file.name.as_path()))
+            .is_some_and(|f| f.is_qualified(file.name.as_path()))
             || clang_params.format_filter.is_none()
         {
             let format_result = run_clang_format(&mut file, &clang_params)?;
@@ -65,7 +67,7 @@ fn analyze_single_file(
         if clang_params
             .tidy_filter
             .as_ref()
-            .is_some_and(|f| f.is_source_or_ignored(file.name.as_path()))
+            .is_some_and(|f| f.is_qualified(file.name.as_path()))
             || clang_params.tidy_filter.is_none()
         {
             let tidy_result = run_clang_tidy(&mut file, &clang_params)?;
@@ -101,7 +103,7 @@ pub async fn capture_clang_tools_output(
     files: &[Arc<Mutex<FileObj>>],
     version: &RequestedVersion,
     mut clang_params: ClangParams,
-    rest_api_client: &impl RestApiClient,
+    rest_api_client: &RestClient,
 ) -> Result<ClangVersions> {
     let mut clang_versions = ClangVersions::default();
     // find the executable paths for clang-tidy and/or clang-format and show version
@@ -148,11 +150,12 @@ pub async fn capture_clang_tools_output(
         // This includes any `spawn()` error and any `analyze_single_file()` error.
         // Any unresolved tasks are aborted and dropped when an error is returned here.
         let (file_name, logs) = output??;
-        rest_api_client.start_log_group(format!("Analyzing {}", file_name.to_string_lossy()));
+        let log_group_name = format!("Analyzing {}", file_name.to_string_lossy());
+        rest_api_client.start_log_group(&log_group_name);
         for (level, msg) in logs {
             log::log!(level, "{}", msg);
         }
-        rest_api_client.end_log_group();
+        rest_api_client.end_log_group(&log_group_name);
     }
     Ok(clang_versions)
 }
@@ -167,6 +170,17 @@ pub struct Suggestion {
     pub suggestion: String,
     /// The file that this suggestion pertains to.
     pub path: String,
+}
+
+impl Suggestion {
+    pub(crate) fn as_review_comment(&self) -> ReviewComment {
+        ReviewComment {
+            line_start: Some(self.line_start),
+            line_end: self.line_end,
+            comment: self.suggestion.clone(),
+            path: self.path.clone(),
+        }
+    }
 }
 
 /// A struct to describe the Pull Request review suggestions.
@@ -189,8 +203,12 @@ pub struct ReviewComments {
 }
 
 impl ReviewComments {
-    pub fn summarize(&self, clang_versions: &ClangVersions) -> String {
-        let mut body = format!("{COMMENT_MARKER}## Cpp-linter Review\n");
+    pub fn summarize(
+        &self,
+        clang_versions: &ClangVersions,
+        comments: &Vec<ReviewComment>,
+    ) -> String {
+        let mut body = String::from("## Cpp-linter Review\n");
         for t in 0_usize..=1 {
             let mut total = 0;
             let (tool_name, tool_version) = if t == 0 {
@@ -209,9 +227,9 @@ impl ReviewComments {
             if let Some(ver_str) = tool_version {
                 body.push_str(format!("\n### Used {tool_name} v{ver_str}\n").as_str());
             }
-            for comment in &self.comments {
+            for comment in comments {
                 if comment
-                    .suggestion
+                    .comment
                     .contains(format!("### {tool_name}").as_str())
                 {
                     total += 1;
@@ -266,24 +284,17 @@ pub fn make_patch<'buffer>(
     path: &Path,
     patched: &'buffer [u8],
     original_content: &'buffer [u8],
-) -> Result<Patch<'buffer>> {
+) -> Result<Patch<'buffer>, git2::Error> {
     let mut diff_opts = &mut DiffOptions::new();
     diff_opts = diff_opts.indent_heuristic(true);
     diff_opts = diff_opts.context_lines(0);
-    let patch = Patch::from_buffers(
+    Patch::from_buffers(
         original_content,
         Some(path),
         patched,
         Some(path),
         Some(diff_opts),
     )
-    .with_context(|| {
-        format!(
-            "Failed to create patch for file {}.",
-            path.to_string_lossy()
-        )
-    })?;
-    Ok(patch)
 }
 
 /// A trait for generating suggestions from a [`FileObj`]'s advice's generated `patched` buffer.
@@ -301,7 +312,7 @@ pub trait MakeSuggestions {
         file_obj: &FileObj,
         patch: &mut Patch,
         summary_only: bool,
-    ) -> Result<()> {
+    ) -> Result<(), SuggestionError> {
         let is_tidy_tool = (&self.get_tool_name() == "clang-tidy") as usize;
         let hunks_total = patch.num_hunks();
         let mut hunks_in_patch = 0u32;
@@ -313,11 +324,17 @@ pub trait MakeSuggestions {
             .to_owned();
         let patch_buf = &patch
             .to_buf()
-            .with_context(|| "Failed to convert patch to byte array")?
+            .map_err(|e| SuggestionError::PatchIntoBytesFailed {
+                file_name: file_name.clone(),
+                source: e,
+            })?
             .to_vec();
         review_comments.full_patch[is_tidy_tool].push_str(
             String::from_utf8(patch_buf.to_owned())
-                .with_context(|| format!("Failed to convert patch to string: {file_name}"))?
+                .map_err(|e| SuggestionError::PatchIntoStringFailed {
+                    file_name: file_name.clone(),
+                    source: e,
+                })?
                 .as_str(),
         );
         if summary_only {
@@ -325,9 +342,14 @@ pub trait MakeSuggestions {
             return Ok(());
         }
         for hunk_id in 0..hunks_total {
-            let (hunk, line_count) = patch.hunk(hunk_id).with_context(|| {
-                format!("Failed to get hunk {hunk_id} from patch for {file_name}")
-            })?;
+            let (hunk, line_count) =
+                patch
+                    .hunk(hunk_id)
+                    .map_err(|e| SuggestionError::GetHunkFailed {
+                        hunk_id,
+                        file_name: file_name.clone(),
+                        source: e,
+                    })?;
             hunks_in_patch += 1;
             let hunk_range = file_obj.is_hunk_in_diff(&hunk);
             match hunk_range {
@@ -337,11 +359,23 @@ pub trait MakeSuggestions {
                     let suggestion_help = self.get_suggestion_help(start_line, end_line);
                     let mut removed = vec![];
                     for line_index in 0..line_count {
-                        let diff_line = patch
-                            .line_in_hunk(hunk_id, line_index)
-                            .with_context(|| format!("Failed to get line {line_index} in a hunk {hunk_id} of patch for {file_name}"))?;
-                        let line = String::from_utf8(diff_line.content().to_owned())
-                            .with_context(|| format!("Failed to convert line {line_index} buffer to string in hunk {hunk_id} of patch for {file_name}"))?;
+                        let diff_line = patch.line_in_hunk(hunk_id, line_index).map_err(|e| {
+                            SuggestionError::GetHunkLineFailed {
+                                line_index,
+                                hunk_id,
+                                file_name: file_name.clone(),
+                                source: e,
+                            }
+                        })?;
+                        let line =
+                            String::from_utf8(diff_line.content().to_owned()).map_err(|e| {
+                                SuggestionError::HunkLineIntoStringFailed {
+                                    line_index,
+                                    hunk_id,
+                                    file_name: file_name.clone(),
+                                    source: e,
+                                }
+                            })?;
                         if ['+', ' '].contains(&diff_line.origin()) {
                             suggestion.push_str(line.as_str());
                         } else {
