@@ -38,7 +38,7 @@ jobs:
           persist-credentials: false
       - run: rustup update --no-self-update
       - name: Cache .cargo locked resources
-        uses: actions/cache@v5
+        uses: actions/cache@v5.0.4
         with:
           path: ~/.cargo
           key: ${{ runner.os }}-docs-cargo-${{ hashFiles('Cargo.lock') }}
@@ -52,7 +52,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Cache .cargo locked resources
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v5.0.4
         with:
           path: ~/.cargo
           key: ${{ runner.os }}-docs-cargo-${{ hashFiles('Cargo.lock') }}
@@ -69,7 +69,7 @@ jobs:
       - name: Build docs
         run: nur docs --build
       - name: Upload docs build as artifact
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@v5
         with:
           name: cpp-linter-docs
           path: docs/site
@@ -83,7 +83,7 @@ jobs:
           persist-credentials: false
       - run: rustup update --no-self-update
       - name: Cache .cargo locked resources
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v5.0.4
         with:
           path: ~/.cargo
           key: ${{ runner.os }}-docs-cargo-${{ hashFiles('Cargo.lock') }}
