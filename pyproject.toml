@@ -60,7 +60,7 @@ dev = [
     "ruff==0.14.13",
 ]
 test = [
-    "meson==1.10.2",
+    "meson==1.11.0",
 ]
 
 [tool.uv]
