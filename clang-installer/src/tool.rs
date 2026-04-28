@@ -44,8 +44,8 @@ pub enum GetClangVersionError {
     RegexCompile(#[from] regex::Error),
 
     /// Failed to parse the version number from the output of `clang-tool --version`.
-    #[error("Failed to parse the version number from the `--version` output")]
-    VersionParse,
+    #[error("Failed to parse the version number from the `--version` output: {0}")]
+    VersionParse(String),
 
     /// Failed to parse the version number from the output of `clang-tool --version` into a [`semver::Version`].
     #[error("Failed to parse the version number from the `--version` output: {0}")]
@@ -149,12 +149,13 @@ impl ClangTool {
             .map_err(|e| GetClangVersionError::Command(path.to_path_buf(), e))?;
         let stdout = String::from_utf8_lossy(&output.stdout);
         let version_pattern = Regex::new(r"(?i)version[^\d]*([\d.]+)")?;
-        let captures = version_pattern
-            .captures(&stdout)
-            .ok_or(GetClangVersionError::VersionParse)?;
-        let result = captures.get(1).ok_or(GetClangVersionError::VersionParse)?;
-        let version = Version::parse(result.as_str())?;
-        Ok(version)
+        if let Some(captures) = version_pattern.captures(&stdout)
+            && let Some(result) = captures.get(1)
+        {
+            let version = Version::parse(result.as_str())?;
+            return Ok(version);
+        }
+        Err(GetClangVersionError::VersionParse(stdout.to_string()))
     }
 
     pub fn symlink_bin(
