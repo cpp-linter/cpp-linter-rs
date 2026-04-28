@@ -271,7 +271,7 @@ mod test {
 
     async fn checkout_cpp_linter_py_repo(
         sha: &str,
-        extensions: &[String],
+        extensions: &[&str],
         tmp: &TempDir,
         patch_path: Option<&str>,
         ignore_staged: bool,
@@ -287,16 +287,12 @@ mod test {
             env::set_var("CI", "false");
         }
         let rest_api_client = RestClient::new().unwrap();
-        let file_filter = FileFilter::new(
-            &["target"],
-            &extensions.iter().map(|s| s.as_str()).collect::<Vec<&str>>(),
-            None,
-        );
+        let file_filter = FileFilter::new(&["target"], extensions, None);
         set_current_dir(tmp).unwrap();
         let base_diff = if ignore_staged {
             Some("0".to_string())
         } else {
-            None::<String>
+            None
         };
         rest_api_client
             .get_list_of_changed_files(
@@ -315,7 +311,7 @@ mod test {
         let sha = "0c236809891000b16952576dc34de082d7a40bf3";
         let cur_dir = current_dir().unwrap();
         let tmp = get_temp_dir();
-        let extensions = vec!["cpp".to_string(), "hpp".to_string()];
+        let extensions = ["cpp", "hpp"];
         let files = checkout_cpp_linter_py_repo(sha, &extensions, &tmp, None, false).await;
         println!("files = {:?}", files);
         assert!(files.is_empty());
@@ -329,13 +325,21 @@ mod test {
         let sha = "950ff0b690e1903797c303c5fc8d9f3b52f1d3c5";
         let cur_dir = current_dir().unwrap();
         let tmp = get_temp_dir();
-        let extensions = vec!["cpp".to_string(), "hpp".to_string()];
-        let files = checkout_cpp_linter_py_repo(sha, &extensions.clone(), &tmp, None, false).await;
+        let extensions = ["cpp", "hpp"];
+        let files = checkout_cpp_linter_py_repo(sha, &extensions, &tmp, None, false).await;
         println!("files = {:?}", files);
         assert!(files.len() >= 2);
         for file in files {
             assert!(
-                extensions.contains(&file.name.extension().unwrap().to_string_lossy().to_string())
+                extensions.contains(
+                    &file
+                        .name
+                        .extension()
+                        .unwrap()
+                        .to_string_lossy()
+                        .to_string()
+                        .as_str()
+                )
             );
         }
         set_current_dir(cur_dir).unwrap(); // prep to delete temp_folder
@@ -348,10 +352,10 @@ mod test {
         let sha = "0c236809891000b16952576dc34de082d7a40bf3";
         let cur_dir = current_dir().unwrap();
         let tmp = get_temp_dir();
-        let extensions = vec!["cpp".to_string(), "hpp".to_string()];
+        let extensions = ["cpp", "hpp"];
         let files = checkout_cpp_linter_py_repo(
             sha,
-            &extensions.clone(),
+            &extensions,
             &tmp,
             Some("tests/git_status_test_assets/cpp-linter/cpp-linter/test_git_lib.patch"),
             false,
@@ -361,7 +365,15 @@ mod test {
         assert!(!files.is_empty());
         for file in files {
             assert!(
-                extensions.contains(&file.name.extension().unwrap().to_string_lossy().to_string())
+                extensions.contains(
+                    &file
+                        .name
+                        .extension()
+                        .unwrap()
+                        .to_string_lossy()
+                        .to_string()
+                        .as_str()
+                )
             );
         }
         set_current_dir(cur_dir).unwrap(); // prep to delete temp_folder
@@ -374,16 +386,23 @@ mod test {
         let sha = "0c236809891000b16952576dc34de082d7a40bf3";
         let cur_dir = current_dir().unwrap();
         let tmp = get_temp_dir();
-        let extensions = vec!["cpp".to_string(), "hpp".to_string()];
+        let extensions = ["cpp", "hpp"];
         let files = checkout_cpp_linter_py_repo(
             sha,
-            &extensions.clone(),
+            &extensions,
             &tmp,
             Some("tests/git_status_test_assets/cpp-linter/cpp-linter/test_git_lib.patch"),
             true,
         )
         .await;
         println!("files = {:?}", files);
+        let git_status = std::process::Command::new("git")
+            .args(["diff", "HEAD~1..HEAD"])
+            .output()
+            .map(|o| String::from_utf8(o.stdout).unwrap())
+            .unwrap();
+        eprintln!("git status:\n{git_status}");
+        eprintln!("files: {files:?}");
         assert!(files.is_empty());
         set_current_dir(cur_dir).unwrap(); // prep to delete temp_folder
         drop(tmp); // delete temp_folder
