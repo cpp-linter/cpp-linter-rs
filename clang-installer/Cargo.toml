@@ -41,7 +41,7 @@ tempfile = { workspace = true }
 [dev-dependencies]
 colored = { workspace = true }
 mockito = { workspace = true }
-reqwest = { workspace = true, default-features = true }
+reqwest = { workspace = true, features = ["native-tls"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 [features]
