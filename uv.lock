@@ -286,7 +286,7 @@ dev = [
     { name = "pre-commit", specifier = ">=4.3.0" },
     { name = "ruff", specifier = "==0.14.13" },
 ]
-test = [{ name = "meson", specifier = "==1.10.2" }]
+test = [{ name = "meson", specifier = "==1.11.1" }]
 
 [[package]]
 name = "distlib"
@@ -644,11 +644,10 @@ wheels = [
 
 [[package]]
 name = "meson"
-version = "1.10.2"
+version = "1.11.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/ce/99/f2e4780865ebabda14ab03b98def0bf27c021efaf7ec7138c1dbbf1c72cb/meson-1.10.2.tar.gz", hash = "sha256:7890287d911dd4ee1ebd0efb61ed0321bfcd87c725df923a837cf90c6508f96b", size = 2422765, upload-time = "2026-03-15T13:39:52.424Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0b/78/7d049e63e624d51d0065191dae101a1e36d5d3a2360633772d9ad8afb2d5/meson-1.10.2-py3-none-any.whl", hash = "sha256:5f84ef186e6e788d9154db63620fc61b3ece69f643b94b43c8b9203c43d89b36", size = 1060890, upload-time = "2026-03-15T13:39:48.197Z" },
+    { url = "https://files.pythonhosted.org/packages/5e/cd/f3a881ff5e601d6bbeff63b38ee2362e1167c47d9cde03eddf8d71a4ffb0/meson-1.11.1-py3-none-any.whl", hash = "sha256:9b3a023657e393dbc5335b95c561337d49b7a458f5541e47ec44f2cc566e0d80", size = 1078534, upload-time = "2026-04-21T03:15:31.611Z" },
 ]
 
 [[package]]
