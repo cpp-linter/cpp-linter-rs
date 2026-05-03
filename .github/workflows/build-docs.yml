@@ -38,7 +38,7 @@ jobs:
           persist-credentials: false
       - run: rustup update --no-self-update
       - name: Cache .cargo locked resources
-        uses: actions/cache@v5.0.4
+        uses: actions/cache@v5.0.5
         with:
           path: ~/.cargo
           key: ${{ runner.os }}-docs-cargo-${{ hashFiles('Cargo.lock') }}
@@ -52,14 +52,14 @@ jobs:
         with:
           persist-credentials: false
       - name: Cache .cargo locked resources
-        uses: actions/cache/restore@v5.0.4
+        uses: actions/cache/restore@v5.0.5
         with:
           path: ~/.cargo
           key: ${{ runner.os }}-docs-cargo-${{ hashFiles('Cargo.lock') }}
       - name: Install uv
-        uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8.0.0
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
       - name: Install cargo-binstall
-        uses: cargo-bins/cargo-binstall@f8ce4d55b131f4a1e373b8747ca6b6a54133ae5a # v1.18.0
+        uses: cargo-bins/cargo-binstall@dc19f1e48450eefe5a29b8da6c6b00a87d730b37 # v1.18.1
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - name: Install nur
@@ -83,14 +83,14 @@ jobs:
           persist-credentials: false
       - run: rustup update --no-self-update
       - name: Cache .cargo locked resources
-        uses: actions/cache/restore@v5.0.4
+        uses: actions/cache/restore@v5.0.5
         with:
           path: ~/.cargo
           key: ${{ runner.os }}-docs-cargo-${{ hashFiles('Cargo.lock') }}
       - name: Install uv
-        uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8.0.0
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
       - name: Install cargo-binstall
-        uses: cargo-bins/cargo-binstall@f8ce4d55b131f4a1e373b8747ca6b6a54133ae5a # v1.18.0
+        uses: cargo-bins/cargo-binstall@dc19f1e48450eefe5a29b8da6c6b00a87d730b37 # v1.18.1
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - name: Install nur
