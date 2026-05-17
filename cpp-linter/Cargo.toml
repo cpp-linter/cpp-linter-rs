@@ -23,7 +23,7 @@ fast-glob = "1.0.1"
 futures = "0.3.32"
 git2 = "0.20.4"
 log = { workspace = true }
-quick-xml = { version = "0.39.2", features = ["serialize"] }
+quick-xml = { version = "0.39.4", features = ["serialize"] }
 regex = { workspace = true }
 reqwest = { workspace = true }
 semver =  { workspace = true }
