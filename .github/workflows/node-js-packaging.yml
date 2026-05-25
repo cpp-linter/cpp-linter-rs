@@ -89,7 +89,7 @@ jobs:
           rustup update stable --no-self-update
           rustup target add ${{ matrix.settings.target }}
       - name: Cache cargo
-        uses: actions/cache@v5.0.4 # zizmor: ignore[cache-poisoning]
+        uses: actions/cache@v5.0.5 # zizmor: ignore[cache-poisoning]
         with:
           path: |
             ~/.cargo/registry/index/
@@ -106,7 +106,7 @@ jobs:
           use-cache: true # zizmor: ignore[cache-poisoning]
       - name: Install cargo-binstall
         if: contains(matrix.settings.build, ' -x ') || contains(matrix.settings.build, '--use-cross ')
-        uses: cargo-bins/cargo-binstall@f8ce4d55b131f4a1e373b8747ca6b6a54133ae5a # v1.18.0
+        uses: cargo-bins/cargo-binstall@aaa84a43aec4955a42c5ffc65d258961e39f276e # v1.19.1
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - name: Install ${{contains(matrix.settings.build, ' -x ') && 'cargo-zigbuild' || 'cargo-cross'}}
@@ -141,7 +141,7 @@ jobs:
           persist-credentials: false
       - name: Build
         id: build
-        uses: cross-platform-actions/action@233156312992f3f169d8d0c633c21d12a5d30455 # v1.0.0
+        uses: cross-platform-actions/action@0c165ad7eb2d6a7e8552d6af5aad2bbedfc646b0 # v1.1.0
         env:
           DEBUG: napi:*
           RUSTUP_IO_THREADS: 1
