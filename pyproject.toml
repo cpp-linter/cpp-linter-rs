@@ -1,5 +1,5 @@
 [build-system]
-requires = ["maturin>=1.4,<2.0"]
+requires = ["maturin<2.0,>=1.4"]
 build-backend = "maturin"
 
 [project]
@@ -53,7 +53,7 @@ manifest-path = "bindings/python/Cargo.toml"
 
 [dependency-groups]
 dev = [
-    "maturin==1.11.5",
+    "maturin==1.13.3",
     "mypy==1.19.1",
     "patchelf==0.17.2.2 ; sys_platform == 'linux'",
     "pre-commit>=4.3.0",
