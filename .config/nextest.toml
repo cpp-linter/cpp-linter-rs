@@ -27,8 +27,7 @@ status-level = "pass"
 # A profile to run only tests that use clang-tidy and/or clang-format
 # NOTE: This profile is intended to keep CI runtime low. Locally, use default or all profiles
 
-# This is all tests in tests/ folder + unit test for --extra-args.
-default-filter = "kind(test) + test(#*use_extra_args) + test(#*eval_version)"
+default-filter = "(kind(test) + test(use_extra_args)) - package(clang-installer)"
 
 # show log output from each failing test
 failure-output = "final"
