@@ -20,6 +20,9 @@ status-level = "skip"
 # Run this profile before other tests to warmup the cache of clang tools binaries.
 default-filter = 'test(#*eval_version)'
 
+# only show the job(s) being run in this profile
+status-level = "pass"
+
 [profile.ci]
 # A profile to run only tests that use clang-tidy and/or clang-format
 # NOTE: This profile is intended to keep CI runtime low. Locally, use default or all profiles

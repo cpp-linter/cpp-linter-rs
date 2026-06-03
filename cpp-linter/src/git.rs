@@ -146,9 +146,14 @@ mod test {
             }
         }
         if let Some(patch) = patch_path {
-            let canonical_path_path = fs::canonicalize(patch).unwrap();
+            let canonical_patch_path = fs::canonicalize(patch).unwrap();
+            let patch_path = canonical_patch_path
+                .to_str()
+                .unwrap()
+                // on Windows, canonical paths can have a prefix of "\\?\" which git does not recognize
+                .trim_start_matches("\\\\?\\");
             let ok = Command::new("git")
-                .args(["apply", "--index", canonical_path_path.to_str().unwrap()])
+                .args(["apply", "--index", patch_path])
                 .current_dir(path)
                 .status()
                 .expect("Failed to apply patch and stage its changes");
