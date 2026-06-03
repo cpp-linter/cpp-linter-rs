@@ -72,15 +72,19 @@ fn generate_tool_summary(review_enabled: bool, force_lgtm: bool, tool_name: &str
 
 async fn setup(lib_root: &Path, test_params: &TestParams) {
     let mut event_payload_path = NamedTempFile::new_in("./").unwrap();
-    let event_payload = serde_json::json!({
-        "pull_request": {
-            "draft": test_params.pr_draft,
-            "state": test_params.pr_state,
-            "number": PR,
-            "locked": false,
-        }
-    })
-    .to_string();
+    let event_payload = if test_params.bad_pr_info {
+        "".to_string()
+    } else {
+        serde_json::json!({
+            "pull_request": {
+                "draft": test_params.pr_draft,
+                "state": test_params.pr_state,
+                "number": PR,
+                "locked": false,
+            }
+        })
+        .to_string()
+    };
     event_payload_path
         .write_all(event_payload.as_bytes())
         .expect("Failed to create mock event payload.");
@@ -108,22 +112,24 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
     }
     let mut mocks = vec![];
 
-    let pr_endpoint = format!("/repos/{REPO}/pulls/{PR}");
-    mocks.push(
-        server
-            .mock("GET", format!("{pr_endpoint}/files").as_str())
-            .match_header("Accept", "application/vnd.github.raw+json")
-            .match_header("Authorization", format!("token {TOKEN}").as_str())
-            .match_query(Matcher::Any)
-            .with_body_from_file(format!("{asset_path}pr_27.json"))
-            .with_header(REMAINING_RATE_LIMIT_HEADER, "50")
-            .with_header(RESET_RATE_LIMIT_HEADER, reset_timestamp.as_str())
-            .create(),
-    );
+    if !test_params.bad_pr_info {
+        let pr_endpoint = format!("/repos/{REPO}/pulls/{PR}");
+        mocks.push(
+            server
+                .mock("GET", format!("{pr_endpoint}/files").as_str())
+                .match_header("Accept", "application/vnd.github.raw+json")
+                .match_header("Authorization", format!("token {TOKEN}").as_str())
+                .match_query(Matcher::Any)
+                .with_body_from_file(format!("{asset_path}pr_27.json"))
+                .with_header(REMAINING_RATE_LIMIT_HEADER, "50")
+                .with_header(RESET_RATE_LIMIT_HEADER, reset_timestamp.as_str())
+                .create(),
+        );
+    }
 
     let reviews_endpoint = format!("/repos/{REPO}/pulls/{PR}/reviews");
 
-    if test_params.pr_state != "closed" {
+    if test_params.pr_state != "closed" && !test_params.bad_pr_info {
         let mut mock = server
             .mock("GET", reviews_endpoint.as_str())
             .match_header("Accept", "application/vnd.github.raw+json")
@@ -149,6 +155,7 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
     if !test_params.fail_get_existing_reviews
         && !test_params.bad_existing_reviews
         && test_params.pr_state != "closed"
+        && !test_params.bad_pr_info
     {
         mocks.push(
             server
@@ -247,12 +254,12 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
     }
     match run_main(args).await {
         Ok(_) => {
-            if test_params.bad_existing_reviews {
+            if test_params.bad_existing_reviews || test_params.bad_pr_info {
                 panic!("Expected failure, but it succeeded");
             }
         }
         Err(e) => {
-            if !test_params.bad_existing_reviews {
+            if !test_params.bad_existing_reviews && !test_params.bad_pr_info {
                 panic!("Failed unexpectedly: {e:?}");
             }
         }
