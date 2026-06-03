@@ -190,11 +190,21 @@ mod test {
     use super::run_main;
     use std::env;
 
+    /// helper to avoid writing to the same GITHUB_OUTPUT file in parallel-running tests.
+    fn setup_tmp_gh_out_path() -> tempfile::NamedTempFile {
+        let gh_out_path = tempfile::NamedTempFile::new().unwrap();
+        unsafe {
+            env::set_var(
+                "GITHUB_OUTPUT",
+                gh_out_path.path().to_string_lossy().to_string(),
+            );
+        }
+        gh_out_path
+    }
+
     #[tokio::test]
     async fn normal() {
-        unsafe {
-            env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
-        }
+        let tmp_gh_out = setup_tmp_gh_out_path();
         run_main(vec![
             "cpp-linter".to_string(),
             "-l".to_string(),
@@ -205,23 +215,21 @@ mod test {
         ])
         .await
         .unwrap();
+        drop(tmp_gh_out);
     }
 
     #[tokio::test]
     async fn version_command() {
-        unsafe {
-            env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
-        }
+        let tmp_gh_out = setup_tmp_gh_out_path();
         run_main(vec!["cpp-linter".to_string(), "version".to_string()])
             .await
             .unwrap();
+        drop(tmp_gh_out);
     }
 
     #[tokio::test]
     async fn force_debug_output() {
-        unsafe {
-            env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
-        }
+        let tmp_gh_out = setup_tmp_gh_out_path();
         run_main(vec![
             "cpp-linter".to_string(),
             "-l".to_string(),
@@ -231,13 +239,12 @@ mod test {
         ])
         .await
         .unwrap();
+        drop(tmp_gh_out);
     }
 
     #[tokio::test]
     async fn no_version_input() {
-        unsafe {
-            env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
-        }
+        let tmp_gh_out = setup_tmp_gh_out_path();
         run_main(vec![
             "cpp-linter".to_string(),
             "-l".to_string(),
@@ -246,12 +253,13 @@ mod test {
         ])
         .await
         .unwrap();
+        drop(tmp_gh_out);
     }
 
     #[tokio::test]
     async fn pre_commit_env() {
+        let tmp_gh_out = setup_tmp_gh_out_path();
         unsafe {
-            env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
             env::set_var("PRE_COMMIT", "1");
         }
         run_main(vec![
@@ -262,15 +270,14 @@ mod test {
         ])
         .await
         .unwrap_err();
+        drop(tmp_gh_out);
     }
 
     // Verifies that the system gracefully handles cases where all analysis is disabled.
     // This ensures no diagnostic comments are generated when analysis is explicitly skipped.
     #[tokio::test]
     async fn no_analysis() {
-        unsafe {
-            env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
-        }
+        let tmp_gh_out = setup_tmp_gh_out_path();
         run_main(vec![
             "cpp-linter".to_string(),
             "-l".to_string(),
@@ -281,13 +288,12 @@ mod test {
         ])
         .await
         .unwrap();
+        drop(tmp_gh_out);
     }
 
     #[tokio::test]
     async fn bad_repo_root() {
-        unsafe {
-            env::remove_var("GITHUB_OUTPUT"); // avoid writing to GH_OUT in parallel-running tests
-        }
+        let tmp_gh_out = setup_tmp_gh_out_path();
         run_main(vec![
             "cpp-linter".to_string(),
             "--repo-root".to_string(),
@@ -295,5 +301,6 @@ mod test {
         ])
         .await
         .unwrap_err();
+        drop(tmp_gh_out);
     }
 }
