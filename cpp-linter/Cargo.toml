@@ -22,7 +22,7 @@ clap = { workspace = true, optional = true }
 colored = { workspace = true, optional = true }
 fast-glob = "1.0.1"
 futures = "0.3.32"
-git2 = { version = "0.21.0", features = ["https"] }
+git2 = { version = "0.21.0" }
 log = { workspace = true }
 quick-xml = { version = "0.40.1", features = ["serialize"] }
 regex = { workspace = true }
@@ -43,12 +43,10 @@ features = ["file-changes"]
 [dev-dependencies]
 mockito = { workspace = true }
 tempfile = { workspace = true }
-git2 = { version = "0.21.0", features = ["https"] }
-reqwest = { workspace = true, features = ["native-tls"] }
+reqwest = { workspace = true, features = ["default-tls"] }
 
 [features]
-openssl-vendored = ["git2/vendored-openssl", "reqwest/native-tls-vendored"]
-bin = ["reqwest/native-tls", "dep:clap", "dep:colored"]
+bin = ["reqwest/default-tls", "dep:clap", "dep:colored"]
 
 [lib]
 bench = false

@@ -22,8 +22,5 @@ napi-derive = "3.5.6"
 cpp-linter = { path = "../../cpp-linter", features = ["bin"] }
 anyhow = { workspace = true }
 
-[features]
-openssl-vendored = ["cpp-linter/openssl-vendored"]
-
 [build-dependencies]
 napi-build = "2.3.2"

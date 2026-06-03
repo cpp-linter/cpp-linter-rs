@@ -4,6 +4,7 @@ words:
   - armv
   - bindgen
   - binstall
+  - binutils
   - bndy
   - Boolish
   - bugprone
