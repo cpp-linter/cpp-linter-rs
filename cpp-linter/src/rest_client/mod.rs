@@ -190,12 +190,10 @@ impl RestClient {
             let has_changes = review_comments.full_patch.iter().any(|p| !p.is_empty());
             options.action = if feedback_inputs.passive_reviews {
                 ReviewAction::Comment
+            } else if options.comments.is_empty() && !has_changes {
+                ReviewAction::Approve
             } else {
-                if options.comments.is_empty() && !has_changes {
-                    ReviewAction::Approve
-                } else {
-                    ReviewAction::RequestChanges
-                }
+                ReviewAction::RequestChanges
             };
             options.summary = review_comments.summarize(&clang_versions, &options.comments);
             self.client.post_pr_review(&options).await?;
@@ -309,8 +307,8 @@ impl RestClient {
                     files,
                     &mut comment,
                     format_checks_failed,
-                    // tidy_version should be `Some()` value at this point.
-                    &clang_versions.tidy_version.as_ref().unwrap().to_string(),
+                    // format_version should be `Some()` value at this point.
+                    &clang_versions.format_version.as_ref().unwrap().to_string(),
                     &mut remaining_length,
                 );
             }
@@ -319,8 +317,8 @@ impl RestClient {
                     files,
                     &mut comment,
                     tidy_checks_failed,
-                    // format_version should be `Some()` value at this point.
-                    &clang_versions.format_version.as_ref().unwrap().to_string(),
+                    // tidy_version should be `Some()` value at this point.
+                    &clang_versions.tidy_version.as_ref().unwrap().to_string(),
                     &mut remaining_length,
                 );
             }
@@ -332,6 +330,9 @@ impl RestClient {
     }
 }
 
+/// A closing tag for details blocks in markdown comments.
+const CLOSER: &str = "\n</details>";
+
 fn make_format_comment(
     files: &[Arc<Mutex<FileObj>>],
     comment: &mut String,
@@ -342,9 +343,8 @@ fn make_format_comment(
     let opener = format!(
         "\n<details><summary>clang-format (v{version_used}) reports: <strong>{format_checks_failed} file(s) not formatted</strong></summary>\n\n",
     );
-    let closer = String::from("\n</details>");
     let mut format_comment = String::new();
-    *remaining_length -= opener.len() as u64 + closer.len() as u64;
+    *remaining_length = remaining_length.saturating_sub(opener.len() as u64 + CLOSER.len() as u64);
     for file in files {
         let file = file.lock().unwrap();
         if let Some(format_advice) = &file.format_advice
@@ -360,7 +360,7 @@ fn make_format_comment(
     }
     comment.push_str(&opener);
     comment.push_str(&format_comment);
-    comment.push_str(&closer);
+    comment.push_str(CLOSER);
 }
 
 fn make_tidy_comment(
@@ -373,9 +373,8 @@ fn make_tidy_comment(
     let opener = format!(
         "\n<details><summary>clang-tidy (v{version_used}) reports: {tidy_checks_failed}<strong> concern(s)</strong></summary>\n\n"
     );
-    let closer = String::from("\n</details>");
     let mut tidy_comment = String::new();
-    *remaining_length -= opener.len() as u64 + closer.len() as u64;
+    *remaining_length = remaining_length.saturating_sub(opener.len() as u64 + CLOSER.len() as u64);
     for file in files {
         let file = file.lock().unwrap();
         if let Some(tidy_advice) = &file.tidy_advice {
@@ -409,7 +408,7 @@ fn make_tidy_comment(
     }
     comment.push_str(&opener);
     comment.push_str(&tidy_comment);
-    comment.push_str(&closer);
+    comment.push_str(CLOSER);
 }
 
 #[cfg(all(test, feature = "bin"))]
