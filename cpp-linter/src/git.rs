@@ -8,128 +8,15 @@
 //! (str or bytes) only happens in CI or when libgit2 cannot be used to initialize a
 //! repository.
 
-use std::{fmt::Display, ops::RangeInclusive, path::PathBuf};
+use std::{ops::RangeInclusive, path::PathBuf};
 
-use anyhow::{Context, Result};
 // non-std crates
-use git2::{Diff, Error, Patch, Repository};
+use anyhow::Result;
+use git2::{Diff, Patch};
 
 // project specific modules/crates
 use crate::{cli::LinesChangedOnly, common_fs::FileObj};
 use git_bot_feedback::{FileFilter, error::DiffError};
-
-/// This (re-)initializes the repository located in the specified `path`.
-///
-/// This is actually not used in CI for file permissions and ownership reasons.
-/// Rather this is only (supposed to be) used when executed on a local developer
-/// machine.
-pub fn open_repo(path: &str) -> Result<Repository, Error> {
-    Repository::open(PathBuf::from(path).as_path())
-}
-
-/// Fetches the SHA1 of the commit for the specified [`git2::Repository`].
-///
-/// The optionally specified `depth` can be used to traverse the tree a number of times
-/// since the current `"HEAD"`.
-fn get_sha<'d, T: Display>(
-    repo: &'d Repository,
-    depth: &Option<T>,
-) -> Result<git2::Object<'d>, Error> {
-    match depth {
-        Some(base) => {
-            let base = base.to_string();
-            // First treat base as an explicit refs/SHAs. If that fails, then
-            // fall back to `HEAD~<base>` if `base` is purely numeric.
-            match repo.revparse_single(base.as_str()) {
-                Ok(obj) => Ok(obj),
-                Err(err) => {
-                    if base.chars().all(|c| c.is_ascii_digit()) {
-                        repo.revparse_single(format!("HEAD~{}", base).as_str())
-                    } else {
-                        Err(err)
-                    }
-                }
-            }
-        }
-        None => repo.revparse_single("HEAD"),
-    }
-}
-
-/// Fetch the [`git2::Diff`] about a given [`git2::Repository`].
-///
-/// This is actually not used in CI for file permissions and ownership reasons.
-/// Rather, this is only (supposed to be) used when executed on a local developer
-/// machine.
-///
-/// ## Using `diff_base` and `ignore_index`
-///
-/// The `diff_base` is a commit or ref to use as the base of the diff.
-/// Use `ignore_index` to exclude any staged changes in the local index.
-///
-/// | `diff_base` value | Git index state | Scope of diff |
-/// |-------------------|-----------------|---------------|
-/// | `None` | No staged changes | `HEAD~1..HEAD` |
-/// | `None` | Has staged changes | `HEAD..index` |
-/// | `Some(2)` or `Some("HEAD~2")` | No staged changes | `HEAD~2..HEAD` |
-/// | `Some(2)` or `Some("HEAD~2")` | Has staged changes | `HEAD~2..index` |
-pub fn get_diff<'d, T: Display>(
-    repo: &'d Repository,
-    diff_base: &Option<T>,
-    ignore_index: bool,
-) -> Result<git2::Diff<'d>> {
-    let use_staged_files = if ignore_index {
-        false
-    } else {
-        // check if there are staged file changes
-        repo.statuses(None)
-            .with_context(|| "Could not get repo statuses")?
-            .iter()
-            .any(|entry| {
-                entry.status().bits()
-                    & (git2::Status::INDEX_NEW.bits()
-                        | git2::Status::INDEX_MODIFIED.bits()
-                        | git2::Status::INDEX_RENAMED.bits())
-                    > 0
-            })
-    };
-    let base = if diff_base.is_some() {
-        // diff base is specified (regardless of staged changes)
-        get_sha(repo, diff_base)
-    } else if !use_staged_files {
-        // diff base is unspecified, when the repo has
-        // no staged changes (and they are not ignored),
-        // then focus on just the last commit
-        get_sha(repo, &Some(1))
-    } else {
-        // diff base is unspecified and there are staged changes, so
-        // let base be set to HEAD.
-        get_sha(repo, &None::<u8>)
-    }?
-    .peel_to_tree()?;
-
-    // RARE BUG when `head` is the first commit in the repo! Affects local-only runs.
-    // > Error { code: -3, class: 3, message: "parent 0 does not exist" }
-    if use_staged_files {
-        // get diff including staged files
-        repo.diff_tree_to_index(Some(&base), None, None)
-            .with_context(|| {
-                format!(
-                    "Could not get diff for {}..index",
-                    &base.id().to_string()[..7]
-                )
-            })
-    } else {
-        // get diff for range of commits between base..HEAD
-        let head = get_sha(repo, &None::<u8>)?.peel_to_tree()?;
-        repo.diff_tree_to_tree(Some(&base), Some(&head), None)
-            .with_context(|| {
-                format!(
-                    "Could not get diff for {}..HEAD",
-                    &base.id().to_string()[..7]
-                )
-            })
-    }
-}
 
 /// Parses a patch for a single file in a diff.
 ///
@@ -227,40 +114,56 @@ pub fn parse_diff_from_buf(
 mod test {
     use std::{
         env::{self, current_dir, set_current_dir},
-        fs::read,
+        fs,
+        process::Command,
     };
 
-    use git2::{ApplyLocation, Diff, IndexAddOption, Repository, build::CheckoutBuilder};
     use tempfile::{TempDir, tempdir};
 
-    use super::get_sha;
     use crate::{cli::LinesChangedOnly, rest_client::RestClient};
     use git_bot_feedback::FileFilter;
 
     const TEST_REPO_URL: &str = "https://github.com/cpp-linter/cpp-linter";
 
     // used to setup a testing stage
-    fn clone_repo(sha: Option<&str>, path: &str, patch_path: Option<&str>) -> Repository {
-        let repo = Repository::clone(TEST_REPO_URL, path).unwrap();
+    fn clone_repo(sha: Option<&str>, path: &str, patch_path: Option<&str>) {
+        // let repo = Repository::clone(TEST_REPO_URL, path).unwrap();
+        let ok = Command::new("git")
+            .args(["clone", TEST_REPO_URL, path])
+            .status()
+            .expect("Failed to clone repo");
+        if !ok.success() {
+            panic!("Failed to clone repo");
+        }
         if let Some(sha) = sha {
-            let commit = repo.revparse_single(sha).unwrap();
-            repo.checkout_tree(
-                &commit,
-                Some(CheckoutBuilder::new().force().recreate_missing(true)),
-            )
-            .unwrap();
-            repo.set_head_detached(commit.id()).unwrap();
+            let ok = Command::new("git")
+                .args(["-c", "advice.detachedHead=false", "checkout", sha])
+                .current_dir(path)
+                .status()
+                .expect("Failed to checkout commit");
+            if !ok.success() {
+                panic!("Failed to checkout commit");
+            }
         }
         if let Some(patch) = patch_path {
-            let diff = Diff::from_buffer(&read(patch).unwrap()).unwrap();
-            repo.apply(&diff, ApplyLocation::Both, None).unwrap();
-            let mut index = repo.index().unwrap();
-            index
-                .add_all(["tests/demo/demo.*"], IndexAddOption::DEFAULT, None)
-                .unwrap();
-            index.write().unwrap();
+            let canonical_path_path = fs::canonicalize(patch).unwrap();
+            let ok = Command::new("git")
+                .args(["apply", "--index", canonical_path_path.to_str().unwrap()])
+                .current_dir(path)
+                .status()
+                .expect("Failed to apply patch and stage its changes");
+            if !ok.success() {
+                panic!("Failed to apply patch and stage its changes");
+            }
+            let ok = Command::new("git")
+                .args(["status", "-s"])
+                .current_dir(path)
+                .status()
+                .expect("Failed to get git status after applying patch");
+            if !ok.success() {
+                panic!("Failed to get git status after applying patch");
+            }
         }
-        repo
     }
 
     fn get_temp_dir() -> TempDir {
@@ -290,7 +193,7 @@ mod test {
         let file_filter = FileFilter::new(&["target"], extensions, None);
         set_current_dir(tmp).unwrap();
         let base_diff = if ignore_staged {
-            Some("0".to_string())
+            Some("HEAD".to_string())
         } else {
             None
         };
@@ -395,30 +298,18 @@ mod test {
             true,
         )
         .await;
-        println!("files = {:?}", files);
-        let git_status = std::process::Command::new("git")
-            .args(["diff", "HEAD~1..HEAD"])
-            .output()
-            .map(|o| String::from_utf8(o.stdout).unwrap())
+        Command::new("git")
+            .args([
+                "--no-pager",
+                "show",
+                "a2875ac00e6f1dc3eb4ac19712c7a241b5a76e83",
+                "--format=%b",
+            ])
+            .status()
             .unwrap();
-        eprintln!("git status:\n{git_status}");
         eprintln!("files: {files:?}");
         assert!(files.is_empty());
         set_current_dir(cur_dir).unwrap(); // prep to delete temp_folder
         drop(tmp); // delete temp_folder
-    }
-
-    #[test]
-    fn repo_get_sha() {
-        let tmp_dir = get_temp_dir();
-        let repo = clone_repo(None, tmp_dir.path().to_str().unwrap(), None);
-        for (ours, theirs) in [(None::<u8>, "HEAD"), (Some(2), "HEAD~2")] {
-            let our_obj = get_sha(&repo, &ours).unwrap();
-            let their_obj = get_sha(&repo, &Some(theirs)).unwrap();
-            assert_eq!(our_obj.id(), their_obj.id());
-        }
-        // test an invalid ref for coverage measurement
-        assert!(get_sha(&repo, &Some("1.0")).is_err());
-        drop(tmp_dir); // delete temp_folder
     }
 }
