@@ -117,7 +117,7 @@ jobs:
           }
 
       - name: Generate Coverage HTML report
-        run: nur test llvm-cov
+        run: nur test html
 
       - name: Upload coverage data
         uses: actions/upload-artifact@v7
