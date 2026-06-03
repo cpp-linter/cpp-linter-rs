@@ -27,9 +27,8 @@ default-filter = 'test(#*eval_version)'
 # This is all tests in tests/ folder + unit test for --extra-args.
 default-filter = "kind(test) + test(#*use_extra_args) + test(#*eval_version)"
 
-# show log output from each test
-success-output = "final"
-failure-output = "immediate-final"
+# show log output from each failing test
+failure-output = "final"
 
 [profile.all]
 # A profile to run all tests (including tests that run longer than 10 seconds)
