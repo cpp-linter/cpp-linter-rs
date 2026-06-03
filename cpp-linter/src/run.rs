@@ -78,7 +78,6 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
             LevelFilter::Info
         },
     );
-    // log::info!("Processing event {}", rest_api_client.event_name);
     let is_pr = rest_api_client.is_pr();
 
     let mut file_filter = FileFilter::new(

@@ -220,7 +220,7 @@ impl From<&Cli> for ClangParams {
 }
 
 /// A struct to contain CLI options that relate to
-/// [`ResApiClient.post_feedback()`](fn@crate::rest_api::ResApiClient.post_feedback()).
+/// [`RestClient.post_feedback()`](fn@crate::rest_api::RestClient.post_feedback()).
 pub struct FeedbackInput {
     pub thread_comments: ThreadComments,
     pub no_lgtm: bool,
