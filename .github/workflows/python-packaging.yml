@@ -5,11 +5,7 @@
 #
 # NOTE: There are some customizations added to the generated output.
 # - workflow name is more descriptive
-# - use openssl-vendored cargo feature on
-#   * most cross-compiled Linux wheels
-#   * all MacOS builds
-# - musl linux builds (& x390 Linux target) are excluded due to complexity of
-#   installing openSSL lib in cross-compiler's docker/env.
+# - use zig compiler on most cross-compiled Linux wheels
 name: Python builds
 
 on:
@@ -60,8 +56,8 @@ jobs:
             target: aarch64
           - runner: ubuntu-latest
             target: armv7
-          # - runner: ubuntu-latest
-          #   target: s390x
+          - runner: ubuntu-latest
+            target: s390x
           - runner: ubuntu-latest
             target: ppc64le
     steps:
