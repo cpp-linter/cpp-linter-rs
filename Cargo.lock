@@ -718,8 +718,9 @@ dependencies = [
 
 [[package]]
 name = "git-bot-feedback"
-version = "0.5.3"
-source = "git+https://github.com/2bndy5/git-bot-feedback?branch=git-diff-no-staged#e2143b3a92731fdedeb9cf081132fa93d23555f9"
+version = "0.5.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "002bc7450062bd6651a86e99a454f52aea873bfe293d24cfabbf52180c97da89"
 dependencies = [
  "async-trait",
  "chrono",
@@ -1811,7 +1812,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2521,7 +2522,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
