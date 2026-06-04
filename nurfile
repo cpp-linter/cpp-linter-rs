@@ -87,7 +87,7 @@ export def "nur test" [
 }
 
 # Generate HTML coverage report
-export def "nur test llvm-cov" [
+export def "nur test html" [
     --open (-o), # Open the built report in your browser.
 ] {
     mut cmd = [
@@ -150,3 +150,5 @@ export def "nur pre-commit" [
     let args = if $all { ["--all-files"] } else { [] }
     run-cmd uv run pre-commit run ...$args
 }
+
+alias "nur pre" = nur pre-commit

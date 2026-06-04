@@ -20,6 +20,3 @@ bench = false
 pyo3 = { workspace = true, features = ["abi3-py39"] }
 cpp-linter = { path = "../../cpp-linter", features = ["bin"] }
 tokio = { workspace = true }
-
-[features]
-openssl-vendored = ["cpp-linter/openssl-vendored"]

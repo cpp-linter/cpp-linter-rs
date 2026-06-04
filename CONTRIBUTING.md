@@ -59,7 +59,7 @@ nur test --profile ci
 To generate a coverage report:
 
 ```sh
-nur test llvm-cov --open
+nur test html --open
 ```
 
 The `--open` flag is optional. It opens the built coverage report in your

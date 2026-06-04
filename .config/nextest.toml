@@ -20,16 +20,17 @@ status-level = "skip"
 # Run this profile before other tests to warmup the cache of clang tools binaries.
 default-filter = 'test(#*eval_version)'
 
+# only show the job(s) being run in this profile
+status-level = "pass"
+
 [profile.ci]
 # A profile to run only tests that use clang-tidy and/or clang-format
 # NOTE: This profile is intended to keep CI runtime low. Locally, use default or all profiles
 
-# This is all tests in tests/ folder + unit test for --extra-args.
-default-filter = "kind(test) + test(#*use_extra_args) + test(#*eval_version)"
+default-filter = "(kind(test) + test(use_extra_args)) - package(clang-installer)"
 
-# show log output from each test
-success-output = "final"
-failure-output = "immediate-final"
+# show log output from each failing test
+failure-output = "final"
 
 [profile.all]
 # A profile to run all tests (including tests that run longer than 10 seconds)

@@ -60,7 +60,17 @@ async fn download(url: &Url, cache_path: &Path, timeout: u64) -> Result<(), Down
     }
     let mut tmp_file = tempfile::NamedTempFile::new()?;
     let content_len = response.content_length().and_then(NonZero::new);
-    let mut progress_bar = ProgressBar::new(content_len, "Downloading");
+    let mut progress_bar = ProgressBar::new(
+        content_len,
+        format!(
+            "Downloading {}",
+            cache_path
+                .file_name()
+                .map(|p| p.to_string_lossy())
+                .unwrap_or_default()
+        )
+        .as_str(),
+    );
     progress_bar.render()?;
     while let Some(chunk) = response.chunk().await? {
         let chunk_len = chunk.len() as u64;

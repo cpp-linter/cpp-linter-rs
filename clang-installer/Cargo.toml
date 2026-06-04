@@ -35,13 +35,13 @@ thiserror = { workspace = true }
 tokio = { workspace = true, features = ["macros"], optional = true }
 url = "2.5.8"
 which = "8.0.2"
-zip = { version = "8.5.1", default-features = false, features = ["deflate"] }
+zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
 tempfile = { workspace = true }
 
 [dev-dependencies]
 colored = { workspace = true }
 mockito = { workspace = true }
-reqwest = { workspace = true, default-features = true }
+reqwest = { workspace = true, features = ["default-tls"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 [features]

@@ -109,7 +109,7 @@ jobs:
             with-env { CLANG_VERSION: $"($ver)" } {
               nur test --profile warmup
               let test_profile = (
-                if ($ver == $max_ver) { "all" } else { "ci" }
+                if ($ver == $min_ver) { "all" } else { "ci" }
               )
               nur test --profile $test_profile
             }
@@ -117,7 +117,7 @@ jobs:
           }
 
       - name: Generate Coverage HTML report
-        run: nur test llvm-cov
+        run: nur test html
 
       - name: Upload coverage data
         uses: actions/upload-artifact@v7

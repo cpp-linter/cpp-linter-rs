@@ -42,63 +42,48 @@ jobs:
         include:
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-latest
-            vendored: true
             cross: true
           - target: aarch64-unknown-linux-musl
             os: ubuntu-latest
-            vendored: true
             cross: true
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
-            vendored: false
             cross: false
           - target: x86_64-unknown-linux-musl
             os: ubuntu-latest
-            vendored: true
             cross: true
           - target: arm-unknown-linux-gnueabi
             os: ubuntu-latest
-            vendored: true
             cross: true
           - target: arm-unknown-linux-gnueabihf
             os: ubuntu-latest
-            vendored: true
             cross: true
           - target: armv7-unknown-linux-gnueabihf
             os: ubuntu-latest
-            vendored: true
             cross: true
           - target: powerpc-unknown-linux-gnu
             os: ubuntu-latest
-            vendored: true
             cross: true
-          # - target: powerpc64-unknown-linux-gnu
-          #   os: ubuntu-latest
-          #   vendored: true
-          #   cross: true
+          - target: powerpc64-unknown-linux-gnu
+            os: ubuntu-latest
+            cross: true
           - target: powerpc64le-unknown-linux-gnu
             os: ubuntu-latest
-            vendored: true
             cross: true
           - target: s390x-unknown-linux-gnu
             os: ubuntu-latest
-            vendored: true
             cross: true
           - target: aarch64-apple-darwin
             os: macos-latest
-            vendored: true
             cross: false
           - target: x86_64-apple-darwin
             os: macos-latest
-            vendored: true
             cross: false
           - target: x86_64-pc-windows-msvc
             os: windows-latest
-            vendored: false
             cross: false
           - target: aarch64-pc-windows-msvc
             os: windows-latest
-            vendored: false
             cross: false
     runs-on: ${{ matrix.os }}
     permissions:
@@ -136,7 +121,7 @@ jobs:
           --bin clang-tools
           --release
           --target ${{ matrix.target }}
-          --features ${{ matrix.vendored && 'bin,openssl-vendored' || 'bin' }}
+          --features bin
 
       - name: Prepare artifacts (unix)
         if: runner.os != 'Windows'

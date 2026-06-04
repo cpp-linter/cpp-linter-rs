@@ -45,7 +45,7 @@ jobs:
         settings:
           - host: macos-latest
             target: x86_64-apple-darwin
-            build: yarn build --target x86_64-apple-darwin --features openssl-vendored
+            build: yarn build --target x86_64-apple-darwin
           - host: windows-latest
             build: yarn build --target x86_64-pc-windows-msvc
             target: x86_64-pc-windows-msvc
@@ -54,22 +54,22 @@ jobs:
             target: i686-pc-windows-msvc
           - host: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            build: yarn build --target x86_64-unknown-linux-gnu --use-cross --features openssl-vendored
+            build: yarn build --target x86_64-unknown-linux-gnu --use-cross
           - host: ubuntu-latest
             target: x86_64-unknown-linux-musl
-            build: yarn build --target x86_64-unknown-linux-musl -x --features openssl-vendored
+            build: yarn build --target x86_64-unknown-linux-musl -x
           - host: macos-latest
             target: aarch64-apple-darwin
-            build: yarn build --target aarch64-apple-darwin --features openssl-vendored
+            build: yarn build --target aarch64-apple-darwin
           - host: ubuntu-latest
             target: aarch64-unknown-linux-gnu
-            build: yarn build --target aarch64-unknown-linux-gnu --use-cross --features openssl-vendored
+            build: yarn build --target aarch64-unknown-linux-gnu --use-cross
           - host: ubuntu-latest
             target: armv7-unknown-linux-gnueabihf
-            build: yarn build --target armv7-unknown-linux-gnueabihf --use-cross --features openssl-vendored
+            build: yarn build --target armv7-unknown-linux-gnueabihf --use-cross
           - host: ubuntu-latest
             target: aarch64-unknown-linux-musl
-            build: yarn build --target aarch64-unknown-linux-musl -x --features openssl-vendored
+            build: yarn build --target aarch64-unknown-linux-musl -x
           - host: windows-latest
             target: aarch64-pc-windows-msvc
             build: yarn build --target aarch64-pc-windows-msvc
@@ -100,20 +100,20 @@ jobs:
             target/
           key: ${{ matrix.settings.target }}-cargo-${{ matrix.settings.host }}
       - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
-        if: ${{ contains(matrix.settings.build, ' -x ') }}
+        if: ${{ endsWith(matrix.settings.build, ' -x') }}
         with:
           version: 0.14.1
           use-cache: true # zizmor: ignore[cache-poisoning]
       - name: Install cargo-binstall
-        if: contains(matrix.settings.build, ' -x ') || contains(matrix.settings.build, '--use-cross ')
+        if: endsWith(matrix.settings.build, ' -x') || endsWith(matrix.settings.build, '--use-cross')
         uses: cargo-bins/cargo-binstall@aaa84a43aec4955a42c5ffc65d258961e39f276e # v1.19.1
         env:
           GITHUB_TOKEN: ${{ github.token }}
-      - name: Install ${{contains(matrix.settings.build, ' -x ') && 'cargo-zigbuild' || 'cargo-cross'}}
-        if: contains(matrix.settings.build, ' -x ') || contains(matrix.settings.build, '--use-cross ')
+      - name: Install ${{endsWith(matrix.settings.build, ' -x') && 'cargo-zigbuild' || 'cargo-cross'}}
+        if: endsWith(matrix.settings.build, ' -x') || endsWith(matrix.settings.build, '--use-cross')
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          tool: ${{contains(matrix.settings.build, ' -x ') && 'cargo-zigbuild' || 'cross'}}
+          tool: ${{endsWith(matrix.settings.build, ' -x') && 'cargo-zigbuild' || 'cross'}}
         run: cargo binstall -y $tool
       - name: Setup toolchain
         run: ${{ matrix.settings.setup }}
@@ -139,8 +139,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - name: Build
-        id: build
+      - name: setup FreeBSD VM
         uses: cross-platform-actions/action@0c165ad7eb2d6a7e8552d6af5aad2bbedfc646b0 # v1.1.0
         env:
           DEBUG: napi:*
@@ -151,29 +150,30 @@ jobs:
           memory: 8G
           cpu_count: 3
           environment_variables: DEBUG RUSTUP_IO_THREADS
-          shell: bash
-          run: |
-            sudo pkg install -y -f curl node libnghttp2 npm cmake
-            sudo npm install -g yarn --ignore-scripts
-            curl https://sh.rustup.rs -sSf --output rustup.sh
-            sh rustup.sh -y --profile minimal --default-toolchain stable
-            source "$HOME/.cargo/env"
-            echo "~~~~ rustc --version ~~~~"
-            rustc --version
-            echo "~~~~ node -v ~~~~"
-            node -v
-            echo "~~~~ yarn --version ~~~~"
-            yarn --version
-            pwd
-            ls -lah
-            whoami
-            env
-            freebsd-version
-            yarn install
-            yarn build
-            rm -rf node_modules
-            rm -rf target
-            rm -rf .yarn/cache
+      - name: Build
+        shell: cpa.sh {0}
+        run: |-
+          sudo pkg install -y -f curl node libnghttp2 npm cmake
+          sudo npm install -g yarn --ignore-scripts
+          curl https://sh.rustup.rs -sSf --output rustup.sh
+          sh rustup.sh -y --profile minimal --default-toolchain stable
+          . "$HOME/.cargo/env"
+          echo "~~~~ rustc --version ~~~~"
+          rustc --version
+          echo "~~~~ node -v ~~~~"
+          node -v
+          echo "~~~~ yarn --version ~~~~"
+          yarn --version
+          pwd
+          ls -lah
+          whoami
+          env
+          freebsd-version
+          yarn install
+          yarn build
+          rm -rf node_modules
+          rm -rf target
+          rm -rf .yarn/cache
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:

@@ -1,0 +1,74 @@
+[
+  {
+    "sha": "1dd236cb113f5e05df15f34dfd338b3dd8b164cd",
+    "filename": ".clang-format",
+    "status": "modified",
+    "additions": 1,
+    "deletions": 1,
+    "changes": 2,
+    "blob_url": "https://github.com/cpp-linter/test-cpp-linter-action/blob/01e2ebf010b949986fa3e6d6e81e7f7c8da90001/.clang-format",
+    "raw_url": "https://github.com/cpp-linter/test-cpp-linter-action/raw/01e2ebf010b949986fa3e6d6e81e7f7c8da90001/.clang-format",
+    "contents_url": "https://api.github.com/repos/cpp-linter/test-cpp-linter-action/contents/.clang-format?ref=01e2ebf010b949986fa3e6d6e81e7f7c8da90001",
+    "patch": "@@ -1,3 +1,3 @@\n ---\n Language:        Cpp\n-BasedOnStyle:  WebKit\n\\ No newline at end of file\n+BasedOnStyle:  WebKit"
+  },
+  {
+    "sha": "d3865adefcf84328aa3e1015942d8a60680f726a",
+    "filename": ".clang-tidy",
+    "status": "modified",
+    "additions": 1,
+    "deletions": 0,
+    "changes": 1,
+    "blob_url": "https://github.com/cpp-linter/test-cpp-linter-action/blob/01e2ebf010b949986fa3e6d6e81e7f7c8da90001/.clang-tidy",
+    "raw_url": "https://github.com/cpp-linter/test-cpp-linter-action/raw/01e2ebf010b949986fa3e6d6e81e7f7c8da90001/.clang-tidy",
+    "contents_url": "https://api.github.com/repos/cpp-linter/test-cpp-linter-action/contents/.clang-tidy?ref=01e2ebf010b949986fa3e6d6e81e7f7c8da90001",
+    "patch": "@@ -183,3 +183,4 @@ CheckOptions:\n     value:           '1'\n   - key:             readability-uppercase-literal-suffix.NewSuffixes\n     value:           ''\n+..."
+  },
+  {
+    "sha": "7c6ca7ac47687ea5caae171ccd04525c08312bc6",
+    "filename": ".github/workflows/cpp-lint-action.yml",
+    "status": "modified",
+    "additions": 7,
+    "deletions": 7,
+    "changes": 14,
+    "blob_url": "https://github.com/cpp-linter/test-cpp-linter-action/blob/01e2ebf010b949986fa3e6d6e81e7f7c8da90001/.github%2Fworkflows%2Fcpp-lint-action.yml",
+    "raw_url": "https://github.com/cpp-linter/test-cpp-linter-action/raw/01e2ebf010b949986fa3e6d6e81e7f7c8da90001/.github%2Fworkflows%2Fcpp-lint-action.yml",
+    "contents_url": "https://api.github.com/repos/cpp-linter/test-cpp-linter-action/contents/.github%2Fworkflows%2Fcpp-lint-action.yml?ref=01e2ebf010b949986fa3e6d6e81e7f7c8da90001",
+    "patch": "@@ -32,7 +32,7 @@ jobs:\n         run: mkdir build && cmake -Bbuild src\n \n       - name: Run linter as action\n-        uses: cpp-linter/cpp-linter-action@latest\n+        uses: cpp-linter/cpp-linter-action@main\n         id: linter\n         env:\n           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}\n@@ -42,17 +42,17 @@ jobs:\n           # to ignore all build folder contents\n           ignore: build\n           database: build\n-          verbosity: 9\n+          verbosity: debug\n           version: ${{ matrix.clang-version }}\n-          thread-comments: ${{ matrix.clang-version == '12' }}\n-          file-annotations: ${{ matrix.clang-version == '12' }}\n+          thread-comments: ${{ matrix.clang-version == '16' }}\n+          file-annotations: ${{ matrix.clang-version == '16' }}\n           extra-args: -std=c++14 -Wall\n \n       - name: Fail fast?!\n         # if: steps.linter.outputs.checks-failed > 0\n         run: | \n-          echo \"some linter checks failed\"\n-          echo \"${{ steps.linter.outputs.checks-failed }}\"\n-          echo \"${{ env.checks-failed }}\"\n+          echo \"checks-failed: ${{ steps.linter.outputs.checks-failed }}\"\n+          echo \"clang-tidy-checks-failed: ${{ steps.linter.outputs.clang-tidy-checks-failed }}\"\n+          echo \"clang-format-checks-failed: ${{ steps.linter.outputs.clang-format-checks-failed }}\"\n         # for actual deployment\n         # run: exit 1"
+  },
+  {
+    "sha": "18b133e7997cdace197d391cc01e9b192b446df0",
+    "filename": ".github/workflows/cpp-lint-package.yml",
+    "status": "modified",
+    "additions": 10,
+    "deletions": 3,
+    "changes": 13,
+    "blob_url": "https://github.com/cpp-linter/test-cpp-linter-action/blob/01e2ebf010b949986fa3e6d6e81e7f7c8da90001/.github%2Fworkflows%2Fcpp-lint-package.yml",
+    "raw_url": "https://github.com/cpp-linter/test-cpp-linter-action/raw/01e2ebf010b949986fa3e6d6e81e7f7c8da90001/.github%2Fworkflows%2Fcpp-lint-package.yml",
+    "contents_url": "https://api.github.com/repos/cpp-linter/test-cpp-linter-action/contents/.github%2Fworkflows%2Fcpp-lint-package.yml?ref=01e2ebf010b949986fa3e6d6e81e7f7c8da90001",
+    "patch": "@@ -5,8 +5,9 @@ on:\n     inputs:\n       branch:\n         description: 'which branch to test'\n-        default: 'main'\n+        default: 'fix-test-coverage'\n         required: true\n+  pull_request:\n \n jobs:\n   cpp-linter:\n@@ -16,7 +17,8 @@ jobs:\n       matrix:\n         clang-version: ['7', '8', '9','10', '11', '12', '13', '14', '15', '16', '17']\n         repo: ['cpp-linter/cpp-linter']\n-        branch: ['${{ inputs.branch }}']\n+        branch:\n+          - ${{ github.event_name == 'workflow_dispatch' && inputs.branch || 'fix-test-coverage' }}\n       fail-fast: false\n \n     steps:\n@@ -66,9 +68,14 @@ jobs:\n           --extra-arg=\"-std=c++14 -Wall\"\n           --thread-comments=${{ matrix.clang-version == '17' && 'update' }}\n           -a=${{ matrix.clang-version == '17' }}\n+          --tidy-review=${{ matrix.clang-version == '17' }}\n+          --format-review=${{ matrix.clang-version == '17' }}\n \n       - name: Fail fast?!\n         if: steps.linter.outputs.checks-failed > 0\n-        run: echo \"Some files failed the linting checks!\"\n+        run: |\n+          echo \"checks-failed: ${{ steps.linter.outputs.checks-failed }}\"\n+          echo \"clang-tidy-checks-failed: ${{ steps.linter.outputs.clang-tidy-checks-failed }}\"\n+          echo \"clang-format-checks-failed: ${{ steps.linter.outputs.clang-format-checks-failed }}\"\n         # for actual deployment\n         # run: exit 1"
+  },
+  {
+    "sha": "1bf553e06e4b7c6c9a9be5da4845acbdeb04f6a5",
+    "filename": "src/demo.cpp",
+    "status": "modified",
+    "additions": 11,
+    "deletions": 10,
+    "changes": 21,
+    "blob_url": "https://github.com/cpp-linter/test-cpp-linter-action/blob/01e2ebf010b949986fa3e6d6e81e7f7c8da90001/src%2Fdemo.cpp",
+    "raw_url": "https://github.com/cpp-linter/test-cpp-linter-action/raw/01e2ebf010b949986fa3e6d6e81e7f7c8da90001/src%2Fdemo.cpp",
+    "contents_url": "https://api.github.com/repos/cpp-linter/test-cpp-linter-action/contents/src%2Fdemo.cpp?ref=01e2ebf010b949986fa3e6d6e81e7f7c8da90001",
+    "patch": "@@ -1,17 +1,18 @@\n /** This is a very ugly test code (doomed to fail linting) */\n #include \"demo.hpp\"\n-#include <cstdio>\n-#include <cstddef>\n+#include <stdio.h>\n \n-// using size_t from cstddef\n-size_t dummyFunc(size_t i) { return i; }\n \n-int main()\n-{\n-    for (;;)\n-        break;\n+\n+\n+int main(){\n+\n+    for (;;) break;\n+\n \n     printf(\"Hello world!\\n\");\n \n-    return 0;\n-}\n+\n+\n+\n+    return 0;}"
+  },
+  {
+    "sha": "f93d0122ae2e3c1952c795837d71c432036b55eb",
+    "filename": "src/demo.hpp",
+    "status": "modified",
+    "additions": 3,
+    "deletions": 8,
+    "changes": 11,
+    "blob_url": "https://github.com/cpp-linter/test-cpp-linter-action/blob/01e2ebf010b949986fa3e6d6e81e7f7c8da90001/src%2Fdemo.hpp",
+    "raw_url": "https://github.com/cpp-linter/test-cpp-linter-action/raw/01e2ebf010b949986fa3e6d6e81e7f7c8da90001/src%2Fdemo.hpp",
+    "contents_url": "https://api.github.com/repos/cpp-linter/test-cpp-linter-action/contents/src%2Fdemo.hpp?ref=01e2ebf010b949986fa3e6d6e81e7f7c8da90001",
+    "patch": "@@ -5,12 +5,10 @@\n class Dummy {\n     char* useless;\n     int numb;\n+    Dummy() :numb(0), useless(\"\\0\"){}\n \n     public:\n-    void *not_usefull(char *str){\n-        useless = str;\n-        return 0;\n-    }\n+    void *not_useful(char *str){useless = str;}\n };\n \n \n@@ -28,14 +26,11 @@ class Dummy {\n \n \n \n-\n-\n-\n-\n \n \n struct LongDiff\n {\n+\n     long diff;\n \n };"
+  }
+]
