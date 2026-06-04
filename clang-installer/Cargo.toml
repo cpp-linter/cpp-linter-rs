@@ -1,6 +1,6 @@
 [package]
 name = "clang-installer"
-version = "0.1.0"
+version = "0.1.1"
 description = "A utility for installing specific versions of clang-format and clang-tidy, used by cpp-linter."
 readme = "README.md"
 keywords = ["clang-tidy", "clang-format", "cpp-linter"]
