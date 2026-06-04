@@ -109,7 +109,7 @@ jobs:
             with-env { CLANG_VERSION: $"($ver)" } {
               nur test --profile warmup
               let test_profile = (
-                if ($ver == $max_ver) { "all" } else { "ci" }
+                if ($ver == $min_ver) { "all" } else { "ci" }
               )
               nur test --profile $test_profile
             }
