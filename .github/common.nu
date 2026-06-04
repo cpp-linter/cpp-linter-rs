@@ -36,6 +36,7 @@ export def --wrapped run-cmd [...cmd: string] {
         ($cmd | first)
     }
     print $"(ansi blue)\nRunning(ansi reset) ($cmd | str join ' ')"
+    # spell-checker: disable-next-line
     let elapsed = timeit {|| ^($cmd | first) ...($cmd | skip 1)}
     print $"(ansi magenta)($app) took ($elapsed)(ansi reset)"
 }

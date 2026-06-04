@@ -29,6 +29,7 @@ words:
   - ecurity
   - efactor
   - elete
+  - elif
   - emove
   - endfor
   - endgroup
@@ -114,8 +115,6 @@ words:
   - tempdir
   - tempfile
   - thiserror
-  - timeit
-  - topo
   - twemoji
   - upport
   - vararg

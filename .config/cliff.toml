@@ -28,8 +28,10 @@ body = """
 
         > {{ message }}
     {%- endif %}
-{% else -%}
+{% elif previous.timestamp -%}
     ## [{{ UNRELEASED }}] - {{ previous.timestamp | date(format="%Y-%m-%d") }} to present
+{% else -%}
+    ## [{{ UNRELEASED }}]
 {% endif -%}
 
 {% for group, commits in commits | group_by(attribute="group") %}
@@ -45,14 +47,19 @@ body = """
     {% endfor %}
 {% endfor -%}
 
-{% set first_commit = previous.version -%}
-{%- set last_commit = "HEAD" -%}
 {% if version -%}
+    {#- Use the current version tag as the latest commit -#}
     {%- set last_commit = version -%}
-    {%- if not previous.version -%}
-        {#- If this is the first versioned release, use the initial commit -#}
-        {%- set first_commit = init_commit -%}
-    {%- endif -%}
+{%- else -%}
+    {#- Otherwise, just call it HEAD -#}
+    {%- set last_commit = "HEAD" -%}
+{%- endif -%}
+{%- if not previous.version -%}
+    {#- If this is the first versioned release, use the initial commit -#}
+    {%- set first_commit = init_commit -%}
+{%- else -%}
+    {#- Otherwise, use the previous version tag as the starting point -#}
+    {%- set first_commit = previous.version -%}
 {%- endif %}
 [{{ this_version }}]: {{ self::remote_url() }}/compare/{{ first_commit }}...{{ last_commit }}
 
@@ -148,10 +155,11 @@ commit_parsers = [
 # filter out the commits that are not matched by commit parsers
 filter_commits = true
 # sort the tags topologically
+# spell-checker: disable-next-line
 topo_order = false
 # sort the commits inside sections by oldest/newest order
 sort_commits = "oldest"
 
-# [remote.github]
-# owner = "cpp-linter"
-# repo = "cpp-linter-rs"
+[remote.github]
+owner = "cpp-linter"
+repo = "cpp-linter-rs"

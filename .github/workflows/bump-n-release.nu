@@ -5,6 +5,9 @@
 #
 #    This step requires `cargo-edit` installed.
 #
+#    If bumping the cpp-linter-js package, yarn must be installed to
+#    update the version in the bindings/node/package.json manifest also.
+#
 # 2. Updates the appropriate CHANGELOG.md
 #
 #    Requires `git-cliff` (see https://git-cliff.org) to be installed
@@ -85,6 +88,7 @@ const PkgPaths = {
         path: 'bindings/node'
     }
 }
+
 export def get-changed-pkgs [] {
     let changed_files = (
         git 'diff' '--name-only' 'HEAD~1' 'HEAD'
@@ -99,17 +103,15 @@ export def get-changed-pkgs [] {
         let pkg = $row.column0
         let paths = $row.column1
         print $"Checking changes for ($pkg)..."
-        let has_changed = if ($paths.include | is-empty) {
-            true
-        } else {
-            $changed_files | any {|file| $paths.include | each {|p| glob $p | any {|g| $g == $file}}}
+        let has_changed = if ($paths.include | is-empty) { true } else {
+            $changed_files | any {|file| $paths.include | any {|p| ($file | path expand) in (glob $p)}}
         }
         print $"  Has changes: ($has_changed)"
         let has_excluded_change = if ($paths.exclude | is-empty) { false } else {
-            $changed_files | any {|file| $paths.exclude | each {|p| glob $p | any {|g| $g == $file}}}
+            $changed_files | any {|file| $paths.exclude | any {|p| ($file | path expand) in (glob $p)}}
         }
         print $"  Has excluded changes: ($has_excluded_change)"
-        if $has_changed and not $has_excluded_change {
+        if $has_changed {
             print $" Package ($pkg) has relevant changes"
             $pkgs = $pkgs | append $pkg
         }
@@ -186,8 +188,6 @@ export def gen-changes [
     mut args = [
         '--config' $"($config_path | path join 'cliff.toml')"
         '--tag-pattern' $"($pkg)/*"
-        '--workdir' $path
-        '--repository' (pwd)
     ]
     if (($tag | str length) > 0) {
         $args = $args | append ['--tag', $tag]
@@ -255,13 +255,13 @@ def main [
     }
     if (is-in-ci) and $is_main {
         print 'Pushing metadata changes'
-        run-cmd 'git' 'config' '--global' 'user.name' $"($env.GITHUB_ACTOR)"
-        run-cmd 'git' 'config' '--global' 'user.email' $"($env.GITHUB_ACTOR_ID)+($env.GITHUB_ACTOR)@users.noreply.github.com"
-        run-cmd 'git' 'add' '--all'
-        run-cmd 'git' 'commit' '-m' $"build: bump version to ($tag)"
-        run-cmd 'git' 'push'
+        run-cmd git config --global user.name $"($env.GITHUB_ACTOR)"
+        run-cmd git config --global user.email $"($env.GITHUB_ACTOR_ID)+($env.GITHUB_ACTOR)@users.noreply.github.com"
+        run-cmd git add --all
+        run-cmd git commit -m $"build: bump version to ($tag)"
+        run-cmd git push
         print $"Deploying ($tag)"
-        run-cmd 'gh' 'release' 'create' $tag '--notes-file' '.config/ReleaseNotes.md' '--title' $"($pkg) v($ver)"
+        run-cmd gh release create $tag --notes-file .config/ReleaseNotes.md --title $"($pkg) v($ver)"
     } else if $is_main {
         print $"(ansi yellow)Not deploying from local clone.(ansi reset)"
     }
