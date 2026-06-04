@@ -54,7 +54,7 @@ pub enum GetClangVersionError {
 
 /// A enumeration of supported clang tools.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
-#[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
+#[cfg_attr(feature = "bin", derive(clap::ValueEnum))]
 pub enum ClangTool {
     ClangTidy,
     ClangFormat,

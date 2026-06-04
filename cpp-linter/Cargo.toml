@@ -59,4 +59,4 @@ bench = false
 required-features = ["bin"]
 
 [package.metadata.binstall]
-pkg-url = "{ repo }/releases/download/{ name }/v{ version }/{ bin }-{ target }{ archive-suffix }"
+pkg-url = "{ repo }/releases/download/cpp-linter/v{ version }/{ name }-{ target }{ archive-suffix }"

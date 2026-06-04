@@ -45,11 +45,7 @@ reqwest = { workspace = true, features = ["default-tls"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 [features]
-bin = ["clap", "tokio", "anyhow", "colored"]
-clap = ["dep:clap"]
-tokio = ["dep:tokio"]
-anyhow = ["dep:anyhow"]
-colored = ["dep:colored"]
+bin = ["dep:clap", "dep:tokio", "dep:anyhow", "dep:colored"]
 
 [package.metadata.binstall]
-pkg-url = "{ repo }/releases/download/{ name }/v{ version }/{ bin }-{ target }{ archive-suffix }"
+pkg-url = "{ repo }/releases/download/clang-installer/v{ version }/{ name }-{ target }{ archive-suffix }"
