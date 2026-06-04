@@ -142,10 +142,11 @@ impl RestClient {
                 ));
             }
             let options = ThreadCommentOptions {
-                policy: match feedback_inputs.thread_comments {
-                    ThreadComments::Update => CommentPolicy::Update,
-                    ThreadComments::On => CommentPolicy::Anew,
-                    ThreadComments::Off => unreachable!(),
+                policy: if feedback_inputs.thread_comments == ThreadComments::Update {
+                    CommentPolicy::Update
+                } else {
+                    // feedback_inputs.thread_comments is not Off and not Update, so it must be just On.
+                    CommentPolicy::Anew
                 },
                 comment: comment.unwrap_or_default(),
                 kind: if format_checks_failed == 0 && tidy_checks_failed == 0 {
@@ -258,10 +259,9 @@ impl RestClient {
                         let title = format!("{}:{}:{}", note.filename, note.line, note.cols);
                         let annotation = FileAnnotation {
                             severity: match note.severity.as_str() {
-                                "note" => AnnotationLevel::Notice,
                                 "warning" => AnnotationLevel::Warning,
                                 "error" => AnnotationLevel::Error,
-                                _ => AnnotationLevel::Notice, // default to notice if severity is unrecognized
+                                _ => AnnotationLevel::Notice, // default to notice for all else
                             },
                             path,
                             start_line: None,
@@ -417,7 +417,7 @@ mod test {
         default::Default,
         env,
         io::Read,
-        path::{Path, PathBuf},
+        path::PathBuf,
         sync::{Arc, Mutex},
     };
 
@@ -439,11 +439,7 @@ mod test {
 
     // ************************* tests for step-summary and output variables
 
-    async fn create_comment(
-        is_lgtm: bool,
-        fail_gh_out: bool,
-        fail_summary: bool,
-    ) -> (String, String) {
+    async fn create_comment(is_lgtm: bool) -> (String, String) {
         let tmp_dir = tempdir().unwrap();
         unsafe {
             // ensure we are mimicking a CI platform
@@ -490,27 +486,14 @@ mod test {
                 String::from("file")
             },
             step_summary: true,
+            file_annotations: false,
             ..Default::default()
         };
         let mut step_summary_path = NamedTempFile::new_in(tmp_dir.path()).unwrap();
         let mut gh_out_path = NamedTempFile::new_in(tmp_dir.path()).unwrap();
         unsafe {
-            env::set_var(
-                "GITHUB_STEP_SUMMARY",
-                if fail_summary {
-                    Path::new("not-a-file.txt")
-                } else {
-                    step_summary_path.path()
-                },
-            );
-            env::set_var(
-                "GITHUB_OUTPUT",
-                if fail_gh_out {
-                    Path::new("not-a-file.txt")
-                } else {
-                    gh_out_path.path()
-                },
-            );
+            env::set_var("GITHUB_STEP_SUMMARY", step_summary_path.path());
+            env::set_var("GITHUB_OUTPUT", gh_out_path.path());
         }
         let clang_versions = ClangVersions {
             format_version: Some(Version::new(1, 2, 3)),
@@ -524,20 +507,16 @@ mod test {
         step_summary_path
             .read_to_string(&mut step_summary_content)
             .unwrap();
-        if !fail_summary {
-            assert!(&step_summary_content.contains(USER_OUTREACH));
-        }
+        assert!(&step_summary_content.contains(USER_OUTREACH));
         let mut gh_out_content = String::new();
         gh_out_path.read_to_string(&mut gh_out_content).unwrap();
-        if !fail_gh_out {
-            assert!(gh_out_content.starts_with("checks-failed="));
-        }
+        assert!(gh_out_content.starts_with("checks-failed="));
         (step_summary_content, gh_out_content)
     }
 
     #[tokio::test]
     async fn check_comment_concerns() {
-        let (comment, gh_out) = create_comment(false, false, false).await;
+        let (comment, gh_out) = create_comment(false).await;
         assert!(&comment.contains(":warning:\nSome files did not pass the configured checks!\n"));
         let fmt_pattern = Regex::new(r"format-checks-failed=(\d+)\n").unwrap();
         let tidy_pattern = Regex::new(r"tidy-checks-failed=(\d+)\n").unwrap();
@@ -559,7 +538,7 @@ mod test {
         unsafe {
             env::set_var("ACTIONS_STEP_DEBUG", "true");
         }
-        let (comment, gh_out) = create_comment(true, false, false).await;
+        let (comment, gh_out) = create_comment(true).await;
         assert!(comment.contains(":heavy_check_mark:\nNo problems need attention."));
         assert_eq!(
             gh_out,
