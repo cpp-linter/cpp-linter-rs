@@ -405,7 +405,7 @@ dependencies = [
 
 [[package]]
 name = "cpp-linter-py"
-version = "2.0.0-rc.15"
+version = "2.0.0-rc.16"
 dependencies = [
  "cpp-linter",
  "pyo3",
