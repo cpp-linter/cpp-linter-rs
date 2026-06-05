@@ -7,7 +7,7 @@ name = "cli-gen"
 description = "Generate cpp-linter CLI doc from rust src."
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 authors = [
     { name = "Brendan Doherty", email = "2bndy5@gmail.com" },
 ]
@@ -16,10 +16,10 @@ dynamic = ["version"]
 
 [dependency-groups]
 dev = [
-    "maturin==1.11.5",
-    "mypy==1.19.1",
+    "maturin==1.13.3",
+    "mypy==2.1.0",
     "patchelf==0.17.2.2 ; sys_platform == 'linux'",
-    "ruff==0.14.13",
+    "ruff==0.15.16",
 ]
 docs = [
     "markdown-gfm-admonition==0.3.0",
