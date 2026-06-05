@@ -34,7 +34,7 @@ thiserror = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 [dependencies.git-bot-feedback]
-version = "0.5.4"
+version = "0.5.5"
 features = ["file-changes"]
 # path = "../../git-bot-feedback"
 # git = "https://github.com/2bndy5/git-bot-feedback"

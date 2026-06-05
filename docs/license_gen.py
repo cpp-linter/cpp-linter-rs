@@ -9,6 +9,7 @@ INTRO = """# Third-party Licenses
 [MIT]: https://choosealicense.com/licenses/mit
 [Apache-2.0]: https://choosealicense.com/licenses/apache-2.0/
 [MPL-2.0]: https://choosealicense.com/licenses/mpl-2.0
+[GPL-3.0]: https://choosealicense.com/licenses/gpl-3.0/
 """
 
 TABLE_HEADER = "| Dependency | License |\n|:------------|:-------|\n"
@@ -23,17 +24,6 @@ CLANG_INSTALLER_DEPS = f"""## clang-installer's dependencies
 {TABLE_HEADER}\
 """
 
-OPTIONAL_DEPS = f"""## Optional dependencies
-
-The following are conditionally included in binaries (using the `openssl-vendored`
-feature on a case-by-case basis) because it is a dependency of
-[git2](https://crates.io/crates/git2):
-
-{TABLE_HEADER}\
-| [openssl](https://crates.io/crates/openssl) | [Apache-2.0] |
-| [openssl-probe](https://crates.io/crates/openssl-probe) | [MIT] OR [Apache-2.0] |
-"""
-
 PY_BINDING_HEADER = f"""## Bindings' dependencies
 
 ### Python binding
@@ -44,7 +34,9 @@ JS_BINDING_HEADER = f"""### Node.js binding
 
 {TABLE_HEADER}"""
 
-SELF_DEP = re.compile(r"(\| \[cpp-linter v[0-9.]+[^\s]*)[^\]]+(\]\(.*)$")
+SELF_DEP = re.compile(
+    r"(\| \[(?:cpp-linter|clang-installer) v[0-9.]+[^\s]*)[^\]]+(\]\(.*)$"
+)
 
 
 class TreeGetter:
@@ -80,6 +72,7 @@ class TreeGetter:
                 .replace(" MIT", " [MIT]")
                 .replace(" Apache-2.0", " [Apache-2.0]")
                 .replace(" MPL-2.0", " [MPL-2.0]")
+                .replace(" GPL-3.0", " [GPL-3.0]")
                 .strip()
             )
             self_match = SELF_DEP.match(dep)
@@ -96,7 +89,6 @@ with mkdocs_gen_files.open(FILENAME, "w") as io_doc:
     doc += tg.get_output()
     # print(doc)
     print(doc, file=io_doc)
-    print(f"\n{OPTIONAL_DEPS}\n", file=io_doc)
     tg.package("cpp-linter-py")
     doc = tg.get_output()
     print(f"\n{PY_BINDING_HEADER}{doc}", file=io_doc)
