@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
+## [cpp-linter-js/v2.0.0-rc.16] - 2026-06-05
+
+### <!-- 4 --> 🛠️ Fixed
+
+- Restore cargo binstall support by @2bndy5 in [#328](https://github.com/cpp-linter/cpp-linter-rs/pull/328)
+
+### <!-- 6 --> 📦 Dependency updates
+
+- Bump deps in the uv-pip group and drop python v3.9 support by @dependabot[bot] in [#316](https://github.com/cpp-linter/cpp-linter-rs/pull/316)
+- Bump the npm group across 1 directory with 3 updates by @dependabot[bot] in [#315](https://github.com/cpp-linter/cpp-linter-rs/pull/315)
+- Bump version to clang-installer/v0.1.2 by @2bndy5 in [`2aea596`](https://github.com/cpp-linter/cpp-linter-rs/commit/2aea596824ca58387860b392e67e180630db258b)
+- Bump version to cpp-linter/v2.0.0-rc.16 by @2bndy5 in [`85d6de5`](https://github.com/cpp-linter/cpp-linter-rs/commit/85d6de5fb3073ae66333d48c3d3275ac07baf02f)
+- Bump version to cpp-linter-py/v2.0.0-rc.16 by @2bndy5 in [`8dbd515`](https://github.com/cpp-linter/cpp-linter-rs/commit/8dbd515697b89696e922dc1a65c324a22e6624bd)
+
+### <!-- 9 --> 🗨️ Changed
+
+- Realign release candidate numbers by @2bndy5 in [`22dd0bb`](https://github.com/cpp-linter/cpp-linter-rs/commit/22dd0bb6bf0493d88ee20fed5acc8ffbf1d32f62)
+
+[cpp-linter-js/v2.0.0-rc.16]: https://github.com/cpp-linter/cpp-linter-rs/compare/cpp-linter-js/v2.0.0-rc.1...cpp-linter-js/v2.0.0-rc.16
+
+Full commit diff: [`cpp-linter-js/v2.0.0-rc.1...cpp-linter-js/v2.0.0-rc.16`][cpp-linter-js/v2.0.0-rc.16]
+
 ## [cpp-linter-js/v2.0.0-rc.1] - 2026-06-04
 
 ### <!-- 1 --> 🚀 Added
@@ -132,6 +154,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump version to clang-installer/v0.1.1 by @2bndy5 in [`24ed0a4`](https://github.com/cpp-linter/cpp-linter-rs/commit/24ed0a4556bf5169b8da5c06eef29f5694caa2cd)
 - Bump version to cpp-linter/v2.0.0-rc.1 by @2bndy5 in [`2c65f26`](https://github.com/cpp-linter/cpp-linter-rs/commit/2c65f26bc24060e5f80271ef315f54dced30b9cd)
 - Bump version to cpp-linter-py/v2.0.0-rc.1 by @2bndy5 in [`e88c348`](https://github.com/cpp-linter/cpp-linter-rs/commit/e88c348424db535e7ced5f81300df74aed0885f4)
+- Bump version to cpp-linter-js/v2.0.0-rc.1 by @2bndy5 in [`86cc773`](https://github.com/cpp-linter/cpp-linter-rs/commit/86cc7739b865fd0bce86d0f265a0e0935ef13437)
 
 ### <!-- 8 --> 📝 Documentation
 
