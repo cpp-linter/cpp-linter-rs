@@ -8,7 +8,7 @@ description = "Run clang-format and clang-tidy on a batch of files."
 readme = "bindings/python/README.md"
 keywords = ["clang", "clang-tools", "linter", "clang-tidy", "clang-format"]
 license = "MIT"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 authors = [
     { name = "Brendan Doherty", email = "2bndy5@gmail.com" },
     { name = "Xianpeng Shen", email = "xianpeng.shen@gmail.com" },
@@ -54,10 +54,10 @@ manifest-path = "bindings/python/Cargo.toml"
 [dependency-groups]
 dev = [
     "maturin==1.13.3",
-    "mypy==1.19.1",
+    "mypy==2.1.0",
     "patchelf==0.17.2.2 ; sys_platform == 'linux'",
     "pre-commit>=4.3.0",
-    "ruff==0.14.13",
+    "ruff==0.15.16",
 ]
 test = [
     "meson==1.10.2",
