@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
+## [clang-installer/v0.1.2] - 2026-06-05
+
+### <!-- 4 --> 🛠️ Fixed
+
+- Restore cargo binstall support by @2bndy5 in [#328](https://github.com/cpp-linter/cpp-linter-rs/pull/328)
+
+[clang-installer/v0.1.2]: https://github.com/cpp-linter/cpp-linter-rs/compare/clang-installer/v0.1.1...clang-installer/v0.1.2
+
+Full commit diff: [`clang-installer/v0.1.1...clang-installer/v0.1.2`][clang-installer/v0.1.2]
+
 ## [clang-installer/v0.1.1] - 2026-06-04
 
 ### <!-- 1 --> 🚀 Added
@@ -16,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### <!-- 6 --> 📦 Dependency updates
 
 - Bump the cargo group across 1 directory with 8 updates by @dependabot[bot] in [#301](https://github.com/cpp-linter/cpp-linter-rs/pull/301)
+- Bump version to clang-installer/v0.1.1 by @2bndy5 in [`24ed0a4`](https://github.com/cpp-linter/cpp-linter-rs/commit/24ed0a4556bf5169b8da5c06eef29f5694caa2cd)
 
 ### <!-- 9 --> 🗨️ Changed
 

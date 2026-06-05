@@ -17,7 +17,7 @@ license.workspace = true
 anyhow = { workspace = true }
 async-trait = "0.1.89"
 chrono = "0.4.44"
-clang-installer = { path = "../clang-installer", version = "0.1.1" }
+clang-installer = { path = "../clang-installer", version = "0.1.2" }
 clap = { workspace = true, optional = true }
 colored = { workspace = true, optional = true }
 fast-glob = "1.0.1"
