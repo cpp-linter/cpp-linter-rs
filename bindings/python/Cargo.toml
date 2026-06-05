@@ -17,6 +17,6 @@ crate-type = ["cdylib"]
 bench = false
 
 [dependencies]
-pyo3 = { workspace = true, features = ["abi3-py39"] }
+pyo3 = { workspace = true, features = ["abi3-py310"] }
 cpp-linter = { path = "../../cpp-linter", features = ["bin"] }
 tokio = { workspace = true }
