@@ -153,12 +153,12 @@ jobs:
           $tgt = "cpp-linter"
           mv "../target/${{ matrix.target }}/release/${tgt}.exe" "./${tgt}.exe"
           $arc_name = "${tgt}-${{ matrix.target }}.zip"
-          tar -a -c -v -f "${arc_name}" ${tgt}.exe LICENSE
+          tar -a -c -v -f "${arc_name}" "${tgt}.exe" "LICENSE"
 
           $tgt = "clang-tools"
           mv "../target/${{ matrix.target }}/release/${tgt}.exe" "./${tgt}.exe"
           $arc_name = "${tgt}-${{ matrix.target }}.zip"
-          tar -a -c -v -f "${arc_name}" ${tgt}.exe LICENSE
+          tar -a -c -v -f "${arc_name}" "${tgt}.exe" "LICENSE"
       - name: Upload cpp-linter artifacts
         uses: actions/upload-artifact@v7
         with:

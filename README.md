@@ -53,7 +53,8 @@
 
 # C/C++ Linting Package
 
-A package for linting C/C++ code with clang-tidy and/or clang-format to collect feedback provided in the form of
+A package for linting C/C++ code with clang-tidy and/or clang-format to collect
+feedback provided in the form of
 
 - [x] [thread-comments](#thread-comment)
 - [x] [step-summary](#step-summary)
@@ -67,7 +68,8 @@ A package for linting C/C++ code with clang-tidy and/or clang-format to collect 
 
 ## Install
 
-This package is available in several programming languages (through their respective package managers).
+This package is available in several programming languages (through their
+respective package managers).
 
 ### Rust
 
@@ -77,7 +79,7 @@ This package is available in several programming languages (through their respec
 Install from source code hosted at crates.io:
 
 ```text
-cargo install cpp-linter
+cargo install cpp-linter --features bin
 ```
 
 Install a pre-compiled binary from GitHub releases:
@@ -175,6 +177,7 @@ To provide feedback (requesting a feature or reporting a bug) please post to
 
 The scripts and documentation in this project are released under the [MIT] license.
 
-As for dependencies (that are redistributed by us in binary form) and their licenses, refer to [THIRD-PARTY LICENSES][other-licenses].
+As for dependencies (that are redistributed by us in binary form) and their
+licenses, refer to [THIRD-PARTY LICENSES][other-licenses].
 
 [MIT]: https://choosealicense.com/licenses/mit

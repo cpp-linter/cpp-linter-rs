@@ -32,11 +32,16 @@ on:
           - patch
           - rc
 
+run-name: >-
+  ${{ inputs.package && 'Deploy ' || 'Show Unreleased Changes' }}
+  ${{ inputs.package || '' }}
+
 permissions: {}
 
 jobs:
   bump-release:
     if: github.event_name == 'workflow_dispatch'
+    name: Bump ${{ inputs.component }} version of ${{ inputs.package }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
