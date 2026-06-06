@@ -31,9 +31,9 @@ pub enum DownloadError {
     #[error("Hash mismatch for downloaded file. Expected: {expected}, Actual: {actual}")]
     HashMismatch { expected: String, actual: String },
 
-    /// An error that occurred while moving/persisting a temporary file into a cache path.
-    #[error("Error persisting temporary file: {0}")]
-    TempFilePersistence(#[from] tempfile::PersistError),
+    /// An error that occurred while creating or persisting a temporary file into a cache path.
+    #[error("Error when {0}: {1}")]
+    TempFile(&'static str, #[source] std::io::Error),
 }
 
 /// Downloads data from the specified URL and returns the response.
@@ -58,7 +58,15 @@ async fn download(url: &Url, cache_path: &Path, timeout: u64) -> Result<(), Down
         }
         return Err(e.into());
     }
-    let mut tmp_file = tempfile::NamedTempFile::new()?;
+    let tmp_file_path = cache_path.with_extension("tmp");
+    let mut tmp_file = fs::OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .create(true)
+        .open(&tmp_file_path)
+        .map_err(|e| {
+            DownloadError::TempFile("creating temporary file for download placeholder", e)
+        })?;
     let content_len = response.content_length().and_then(NonZero::new);
     let mut progress_bar = ProgressBar::new(
         content_len,
@@ -79,8 +87,10 @@ async fn download(url: &Url, cache_path: &Path, timeout: u64) -> Result<(), Down
     }
     progress_bar.finish()?;
     tmp_file.flush()?;
-    tmp_file.as_file_mut().set_modified(SystemTime::now())?;
-    tmp_file.persist(cache_path)?;
+    tmp_file.set_modified(SystemTime::now())?;
+    drop(tmp_file); // ensure the file is closed before renaming
+    fs::rename(tmp_file_path, cache_path)
+        .map_err(|e| DownloadError::TempFile("renaming temporary file after download", e))?;
     Ok(())
 }
 
