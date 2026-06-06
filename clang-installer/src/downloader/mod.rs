@@ -88,6 +88,7 @@ async fn download(url: &Url, cache_path: &Path, timeout: u64) -> Result<(), Down
     progress_bar.finish()?;
     tmp_file.flush()?;
     tmp_file.set_modified(SystemTime::now())?;
+    drop(tmp_file); // ensure the file is closed before renaming
     fs::rename(tmp_file_path, cache_path)
         .map_err(|e| DownloadError::TempFile("renaming temporary file after download", e))?;
     Ok(())
