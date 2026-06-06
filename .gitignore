@@ -347,3 +347,4 @@ cpp-linter-py/docs/cli_args.rst
 lcov.info
 coverage.json
 .config/ReleaseNotes.md
+versions.json

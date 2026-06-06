@@ -43,10 +43,10 @@ pub enum StaticDistDownloadError {
     #[error("Failed to parse the SHA512 sum file")]
     Sha512Corruption,
 }
-const MIN_CLANG_TOOLS_VERSION: u8 = 11;
-pub(crate) const MAX_CLANG_TOOLS_VERSION: u8 = 22;
+const MIN_CLANG_TOOLS_VERSION: &str = env!("MIN_CLANG_TOOLS_VERSION");
+pub(crate) const MAX_CLANG_TOOLS_VERSION: &str = env!("MAX_CLANG_TOOLS_VERSION");
 const CLANG_TOOLS_REPO: &str = "https://github.com/cpp-linter/clang-tools-static-binaries";
-const CLANG_TOOLS_TAG: &str = "master-6e612956";
+const CLANG_TOOLS_TAG: &str = env!("CLANG_TOOLS_TAG");
 
 /// A downloader that uses statically linked binary distribution files
 /// provided by the cpp-linter team.
@@ -56,25 +56,8 @@ impl Cacher for StaticDistDownloader {}
 
 impl StaticDistDownloader {
     pub fn get_major_version_range() -> RangeInclusive<u8> {
-        let min_clang_tools_version: u8 = option_env!("MIN_CLANG_TOOLS_VERSION")
-            .and_then(|v| match v.parse::<u8>() {
-                Ok(parsed) => Some(parsed),
-                Err(e) => {
-                    log::error!("Invalid MIN_CLANG_TOOLS_VERSION env var value: {v}. Error: {e}");
-                    None
-                }
-            })
-            .unwrap_or(MIN_CLANG_TOOLS_VERSION);
-        let max_clang_tools_version: u8 = option_env!("MAX_CLANG_TOOLS_VERSION")
-            .and_then(|v| match v.parse::<u8>() {
-                Ok(parsed) => Some(parsed),
-                Err(e) => {
-                    log::error!("Invalid MAX_CLANG_TOOLS_VERSION env var value: {v}. Error: {e}");
-                    None
-                }
-            })
-            .unwrap_or(MAX_CLANG_TOOLS_VERSION);
-        min_clang_tools_version..=max_clang_tools_version
+        MIN_CLANG_TOOLS_VERSION.parse().unwrap_or(11)
+            ..=MAX_CLANG_TOOLS_VERSION.parse().unwrap_or(22)
     }
 
     /// Finds a suitable version from `req_ver` within the range of available clang tools versions.
@@ -83,6 +66,7 @@ impl StaticDistDownloader {
     /// `MAX_CLANG_TOOLS_VERSION` environment variables (inclusive) at compile time.
     fn find_suitable_version(req_ver: &VersionReq) -> Option<Version> {
         let clang_tools_versions: RangeInclusive<u8> = Self::get_major_version_range();
+        println!("Available clang tools versions: {clang_tools_versions:?}");
         let outlier = Version::new(12, 0, 1);
         for ver in clang_tools_versions
             .map(|v| Version::new(v as u64, 0, 0))

@@ -99,13 +99,23 @@ jobs:
         uses: hustcer/setup-nu@92c296ba1ba2ba04cc948ab64ddefe192dc13f0c # v3.23
 
       - name: Run test suite
-        env:
-          MIN_CLANG_TOOLS_VERSION: "11"
-          MAX_CLANG_TOOLS_VERSION: "22"
         shell: nu {0}
         run: |-
-          let max_ver = $env.MAX_CLANG_TOOLS_VERSION | into int
-          let min_ver = $env.MIN_CLANG_TOOLS_VERSION | into int
+          let version_info = (
+            (^gh release download -R cpp-linter/clang-tools-static-binaries --pattern versions.json --output -)
+            | from json
+          )
+          mut max_ver = 0
+          mut min_ver = 99
+          for ver in ($version_info.llvm_versions | columns) {
+            let ver = $ver | into int
+            if ($ver < $min_ver) {
+              $min_ver = $ver
+            }
+            if ($ver > $max_ver) {
+              $max_ver = $ver
+            }
+          }
           for $ver in ($min_ver..$max_ver) {
             print $"::group::Testing with clang v($ver)"
             with-env { CLANG_VERSION: $"($ver)" } {
