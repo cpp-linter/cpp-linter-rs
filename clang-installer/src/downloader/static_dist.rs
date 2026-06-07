@@ -65,7 +65,6 @@ impl StaticDistDownloader {
     /// `MAX_CLANG_TOOLS_VERSION` environment variables (inclusive) at compile time.
     fn find_suitable_version(req_ver: &VersionReq) -> Option<Version> {
         let clang_tools_versions: RangeInclusive<u8> = Self::get_major_version_range();
-        println!("Available clang tools versions: {clang_tools_versions:?}");
         clang_tools_versions
             .map(|v| Version::new(v as u64, 0, 0))
             .rev()
@@ -161,7 +160,7 @@ impl StaticDistDownloader {
                 sha512_cache_path.to_string_lossy()
             );
         } else {
-            let sha512_url = Url::parse(format!("{base_url}.sha512sum").as_str())?;
+            let sha512_url = Url::parse(format!("{base_url}{suffix}.sha512sum").as_str())?;
             log::info!(
                 "Downloading SHA512 checksum for {tool} version {ver_str} from {sha512_url}"
             );
