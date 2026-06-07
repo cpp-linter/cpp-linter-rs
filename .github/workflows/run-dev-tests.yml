@@ -48,6 +48,7 @@ jobs:
           if-no-files-found: error
 
   test:
+    needs: [seed-build-script]
     strategy:
       fail-fast: false
       matrix:
@@ -167,3 +168,4 @@ jobs:
           token: ${{secrets.CODECOV_TOKEN}}
           files: lcov.info
           fail_ci_if_error: true # optional (default = false)
+          use_pypi: true # workaround unexpected GPG key changes (temporarily)
