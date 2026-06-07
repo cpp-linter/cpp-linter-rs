@@ -168,6 +168,8 @@ export def bump-version [
         run-cmd 'yarn' 'version' ($result | get 'new')
         print 'Updated version in bindings/node/package.json'
         cd '../..'
+        print "Regenerating index.js"
+        run-cmd yarn build:debug
     }
     $result | get new
 }
