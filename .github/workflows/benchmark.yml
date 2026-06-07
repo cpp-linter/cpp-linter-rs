@@ -58,7 +58,7 @@ jobs:
       BIN: target/release/cpp-linter
     steps:
       - name: Checkout ${{ matrix.name }}
-        uses: actions/checkout@v6
+        uses: actions/checkout@v6.0.2
         with:
           ref: ${{ matrix.commit }}
           persist-credentials: false
@@ -96,7 +96,7 @@ jobs:
   # build-py-binding:
   #   runs-on: ubuntu-latest
   #   steps:
-  #     - uses: actions/checkout@v6
+  #     - uses: actions/checkout@v6.0.2
   #       with:
   #         persist-credentials: false
   #     - name: Set up Python
@@ -126,11 +126,11 @@ jobs:
     needs: [build-bin] #, build-py-binding]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
         with:
           persist-credentials: false
       - name: Checkout libgit2
-        uses: actions/checkout@v6
+        uses: actions/checkout@v6.0.2
         with:
           repository: libgit2/libgit2
           ref: v1.8.1
