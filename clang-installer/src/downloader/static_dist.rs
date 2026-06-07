@@ -1,7 +1,7 @@
 //! A module to download static binaries from cpp-linter/clang-tools-static-binaries.
 
 use std::{
-    env::consts,
+    env::consts::{ARCH, OS},
     fs,
     ops::RangeInclusive,
     path::{Path, PathBuf},
@@ -27,8 +27,10 @@ pub enum StaticDistDownloadError {
     #[error("The requested version does not match any available versions")]
     UnsupportedVersion,
 
-    /// The static binaries are only built for x86_64 (amd64) architecture.
-    #[error("The static binaries are only built for x86_64 (amd64) architecture")]
+    /// The static binaries are only built for
+    /// x86_64 and aarch64 architecture on Linux MacOS, and
+    /// Windows (not aarch64 for Windows currently).
+    #[error("The static binaries are not built for {OS} {ARCH} architecture")]
     UnsupportedArchitecture,
 
     /// Failed to parse a URL.
@@ -43,10 +45,10 @@ pub enum StaticDistDownloadError {
     #[error("Failed to parse the SHA512 sum file")]
     Sha512Corruption,
 }
-const MIN_CLANG_TOOLS_VERSION: u8 = 11;
-pub(crate) const MAX_CLANG_TOOLS_VERSION: u8 = 22;
+const MIN_CLANG_TOOLS_VERSION: &str = env!("MIN_CLANG_TOOLS_VERSION");
+pub(crate) const MAX_CLANG_TOOLS_VERSION: &str = env!("MAX_CLANG_TOOLS_VERSION");
 const CLANG_TOOLS_REPO: &str = "https://github.com/cpp-linter/clang-tools-static-binaries";
-const CLANG_TOOLS_TAG: &str = "master-6e612956";
+const CLANG_TOOLS_TAG: &str = env!("CLANG_TOOLS_TAG");
 
 /// A downloader that uses statically linked binary distribution files
 /// provided by the cpp-linter team.
@@ -56,25 +58,8 @@ impl Cacher for StaticDistDownloader {}
 
 impl StaticDistDownloader {
     pub fn get_major_version_range() -> RangeInclusive<u8> {
-        let min_clang_tools_version: u8 = option_env!("MIN_CLANG_TOOLS_VERSION")
-            .and_then(|v| match v.parse::<u8>() {
-                Ok(parsed) => Some(parsed),
-                Err(e) => {
-                    log::error!("Invalid MIN_CLANG_TOOLS_VERSION env var value: {v}. Error: {e}");
-                    None
-                }
-            })
-            .unwrap_or(MIN_CLANG_TOOLS_VERSION);
-        let max_clang_tools_version: u8 = option_env!("MAX_CLANG_TOOLS_VERSION")
-            .and_then(|v| match v.parse::<u8>() {
-                Ok(parsed) => Some(parsed),
-                Err(e) => {
-                    log::error!("Invalid MAX_CLANG_TOOLS_VERSION env var value: {v}. Error: {e}");
-                    None
-                }
-            })
-            .unwrap_or(MAX_CLANG_TOOLS_VERSION);
-        min_clang_tools_version..=max_clang_tools_version
+        MIN_CLANG_TOOLS_VERSION.parse().unwrap_or(11)
+            ..=MAX_CLANG_TOOLS_VERSION.parse().unwrap_or(22)
     }
 
     /// Finds a suitable version from `req_ver` within the range of available clang tools versions.
@@ -83,18 +68,10 @@ impl StaticDistDownloader {
     /// `MAX_CLANG_TOOLS_VERSION` environment variables (inclusive) at compile time.
     fn find_suitable_version(req_ver: &VersionReq) -> Option<Version> {
         let clang_tools_versions: RangeInclusive<u8> = Self::get_major_version_range();
-        let outlier = Version::new(12, 0, 1);
-        for ver in clang_tools_versions
+        clang_tools_versions
             .map(|v| Version::new(v as u64, 0, 0))
             .rev()
-        {
-            if ver.major == 12 && req_ver.matches(&outlier) {
-                return Some(outlier);
-            } else if req_ver.matches(&ver) {
-                return Some(ver);
-            }
-        }
-        None
+            .find(|ver| req_ver.matches(ver))
     }
 
     /// Verifies the SHA512 checksum of the downloaded file.
@@ -121,34 +98,45 @@ impl StaticDistDownloader {
         requested_version: &VersionReq,
         directory: Option<&PathBuf>,
     ) -> Result<PathBuf, StaticDistDownloadError> {
-        if consts::ARCH != "x86_64" {
-            return Err(StaticDistDownloadError::UnsupportedArchitecture);
-        }
+        #[cfg(any(
+            // Windows support is only for x86_64 architecture (for now)
+            all(target_os = "windows", not(target_arch = "x86_64")),
+            // Linux and macOS support only x86_64 and aarch64 architectures
+            all(
+                any(target_os = "linux", target_os = "macos"),
+                not(any(target_arch = "x86_64", target_arch = "aarch64"))
+            ),
+            // Any OS other than Windows, Linux, or macOS is unsupported
+            not(any(target_os = "windows", target_os = "linux", target_os = "macos")),
+        ))]
+        return Err(StaticDistDownloadError::UnsupportedArchitecture);
+
         let ver = Self::find_suitable_version(requested_version)
             .ok_or(StaticDistDownloadError::UnsupportedVersion)?;
-        let ver_str = if ver.minor == 0 && ver.patch == 0 {
-            ver.major.to_string()
+        let ver_str = ver.major.to_string();
+        // we already gated unsupported architectures above,
+        // so we can assume it's either x86_64 or aarch64 here
+        let arch = if cfg!(target_arch = "aarch64") {
+            "arm64"
         } else {
-            ver.to_string()
+            "amd64"
         };
+        let platform = if cfg!(target_os = "windows") {
+            "windows"
+        } else if cfg!(target_os = "macos") {
+            "macos"
+        } else {
+            "linux"
+        };
+
+        let base_url = format!(
+            "{CLANG_TOOLS_REPO}/releases/download/{CLANG_TOOLS_TAG}/{tool}-{ver_str}_{platform}-{arch}",
+        );
         let suffix = if cfg!(target_os = "windows") {
             ".exe"
         } else {
             ""
         };
-        let clang_tools_repo: &str = option_env!("CLANG_TOOLS_REPO").unwrap_or(CLANG_TOOLS_REPO);
-        let clang_tools_tag: &str = option_env!("CLANG_TOOLS_TAG").unwrap_or(CLANG_TOOLS_TAG);
-
-        let base_url = format!(
-            "{clang_tools_repo}/releases/download/{clang_tools_tag}/{tool}-{ver_str}_{}-amd64",
-            if cfg!(target_os = "windows") {
-                "windows"
-            } else if cfg!(target_os = "macos") {
-                "macos"
-            } else {
-                "linux"
-            },
-        );
         let url = Url::parse(format!("{base_url}{suffix}").as_str())?;
         let cache_path = Self::get_cache_dir();
         let bin_name = format!("{tool}-{ver_str}{suffix}");
@@ -177,7 +165,7 @@ impl StaticDistDownloader {
                 sha512_cache_path.to_string_lossy()
             );
         } else {
-            let sha512_url = Url::parse(format!("{base_url}.sha512sum").as_str())?;
+            let sha512_url = Url::parse(format!("{base_url}{suffix}.sha512sum").as_str())?;
             log::info!(
                 "Downloading SHA512 checksum for {tool} version {ver_str} from {sha512_url}"
             );

@@ -47,5 +47,10 @@ tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 [features]
 bin = ["dep:clap", "dep:tokio", "dep:anyhow", "dep:colored"]
 
+[build-dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+reqwest = { workspace = true, features = ["default-tls", "blocking"] }
+
 [package.metadata.binstall]
 pkg-url = "{ repo }/releases/download/clang-installer/v{ version }/{ name }-{ target }{ archive-suffix }"

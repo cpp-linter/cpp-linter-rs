@@ -25,7 +25,26 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  seed-build-script:
+    runs-on: ubuntu-latest
+    name: Pre-seed static binaries' versions
+    steps:
+      - env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: >-
+          gh release download
+          -R cpp-linter/clang-tools-static-binaries
+          --pattern versions.json
+          --output versions.json
+      - name: Upload versions.json
+        uses: actions/upload-artifact@v7
+        with:
+          name: static-binary-versions
+          path: versions.json
+          if-no-files-found: error
+
   build-bin:
+    needs: [seed-build-script]
     name: Build ${{ matrix.name }} binary
     runs-on: ubuntu-latest
     strategy:
@@ -60,6 +79,12 @@ jobs:
           fi
       - run: rustup update --no-self-update
         if: steps.cache.outputs.cache-hit != 'true' || steps.validate.outputs.cache-valid == 'false'
+      - name: Restore build script seed
+        if: steps.cache.outputs.cache-hit != 'true' || steps.validate.outputs.cache-valid == 'false'
+        uses: actions/download-artifact@v8
+        with:
+          name: static-binary-versions
+          path: clang-installer
       - run: cargo build --bin cpp-linter --features bin --release
         if: steps.cache.outputs.cache-hit != 'true' || steps.validate.outputs.cache-valid == 'false'
       - name: Upload build artifact

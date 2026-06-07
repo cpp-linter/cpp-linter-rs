@@ -326,7 +326,7 @@ mod tests {
     /// If successful, clang-tidy will be installed globally, which may be undesirable.
     #[tokio::test]
     async fn eval_version() {
-        let clang_version = option_env!("CLANG_VERSION").unwrap_or("12.0.1");
+        let clang_version = option_env!("CLANG_VERSION").unwrap_or("16");
         for tool in [ClangTool::ClangFormat, ClangTool::ClangTidy] {
             let version_req = VersionReq::parse(clang_version).unwrap();
             println!("Installing {tool} with version requirement: {version_req}");

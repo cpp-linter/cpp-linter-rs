@@ -43,9 +43,29 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  seed-build-script:
+    runs-on: ubuntu-latest
+    name: Pre-seed static binaries' versions
+    steps:
+      - env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: >-
+          gh release download
+          -R cpp-linter/clang-tools-static-binaries
+          --pattern versions.json
+          --output versions.json
+      - name: Upload versions.json
+        uses: actions/upload-artifact@v7
+        with:
+          name: static-binary-versions
+          path: versions.json
+          if-no-files-found: error
+
   linux:
+    needs: [seed-build-script]
     runs-on: ${{ matrix.platform.runner }}
     strategy:
+      fail-fast: false
       matrix:
         platform:
           - runner: ubuntu-latest
@@ -56,10 +76,13 @@ jobs:
             target: aarch64
           - runner: ubuntu-latest
             target: armv7
-          - runner: ubuntu-latest
-            target: s390x
-          - runner: ubuntu-latest
-            target: ppc64le
+          # These targets currently fail because the docker containers used for building manylinux wheels
+          # use a known-bad C compiler version; aws-lc-sys refuses to build with the bad compiler:
+          # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=95189
+          # - runner: ubuntu-latest
+          #   target: s390x
+          # - runner: ubuntu-latest
+          #   target: ppc64le
     steps:
       - uses: actions/checkout@v6
         with:
@@ -67,7 +90,11 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.x'
-
+      - name: Restore build script seed
+        uses: actions/download-artifact@v8
+        with:
+          name: static-binary-versions
+          path: clang-installer
       - name: Build wheels
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
@@ -75,28 +102,22 @@ jobs:
           # Use the zig toolchain for all targets except ppc64le.
           # Note, this is meant to avoid build errors in aws-lc-sys crate, which compiles C code.
           args: >-
-            --release --out dist --find-interpreter
-            ${{ matrix.platform.target != 'ppc64le' && '--zig' || ''}}
+            --release --out dist --find-interpreter --zig
           # avoid cache-poisoning potential for actually distributed builds
           sccache: ${{ startsWith(github.ref, 'refs/tags') && 'false' || 'true' }}
-          manylinux: auto
-          # here we either install the ppc64le compiler/toolchain or install zig on all others
-          before-script-linux: |
-            case "${{ matrix.platform.target }}" in
-              ppc64le)
-                apt-get update
-                apt-get install -y \
-                  pkg-config \
-                  gcc-powerpc64le-linux-gnu \
-                  g++-powerpc64le-linux-gnu \
-                  binutils-powerpc64le-linux-gnu \
-                  libc6-dev-ppc64el-cross
-                ;;
-              *)
-                # spell-checker: disable-next-line
-                pip install ziglang
-                ;;
-            esac
+          manylinux: 'auto'
+          # before-script-linux: |
+          #   case "${{ matrix.platform.target }}" in
+          #     ppc64le)
+          #       apt-get update
+          #       apt-get install -y \
+          #         pkg-config \
+          #         gcc-powerpc64le-linux-gnu \
+          #         g++-powerpc64le-linux-gnu \
+          #         binutils-powerpc64le-linux-gnu \
+          #         libc6-dev-ppc64el-cross
+          #        ;;
+          #   esac
       - name: Upload wheels
         uses: actions/upload-artifact@v7
         with:
@@ -104,6 +125,7 @@ jobs:
           path: dist/*
 
   windows:
+    needs: [seed-build-script]
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       matrix:
@@ -120,6 +142,11 @@ jobs:
         with:
           python-version: '3.x'
           architecture: ${{ matrix.platform.target }}
+      - name: Restore build script seed
+        uses: actions/download-artifact@v8
+        with:
+          name: static-binary-versions
+          path: clang-installer
       - name: Build wheels
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
@@ -133,6 +160,7 @@ jobs:
           path: dist/*
 
   macos:
+    needs: [seed-build-script]
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       fail-fast: false
@@ -149,6 +177,11 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.x'
+      - name: Restore build script seed
+        uses: actions/download-artifact@v8
+        with:
+          name: static-binary-versions
+          path: clang-installer
       - name: Build wheels
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:

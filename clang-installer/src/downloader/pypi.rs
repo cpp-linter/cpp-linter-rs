@@ -353,11 +353,6 @@ impl FromStr for PlatformTag {
 /// ```
 #[derive(Debug)]
 struct WheelTags {
-    /// The version of the package for which the wheel is built.
-    ///
-    /// For clang-format and clang-tidy wheels, this corresponds to the version of the clang tool.
-    version: Version,
-
     /// The platform tag indicates the wheel's target platform.
     platform: PlatformTag,
 }
@@ -377,12 +372,6 @@ impl FromStr for WheelTags {
         }
         iter.next(); // already know the package name
 
-        // The exact version (PEP 440 compatible) should comply with semver parsing.
-        let version = Version::parse(
-            iter.next()
-                .ok_or(PyPiDownloadError::InvalidWheelName(s.to_string()))?,
-        )
-        .map_err(|_| PyPiDownloadError::InvalidVersion)?;
         let platform = PlatformTag::from_str(iter.next_back().unwrap())?;
 
         // The remaining tags are not used for compatibility checks.
@@ -390,7 +379,7 @@ impl FromStr for WheelTags {
         // we don't need to validate python version nor abi tags here.
         // optional build tag is not used in clang_format or clang_tidy wheel deployments
 
-        Ok(Self { version, platform })
+        Ok(Self { platform })
     }
 }
 
@@ -414,15 +403,47 @@ impl PyPiDownloader {
         clang_tool: &ClangTool,
         pypi_info: &PyPiProjectInfo,
         version: &VersionReq,
-    ) -> Result<(Version, PyPiReleaseInfo), PyPiDownloadError> {
+    ) -> Result<(Version, PyPiReleaseInfo, String), PyPiDownloadError> {
         let mut result = None;
 
         for (ver_str, releases) in &pypi_info.releases {
             let ver = match Version::parse(ver_str) {
-                Ok(v) => v,
-                Err(_) => continue,
+                Ok(v) => Version {
+                    // append a pre-release number to weight it properly against a build number (translated to prerelease number below)
+                    pre: semver::Prerelease::from_str("0").unwrap_or_default(),
+                    ..v
+                },
+                Err(_) => {
+                    let mut components = ver_str.split('.');
+                    let count = components.clone().count();
+                    if count <= 3 {
+                        // should've parsed this normally, log warning and skip this version
+                        log::warn!("Skipping malformed version {ver_str} for {clang_tool} on PyPI");
+                        continue;
+                    } else {
+                        // take the first four components and treat them like a `major.minor.patch.build-number`
+                        let major: u64 = components.next().unwrap_or("0").parse().unwrap_or(0);
+                        let minor: u64 = components.next().unwrap_or("0").parse().unwrap_or(0);
+                        let patch: u64 = components.next().unwrap_or("0").parse().unwrap_or(0);
+                        let build: &str = components.next().unwrap_or("0");
+                        Version {
+                            major,
+                            minor,
+                            patch,
+                            pre: semver::Prerelease::from_str(build).unwrap_or_default(),
+                            build: semver::BuildMetadata::EMPTY,
+                        }
+                    }
+                }
             };
-            if version.matches(&ver) {
+            // do not compare pre-release numbers since these are actually build numbers
+            if version.matches(&Version {
+                major: ver.major,
+                minor: ver.minor,
+                patch: ver.patch,
+                pre: semver::Prerelease::default(),
+                build: semver::BuildMetadata::EMPTY,
+            }) {
                 for release in releases {
                     if !release.filename.ends_with(".whl") {
                         continue;
@@ -430,19 +451,19 @@ impl PyPiDownloader {
                     let wheel_tags = WheelTags::from_str(&release.filename)?;
                     if !release.yanked && wheel_tags.is_compatible_with_system() {
                         log::debug!(
-                            "Found {clang_tool} (size: {}, digest: {:?}); {wheel_tags:?}",
+                            "Found {clang_tool} v{ver_str} (size: {}, digest: {:?}); {wheel_tags:?}",
                             release.size,
                             release.digests
                         );
-                        if result.as_ref().is_none_or(|(v, _)| *v < ver) {
-                            result = Some((wheel_tags.version.clone(), release));
+                        if result.as_ref().is_none_or(|(v, _, _)| *v < ver) {
+                            result = Some((ver.clone(), release, ver_str.to_owned()));
                         }
                     }
                 }
             }
         }
         result
-            .map(|(a, b)| (a, b.to_owned()))
+            .map(|(a, b, c)| (Version::new(a.major, a.minor, a.patch), b.to_owned(), c))
             .ok_or(PyPiDownloadError::NoVersionFound)
     }
 
@@ -484,18 +505,21 @@ impl PyPiDownloader {
         directory: Option<&PathBuf>,
     ) -> Result<PathBuf, PyPiDownloadError> {
         let info = Self::get_pypi_release_info(clang_tool).await?;
-        let (ver, info) = Self::get_best_pypi_release(clang_tool, &info, version)?;
-        let cached_filename = format!("{clang_tool}_{ver}.whl");
+        let (ver, info, ver_str) = Self::get_best_pypi_release(clang_tool, &info, version)?;
+        let cached_filename = format!("{clang_tool}_{ver_str}.whl",);
         let cached_dir = Self::get_cache_dir();
         let cached_wheel = cached_dir.join("pypi").join(&cached_filename);
         let file_lock = lock_path(&cached_wheel)?;
         if Self::is_cache_valid(&cached_wheel, None) {
             log::info!(
-                "Using cached wheel for {clang_tool} version {ver} from {}",
+                "Using cached wheel for {clang_tool} version {ver_str} from {}",
                 cached_wheel.to_string_lossy()
             );
         } else {
-            log::info!("Downloading {clang_tool} version {ver} from {}", info.url);
+            log::info!(
+                "Downloading {clang_tool} version {ver_str} from {}",
+                info.url
+            );
             download(&Url::parse(&info.url)?, &cached_wheel, 60).await?;
         }
         if let Some(digest) = info.digests.first() {
