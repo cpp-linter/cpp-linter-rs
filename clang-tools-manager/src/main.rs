@@ -1,5 +1,5 @@
 use anyhow::Result;
-use clang_installer::{ClangTool, RequestedVersion};
+use clang_tools_manager::{ClangTool, RequestedVersion};
 use clap::Parser;
 
 use std::{collections::HashMap, path::PathBuf, str::FromStr};
@@ -43,7 +43,7 @@ mod logging {
             } else if self.enabled(record.metadata()) {
                 let module = record.module_path();
                 if module.is_none_or(|v| {
-                    v.starts_with("clang_installer") || v.starts_with("clang_tools")
+                    v.starts_with("clang_tools_manager") || v.starts_with("clang_tools")
                 }) {
                     writeln!(
                         stdout,

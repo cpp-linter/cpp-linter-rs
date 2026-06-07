@@ -1,6 +1,6 @@
 use std::env;
 
-use clang_installer::{ClangTool, StaticDistDownloader};
+use clang_tools_manager::{ClangTool, StaticDistDownloader};
 use semver::VersionReq;
 use tempfile::TempDir;
 mod common;

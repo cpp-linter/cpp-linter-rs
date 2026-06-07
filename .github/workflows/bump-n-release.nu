@@ -58,7 +58,7 @@ const PkgPaths = {
     'cpp-linter': {
         include: ['cpp-linter/**/*']
         exclude: [
-            'clang-installer/**/*'
+            'clang-tools-manager/**/*'
             'bindings/**/*'
             'yarn.lock'
             '.yarnrc.yml'
@@ -66,8 +66,8 @@ const PkgPaths = {
         ]
         path: 'cpp-linter'
     },
-    'clang-installer': {
-        include: ['clang-installer/**']
+    'clang-tools-manager': {
+        include: ['clang-tools-manager/**']
         exclude: [
             'cpp-linter/**/*'
             'bindings/**/*'
@@ -75,7 +75,7 @@ const PkgPaths = {
             '.yarnrc.yml'
             ...$COMMON_EXCLUDES
         ]
-        path: 'clang-installer'
+        path: 'clang-tools-manager'
     },
     'cpp-linter-py': {
         include: []

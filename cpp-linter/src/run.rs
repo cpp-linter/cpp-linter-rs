@@ -12,7 +12,7 @@ use std::{
 
 // non-std crates
 use anyhow::{Result, anyhow};
-use clang_installer::RequestedVersion;
+use clang_tools_manager::RequestedVersion;
 use clap::Parser;
 use log::{LevelFilter, set_max_level};
 

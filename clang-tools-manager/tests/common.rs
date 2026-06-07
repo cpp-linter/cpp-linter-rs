@@ -36,9 +36,9 @@ impl Log for SimpleLogger {
                 .expect("Failed to flush log command in stdout");
         } else if self.enabled(record.metadata()) {
             let module = record.module_path();
-            if module
-                .is_none_or(|v| v.starts_with("clang_installer") || v.starts_with("clang_tools"))
-            {
+            if module.is_none_or(|v| {
+                v.starts_with("clang_tools_manager") || v.starts_with("clang_tools")
+            }) {
                 writeln!(
                     stdout,
                     "[{}]: {}",

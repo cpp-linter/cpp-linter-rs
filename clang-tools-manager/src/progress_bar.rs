@@ -40,7 +40,7 @@ impl ProgressBar {
     ///
     /// ```
     /// use std::num::NonZero;
-    /// use clang_installer::ProgressBar;
+    /// use clang_tools_manager::ProgressBar;
     ///
     /// let total = NonZero::new(100);
     /// let mut progress_bar = ProgressBar::new(total, "Downloading");

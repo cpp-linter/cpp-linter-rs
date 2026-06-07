@@ -84,7 +84,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: static-binary-versions
-          path: clang-installer
+          path: clang-tools-manager
       - run: cargo build --bin cpp-linter --features bin --release
         if: steps.cache.outputs.cache-hit != 'true' || steps.validate.outputs.cache-valid == 'false'
       - name: Upload build artifact

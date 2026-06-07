@@ -19,7 +19,7 @@ CPP_LINTER_DEPS = f"""## cpp-linter's dependencies
 {TABLE_HEADER}\
 """
 
-CLANG_INSTALLER_DEPS = f"""## clang-installer's dependencies
+CLANG_INSTALLER_DEPS = f"""## clang-tools-manager's dependencies
 
 {TABLE_HEADER}\
 """
@@ -35,7 +35,7 @@ JS_BINDING_HEADER = f"""### Node.js binding
 {TABLE_HEADER}"""
 
 SELF_DEP = re.compile(
-    r"(\| \[(?:cpp-linter|clang-installer) v[0-9.]+[^\s]*)[^\]]+(\]\(.*)$"
+    r"(\| \[(?:cpp-linter|clang-tools-manager) v[0-9.]+[^\s]*)[^\]]+(\]\(.*)$"
 )
 
 
@@ -95,7 +95,7 @@ with mkdocs_gen_files.open(FILENAME, "w") as io_doc:
     tg.package("cpp-linter-js")
     doc = tg.get_output()
     print(f"\n{JS_BINDING_HEADER}{doc}", file=io_doc)
-    tg.package("clang-installer")
+    tg.package("clang-tools-manager")
     doc = tg.get_output()
     print(f"\n{CLANG_INSTALLER_DEPS}{doc}", file=io_doc)
 

@@ -10,7 +10,7 @@ use std::{
 
 // non-std crates
 use anyhow::{Context, Result, anyhow};
-use clang_installer::{ClangTool, RequestedVersion};
+use clang_tools_manager::{ClangTool, RequestedVersion};
 use git_bot_feedback::ReviewComment;
 use git2::{DiffOptions, Patch};
 use semver::Version;

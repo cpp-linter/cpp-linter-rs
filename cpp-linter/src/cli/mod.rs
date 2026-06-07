@@ -7,7 +7,7 @@ use std::str::FromStr;
 
 // non-std crates
 #[cfg(feature = "bin")]
-use clang_installer::RequestedVersion;
+use clang_tools_manager::RequestedVersion;
 #[cfg(feature = "bin")]
 use clap::{
     ArgAction, Args, Parser, Subcommand, ValueEnum,
