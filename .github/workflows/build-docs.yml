@@ -44,9 +44,27 @@ jobs:
           key: ${{ runner.os }}-docs-cargo-${{ hashFiles('Cargo.lock') }}
       - run: cargo fetch
 
+  seed-build-script:
+    runs-on: ubuntu-latest
+    name: Pre-seed static binaries' versions
+    steps:
+      - env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: >-
+          gh release download
+          -R cpp-linter/clang-tools-static-binaries
+          --pattern versions.json
+          --output versions.json
+      - name: Upload versions.json
+        uses: actions/upload-artifact@v7
+        with:
+          name: static-binary-versions
+          path: versions.json
+          if-no-files-found: error
+
   build-mkdocs:
     runs-on: ubuntu-latest
-    needs: [cache-deps]
+    needs: [cache-deps, seed-build-script]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -66,6 +84,11 @@ jobs:
         run: cargo binstall -y nur
         env:
           GITHUB_TOKEN: ${{ github.token }}
+      - name: Restore build script seed
+        uses: actions/download-artifact@v8
+        with:
+          name: static-binary-versions
+          path: clang-installer
       - name: Build docs
         run: nur docs --build
       - name: Upload docs build as artifact
@@ -76,7 +99,7 @@ jobs:
 
   build-rustdoc:
     runs-on: ubuntu-latest
-    needs: [cache-deps]
+    needs: [cache-deps, seed-build-script]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -97,6 +120,11 @@ jobs:
         run: cargo binstall -y nur
         env:
           GITHUB_TOKEN: ${{ github.token }}
+      - name: Restore build script seed
+        uses: actions/download-artifact@v8
+        with:
+          name: static-binary-versions
+          path: clang-installer
       - run: nur docs rs
       - name: upload rustdoc build as artifact
         uses: actions/upload-artifact@v7

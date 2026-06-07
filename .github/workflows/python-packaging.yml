@@ -43,7 +43,26 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  seed-build-script:
+    runs-on: ubuntu-latest
+    name: Pre-seed static binaries' versions
+    steps:
+      - env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: >-
+          gh release download
+          -R cpp-linter/clang-tools-static-binaries
+          --pattern versions.json
+          --output versions.json
+      - name: Upload versions.json
+        uses: actions/upload-artifact@v7
+        with:
+          name: static-binary-versions
+          path: versions.json
+          if-no-files-found: error
+
   linux:
+    needs: [seed-build-script]
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       matrix:
@@ -67,7 +86,11 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.x'
-
+      - name: Restore build script seed
+        uses: actions/download-artifact@v8
+        with:
+          name: static-binary-versions
+          path: clang-installer
       - name: Build wheels
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
@@ -104,6 +127,7 @@ jobs:
           path: dist/*
 
   windows:
+    needs: [seed-build-script]
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       matrix:
@@ -120,6 +144,11 @@ jobs:
         with:
           python-version: '3.x'
           architecture: ${{ matrix.platform.target }}
+      - name: Restore build script seed
+        uses: actions/download-artifact@v8
+        with:
+          name: static-binary-versions
+          path: clang-installer
       - name: Build wheels
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
@@ -133,6 +162,7 @@ jobs:
           path: dist/*
 
   macos:
+    needs: [seed-build-script]
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       fail-fast: false
@@ -149,6 +179,11 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.x'
+      - name: Restore build script seed
+        uses: actions/download-artifact@v8
+        with:
+          name: static-binary-versions
+          path: clang-installer
       - name: Build wheels
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:

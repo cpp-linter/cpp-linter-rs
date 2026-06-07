@@ -29,6 +29,24 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  seed-build-script:
+    runs-on: ubuntu-latest
+    name: Pre-seed static binaries' versions
+    steps:
+      - env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: >-
+          gh release download
+          -R cpp-linter/clang-tools-static-binaries
+          --pattern versions.json
+          --output versions.json
+      - name: Upload versions.json
+        uses: actions/upload-artifact@v7
+        with:
+          name: static-binary-versions
+          path: versions.json
+          if-no-files-found: error
+
   test:
     strategy:
       fail-fast: false
@@ -98,13 +116,16 @@ jobs:
       - name: Install nushell
         uses: hustcer/setup-nu@92c296ba1ba2ba04cc948ab64ddefe192dc13f0c # v3.23
 
+      - name: Restore build script seed
+        uses: actions/download-artifact@v8
+        with:
+          name: static-binary-versions
+          path: clang-installer
+
       - name: Run test suite
         shell: nu {0}
         run: |-
-          let version_info = (
-            (^gh release download -R cpp-linter/clang-tools-static-binaries --pattern versions.json --output -)
-            | from json
-          )
+          let version_info = open "clang-installer/versions.json"
           mut max_ver = 0
           mut min_ver = 99
           for ver in ($version_info.llvm_versions | columns) {
@@ -116,6 +137,7 @@ jobs:
               $max_ver = $ver
             }
           }
+          let min_ver = $min_ver # make immutable
           for $ver in ($min_ver..$max_ver) {
             print $"::group::Testing with clang v($ver)"
             with-env { CLANG_VERSION: $"($ver)" } {

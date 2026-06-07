@@ -38,7 +38,26 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  seed-build-script:
+    runs-on: ubuntu-latest
+    name: Pre-seed static binaries' versions
+    steps:
+      - env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: >-
+          gh release download
+          -R cpp-linter/clang-tools-static-binaries
+          --pattern versions.json
+          --output versions.json
+      - name: Upload versions.json
+        uses: actions/upload-artifact@v7
+        with:
+          name: static-binary-versions
+          path: versions.json
+          if-no-files-found: error
+
   build:
+    needs: [seed-build-script]
     strategy:
       fail-fast: false
       matrix:
@@ -121,6 +140,11 @@ jobs:
         shell: bash
       - name: Install dependencies
         run: yarn install
+      - name: Restore build script seed
+        uses: actions/download-artifact@v8
+        with:
+          name: static-binary-versions
+          path: clang-installer
       - name: Build
         run: ${{ matrix.settings.build }}
         shell: bash
@@ -133,6 +157,7 @@ jobs:
             bindings/node/${{ env.APP_NAME }}.*.wasm
           if-no-files-found: error
   build-freebsd:
+    needs: [seed-build-script]
     runs-on: ubuntu-latest
     name: Build FreeBSD
     steps:
@@ -150,6 +175,11 @@ jobs:
           memory: 8G
           cpu_count: 3
           environment_variables: DEBUG RUSTUP_IO_THREADS
+      - name: Restore build script seed
+        uses: actions/download-artifact@v8
+        with:
+          name: static-binary-versions
+          path: clang-installer
       - name: Build
         shell: cpa.sh {0}
         run: |-
