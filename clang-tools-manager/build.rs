@@ -16,7 +16,7 @@ fn main() {
         fs::read_to_string(&pre_seed).unwrap()
     } else {
         ClientBuilder::new()
-            .user_agent("cpp-linter-rs/clang-installer")
+            .user_agent("cpp-linter-rs/clang-tools-manager")
             .timeout(Duration::from_secs(30))
             .build()
             .unwrap()

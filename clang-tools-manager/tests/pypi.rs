@@ -2,7 +2,7 @@ use std::{env, process::Command};
 
 use semver::VersionReq;
 
-use clang_installer::{ClangTool, PyPiDownloader};
+use clang_tools_manager::{ClangTool, PyPiDownloader};
 use tempfile::TempDir;
 mod common;
 

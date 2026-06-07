@@ -15,7 +15,7 @@ nav:
     - changelog/cpp-linter.md
     - changelog/cpp-linter-py.md
     - changelog/cpp-linter-js.md
-    - changelog/clang-installer.md
+    - changelog/clang-tools-manager.md
   - contributing.md
   - other-licenses.md
 

@@ -12,7 +12,7 @@ def "nur docs rs" [
         "--package",
         "cpp-linter",
         "--package",
-        "clang-installer",
+        "clang-tools-manager",
     ]
     if $open {
         $cmd = $cmd | append "--open"
@@ -73,7 +73,7 @@ export def "nur test" [
         --package,
         cpp-linter,
         --package,
-        clang-installer,
+        clang-tools-manager,
         --features,
         bin,
         --lib,

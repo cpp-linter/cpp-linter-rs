@@ -134,7 +134,7 @@ ignorePaths:
   - target/**
   - "**/.gitignore"
   - cpp-linter/tests/**/*.json
-  - clang-installer/tests/**/*.json
+  - clang-tools-manager/tests/**/*.json
   - cpp-linter/tests/**/*.diff
   - cpp-linter/tests/**/.clang-tidy
   - .vscode/extensions.json

@@ -144,7 +144,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: static-binary-versions
-          path: clang-installer
+          path: clang-tools-manager
       - name: Build
         run: ${{ matrix.settings.build }}
         shell: bash
@@ -179,7 +179,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: static-binary-versions
-          path: clang-installer
+          path: clang-tools-manager
       - name: Build
         shell: cpa.sh {0}
         run: |-

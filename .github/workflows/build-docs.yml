@@ -88,7 +88,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: static-binary-versions
-          path: clang-installer
+          path: clang-tools-manager
       - name: Build docs
         run: nur docs --build
       - name: Upload docs build as artifact
@@ -124,7 +124,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: static-binary-versions
-          path: clang-installer
+          path: clang-tools-manager
       - run: nur docs rs
       - name: upload rustdoc build as artifact
         uses: actions/upload-artifact@v7

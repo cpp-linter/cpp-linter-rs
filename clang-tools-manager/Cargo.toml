@@ -1,5 +1,5 @@
 [package]
-name = "clang-installer"
+name = "clang-tools-manager"
 version = "0.1.2"
 description = "A utility for installing specific versions of clang-format and clang-tidy, used by cpp-linter."
 readme = "README.md"
@@ -53,4 +53,4 @@ serde_json = { workspace = true }
 reqwest = { workspace = true, features = ["default-tls", "blocking"] }
 
 [package.metadata.binstall]
-pkg-url = "{ repo }/releases/download/clang-installer/v{ version }/{ name }-{ target }{ archive-suffix }"
+pkg-url = "{ repo }/releases/download/clang-tools-manager/v{ version }/{ name }-{ target }{ archive-suffix }"

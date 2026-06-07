@@ -6,20 +6,20 @@ on:
     paths:
       - cpp-linter/src/**
       - cpp-linter/Cargo.toml
-      - clang-installer/src/**
-      - clang-installer/Cargo.toml
+      - clang-tools-manager/src/**
+      - clang-tools-manager/Cargo.toml
       - Cargo.toml
       - Cargo.lock
     tags:
       - cpp-linter/v*
-      - clang-installer/v*
+      - clang-tools-manager/v*
   pull_request:
     branches: [main]
     paths:
       - cpp-linter/src/**
       - cpp-linter/Cargo.toml
-      - clang-installer/src/**
-      - clang-installer/Cargo.toml
+      - clang-tools-manager/src/**
+      - clang-tools-manager/Cargo.toml
       - Cargo.toml
       - Cargo.lock
 
@@ -136,7 +136,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: static-binary-versions
-          path: clang-installer
+          path: clang-tools-manager
 
       - name: Build
         run: >-
@@ -198,7 +198,7 @@ jobs:
           if-no-files-found: error
 
   publish:
-    if: startswith(github.ref, 'refs/tags/cpp-linter/v') || startswith(github.ref, 'refs/tags/clang-installer/v')
+    if: startswith(github.ref, 'refs/tags/cpp-linter/v') || startswith(github.ref, 'refs/tags/clang-tools-manager/v')
     runs-on: ubuntu-latest
     needs: [create-assets]
     permissions:
@@ -229,6 +229,6 @@ jobs:
         uses: rust-lang/crates-io-auth-action@bbd81622f20ce9e2dd9622e3218b975523e45bbe # v1.0.4
       - name: Publish package
         env:
-          PKG_NAME: ${{ startsWith(github.ref_name, 'cpp-linter') && 'cpp-linter' || 'clang-installer' }}
+          PKG_NAME: ${{ startsWith(github.ref_name, 'cpp-linter') && 'cpp-linter' || 'clang-tools-manager' }}
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
         run: cargo publish -p ${PKG_NAME}

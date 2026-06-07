@@ -20,7 +20,7 @@ on:
           - cpp-linter
           - cpp-linter-js
           - cpp-linter-py
-          - clang-installer
+          - clang-tools-manager
       component:
         description: The version component to increase
         type: choice

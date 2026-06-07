@@ -1,4 +1,4 @@
-# clang-installer
+# clang-tools-manager
 
 A Rust crate to ensure clang-format and/or clang-tidy are installed.
 

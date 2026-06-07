@@ -1,8 +1,8 @@
 ---
-title: Changes in clang-installer
+title: Changes in clang-tools-manager
 ---
 
 <!-- markdownlint-disable MD041 -->
 {%
-    include "../../../clang-installer/CHANGELOG.md"
+    include "../../../clang-tools-manager/CHANGELOG.md"
 %}
