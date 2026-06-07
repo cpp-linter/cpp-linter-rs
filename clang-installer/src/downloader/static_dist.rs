@@ -1,6 +1,7 @@
 //! A module to download static binaries from cpp-linter/clang-tools-static-binaries.
 
 use std::{
+    env::consts::{ARCH, OS},
     fs,
     ops::RangeInclusive,
     path::{Path, PathBuf},
@@ -26,8 +27,10 @@ pub enum StaticDistDownloadError {
     #[error("The requested version does not match any available versions")]
     UnsupportedVersion,
 
-    /// The static binaries are only built for x86_64 (amd64) architecture.
-    #[error("The static binaries are only built for x86_64 (amd64) architecture")]
+    /// The static binaries are only built for
+    /// x86_64 and aarch64 architecture on Linux MacOS, and
+    /// Windows (not aarch64 for Windows currently).
+    #[error("The static binaries are not built for {OS} {ARCH} architecture")]
     UnsupportedArchitecture,
 
     /// Failed to parse a URL.
@@ -98,11 +101,13 @@ impl StaticDistDownloader {
         #[cfg(any(
             // Windows support is only for x86_64 architecture (for now)
             all(target_os = "windows", not(target_arch = "x86_64")),
-            // Non-Windows platforms support only x86_64 and aarch64 architectures
+            // Linux and macOS support only x86_64 and aarch64 architectures
             all(
-                unix,
+                any(target_os = "linux", target_os = "macos"),
                 not(any(target_arch = "x86_64", target_arch = "aarch64"))
-            )
+            ),
+            // Any OS other than Windows, Linux, or macOS is unsupported
+            not(any(target_os = "windows", target_os = "linux", target_os = "macos")),
         ))]
         return Err(StaticDistDownloadError::UnsupportedArchitecture);
 
