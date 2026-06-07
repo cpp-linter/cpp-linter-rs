@@ -45,8 +45,3 @@ async fn setup(ver_spec: &str) {
 async fn download_clang_format_17() {
     setup("17").await;
 }
-
-#[tokio::test]
-async fn download_clang_format_12_0_1() {
-    setup("=12.0.1").await;
-}

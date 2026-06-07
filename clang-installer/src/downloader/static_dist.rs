@@ -1,7 +1,6 @@
 //! A module to download static binaries from cpp-linter/clang-tools-static-binaries.
 
 use std::{
-    env::consts,
     fs,
     ops::RangeInclusive,
     path::{Path, PathBuf},
@@ -67,18 +66,10 @@ impl StaticDistDownloader {
     fn find_suitable_version(req_ver: &VersionReq) -> Option<Version> {
         let clang_tools_versions: RangeInclusive<u8> = Self::get_major_version_range();
         println!("Available clang tools versions: {clang_tools_versions:?}");
-        let outlier = Version::new(12, 0, 1);
-        for ver in clang_tools_versions
+        clang_tools_versions
             .map(|v| Version::new(v as u64, 0, 0))
             .rev()
-        {
-            if ver.major == 12 && req_ver.matches(&outlier) {
-                return Some(outlier);
-            } else if req_ver.matches(&ver) {
-                return Some(ver);
-            }
-        }
-        None
+            .find(|ver| req_ver.matches(ver))
     }
 
     /// Verifies the SHA512 checksum of the downloaded file.
@@ -105,34 +96,43 @@ impl StaticDistDownloader {
         requested_version: &VersionReq,
         directory: Option<&PathBuf>,
     ) -> Result<PathBuf, StaticDistDownloadError> {
-        if consts::ARCH != "x86_64" {
-            return Err(StaticDistDownloadError::UnsupportedArchitecture);
-        }
+        #[cfg(any(
+            // Windows support is only for x86_64 architecture (for now)
+            all(target_os = "windows", not(target_arch = "x86_64")),
+            // Non-Windows platforms support only x86_64 and aarch64 architectures
+            all(
+                unix,
+                not(any(target_arch = "x86_64", target_arch = "aarch64"))
+            )
+        ))]
+        return Err(StaticDistDownloadError::UnsupportedArchitecture);
+
         let ver = Self::find_suitable_version(requested_version)
             .ok_or(StaticDistDownloadError::UnsupportedVersion)?;
-        let ver_str = if ver.minor == 0 && ver.patch == 0 {
-            ver.major.to_string()
+        let ver_str = ver.major.to_string();
+        // we already gated unsupported architectures above,
+        // so we can assume it's either x86_64 or aarch64 here
+        let arch = if cfg!(target_arch = "aarch64") {
+            "arm64"
         } else {
-            ver.to_string()
+            "amd64"
         };
+        let platform = if cfg!(target_os = "windows") {
+            "windows"
+        } else if cfg!(target_os = "macos") {
+            "macos"
+        } else {
+            "linux"
+        };
+
+        let base_url = format!(
+            "{CLANG_TOOLS_REPO}/releases/download/{CLANG_TOOLS_TAG}/{tool}-{ver_str}_{platform}-{arch}",
+        );
         let suffix = if cfg!(target_os = "windows") {
             ".exe"
         } else {
             ""
         };
-        let clang_tools_repo: &str = option_env!("CLANG_TOOLS_REPO").unwrap_or(CLANG_TOOLS_REPO);
-        let clang_tools_tag: &str = option_env!("CLANG_TOOLS_TAG").unwrap_or(CLANG_TOOLS_TAG);
-
-        let base_url = format!(
-            "{clang_tools_repo}/releases/download/{clang_tools_tag}/{tool}-{ver_str}_{}-amd64",
-            if cfg!(target_os = "windows") {
-                "windows"
-            } else if cfg!(target_os = "macos") {
-                "macos"
-            } else {
-                "linux"
-            },
-        );
         let url = Url::parse(format!("{base_url}{suffix}").as_str())?;
         let cache_path = Self::get_cache_dir();
         let bin_name = format!("{tool}-{ver_str}{suffix}");
