@@ -113,6 +113,12 @@ pub async fn capture_clang_tools_output(
         let tool_info = version.eval_tool(&tool, false, None).await?.ok_or(anyhow!(
             "Failed to find {tool} or install a suitable version"
         ))?;
+        log::info!(
+            "Using {tool} version {}.{}.{}",
+            tool_info.version.major,
+            tool_info.version.minor,
+            tool_info.version.patch,
+        );
         clang_versions.tidy_version = Some(tool_info.version);
         clang_params.clang_tidy_command = Some(tool_info.path);
     }
@@ -121,6 +127,12 @@ pub async fn capture_clang_tools_output(
         let tool_info = version.eval_tool(&tool, false, None).await?.ok_or(anyhow!(
             "Failed to find {tool} or install a suitable version"
         ))?;
+        log::info!(
+            "Using {tool} version {}.{}.{}",
+            tool_info.version.major,
+            tool_info.version.minor,
+            tool_info.version.patch,
+        );
         clang_versions.format_version = Some(tool_info.version);
         clang_params.clang_format_command = Some(tool_info.path);
     }
