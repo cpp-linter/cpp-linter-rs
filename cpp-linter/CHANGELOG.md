@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
+## [cpp-linter/v2.0.0-rc.17] - 2026-06-08
+
+### <!-- 4 --> 🛠️ Fixed
+
+- Show used clang tools' version in logs by @2bndy5 in [#336](https://github.com/cpp-linter/cpp-linter-rs/pull/336)
+- Rename `clang-installer` to `clang-tools-manager` by @2bndy5 in [#337](https://github.com/cpp-linter/cpp-linter-rs/pull/337)
+
+### <!-- 6 --> 📦 Dependency updates
+
+- Bump version to clang-tools-manager/v0.2.0 by @2bndy5 in [`2505553`](https://github.com/cpp-linter/cpp-linter-rs/commit/25055539eed2ca9f5aca7c65085b826787b52621)
+
+### <!-- 8 --> 📝 Documentation
+
+- Revise third-party license tables in docs by @2bndy5 in [#329](https://github.com/cpp-linter/cpp-linter-rs/pull/329)
+
+[cpp-linter/v2.0.0-rc.17]: https://github.com/cpp-linter/cpp-linter-rs/compare/cpp-linter/v2.0.0-rc.16...cpp-linter/v2.0.0-rc.17
+
+Full commit diff: [`cpp-linter/v2.0.0-rc.16...cpp-linter/v2.0.0-rc.17`][cpp-linter/v2.0.0-rc.17]
+
 ## [cpp-linter/v2.0.0-rc.16] - 2026-06-05
 
 ### <!-- 4 --> 🛠️ Fixed
@@ -15,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### <!-- 6 --> 📦 Dependency updates
 
 - Bump version to clang-installer/v0.1.2 by @2bndy5 in [`2aea596`](https://github.com/cpp-linter/cpp-linter-rs/commit/2aea596824ca58387860b392e67e180630db258b)
+- Bump version to cpp-linter/v2.0.0-rc.16 by @2bndy5 in [`85d6de5`](https://github.com/cpp-linter/cpp-linter-rs/commit/85d6de5fb3073ae66333d48c3d3275ac07baf02f)
 
 ### <!-- 9 --> 🗨️ Changed
 
