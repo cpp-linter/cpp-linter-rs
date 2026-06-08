@@ -95,7 +95,7 @@ jobs:
     name: Build ${{ matrix.settings.target }}
     runs-on: ${{ matrix.settings.host }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
         with:
           persist-credentials: false
       - name: Setup node
@@ -161,11 +161,11 @@ jobs:
     runs-on: ubuntu-latest
     name: Build FreeBSD
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
         with:
           persist-credentials: false
       - name: setup FreeBSD VM
-        uses: cross-platform-actions/action@0c165ad7eb2d6a7e8552d6af5aad2bbedfc646b0 # v1.1.0
+        uses: cross-platform-actions/action@be3d7e9ff5c8770b9c51b1a8c8c5446e1cad7cf9 # v1.2.0
         env:
           DEBUG: napi:*
           RUSTUP_IO_THREADS: 1
@@ -235,7 +235,7 @@ jobs:
           - '24'
     runs-on: ${{ matrix.settings.host }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
         with:
           persist-credentials: false
       - name: Setup node
@@ -277,7 +277,7 @@ jobs:
             node: '24' # no docker image node:24-slim for armv7
     runs-on: ${{ contains(matrix.target, 'aarch64') && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
         with:
           persist-credentials: false
       - name: Setup node
@@ -318,7 +318,7 @@ jobs:
         run: ls -R .
         shell: bash
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
+        uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3 # v4.1.0
         if: ${{ contains(matrix.target, 'armv7') }}
         with:
           platforms: all
@@ -349,7 +349,7 @@ jobs:
       - test-macOS-windows-binding
       - test-linux-binding
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
         with:
           persist-credentials: false
       - name: Setup node
