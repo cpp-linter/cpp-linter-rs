@@ -6,6 +6,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
+## [cpp-linter-js/v2.0.0-rc.17] - 2026-06-08
+
+### <!-- 1 --> 🚀 Added
+
+- Set clang version min and max at compile time by @2bndy5 in [#333](https://github.com/cpp-linter/cpp-linter-rs/pull/333)
+
+### <!-- 4 --> 🛠️ Fixed
+
+- Rename temp downloaded file to given cache path by @2bndy5 in [#332](https://github.com/cpp-linter/cpp-linter-rs/pull/332)
+- Show used clang tools' version in logs by @2bndy5 in [#336](https://github.com/cpp-linter/cpp-linter-rs/pull/336)
+- Rename `clang-installer` to `clang-tools-manager` by @2bndy5 in [#337](https://github.com/cpp-linter/cpp-linter-rs/pull/337)
+
+### <!-- 6 --> 📦 Dependency updates
+
+- Bump the npm group with 2 updates by @dependabot[bot] in [#338](https://github.com/cpp-linter/cpp-linter-rs/pull/338)
+- Bump version to clang-tools-manager/v0.2.0 by @2bndy5 in [`2505553`](https://github.com/cpp-linter/cpp-linter-rs/commit/25055539eed2ca9f5aca7c65085b826787b52621)
+- Bump version to cpp-linter/v2.0.0-rc.17 by @2bndy5 in [`9d83a7f`](https://github.com/cpp-linter/cpp-linter-rs/commit/9d83a7fdbf2ecde4bcc324c921a2d2ffa233e520)
+- Bump version to cpp-linter-py/v2.0.0-rc.17 by @2bndy5 in [`58640c5`](https://github.com/cpp-linter/cpp-linter-rs/commit/58640c5516fcc462b686d94b90e2cde0f958d0d9)
+
+### <!-- 8 --> 📝 Documentation
+
+- Revise third-party license tables in docs by @2bndy5 in [#329](https://github.com/cpp-linter/cpp-linter-rs/pull/329)
+
+[cpp-linter-js/v2.0.0-rc.17]: https://github.com/cpp-linter/cpp-linter-rs/compare/cpp-linter-js/v2.0.0-rc.16...cpp-linter-js/v2.0.0-rc.17
+
+Full commit diff: [`cpp-linter-js/v2.0.0-rc.16...cpp-linter-js/v2.0.0-rc.17`][cpp-linter-js/v2.0.0-rc.17]
+
 ## [cpp-linter-js/v2.0.0-rc.16] - 2026-06-05
 
 ### <!-- 4 --> 🛠️ Fixed
@@ -19,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump version to clang-installer/v0.1.2 by @2bndy5 in [`2aea596`](https://github.com/cpp-linter/cpp-linter-rs/commit/2aea596824ca58387860b392e67e180630db258b)
 - Bump version to cpp-linter/v2.0.0-rc.16 by @2bndy5 in [`85d6de5`](https://github.com/cpp-linter/cpp-linter-rs/commit/85d6de5fb3073ae66333d48c3d3275ac07baf02f)
 - Bump version to cpp-linter-py/v2.0.0-rc.16 by @2bndy5 in [`8dbd515`](https://github.com/cpp-linter/cpp-linter-rs/commit/8dbd515697b89696e922dc1a65c324a22e6624bd)
+- Bump version to cpp-linter-js/v2.0.0-rc.16 by @2bndy5 in [`0ca69c4`](https://github.com/cpp-linter/cpp-linter-rs/commit/0ca69c4aa1031bb079d3ba64ab53ebf056482f6f)
 
 ### <!-- 9 --> 🗨️ Changed
 
