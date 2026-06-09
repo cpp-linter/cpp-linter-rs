@@ -19,7 +19,7 @@ pub use tool::ClangTool;
 pub mod utils;
 
 mod version;
-pub use version::RequestedVersion;
+pub use version::{ClangVersion, GetToolError, RequestedVersion, RequestedVersionParsingError};
 
 mod progress_bar;
 pub use progress_bar::ProgressBar;

@@ -7,7 +7,6 @@ use std::{
     sync::{Arc, Mutex, MutexGuard},
 };
 
-use anyhow::{Context, Result, anyhow};
 use log::Level;
 use serde::Deserialize;
 
@@ -16,6 +15,7 @@ use super::MakeSuggestions;
 use crate::{
     cli::ClangParams,
     common_fs::{FileObj, get_line_count_from_offset},
+    error::ClangCaptureError,
 };
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq, Default)]
@@ -85,11 +85,11 @@ pub fn tally_format_advice(files: &[Arc<Mutex<FileObj>>]) -> Result<u64, String>
 pub fn run_clang_format(
     file: &mut MutexGuard<FileObj>,
     clang_params: &ClangParams,
-) -> Result<Vec<(log::Level, String)>> {
+) -> Result<Vec<(log::Level, String)>, ClangCaptureError> {
     let cmd_path = clang_params
         .clang_format_command
         .as_ref()
-        .ok_or(anyhow!("clang-format path unknown"))?;
+        .ok_or(ClangCaptureError::ToolPathUnknown("clang-format"))?;
     let mut cmd = Command::new(cmd_path);
     let mut logs = vec![];
     cmd.args(["--style", &clang_params.style]);
@@ -115,7 +115,10 @@ pub fn run_clang_format(
         ));
         Some(
             cmd.output()
-                .with_context(|| format!("Failed to get fixes from clang-format: {file_name}"))?
+                .map_err(|e| ClangCaptureError::FailedToRunCommand {
+                    task: format!("get fixes from clang-format {file_name}"),
+                    source: e,
+                })?
                 .stdout,
         )
     };
@@ -133,7 +136,10 @@ pub fn run_clang_format(
     ));
     let output = cmd
         .output()
-        .with_context(|| format!("Failed to get replacements from clang-format: {file_name}"))?;
+        .map_err(|e| ClangCaptureError::FailedToRunCommand {
+            task: format!("Failed to get replacements from clang-format: {file_name}"),
+            source: e,
+        })?;
     if !output.stderr.is_empty() || !output.status.success() {
         logs.push((
             log::Level::Debug,
@@ -144,22 +150,27 @@ pub fn run_clang_format(
         ));
     }
     let mut format_advice = if !output.stdout.is_empty() {
-        let xml = String::from_utf8(output.stdout).with_context(|| {
-            format!("XML output from clang-format was not UTF-8 encoded: {file_name}")
-        })?;
-        quick_xml::de::from_str::<FormatAdvice>(&xml).with_context(|| {
-            format!("Failed to parse XML output from clang-format for {file_name}")
+        let xml =
+            String::from_utf8(output.stdout).map_err(|e| ClangCaptureError::NonUtf8Output {
+                task: format!("XML output from clang-format (for {file_name})"),
+                source: e,
+            })?;
+        quick_xml::de::from_str::<FormatAdvice>(&xml).map_err(|e| {
+            ClangCaptureError::XmlParsingFailed {
+                file_name: file_name.clone(),
+                source: e,
+            }
         })?
     } else {
         FormatAdvice::default()
     };
     format_advice.patched = patched;
     if !format_advice.replacements.is_empty() {
-        let original_contents = fs::read(&file.name).with_context(|| {
-            format!(
-                "Failed to read file's original content before translating byte offsets: {file_name}",
-            )
-        })?;
+        let original_contents =
+            fs::read(&file.name).map_err(|e| ClangCaptureError::ReadFileFailed {
+                file_name: file_name.clone(),
+                source: e,
+            })?;
         // get line and column numbers from format_advice.offset
         let mut filtered_replacements = Vec::new();
         for replacement in &mut format_advice.replacements {

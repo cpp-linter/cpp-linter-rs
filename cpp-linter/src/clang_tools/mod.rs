@@ -9,7 +9,6 @@ use std::{
 };
 
 // non-std crates
-use anyhow::{Context, Result, anyhow};
 use clang_tools_manager::{ClangTool, RequestedVersion};
 use git_bot_feedback::ReviewComment;
 use git2::{DiffOptions, Patch};
@@ -18,7 +17,7 @@ use tokio::task::JoinSet;
 
 // project-specific modules/crates
 use super::common_fs::FileObj;
-use crate::error::SuggestionError;
+use crate::error::{ClangCaptureError, ClangTaskError, SuggestionError};
 use crate::{
     cli::ClangParams,
     rest_client::{RestClient, USER_OUTREACH},
@@ -39,10 +38,8 @@ use clang_tidy::{CompilationUnit, run_clang_tidy};
 fn analyze_single_file(
     file: Arc<Mutex<FileObj>>,
     clang_params: Arc<ClangParams>,
-) -> Result<(PathBuf, Vec<(log::Level, String)>)> {
-    let mut file = file
-        .lock()
-        .map_err(|_| anyhow!("Failed to lock file mutex"))?;
+) -> Result<(PathBuf, Vec<(log::Level, String)>), ClangCaptureError> {
+    let mut file = file.lock().map_err(|_| ClangCaptureError::MutexPoisoned)?;
     let mut logs = vec![];
     if clang_params.clang_format_command.is_some() {
         if clang_params
@@ -104,15 +101,16 @@ pub async fn capture_clang_tools_output(
     version: &RequestedVersion,
     mut clang_params: ClangParams,
     rest_api_client: &RestClient,
-) -> Result<ClangVersions> {
+) -> Result<ClangVersions, ClangTaskError> {
     let mut clang_versions = ClangVersions::default();
     // find the executable paths for clang-tidy and/or clang-format and show version
     // info as debugging output.
     if clang_params.tidy_checks != "-*" {
         let tool = ClangTool::ClangTidy;
-        let tool_info = version.eval_tool(&tool, false, None).await?.ok_or(anyhow!(
-            "Failed to find {tool} or install a suitable version"
-        ))?;
+        let tool_info = version
+            .eval_tool(&tool, false, None)
+            .await?
+            .ok_or(ClangTaskError::FindToolError(tool.as_str()))?;
         log::info!(
             "Using {tool} version {}.{}.{}",
             tool_info.version.major,
@@ -124,9 +122,10 @@ pub async fn capture_clang_tools_output(
     }
     if !clang_params.style.is_empty() {
         let tool = ClangTool::ClangFormat;
-        let tool_info = version.eval_tool(&tool, false, None).await?.ok_or(anyhow!(
-            "Failed to find {tool} or install a suitable version"
-        ))?;
+        let tool_info = version
+            .eval_tool(&tool, false, None)
+            .await?
+            .ok_or(ClangTaskError::FindToolError(tool.as_str()))?;
         log::info!(
             "Using {tool} version {}.{}.{}",
             tool_info.version.major,
@@ -143,8 +142,7 @@ pub async fn capture_clang_tools_output(
     {
         clang_params.database_json = Some(
             // A compilation database should be UTF-8 encoded, but file paths are not; use lossy conversion.
-            serde_json::from_str::<Vec<CompilationUnit>>(&String::from_utf8_lossy(&db_str))
-                .with_context(|| "Failed to parse compile_commands.json")?,
+            serde_json::from_str::<Vec<CompilationUnit>>(&String::from_utf8_lossy(&db_str))?,
         )
     };
 

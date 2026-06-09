@@ -10,14 +10,13 @@ use std::{
 };
 
 // non-std crates
-use anyhow::{Context, Result, anyhow};
 use clang_tools_manager::utils::normalize_path;
 use regex::Regex;
 use serde::Deserialize;
 
 // project-specific modules/crates
 use super::MakeSuggestions;
-use crate::{cli::ClangParams, common_fs::FileObj};
+use crate::{cli::ClangParams, common_fs::FileObj, error::ClangCaptureError};
 
 /// Used to deserialize a json compilation database's translation unit.
 ///
@@ -145,17 +144,18 @@ const NOTE_HEADER: &str = r"^(.+):(\d+):(\d+):\s(\w+):(.*)\[([a-zA-Z\d\-\.]+),?[
 fn parse_tidy_output(
     tidy_stdout: &[u8],
     database_json: &Option<Vec<CompilationUnit>>,
-) -> Result<TidyAdvice> {
-    let note_header = Regex::new(NOTE_HEADER)
-        .with_context(|| "Failed to compile RegExp pattern for note header")?;
-    let fixed_note = Regex::new(r"^.+:(\d+):\d+:\snote: FIX-IT applied suggested code changes$")
-        .with_context(|| "Failed to compile RegExp pattern for fixed note")?;
+) -> Result<TidyAdvice, ClangCaptureError> {
+    let note_header = Regex::new(NOTE_HEADER)?;
+    let fixed_note = Regex::new(r"^.+:(\d+):\d+:\snote: FIX-IT applied suggested code changes$")?;
     let mut found_fix = false;
     let mut notification = None;
     let mut result = Vec::new();
-    let cur_dir = current_dir().with_context(|| "Failed to access current working directory")?;
+    let cur_dir = current_dir().map_err(ClangCaptureError::UnknownWorkingDirectory)?;
     for line in String::from_utf8(tidy_stdout.to_vec())
-        .with_context(|| "Failed to convert clang-tidy stdout to UTF-8 string")?
+        .map_err(|e| ClangCaptureError::NonUtf8Output {
+            task: "convert clang-tidy stdout".to_string(),
+            source: e,
+        })?
         .lines()
     {
         if let Some(captured) = note_header.captures(line) {
@@ -267,11 +267,11 @@ pub fn tally_tidy_advice(files: &[Arc<Mutex<FileObj>>]) -> Result<u64, String> {
 pub fn run_clang_tidy(
     file: &mut MutexGuard<FileObj>,
     clang_params: &ClangParams,
-) -> Result<Vec<(log::Level, std::string::String)>> {
+) -> Result<Vec<(log::Level, String)>, ClangCaptureError> {
     let cmd_path = clang_params
         .clang_tidy_command
         .as_ref()
-        .ok_or(anyhow!("clang-tidy command not located"))?;
+        .ok_or(ClangCaptureError::ToolPathUnknown("clang-tidy"))?;
     let mut cmd = Command::new(cmd_path);
     let mut logs = vec![];
     if !clang_params.tidy_checks.is_empty() {
@@ -300,12 +300,12 @@ pub fn run_clang_tidy(
         None
     } else {
         cmd.arg("--fix-errors");
-        Some(fs::read_to_string(&file.name).with_context(|| {
-            format!(
-                "Failed to cache file's original content before applying clang-tidy changes: {}",
-                file_name.clone()
-            )
-        })?)
+        Some(
+            fs::read_to_string(&file.name).map_err(|e| ClangCaptureError::WriteFileFailed {
+                file_name: file_name.clone(),
+                source: e,
+            })?,
+        )
     };
     if !clang_params.style.is_empty() {
         cmd.args(["--format-style", clang_params.style.as_str()]);
@@ -322,12 +322,12 @@ pub fn run_clang_tidy(
                 .join(" ")
         ),
     ));
-    let output = cmd.output().with_context(|| {
-        format!(
-            "Failed to execute clang-tidy on file: {}",
-            file_name.clone()
-        )
-    })?;
+    let output = cmd
+        .output()
+        .map_err(|e| ClangCaptureError::FailedToRunCommand {
+            task: format!("execute clang-tidy on file {file_name}"),
+            source: e,
+        })?;
     logs.push((
         log::Level::Debug,
         format!(
@@ -354,13 +354,20 @@ pub fn run_clang_tidy(
         if let Some(tidy_advice) = &mut file.tidy_advice {
             // cache file changes in a buffer and restore the original contents for further analysis
             tidy_advice.patched =
-                Some(fs::read(&file_name).with_context(|| {
-                    format!("Failed to read changes from clang-tidy: {file_name}")
-                })?);
+                Some(
+                    fs::read(&file_name).map_err(|e| ClangCaptureError::ReadFileFailed {
+                        file_name: file_name.clone(),
+                        source: e,
+                    })?,
+                );
         }
         // original_content is guaranteed to be Some() value at this point
-        fs::write(&file_name, original_content)
-            .with_context(|| format!("Failed to restore file's original content: {file_name}"))?;
+        fs::write(&file_name, original_content).map_err(|e| {
+            ClangCaptureError::WriteFileFailed {
+                file_name,
+                source: e,
+            }
+        })?;
     }
     Ok(logs)
 }
