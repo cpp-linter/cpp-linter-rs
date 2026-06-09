@@ -43,7 +43,9 @@ words:
   - gnueabi
   - gnueabihf
   - hustcer
+  - imara
   - inlinehilite
+  - interner
   - iomanip
   - isnan
   - libc
