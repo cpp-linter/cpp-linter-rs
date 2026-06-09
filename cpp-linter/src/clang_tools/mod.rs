@@ -4,20 +4,20 @@
 
 use std::{
     fs,
-    path::{Path, PathBuf},
+    path::PathBuf,
     sync::{Arc, Mutex},
 };
 
 // non-std crates
 use clang_tools_manager::{ClangTool, RequestedVersion};
 use git_bot_feedback::ReviewComment;
-use git2::{DiffOptions, Patch};
+use gix_imara_diff::{BasicLineDiffPrinter, Diff, InternedInput, UnifiedDiffConfig};
 use semver::Version;
 use tokio::task::JoinSet;
 
 // project-specific modules/crates
 use super::common_fs::FileObj;
-use crate::error::{ClangCaptureError, ClangTaskError, SuggestionError};
+use crate::error::{ClangCaptureError, ClangTaskError};
 use crate::{
     cli::ClangParams,
     rest_client::{RestClient, USER_OUTREACH},
@@ -291,20 +291,13 @@ impl ReviewComments {
 }
 
 pub fn make_patch<'buffer>(
-    path: &Path,
-    patched: &'buffer [u8],
-    original_content: &'buffer [u8],
-) -> Result<Patch<'buffer>, git2::Error> {
-    let mut diff_opts = &mut DiffOptions::new();
-    diff_opts = diff_opts.indent_heuristic(true);
-    diff_opts = diff_opts.context_lines(0);
-    Patch::from_buffers(
-        original_content,
-        Some(path),
-        patched,
-        Some(path),
-        Some(diff_opts),
-    )
+    patched: &'buffer str,
+    original_content: &'buffer str,
+) -> (Diff, InternedInput<&'buffer str>) {
+    let input = InternedInput::new(original_content, patched);
+    let mut diff = Diff::compute(gix_imara_diff::Algorithm::Histogram, &input);
+    diff.postprocess_lines(&input);
+    (diff, input)
 }
 
 /// A trait for generating suggestions from a [`FileObj`]'s advice's generated `patched` buffer.
@@ -320,46 +313,31 @@ pub trait MakeSuggestions {
         &self,
         review_comments: &mut ReviewComments,
         file_obj: &FileObj,
-        patch: &mut Patch,
+        diff: &Diff,
+        input: &InternedInput<&str>,
         summary_only: bool,
-    ) -> Result<(), SuggestionError> {
+    ) {
         let is_tidy_tool = (&self.get_tool_name() == "clang-tidy") as usize;
-        let hunks_total = patch.num_hunks();
-        let mut hunks_in_patch = 0u32;
         let file_name = file_obj
             .name
             .to_string_lossy()
             .replace("\\", "/")
             .trim_start_matches("./")
             .to_owned();
-        let patch_buf = &patch
-            .to_buf()
-            .map_err(|e| SuggestionError::PatchIntoBytesFailed {
-                file_name: file_name.clone(),
-                source: e,
-            })?
-            .to_vec();
-        review_comments.full_patch[is_tidy_tool].push_str(
-            String::from_utf8(patch_buf.to_owned())
-                .map_err(|e| SuggestionError::PatchIntoStringFailed {
-                    file_name: file_name.clone(),
-                    source: e,
-                })?
-                .as_str(),
-        );
+        let mut config = UnifiedDiffConfig::default();
+        config.context_len(0);
+        let printer = BasicLineDiffPrinter(&input.interner);
+        let unified_diff = diff.unified_diff(&printer, config, input).to_string();
+        if !unified_diff.is_empty() {
+            let patch_buf = format!("--- a/{file_name}\n+++ b/{file_name}\n{unified_diff}");
+            review_comments.full_patch[is_tidy_tool].push_str(patch_buf.as_str());
+        }
         if summary_only {
             review_comments.tool_total[is_tidy_tool].get_or_insert(0);
-            return Ok(());
+            return;
         }
-        for hunk_id in 0..hunks_total {
-            let (hunk, line_count) =
-                patch
-                    .hunk(hunk_id)
-                    .map_err(|e| SuggestionError::GetHunkFailed {
-                        hunk_id,
-                        file_name: file_name.clone(),
-                        source: e,
-                    })?;
+        let mut hunks_in_patch = 0u32;
+        for hunk in diff.hunks() {
             hunks_in_patch += 1;
             let hunk_range = file_obj.is_hunk_in_diff(&hunk);
             match hunk_range {
@@ -367,49 +345,26 @@ pub trait MakeSuggestions {
                 Some((start_line, end_line)) => {
                     let mut suggestion = String::new();
                     let suggestion_help = self.get_suggestion_help(start_line, end_line);
-                    let mut removed = vec![];
-                    for line_index in 0..line_count {
-                        let diff_line = patch.line_in_hunk(hunk_id, line_index).map_err(|e| {
-                            SuggestionError::GetHunkLineFailed {
-                                line_index,
-                                hunk_id,
-                                file_name: file_name.clone(),
-                                source: e,
-                            }
-                        })?;
-                        let line =
-                            String::from_utf8(diff_line.content().to_owned()).map_err(|e| {
-                                SuggestionError::HunkLineIntoStringFailed {
-                                    line_index,
-                                    hunk_id,
-                                    file_name: file_name.clone(),
-                                    source: e,
-                                }
-                            })?;
-                        if ['+', ' '].contains(&diff_line.origin()) {
-                            suggestion.push_str(line.as_str());
-                        } else {
-                            removed.push(
-                                diff_line
-                                    .old_lineno()
-                                    .expect("Removed line should have a line number"),
-                            );
-                        }
-                    }
-                    if suggestion.is_empty() && !removed.is_empty() {
+                    if hunk.is_pure_removal() {
                         suggestion.push_str(
                             format!(
                                 "Please remove the line(s)\n- {}",
-                                removed
-                                    .iter()
+                                hunk.before
                                     .map(|l| l.to_string())
                                     .collect::<Vec<String>>()
                                     .join("\n- ")
                             )
                             .as_str(),
-                        )
+                        );
                     } else {
-                        suggestion = format!("```suggestion\n{suggestion}```");
+                        suggestion.push_str("```suggestion\n");
+                        for token in
+                            &input.after[hunk.after.start as usize..hunk.after.end as usize]
+                        {
+                            let line = &input.interner[*token];
+                            suggestion.push_str(line);
+                        }
+                        suggestion.push_str("```\n");
                     }
                     let comment = Suggestion {
                         line_start: start_line,
@@ -423,8 +378,7 @@ pub trait MakeSuggestions {
                 }
             }
         }
-        review_comments.tool_total[is_tidy_tool] =
-            Some(review_comments.tool_total[is_tidy_tool].unwrap_or_default() + hunks_in_patch);
-        Ok(())
+        let tool_total = review_comments.tool_total[is_tidy_tool].get_or_insert(0);
+        *tool_total += hunks_in_patch;
     }
 }

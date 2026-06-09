@@ -1,11 +1,8 @@
 //! A module to hold all common file system functionality.
 
-use std::{
-    fmt::Debug,
-    fs,
-    ops::RangeInclusive,
-    path::{Path, PathBuf},
-};
+use std::{fmt::Debug, fs, ops::RangeInclusive, path::PathBuf};
+
+use gix_imara_diff::Hunk;
 
 use crate::{
     clang_tools::{
@@ -15,7 +12,6 @@ use crate::{
     cli::LinesChangedOnly,
     error::FileObjError,
 };
-use git2::DiffHunk;
 
 /// A structure to represent a file's path and line changes.
 #[derive(Debug, Clone)]
@@ -101,14 +97,14 @@ impl FileObj {
 
     /// Is the range from `start_line` to `end_line` contained in a single item of
     /// [`FileObj::diff_chunks`]?
-    pub fn is_hunk_in_diff(&self, hunk: &DiffHunk) -> Option<(u32, u32)> {
-        let (start_line, end_line) = if hunk.old_lines() > 0 {
+    pub fn is_hunk_in_diff(&self, hunk: &Hunk) -> Option<(u32, u32)> {
+        let (start_line, end_line) = if !hunk.before.is_empty() {
             // if old hunk's total lines is > 0
-            let start = hunk.old_start();
-            (start, start + hunk.old_lines() - 1)
+            let start = hunk.before.start;
+            (start, start + hunk.before.len() as u32 - 1)
         } else {
             // old hunk's total lines is 0, meaning changes were only added
-            let start = hunk.new_start();
+            let start = hunk.after.start;
             // make old hunk's range span 1 line
             (start, start)
         };
@@ -145,22 +141,23 @@ impl FileObj {
         review_comments: &mut ReviewComments,
         summary_only: bool,
     ) -> Result<(), FileObjError> {
-        let original_content = fs::read(&self.name).map_err(FileObjError::ReadFile)?;
+        let original_content = fs::read_to_string(&self.name).map_err(FileObjError::ReadFile)?;
         let file_name = self.name.to_str().unwrap_or_default().replace("\\", "/");
-        let file_path = Path::new(&file_name);
         if let Some(advice) = &self.format_advice
             && let Some(patched) = &advice.patched
         {
-            let mut patch = make_patch(file_path, patched, &original_content)
-                .map_err(|e| FileObjError::MakePatchFailed(file_name.clone(), e))?;
-            advice.get_suggestions(review_comments, self, &mut patch, summary_only)?;
+            let patched = String::from_utf8(patched.to_vec())
+                .map_err(|e| FileObjError::FromUtf8Error(file_name.clone(), e))?;
+            let (diff, input) = make_patch(patched.as_str(), &original_content);
+            advice.get_suggestions(review_comments, self, &diff, &input, summary_only);
         }
 
         if let Some(advice) = &self.tidy_advice {
             if let Some(patched) = &advice.patched {
-                let mut patch = make_patch(file_path, patched, &original_content)
-                    .map_err(|e| FileObjError::MakePatchFailed(file_name.clone(), e))?;
-                advice.get_suggestions(review_comments, self, &mut patch, summary_only)?;
+                let patched = String::from_utf8(patched.to_vec())
+                    .map_err(|e| FileObjError::FromUtf8Error(file_name.clone(), e))?;
+                let (diff, input) = make_patch(patched.as_str(), &original_content);
+                advice.get_suggestions(review_comments, self, &diff, &input, summary_only);
             }
 
             if summary_only {
