@@ -11,9 +11,7 @@ use std::{
 // non-std crates
 use clang_tools_manager::{ClangTool, RequestedVersion};
 use git_bot_feedback::ReviewComment;
-use gix_imara_diff::{
-    BasicLineDiffPrinter, Diff, InternedInput, UnifiedDiffConfig, UnifiedDiffPrinter,
-};
+use gix_imara_diff::{BasicLineDiffPrinter, Diff, InternedInput, UnifiedDiffConfig};
 use semver::Version;
 use tokio::task::JoinSet;
 
@@ -360,17 +358,13 @@ pub trait MakeSuggestions {
                         );
                     } else {
                         suggestion.push_str("```suggestion\n");
-                        printer
-                            .display_hunk(
-                                &mut suggestion,
-                                &input.before[hunk.before.start as usize..hunk.before.end as usize],
-                                &input.after[hunk.after.start as usize..hunk.after.end as usize],
-                            )
-                            .map_err(|e| SuggestionError::HunkIntoStringFailed {
-                                file_name: file_name.clone(),
-                                source: e,
-                            })?;
-                        suggestion.push_str("```");
+                        for token in
+                            &input.after[hunk.after.start as usize..hunk.after.end as usize]
+                        {
+                            let line = &input.interner[*token];
+                            suggestion.push_str(line);
+                        }
+                        suggestion.push_str("```\n");
                     }
                     let comment = Suggestion {
                         line_start: start_line,
@@ -384,8 +378,8 @@ pub trait MakeSuggestions {
                 }
             }
         }
-        review_comments.tool_total[is_tidy_tool] =
-            Some(review_comments.tool_total[is_tidy_tool].unwrap_or_default() + hunks_in_patch);
+        let tool_total = review_comments.tool_total[is_tidy_tool].get_or_insert(0);
+        *tool_total += hunks_in_patch;
         Ok(())
     }
 }
