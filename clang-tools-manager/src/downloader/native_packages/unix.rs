@@ -127,12 +127,22 @@ impl PackageManager for UnixPackageManager {
             }
         }
         let output = if Self::has_sudo() && !matches!(self, UnixPackageManager::Homebrew) {
+            log::debug!(
+                "Running `sudo {} {} {package_id}`",
+                self.as_str(),
+                args.join(" ")
+            );
             Command::new("sudo")
                 .arg(self.as_str())
                 .args(args)
                 .arg(package_id.as_str())
                 .output()?
         } else {
+            log::debug!(
+                "Running `{} {} {package_id}`",
+                self.as_str(),
+                args.join(" ")
+            );
             Command::new(self.as_str())
                 .args(args)
                 .arg(package_id.as_str())
@@ -145,6 +155,10 @@ impl PackageManager for UnixPackageManager {
             if matches!(self, UnixPackageManager::Apt)
                 && let Some(version) = version
             {
+                log::error!(
+                    "Failed to install {package_id} via apt: {}",
+                    String::from_utf8_lossy(&output.stderr)
+                );
                 log::info!(
                     "trying to install from official LLVM PPA repository (for Debian-based `apt` package manager)"
                 );
