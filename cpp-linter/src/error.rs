@@ -1,3 +1,4 @@
+use clang_tools_manager::GetToolError;
 use git_bot_feedback::RestClientError;
 
 #[derive(Debug, thiserror::Error)]
@@ -63,4 +64,62 @@ pub enum ClientError {
     MutexPoisoned(String),
     #[error(transparent)]
     FileObjError(#[from] FileObjError),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ClangCaptureError {
+    #[error("Failed to acquire a lock on a file's mutex")]
+    MutexPoisoned,
+    #[error("Unknown path to {0} tool; required to invoke it.")]
+    ToolPathUnknown(&'static str),
+    #[error("Failed to {task}: {source}")]
+    FailedToRunCommand {
+        task: String,
+        #[source]
+        source: std::io::Error,
+    },
+    #[error("{task} output was not valid UTF-8: {source}")]
+    NonUtf8Output {
+        task: String,
+        #[source]
+        source: std::string::FromUtf8Error,
+    },
+    #[error("Failed to parse XML output from clang-format for {file_name}: {source}")]
+    XmlParsingFailed {
+        file_name: String,
+        #[source]
+        source: quick_xml::DeError,
+    },
+    #[error("Failed to read contents of file '{file_name}': {source}")]
+    ReadFileFailed {
+        file_name: String,
+        #[source]
+        source: std::io::Error,
+    },
+    #[error("Failed to write file '{file_name}': {source}")]
+    WriteFileFailed {
+        file_name: String,
+        #[source]
+        source: std::io::Error,
+    },
+    #[error("Failed to compile regular expression: {0}")]
+    RegexError(#[from] regex::Error),
+    #[error("Failed to determine the current working directory: {0}")]
+    UnknownWorkingDirectory(#[source] std::io::Error),
+    #[error("Failed to parse integer from string: {0}")]
+    ParseIntError(#[from] std::num::ParseIntError),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ClangTaskError {
+    #[error(transparent)]
+    GetToolError(#[from] GetToolError),
+    #[error("Failed to find tool {0} or install a suitable version")]
+    FindToolError(&'static str),
+    #[error("Failed to parse compilation database: {0}")]
+    ParseJsonError(#[from] serde_json::Error),
+    #[error("Failed to execute task in parallel: {0}")]
+    JoinError(#[from] tokio::task::JoinError),
+    #[error(transparent)]
+    ClangCaptureError(#[from] ClangCaptureError),
 }

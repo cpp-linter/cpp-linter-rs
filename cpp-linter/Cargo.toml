@@ -14,7 +14,7 @@ license.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = { workspace = true }
+anyhow = { workspace = true, optional = true }
 async-trait = "0.1.89"
 chrono = "0.4.44"
 clang-tools-manager = { path = "../clang-tools-manager", version = "0.2.0" }
@@ -46,7 +46,7 @@ tempfile = { workspace = true }
 reqwest = { workspace = true, features = ["default-tls"] }
 
 [features]
-bin = ["reqwest/default-tls", "dep:clap", "dep:colored"]
+bin = ["reqwest/default-tls", "dep:clap", "dep:colored", "dep:anyhow"]
 
 [lib]
 bench = false
