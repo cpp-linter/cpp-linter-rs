@@ -17,7 +17,7 @@ use tokio::task::JoinSet;
 
 // project-specific modules/crates
 use super::common_fs::FileObj;
-use crate::error::{ClangCaptureError, ClangTaskError, SuggestionError};
+use crate::error::{ClangCaptureError, ClangTaskError};
 use crate::{
     cli::ClangParams,
     rest_client::{RestClient, USER_OUTREACH},
@@ -316,7 +316,7 @@ pub trait MakeSuggestions {
         diff: &Diff,
         input: &InternedInput<&str>,
         summary_only: bool,
-    ) -> Result<(), SuggestionError> {
+    ) {
         let is_tidy_tool = (&self.get_tool_name() == "clang-tidy") as usize;
         let file_name = file_obj
             .name
@@ -334,7 +334,7 @@ pub trait MakeSuggestions {
         }
         if summary_only {
             review_comments.tool_total[is_tidy_tool].get_or_insert(0);
-            return Ok(());
+            return;
         }
         let mut hunks_in_patch = 0u32;
         for hunk in diff.hunks() {
@@ -380,6 +380,5 @@ pub trait MakeSuggestions {
         }
         let tool_total = review_comments.tool_total[is_tidy_tool].get_or_insert(0);
         *tool_total += hunks_in_patch;
-        Ok(())
     }
 }

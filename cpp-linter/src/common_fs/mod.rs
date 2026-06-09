@@ -149,7 +149,7 @@ impl FileObj {
             let patched = String::from_utf8(patched.to_vec())
                 .map_err(|e| FileObjError::FromUtf8Error(file_name.clone(), e))?;
             let (diff, input) = make_patch(patched.as_str(), &original_content);
-            advice.get_suggestions(review_comments, self, &diff, &input, summary_only)?;
+            advice.get_suggestions(review_comments, self, &diff, &input, summary_only);
         }
 
         if let Some(advice) = &self.tidy_advice {
@@ -157,7 +157,7 @@ impl FileObj {
                 let patched = String::from_utf8(patched.to_vec())
                     .map_err(|e| FileObjError::FromUtf8Error(file_name.clone(), e))?;
                 let (diff, input) = make_patch(patched.as_str(), &original_content);
-                advice.get_suggestions(review_comments, self, &diff, &input, summary_only)?;
+                advice.get_suggestions(review_comments, self, &diff, &input, summary_only);
             }
 
             if summary_only {

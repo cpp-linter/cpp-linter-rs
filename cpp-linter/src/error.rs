@@ -2,23 +2,11 @@ use clang_tools_manager::GetToolError;
 use git_bot_feedback::RestClientError;
 
 #[derive(Debug, thiserror::Error)]
-pub enum SuggestionError {
-    #[error("Failed to write hunk of patch into string buffer for {file_name}: {source}")]
-    HunkIntoStringFailed {
-        file_name: String,
-        #[source]
-        source: core::fmt::Error,
-    },
-}
-
-#[derive(Debug, thiserror::Error)]
 pub enum FileObjError {
     #[error("Failed to read file contents")]
     ReadFile(std::io::Error),
     #[error("Failed to convert patch buffer to UTF-8 string for file {0}: {1}")]
     FromUtf8Error(String, #[source] std::string::FromUtf8Error),
-    #[error(transparent)]
-    SuggestionError(#[from] SuggestionError),
 }
 
 #[derive(Debug, thiserror::Error)]
