@@ -301,7 +301,7 @@ pub fn run_clang_tidy(
     } else {
         cmd.arg("--fix-errors");
         Some(
-            fs::read_to_string(&file.name).map_err(|e| ClangCaptureError::WriteFileFailed {
+            fs::read_to_string(&file.name).map_err(|e| ClangCaptureError::ReadFileFailed {
                 file_name: file_name.clone(),
                 source: e,
             })?,
