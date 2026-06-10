@@ -83,16 +83,16 @@ pub async fn try_install_package(
         for mgr in os_pkg_managers {
             log::info!("Trying to install {tool} v{min_version} using {mgr} package manager.");
             let pkg_name = mgr.get_package_name(tool);
-            if mgr.is_installed_package(&pkg_name, Some(min_version)) {
-                let path =
-                    tool.get_exe_path(&RequestedVersion::Requirement(version_req.clone()))?;
-                let version = tool.capture_version(&path)?;
-                if version_req.matches(&version) {
-                    log::info!(
-                        "Found {tool} version matching {version_req} installed via {mgr} package manager."
-                    );
-                    return Ok(Some(ClangVersion { version, path }));
-                }
+            if mgr.is_installed_package(&pkg_name, Some(min_version))
+                && let Ok(path) =
+                    tool.get_exe_path(&RequestedVersion::Requirement(version_req.clone()))
+                && let Ok(version) = tool.capture_version(&path)
+                && version_req.matches(&version)
+            {
+                log::info!(
+                    "Found {tool} version matching {version_req} installed via {mgr} package manager."
+                );
+                return Ok(Some(ClangVersion { version, path }));
             } else {
                 log::info!(
                     "{mgr} package manager does not have a version of {tool} matching {version_req} installed."
