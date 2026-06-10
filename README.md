@@ -25,7 +25,10 @@
 [![Docs][docs-ci-badge]][docs-site]
 [![Pre-commit-ci][pre-commit-badge]][pre-commit-ci]
 [![codecov-status][codecov-badge]][codecov-project]
+[![cpp-linter hub][cpp-linter-hub-badge]][cpp-linter-hub-link]
 
+[cpp-linter-hub-badge]: https://img.shields.io/badge/%F0%9F%8F%A0_cpp--linter_hub-%E2%86%90_home-22863a
+[cpp-linter-hub-link]: https://cpp-linter.github.io/
 [py-build-ci]: https://github.com/cpp-linter/cpp-linter-rs/actions/workflows/python-packaging.yml
 [py-build-badge]: https://github.com/cpp-linter/cpp-linter-rs/actions/workflows/python-packaging.yml/badge.svg
 [bin-build-badge]: https://github.com/cpp-linter/cpp-linter-rs/actions/workflows/binary-builds.yml/badge.svg
