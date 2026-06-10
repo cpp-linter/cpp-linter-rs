@@ -81,6 +81,10 @@ impl RestClient {
             .collect())
     }
 
+    pub fn is_debug_enabled(&self) -> bool {
+        self.client.is_debug_enabled()
+    }
+
     pub fn start_log_group(&self, name: &str) {
         self.client.start_log_group(name)
     }
