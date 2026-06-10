@@ -3,7 +3,7 @@
 
 use std::{
     fs,
-    ops::Range,
+    ops::RangeInclusive,
     path::PathBuf,
     process::Command,
     sync::{Arc, Mutex, MutexGuard},
@@ -19,7 +19,7 @@ use crate::{cli::ClangParams, common_fs::FileObj, error::ClangCaptureError};
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct FormatAdvice {
     /// A list of [`Replacement`]s that clang-tidy wants to make.
-    pub replacements: Vec<Range<u32>>,
+    pub replacements: Vec<RangeInclusive<u32>>,
 
     pub patched: PathBuf,
 }
@@ -142,15 +142,19 @@ pub fn run_clang_format(
         replacements: diff
             .hunks()
             .filter_map(|hunk| {
+                let replacement = if hunk.is_pure_insertion() {
+                    RangeInclusive::new(hunk.after.start, hunk.after.end.saturating_sub(1))
+                } else {
+                    RangeInclusive::new(hunk.before.start, hunk.before.end.saturating_sub(1))
+                };
                 if ranges.is_empty() {
-                    Some(hunk.before)
+                    Some(replacement)
                 } else {
                     // only include replacements that fall within the specified line ranges
                     if ranges.iter().any(|range| {
-                        range.contains(&hunk.before.start)
-                            && range.contains(&hunk.before.end.saturating_sub(1))
+                        range.contains(replacement.start()) && range.contains(replacement.end())
                     }) {
-                        Some(hunk.before)
+                        Some(replacement)
                     } else {
                         None
                     }

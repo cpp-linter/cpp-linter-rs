@@ -223,7 +223,7 @@ impl RestClient {
                 // assemble a list of line numbers
                 let mut lines = Vec::new();
                 for replacement in &format_advice.replacements {
-                    for i in replacement.start..replacement.end {
+                    for i in replacement.clone() {
                         if !lines.contains(&i) {
                             lines.push(i);
                         }
@@ -360,7 +360,7 @@ fn make_format_comment(
             let line_count = format_advice
                 .replacements
                 .iter()
-                .fold(0, |acc, r| acc + r.len());
+                .fold(0, |acc, r| acc + r.clone().count());
             let note = format!(
                 "- {} ({line_count} line{})\n",
                 file.name.to_string_lossy().replace('\\', "/"),
@@ -488,7 +488,7 @@ mod test {
                 });
                 file.format_advice = Some(FormatAdvice {
                     #[allow(clippy::single_range_in_vec_init)]
-                    replacements: vec![1..2],
+                    replacements: vec![1..=2],
                     patched: PathBuf::new(),
                 });
                 files.push(Arc::new(Mutex::new(file)));
