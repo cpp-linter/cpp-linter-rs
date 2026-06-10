@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
+## [cpp-linter-py/v2.0.0-rc.18] - 2026-06-10
+
+### <!-- 1 --> 🚀 Added
+
+- Use concrete error types by @2bndy5 in [#343](https://github.com/cpp-linter/cpp-linter-rs/pull/343)
+- Make diff without libgit2 by @2bndy5 in [#344](https://github.com/cpp-linter/cpp-linter-rs/pull/344)
+
+### <!-- 4 --> 🛠️ Fixed
+
+- Do not fail on check for tool presence (via package managers) by @2bndy5 in [#345](https://github.com/cpp-linter/cpp-linter-rs/pull/345)
+
+### <!-- 6 --> 📦 Dependency updates
+
+- Bump version to cpp-linter-js/v2.0.0-rc.17 by @2bndy5 in [`1529d72`](https://github.com/cpp-linter/cpp-linter-rs/commit/1529d7214611e45a6876ef20580565b1af3ca491)
+- Bump version to clang-tools-manager/v0.2.1 by @2bndy5 in [`f4033b5`](https://github.com/cpp-linter/cpp-linter-rs/commit/f4033b5c1807fb3889cbb3c396d0f292bac92d25)
+- Bump version to cpp-linter/v2.0.0-rc.18 by @2bndy5 in [`83c1b4a`](https://github.com/cpp-linter/cpp-linter-rs/commit/83c1b4aa29c8e388372351724c395a6a3bad7769)
+
+[cpp-linter-py/v2.0.0-rc.18]: https://github.com/cpp-linter/cpp-linter-rs/compare/cpp-linter-py/v2.0.0-rc.17...cpp-linter-py/v2.0.0-rc.18
+
+Full commit diff: [`cpp-linter-py/v2.0.0-rc.17...cpp-linter-py/v2.0.0-rc.18`][cpp-linter-py/v2.0.0-rc.18]
+
 ## [cpp-linter-py/v2.0.0-rc.17] - 2026-06-08
 
 ### <!-- 1 --> 🚀 Added
@@ -23,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump version to cpp-linter-js/v2.0.0-rc.16 by @2bndy5 in [`0ca69c4`](https://github.com/cpp-linter/cpp-linter-rs/commit/0ca69c4aa1031bb079d3ba64ab53ebf056482f6f)
 - Bump version to clang-tools-manager/v0.2.0 by @2bndy5 in [`2505553`](https://github.com/cpp-linter/cpp-linter-rs/commit/25055539eed2ca9f5aca7c65085b826787b52621)
 - Bump version to cpp-linter/v2.0.0-rc.17 by @2bndy5 in [`9d83a7f`](https://github.com/cpp-linter/cpp-linter-rs/commit/9d83a7fdbf2ecde4bcc324c921a2d2ffa233e520)
+- Bump version to cpp-linter-py/v2.0.0-rc.17 by @2bndy5 in [`58640c5`](https://github.com/cpp-linter/cpp-linter-rs/commit/58640c5516fcc462b686d94b90e2cde0f958d0d9)
 
 ### <!-- 8 --> 📝 Documentation
 
