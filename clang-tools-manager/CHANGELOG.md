@@ -6,11 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
+## [clang-tools-manager/v0.2.1] - 2026-06-10
+
+### <!-- 1 --> 🚀 Added
+
+- Use concrete error types by @2bndy5 in [#343](https://github.com/cpp-linter/cpp-linter-rs/pull/343)
+
+### <!-- 4 --> 🛠️ Fixed
+
+- Do not fail on check for tool presence (via package managers) by @2bndy5 in [#345](https://github.com/cpp-linter/cpp-linter-rs/pull/345)
+
+[clang-tools-manager/v0.2.1]: https://github.com/cpp-linter/cpp-linter-rs/compare/clang-tools-manager/v0.2.0...clang-tools-manager/v0.2.1
+
+Full commit diff: [`clang-tools-manager/v0.2.0...clang-tools-manager/v0.2.1`][clang-tools-manager/v0.2.1]
+
 ## [clang-tools-manager/v0.2.0] - 2026-06-08
 
 ### <!-- 4 --> 🛠️ Fixed
 
 - Rename `clang-installer` to `clang-tools-manager` by @2bndy5 in [#337](https://github.com/cpp-linter/cpp-linter-rs/pull/337)
+
+### <!-- 6 --> 📦 Dependency updates
+
+- Bump version to clang-tools-manager/v0.2.0 by @2bndy5 in [`2505553`](https://github.com/cpp-linter/cpp-linter-rs/commit/25055539eed2ca9f5aca7c65085b826787b52621)
 
 [clang-tools-manager/v0.2.0]: https://github.com/cpp-linter/cpp-linter-rs/compare/clang-tools-manager/v0.1.2...clang-tools-manager/v0.2.0
 
