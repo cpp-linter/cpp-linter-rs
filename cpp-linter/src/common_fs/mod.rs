@@ -143,11 +143,8 @@ impl FileObj {
     ) -> Result<(), FileObjError> {
         let original_content = fs::read_to_string(&self.name).map_err(FileObjError::ReadFile)?;
         let file_name = self.name.to_str().unwrap_or_default().replace("\\", "/");
-        if let Some(advice) = &self.format_advice
-            && let Some(patched) = &advice.patched
-        {
-            let patched = String::from_utf8(patched.to_vec())
-                .map_err(|e| FileObjError::FromUtf8Error(file_name.clone(), e))?;
+        if let Some(advice) = &self.format_advice {
+            let patched = fs::read_to_string(&advice.patched).map_err(FileObjError::ReadFile)?;
             let (diff, input) = make_patch(patched.as_str(), &original_content);
             advice.get_suggestions(review_comments, self, &diff, &input, summary_only);
         }
@@ -219,48 +216,13 @@ impl FileObj {
     }
 }
 
-/// Gets the line number for a given `offset` (of bytes) from the given
-/// buffer `contents`.
-///
-/// The `offset` given to this function is expected to originate from
-/// diagnostic information provided by clang-format. Any `offset` out of
-/// bounds is clamped to the given `contents` buffer's length.
-pub fn get_line_count_from_offset(contents: &[u8], offset: u32) -> u32 {
-    let offset = (offset as usize).min(contents.len());
-    let lines = contents[0..offset].split(|byte| byte == &b'\n');
-    lines.count() as u32
-}
-
 #[cfg(test)]
 mod test {
-    use std::{fs, path::PathBuf};
+    use std::path::PathBuf;
 
-    use super::{FileObj, get_line_count_from_offset};
+    use super::FileObj;
     use crate::cli::LinesChangedOnly;
 
-    // *********************** tests for translating byte offset into line/column
-
-    #[test]
-    fn translate_byte_offset() {
-        let contents = fs::read(PathBuf::from("tests/demo/demo.cpp")).unwrap();
-        let lines = get_line_count_from_offset(&contents, 144);
-        assert_eq!(lines, 13);
-    }
-
-    #[test]
-    fn get_line_count_edge_cases() {
-        // Empty content
-        assert_eq!(get_line_count_from_offset(&[], 0), 1);
-
-        // No newlines
-        assert_eq!(get_line_count_from_offset(b"abc", 3), 1);
-
-        // Consecutive newlines
-        assert_eq!(get_line_count_from_offset(b"a\n\nb", 3), 3);
-
-        // Offset beyond content length
-        assert_eq!(get_line_count_from_offset(b"a\nb\n", 10), 3);
-    }
     // *********************** tests for FileObj::get_ranges()
 
     #[test]

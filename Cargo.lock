@@ -390,7 +390,6 @@ dependencies = [
  "gix-imara-diff",
  "log",
  "mockito",
- "quick-xml",
  "regex",
  "reqwest",
  "semver",
@@ -1497,16 +1496,6 @@ dependencies = [
  "pyo3-build-config",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "quick-xml"
-version = "0.40.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2474bd2e5029e7ccb6abb2ba48cf2383a333851dedf495901544281590c7da7f"
-dependencies = [
- "memchr",
- "serde",
 ]
 
 [[package]]
