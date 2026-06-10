@@ -101,6 +101,7 @@ mod test {
                 &LinesChangedOnly::Off.into(),
                 &base_diff,
                 ignore_staged,
+                ".",
             )
             .await
             .unwrap()

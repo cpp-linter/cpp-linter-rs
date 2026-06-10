@@ -13,7 +13,7 @@ use gix_imara_diff::{Diff, InternedInput};
 use log::Level;
 
 // project-specific crates/modules
-use super::MakeSuggestions;
+use super::{CACHE_DIR, MakeSuggestions};
 use crate::{cli::ClangParams, common_fs::FileObj, error::ClangCaptureError};
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -73,13 +73,14 @@ pub fn run_clang_format(
         .as_ref()
         .ok_or(ClangCaptureError::ToolPathUnknown("clang-format"))?;
     let mut cmd = Command::new(cmd_path);
+    cmd.current_dir(&clang_params.repo_root);
     let mut logs = vec![];
     cmd.args(["--style", &clang_params.style]);
     let ranges = file.get_ranges(&clang_params.lines_changed_only);
     for range in &ranges {
         cmd.arg(format!("--lines={}:{}", range.start(), range.end()));
     }
-    let cache_path = clang_params.project_cache_dir.join("patches");
+    let cache_path = clang_params.repo_root.join(CACHE_DIR).join("patches");
     let cache_format_fixes = cache_path.join(file.name.with_added_extension("format"));
     fs::create_dir_all(
         cache_format_fixes
@@ -125,9 +126,11 @@ pub fn run_clang_format(
 
     // use a diff between patched and original contents to get format results
     let original_contents =
-        fs::read_to_string(&file.name).map_err(|e| ClangCaptureError::ReadFileFailed {
-            file_name: file_name.clone(),
-            source: e,
+        fs::read_to_string(clang_params.repo_root.join(&file.name)).map_err(|e| {
+            ClangCaptureError::ReadFileFailed {
+                file_name: file_name.clone(),
+                source: e,
+            }
         })?;
     let patched_contents = String::from_utf8(output.stdout.to_vec()).map_err(|e| {
         ClangCaptureError::NonUtf8Output {

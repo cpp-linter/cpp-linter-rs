@@ -273,6 +273,7 @@ pub fn run_clang_tidy(
         .as_ref()
         .ok_or(ClangCaptureError::ToolPathUnknown("clang-tidy"))?;
     let mut cmd = Command::new(cmd_path);
+    cmd.current_dir(&clang_params.repo_root);
     let mut logs = vec![];
     if !clang_params.tidy_checks.is_empty() {
         cmd.args(["-checks", &clang_params.tidy_checks]);
@@ -496,7 +497,7 @@ mod test {
             format_review: false,
             clang_tidy_command: Some(exe_path),
             clang_format_command: None,
-            project_cache_dir: PathBuf::from(".").join(".cpp-linter-cache"),
+            repo_root: PathBuf::from(".").join(".cpp-linter-cache"),
         };
         let mut file_lock = arc_file.lock().unwrap();
         let logs = run_clang_tidy(&mut file_lock, &clang_params)

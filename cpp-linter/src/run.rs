@@ -6,7 +6,7 @@
 #![cfg(feature = "bin")]
 use std::{
     env,
-    path::{Path, PathBuf},
+    path::PathBuf,
     sync::{Arc, Mutex},
 };
 
@@ -18,7 +18,7 @@ use log::{LevelFilter, set_max_level};
 
 // project specific modules/crates
 use crate::{
-    clang_tools::capture_clang_tools_output,
+    clang_tools::{CACHE_DIR, capture_clang_tools_output},
     cli::{ClangParams, Cli, CliCommand, FeedbackInput, LinesChangedOnly},
     common_fs::FileObj,
     logger,
@@ -58,15 +58,6 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
     }
 
     logger::try_init();
-
-    if cli.source_options.repo_root != "." {
-        env::set_current_dir(Path::new(&cli.source_options.repo_root)).map_err(|e| {
-            anyhow!(
-                "'{}' is inaccessible or does not exist: {e:?}",
-                cli.source_options.repo_root
-            )
-        })?;
-    }
 
     let mut rest_api_client = RestClient::new()?;
     set_max_level(
@@ -120,14 +111,23 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
                 &cli.source_options.lines_changed_only.clone().into(),
                 &cli.source_options.diff_base,
                 cli.source_options.ignore_index,
+                &cli.source_options.repo_root,
             )
             .await?
     } else {
         // walk the folder and look for files with specified extensions according to ignore values.
         let mut all_files: Vec<FileObj> = file_filter
-            .walk_dir(".")?
+            .walk_dir(&cli.source_options.repo_root)?
             .into_iter()
-            .map(|file_name| FileObj::new(PathBuf::from(&file_name)))
+            .map(|file_name| {
+                let file_path = PathBuf::from(&file_name);
+                FileObj::new(
+                    file_path
+                        .strip_prefix(&cli.source_options.repo_root)
+                        .map(PathBuf::from)
+                        .unwrap_or(file_path),
+                )
+            })
             .collect();
         if is_pr && (cli.feedback_options.tidy_review || cli.feedback_options.format_review) {
             let changed_files = rest_api_client
@@ -136,6 +136,7 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
                     &LinesChangedOnly::Off.into(),
                     &cli.source_options.diff_base,
                     cli.source_options.ignore_index,
+                    &cli.source_options.repo_root,
                 )
                 .await?;
             for changed_file in changed_files {
@@ -160,11 +161,12 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
 
     let mut clang_params = ClangParams::from(&cli);
     // mkdir -p .cpp-linter-cache/
-    std::fs::create_dir_all(&clang_params.project_cache_dir)
+    let cache_dir = clang_params.repo_root.join(CACHE_DIR);
+    std::fs::create_dir_all(&cache_dir)
         .with_context(|| "Failed to create a local cache directory.")?;
     // add gitignore file in project cache dir
     std::fs::write(
-        clang_params.project_cache_dir.join(".gitignore"),
+        cache_dir.join(".gitignore"),
         "# Automatically created by cpp-linter\n*\n",
     )
     .with_context(|| "Failed to write .cpp-linter-cache/.gitignore file")?;
@@ -294,19 +296,6 @@ mod test {
         ])
         .await
         .unwrap();
-        drop(tmp_gh_out);
-    }
-
-    #[tokio::test]
-    async fn bad_repo_root() {
-        let tmp_gh_out = setup_tmp_gh_out_path();
-        run_main(vec![
-            "cpp-linter".to_string(),
-            "--repo-root".to_string(),
-            "some-non-existent-dir".to_string(),
-        ])
-        .await
-        .unwrap_err();
         drop(tmp_gh_out);
     }
 }

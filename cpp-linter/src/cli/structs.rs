@@ -178,7 +178,7 @@ pub struct ClangParams {
     pub format_filter: Option<FileFilter>,
     pub tidy_review: bool,
     pub format_review: bool,
-    pub project_cache_dir: PathBuf,
+    pub repo_root: PathBuf,
 }
 
 #[cfg(feature = "bin")]
@@ -216,8 +216,7 @@ impl From<&Cli> for ClangParams {
             format_filter,
             tidy_review: args.feedback_options.tidy_review,
             format_review: args.feedback_options.format_review,
-            project_cache_dir: PathBuf::from(&args.source_options.repo_root)
-                .join(".cpp-linter-cache"),
+            repo_root: PathBuf::from(&args.source_options.repo_root),
         }
     }
 }

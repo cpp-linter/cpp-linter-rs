@@ -27,6 +27,8 @@ use clang_format::run_clang_format;
 pub mod clang_tidy;
 use clang_tidy::{CompilationUnit, run_clang_tidy};
 
+pub const CACHE_DIR: &str = ".cpp-linter-cache";
+
 /// This creates a task to run clang-tidy and clang-format on a single file.
 ///
 /// Returns a Future that infallibly resolves to a 2-tuple that contains
