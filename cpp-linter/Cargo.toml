@@ -24,7 +24,6 @@ fast-glob = "1.0.1"
 futures = "0.3.32"
 gix-imara-diff = { version = "0.2.2", features = ["unified_diff"] }
 log = { workspace = true }
-quick-xml = { version = "0.40.1", features = ["serialize"] }
 regex = { workspace = true }
 reqwest = { workspace = true }
 semver =  { workspace = true }

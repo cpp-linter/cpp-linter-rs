@@ -223,8 +223,10 @@ impl RestClient {
                 // assemble a list of line numbers
                 let mut lines = Vec::new();
                 for replacement in &format_advice.replacements {
-                    if !lines.contains(&replacement.line) {
-                        lines.push(replacement.line);
+                    for i in replacement.start..replacement.end {
+                        if !lines.contains(&i) {
+                            lines.push(i);
+                        }
                     }
                 }
                 // post annotation if any applicable lines were formatted
@@ -355,7 +357,15 @@ fn make_format_comment(
             && !format_advice.replacements.is_empty()
             && *remaining_length > 0
         {
-            let note = format!("- {}\n", file.name.to_string_lossy().replace('\\', "/"));
+            let line_count = format_advice
+                .replacements
+                .iter()
+                .fold(0, |acc, r| acc + r.len());
+            let note = format!(
+                "- {} ({line_count} line{})\n",
+                file.name.to_string_lossy().replace('\\', "/"),
+                if line_count > 1 { "s" } else { "" }
+            );
             if (note.len() as u64) < *remaining_length {
                 format_comment.push_str(&note.to_string());
                 *remaining_length -= note.len() as u64;
@@ -433,7 +443,7 @@ mod test {
     use crate::{
         clang_tools::{
             ClangVersions,
-            clang_format::{FormatAdvice, Replacement},
+            clang_format::FormatAdvice,
             clang_tidy::{TidyAdvice, TidyNotification},
         },
         cli::FeedbackInput,
@@ -477,8 +487,9 @@ mod test {
                     patched: None,
                 });
                 file.format_advice = Some(FormatAdvice {
-                    replacements: vec![Replacement { offset: 0, line: 1 }],
-                    patched: None,
+                    #[allow(clippy::single_range_in_vec_init)]
+                    replacements: vec![1..2],
+                    patched: PathBuf::new(),
                 });
                 files.push(Arc::new(Mutex::new(file)));
             }

@@ -39,12 +39,6 @@ pub enum ClangCaptureError {
         #[source]
         source: std::string::FromUtf8Error,
     },
-    #[error("Failed to parse XML output from clang-format for {file_name}: {source}")]
-    XmlParsingFailed {
-        file_name: String,
-        #[source]
-        source: quick_xml::DeError,
-    },
     #[error("Failed to read contents of file '{file_name}': {source}")]
     ReadFileFailed {
         file_name: String,
@@ -63,6 +57,10 @@ pub enum ClangCaptureError {
     UnknownWorkingDirectory(#[source] std::io::Error),
     #[error("Failed to parse integer from string: {0}")]
     ParseIntError(#[from] std::num::ParseIntError),
+    #[error("Failed to determine the parent directory for caching purposes")]
+    UnknownCacheParentPath,
+    #[error("Failed to create directory for caching patches: {0}")]
+    MkDirFailed(#[source] std::io::Error),
 }
 
 #[derive(Debug, thiserror::Error)]

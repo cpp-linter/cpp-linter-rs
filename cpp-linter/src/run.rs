@@ -11,7 +11,7 @@ use std::{
 };
 
 // non-std crates
-use anyhow::{Result, anyhow};
+use anyhow::{Context, Result, anyhow};
 use clang_tools_manager::RequestedVersion;
 use clap::Parser;
 use log::{LevelFilter, set_max_level};
@@ -159,6 +159,15 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
     rest_api_client.end_log_group("Get list of specified source files");
 
     let mut clang_params = ClangParams::from(&cli);
+    // mkdir -p .cpp-linter-cache/
+    std::fs::create_dir_all(&clang_params.project_cache_dir)
+        .with_context(|| "Failed to create a local cache directory.")?;
+    // add gitignore file in project cache dir
+    std::fs::write(
+        clang_params.project_cache_dir.join(".gitignore"),
+        "# Automatically created by cpp-linter\n*\n",
+    )
+    .with_context(|| "Failed to write .cpp-linter-cache/.gitignore file")?;
     clang_params.format_review &= is_pr;
     clang_params.tidy_review &= is_pr;
     let user_inputs = FeedbackInput::from(&cli);
