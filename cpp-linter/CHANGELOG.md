@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
+## [cpp-linter/v2.0.0-rc.18] - 2026-06-10
+
+### <!-- 1 --> 🚀 Added
+
+- Use concrete error types by @2bndy5 in [#343](https://github.com/cpp-linter/cpp-linter-rs/pull/343)
+- Make diff without libgit2 by @2bndy5 in [#344](https://github.com/cpp-linter/cpp-linter-rs/pull/344)
+
+### <!-- 6 --> 📦 Dependency updates
+
+- Bump version to clang-tools-manager/v0.2.1 by @2bndy5 in [`f4033b5`](https://github.com/cpp-linter/cpp-linter-rs/commit/f4033b5c1807fb3889cbb3c396d0f292bac92d25)
+
+[cpp-linter/v2.0.0-rc.18]: https://github.com/cpp-linter/cpp-linter-rs/compare/cpp-linter/v2.0.0-rc.17...cpp-linter/v2.0.0-rc.18
+
+Full commit diff: [`cpp-linter/v2.0.0-rc.17...cpp-linter/v2.0.0-rc.18`][cpp-linter/v2.0.0-rc.18]
+
 ## [cpp-linter/v2.0.0-rc.17] - 2026-06-08
 
 ### <!-- 4 --> 🛠️ Fixed
@@ -16,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### <!-- 6 --> 📦 Dependency updates
 
 - Bump version to clang-tools-manager/v0.2.0 by @2bndy5 in [`2505553`](https://github.com/cpp-linter/cpp-linter-rs/commit/25055539eed2ca9f5aca7c65085b826787b52621)
+- Bump version to cpp-linter/v2.0.0-rc.17 by @2bndy5 in [`9d83a7f`](https://github.com/cpp-linter/cpp-linter-rs/commit/9d83a7fdbf2ecde4bcc324c921a2d2ffa233e520)
 
 ### <!-- 8 --> 📝 Documentation
 
