@@ -70,9 +70,7 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
 
     let mut rest_api_client = RestClient::new()?;
     set_max_level(
-        if cli.general_options.verbosity.is_debug()
-        /* || rest_api_client.debug_enabled */
-        {
+        if cli.general_options.verbosity.is_debug() || rest_api_client.is_debug_enabled() {
             LevelFilter::Debug
         } else {
             LevelFilter::Info
