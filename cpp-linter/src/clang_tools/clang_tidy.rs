@@ -497,7 +497,7 @@ mod test {
             format_review: false,
             clang_tidy_command: Some(exe_path),
             clang_format_command: None,
-            repo_root: PathBuf::from(".").join(".cpp-linter-cache"),
+            repo_root: PathBuf::from("."),
         };
         let mut file_lock = arc_file.lock().unwrap();
         let logs = run_clang_tidy(&mut file_lock, &clang_params)
