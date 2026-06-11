@@ -288,8 +288,9 @@ mod test {
     #![allow(clippy::unwrap_used)]
 
     use clap::{Parser, ValueEnum};
+    use std::path::PathBuf;
 
-    use super::{Cli, LinesChangedOnly, ThreadComments};
+    use super::{ClangParams, Cli, LinesChangedOnly, ThreadComments};
 
     #[test]
     fn parse_positional() {
@@ -326,6 +327,22 @@ mod test {
         assert_eq!(
             ThreadComments::from_str(input, false).unwrap(),
             ThreadComments::Off
+        );
+    }
+
+    #[test]
+    fn relative_db_path() {
+        let cli = Cli::parse_from([
+            "cpp-linter",
+            "--database",
+            "path/to/compile_commands.json",
+            "--repo-root",
+            "relative",
+        ]);
+        let clang_params = ClangParams::from(&cli);
+        assert_eq!(
+            clang_params.database,
+            Some(PathBuf::from("relative/path/to/compile_commands.json"))
         );
     }
 }

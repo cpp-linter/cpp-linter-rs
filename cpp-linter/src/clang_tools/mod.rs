@@ -397,3 +397,44 @@ pub trait MakeSuggestions {
         *tool_total += hunks_in_patch;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used)]
+
+    use std::{env, fs, path::Path};
+
+    use super::*;
+    #[cfg(feature = "bin")]
+    use crate::logger::try_init;
+
+    async fn test_db_parse<P: AsRef<Path>>(path: P) -> Result<ClangVersions, ClangTaskError> {
+        let clang_params = ClangParams {
+            database: Some(path.as_ref().to_path_buf()),
+            repo_root: PathBuf::from("."),
+            ..Default::default()
+        };
+        let version = RequestedVersion::default();
+        // We don't need to use any specific git REST API client for this.
+        unsafe {
+            env::remove_var("GITHUB_ACTIONS");
+        }
+        let rest_client = RestClient::new().unwrap();
+        #[cfg(feature = "bin")]
+        try_init();
+        capture_clang_tools_output(&[], &version, clang_params, &rest_client).await
+    }
+
+    #[tokio::test]
+    async fn bad_db_path() {
+        test_db_parse("nonexistent/path").await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn bad_db_json() {
+        let tmp_dir = tempfile::tempdir().unwrap();
+        let db_path = tmp_dir.path().join("compile_commands.json");
+        fs::write(&db_path, "not a valid json").unwrap();
+        test_db_parse(tmp_dir.path()).await.unwrap();
+    }
+}
