@@ -136,7 +136,7 @@ impl FileObj {
     }
 
     /// Create a list of [`Suggestion`](struct@crate::clang_tools::Suggestion) from a
-    /// generated [`Patch`](struct@git2::Patch) and store them in the given
+    /// generated diff and store them in the given
     /// [`ReviewComments`](struct@crate::clang_tools::ReviewComments).
     ///
     /// The suggestions will also include diagnostics from clang-tidy that

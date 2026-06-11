@@ -18,7 +18,7 @@ use crate::{cli::ClangParams, common_fs::FileObj, error::ClangCaptureError};
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct FormatAdvice {
-    /// A list of [`Replacement`]s that clang-tidy wants to make.
+    /// A list of line ranges that clang-format wants to replace.
     pub replacements: Vec<RangeInclusive<u32>>,
 
     pub patched: PathBuf,

@@ -1,4 +1,3 @@
-#[cfg(feature = "bin")]
 use std::{fmt::Display, path::PathBuf};
 
 #[cfg(feature = "bin")]
