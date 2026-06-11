@@ -151,7 +151,7 @@ pub struct SourceOptions {
     )]
     pub extensions: Vec<String>,
 
-    /// The relative path to the repository root directory.
+    /// The path to the repository root directory.
     ///
     /// This path should be relative to the current
     /// working directory. It can also be an absolute path.
