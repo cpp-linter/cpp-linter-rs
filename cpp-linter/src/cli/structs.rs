@@ -1,3 +1,4 @@
+#[cfg(feature = "bin")]
 use std::{fmt::Display, path::PathBuf};
 
 #[cfg(feature = "bin")]
@@ -203,10 +204,23 @@ impl From<&Cli> for ClangParams {
                 let ignore_format: Vec<&str> = ignore_format.iter().map(|s| s.as_str()).collect();
                 FileFilter::new(&ignore_format, &extensions, Some("clang-format"))
             });
+        let repo_root = args.source_options.repo_root.clone();
+        let database = args
+            .tidy_options
+            .database
+            .as_ref()
+            .map(PathBuf::from)
+            .map(|db| {
+                if db.is_relative() {
+                    repo_root.join(db)
+                } else {
+                    db
+                }
+            });
         ClangParams {
             tidy_checks: args.tidy_options.tidy_checks.clone(),
             lines_changed_only: args.source_options.lines_changed_only.clone(),
-            database: args.tidy_options.database.clone(),
+            database,
             extra_args: args.tidy_options.extra_arg.clone(),
             database_json: None,
             style: args.format_options.style.clone(),
@@ -216,7 +230,7 @@ impl From<&Cli> for ClangParams {
             format_filter,
             tidy_review: args.feedback_options.tidy_review,
             format_review: args.feedback_options.format_review,
-            repo_root: PathBuf::from(&args.source_options.repo_root),
+            repo_root,
         }
     }
 }

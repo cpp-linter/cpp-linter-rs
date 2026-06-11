@@ -153,14 +153,13 @@ pub struct SourceOptions {
 
     /// The relative path to the repository root directory.
     ///
-    /// This path is relative to the runner's `GITHUB_WORKSPACE`
-    /// environment variable (or the current working directory if
-    /// not using a CI runner).
+    /// This path should be relative to the current
+    /// working directory. It can also be an absolute path.
     #[cfg_attr(
         feature = "bin",
         arg(short, long, default_value = ".", help_heading = "Source options")
     )]
-    pub repo_root: String,
+    pub repo_root: PathBuf,
 
     /// This controls what part of the files are analyzed.
     #[cfg_attr(

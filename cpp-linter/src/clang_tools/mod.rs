@@ -17,15 +17,16 @@ use tokio::task::JoinSet;
 
 // project-specific modules/crates
 use super::common_fs::FileObj;
-use crate::error::{ClangCaptureError, ClangTaskError};
 use crate::{
+    clang_tools::clang_tidy::CompilationUnit,
     cli::ClangParams,
+    error::{ClangCaptureError, ClangTaskError},
     rest_client::{RestClient, USER_OUTREACH},
 };
 pub mod clang_format;
 use clang_format::run_clang_format;
 pub mod clang_tidy;
-use clang_tidy::{CompilationUnit, run_clang_tidy};
+use clang_tidy::run_clang_tidy;
 
 pub const CACHE_DIR: &str = ".cpp-linter-cache";
 
@@ -137,23 +138,27 @@ pub async fn capture_clang_tools_output(
         clang_versions.format_version = Some(tool_info.version);
         clang_params.clang_format_command = Some(tool_info.path);
     }
-
-    // parse database (if provided) to match filenames when parsing clang-tidy's stdout
-    if let Some(db_path) = &clang_params.database
-        && let Ok(db_str) = fs::read(
-            if db_path.is_relative() {
-                clang_params.repo_root.join(db_path)
-            } else {
-                db_path.to_path_buf()
+    if let Some(db_path) = &clang_params.database {
+        let db_path = db_path.join("compile_commands.json");
+        match fs::read_to_string(&db_path) {
+            Ok(db_str) => match serde_json::from_str::<Vec<CompilationUnit>>(&db_str) {
+                Ok(db_json) => {
+                    clang_params.database_json = Some(db_json);
+                }
+                Err(e) => {
+                    log::warn!(
+                        "Failed to parse compilation database JSON at {}: {e:?}",
+                        db_path.to_string_lossy()
+                    );
+                }
+            },
+            Err(e) => {
+                log::warn!(
+                    "Failed to read compilation database file at {}: {e:?}",
+                    db_path.to_string_lossy()
+                );
             }
-            .join(db_path)
-            .join("compile_commands.json"),
-        )
-    {
-        clang_params.database_json = Some(
-            // A compilation database should be UTF-8 encoded, but file paths are not; use lossy conversion.
-            serde_json::from_str::<Vec<CompilationUnit>>(&String::from_utf8_lossy(&db_str))?,
-        )
+        }
     };
 
     let mut executors = JoinSet::new();
