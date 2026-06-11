@@ -146,7 +146,7 @@ pub fn run_clang_format(
             .hunks()
             .filter_map(|hunk| {
                 let replacement = if hunk.is_pure_insertion() {
-                    RangeInclusive::new(hunk.after.start, hunk.after.end.saturating_sub(1))
+                    RangeInclusive::new(hunk.after.start, hunk.after.start)
                 } else {
                     RangeInclusive::new(hunk.before.start, hunk.before.end.saturating_sub(1))
                 };
