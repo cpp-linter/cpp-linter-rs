@@ -261,7 +261,7 @@ impl From<&Cli> for FeedbackInput {
             tidy_review: args.feedback_options.tidy_review,
             format_review: args.feedback_options.format_review,
             passive_reviews: args.feedback_options.passive_reviews,
-            repo_root: PathBuf::from(&args.source_options.repo_root),
+            repo_root: args.source_options.repo_root.clone(),
         }
     }
 }
@@ -288,7 +288,6 @@ mod test {
     #![allow(clippy::unwrap_used)]
 
     use clap::{Parser, ValueEnum};
-    use std::path::PathBuf;
 
     use super::{ClangParams, Cli, LinesChangedOnly, ThreadComments};
 
@@ -331,18 +330,10 @@ mod test {
     }
 
     #[test]
-    fn relative_db_path() {
-        let cli = Cli::parse_from([
-            "cpp-linter",
-            "--database",
-            "path/to/compile_commands.json",
-            "--repo-root",
-            "relative",
-        ]);
+    fn absolute_db_path() {
+        let tmp_dir = tempfile::tempdir().unwrap();
+        let cli = Cli::parse_from(["cpp-linter", "--database", tmp_dir.path().to_str().unwrap()]);
         let clang_params = ClangParams::from(&cli);
-        assert_eq!(
-            clang_params.database,
-            Some(PathBuf::from("relative/path/to/compile_commands.json"))
-        );
+        assert_eq!(clang_params.database, Some(tmp_dir.path().to_path_buf()));
     }
 }
