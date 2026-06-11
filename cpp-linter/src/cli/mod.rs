@@ -1,6 +1,5 @@
-#![deny(clippy::unwrap_used)]
-
 //! This module holds the Command Line Interface design.
+
 use std::path::PathBuf;
 #[cfg(feature = "bin")]
 use std::str::FromStr;
@@ -22,7 +21,9 @@ pub use structs::{ClangParams, FeedbackInput, LinesChangedOnly, ThreadComments};
 #[cfg(feature = "bin")]
 #[derive(Debug, Clone, PartialEq, Eq, ValueEnum)]
 pub enum Verbosity {
+    /// Enables the [`log::Level::Info`] log level and above.
     Info,
+    /// Enables the [`log::Level::Debug`] log level and above.
     Debug,
 }
 
@@ -39,18 +40,23 @@ impl Verbosity {
 #[derive(Debug, Clone, Parser)]
 #[command(author, about)]
 pub struct Cli {
+    /// The CLI's general options, such as `--version` and `--verbosity`.
     #[command(flatten)]
     pub general_options: GeneralOptions,
 
+    /// The CLI's source options, such as `--extensions` and `--ignore`.
     #[command(flatten)]
     pub source_options: SourceOptions,
 
+    /// The CLI's clang-format options, such as `--style` and `--ignore-format`.
     #[command(flatten)]
     pub format_options: FormatOptions,
 
+    /// The CLI's clang-tidy options, such as `--tidy-checks` and `--database`.
     #[command(flatten)]
     pub tidy_options: TidyOptions,
 
+    /// The CLI's feedback options, such as `--thread-comments` and `--no-lgtm`.
     #[command(flatten)]
     pub feedback_options: FeedbackOptions,
 
@@ -67,6 +73,9 @@ pub struct Cli {
     )]
     pub not_ignored: Option<Vec<String>>,
 
+    /// A subcommand to run instead of the default action of cpp-linter.
+    ///
+    /// This is currently only used for the `version` subcommand, which prints the version of cpp-linter and exits.
     #[command(subcommand)]
     pub commands: Option<CliCommand>,
 }

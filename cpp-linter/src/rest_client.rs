@@ -1,3 +1,5 @@
+//! This module defines the struct that wraps employs a REST API client.
+
 use std::{
     env,
     path::{Path, PathBuf},
@@ -33,21 +35,34 @@ pub const USER_OUTREACH: &str = concat!(
     "(https://github.com/cpp-linter/cpp-linter-action/issues)"
 );
 
+/// A wrapper struct around a REST API client.
+///
+/// Underneath, the client may support various Git servers and CI platforms.
+/// Currently, the client supports GitHub and GitHub Actions.
 pub struct RestClient {
     client: Box<dyn RestApiClient + Sync + Send>,
 }
 
 impl RestClient {
+    /// Initializes the REST API client and sets the UserAgent header.
+    ///
+    /// See [git_bot_feedback::client::init_client] for details on
+    /// possible errors during initialization.
     pub fn new() -> Result<Self, ClientError> {
         let mut client = init_client()?;
         client.set_user_agent(USER_AGENT)?;
         Ok(Self { client })
     }
 
+    /// Is this a pull request event?
     pub fn is_pr(&self) -> bool {
         self.client.is_pr_event()
     }
 
+    /// Gets a list of changed files.
+    ///
+    /// Use the [`FileFilter`] and [`LinesChangedOnly`] to filter out files
+    /// that might be negligible.
     pub async fn get_list_of_changed_files(
         &self,
         file_filter: &FileFilter,
@@ -86,18 +101,25 @@ impl RestClient {
             .collect())
     }
 
+    /// Should debug logs be enabled?
     pub fn is_debug_enabled(&self) -> bool {
         self.client.is_debug_enabled()
     }
 
+    /// Start a log group with the given `name`.
     pub fn start_log_group(&self, name: &str) {
         self.client.start_log_group(name)
     }
 
+    /// End a log group with the given `name`.
     pub fn end_log_group(&self, name: &str) {
         self.client.end_log_group(name)
     }
 
+    /// Post various forms of feedback.
+    ///
+    /// Use [`FeedbackInput`] to configure feedback behavior.
+    /// The given [`ClangVersions`] is used in thread comments, step summaries, and PR reviews' summary comment.
     pub async fn post_feedback(
         &mut self,
         files: &[Arc<Mutex<FileObj>>],
@@ -114,14 +136,15 @@ impl RestClient {
             self.client.write_file_annotations(&annotations)?;
         }
         if feedback_inputs.step_summary {
-            comment = Some(Self::make_comment(
+            let summary = Self::make_comment(
                 files,
                 format_checks_failed,
                 tidy_checks_failed,
                 &clang_versions,
                 None,
-            ));
-            self.client.append_step_summary(comment.as_ref().unwrap())?;
+            )?;
+            self.client.append_step_summary(&summary)?;
+            comment = Some(summary);
         }
         let output_vars = [
             OutputVariable {
@@ -148,7 +171,7 @@ impl RestClient {
                     tidy_checks_failed,
                     &clang_versions,
                     Some(65535),
-                ));
+                )?);
             }
             let options = ThreadCommentOptions {
                 policy: if feedback_inputs.thread_comments == ThreadComments::Update {
@@ -308,7 +331,7 @@ impl RestClient {
         tidy_checks_failed: u64,
         clang_versions: &ClangVersions,
         max_len: Option<u64>,
-    ) -> String {
+    ) -> Result<String, ClientError> {
         let mut comment = format!("{COMMENT_MARKER}# Cpp-Linter Report ");
         let mut remaining_length =
             max_len.unwrap_or(u64::MAX) - comment.len() as u64 - USER_OUTREACH.len() as u64;
@@ -317,31 +340,33 @@ impl RestClient {
             let prompt = ":warning:\nSome files did not pass the configured checks!\n";
             remaining_length -= prompt.len() as u64;
             comment.push_str(prompt);
-            if format_checks_failed > 0 {
+            if format_checks_failed > 0
+                && let Some(format_version) = &clang_versions.format_version
+            {
                 make_format_comment(
                     files,
                     &mut comment,
                     format_checks_failed,
-                    // format_version should be `Some()` value at this point.
-                    &clang_versions.format_version.as_ref().unwrap().to_string(),
+                    &format_version.to_string(),
                     &mut remaining_length,
-                );
+                )?;
             }
-            if tidy_checks_failed > 0 {
+            if tidy_checks_failed > 0
+                && let Some(tidy_version) = &clang_versions.tidy_version
+            {
                 make_tidy_comment(
                     files,
                     &mut comment,
                     tidy_checks_failed,
-                    // tidy_version should be `Some()` value at this point.
-                    &clang_versions.tidy_version.as_ref().unwrap().to_string(),
+                    &tidy_version.to_string(),
                     &mut remaining_length,
-                );
+                )?;
             }
         } else {
             comment.push_str(":heavy_check_mark:\nNo problems need attention.");
         }
         comment.push_str(USER_OUTREACH);
-        comment
+        Ok(comment)
     }
 }
 
@@ -354,14 +379,16 @@ fn make_format_comment(
     format_checks_failed: u64,
     version_used: &String,
     remaining_length: &mut u64,
-) {
+) -> Result<(), ClientError> {
     let opener = format!(
         "\n<details><summary>clang-format (v{version_used}) reports: <strong>{format_checks_failed} file(s) not formatted</strong></summary>\n\n",
     );
     let mut format_comment = String::new();
     *remaining_length = remaining_length.saturating_sub(opener.len() as u64 + CLOSER.len() as u64);
     for file in files {
-        let file = file.lock().unwrap();
+        let file = file
+            .lock()
+            .map_err(|e| ClientError::MutexPoisoned(e.to_string()))?;
         if let Some(format_advice) = &file.format_advice
             && !format_advice.replacements.is_empty()
             && *remaining_length > 0
@@ -384,6 +411,7 @@ fn make_format_comment(
     comment.push_str(&opener);
     comment.push_str(&format_comment);
     comment.push_str(CLOSER);
+    Ok(())
 }
 
 fn make_tidy_comment(
@@ -392,14 +420,16 @@ fn make_tidy_comment(
     tidy_checks_failed: u64,
     version_used: &String,
     remaining_length: &mut u64,
-) {
+) -> Result<(), ClientError> {
     let opener = format!(
         "\n<details><summary>clang-tidy (v{version_used}) reports: {tidy_checks_failed}<strong> concern(s)</strong></summary>\n\n"
     );
     let mut tidy_comment = String::new();
     *remaining_length = remaining_length.saturating_sub(opener.len() as u64 + CLOSER.len() as u64);
     for file in files {
-        let file = file.lock().unwrap();
+        let file = file
+            .lock()
+            .map_err(|e| ClientError::MutexPoisoned(e.to_string()))?;
         if let Some(tidy_advice) = &file.tidy_advice {
             for tidy_note in &tidy_advice.notes {
                 let file_path = PathBuf::from(&tidy_note.filename);
@@ -432,10 +462,13 @@ fn make_tidy_comment(
     comment.push_str(&opener);
     comment.push_str(&tidy_comment);
     comment.push_str(CLOSER);
+    Ok(())
 }
 
 #[cfg(all(test, feature = "bin"))]
 mod test {
+    #![allow(clippy::expect_used, clippy::unwrap_used)]
+
     use std::{
         default::Default,
         env,

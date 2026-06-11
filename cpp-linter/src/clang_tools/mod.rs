@@ -1,4 +1,3 @@
-#![deny(clippy::unwrap_used)]
 //! This module holds the functionality related to running clang-format and/or
 //! clang-tidy.
 
@@ -28,6 +27,7 @@ use clang_format::run_clang_format;
 pub mod clang_tidy;
 use clang_tidy::run_clang_tidy;
 
+/// The directory name to use for caching clang-tidy and clang-format results.
 pub const CACHE_DIR: &str = ".cpp-linter-cache";
 
 /// This creates a task to run clang-tidy and clang-format on a single file.
@@ -95,7 +95,7 @@ pub struct ClangVersions {
     pub tidy_version: Option<Version>,
 }
 
-/// Runs clang-tidy and/or clang-format and returns the parsed output from each.
+/// Runs clang-tidy and/or clang-format and returns the version used for each.
 ///
 /// If `tidy_checks` is `"-*"` then clang-tidy is not executed.
 /// If `style` is a blank string (`""`), then clang-format is not executed.
@@ -228,6 +228,7 @@ pub struct ReviewComments {
 }
 
 impl ReviewComments {
+    /// Get a markdown-formatted string that summarizes the given [`ReviewComment`]s.
     pub fn summarize(
         &self,
         clang_versions: &ClangVersions,
@@ -290,6 +291,7 @@ impl ReviewComments {
         body
     }
 
+    /// Check if a given comment's [`Suggestion`] is already contained within the existing [`Self::comments`].
     pub fn is_comment_in_suggestions(&mut self, comment: &Suggestion) -> bool {
         for s in &mut self.comments {
             if s.path == comment.path
@@ -305,6 +307,8 @@ impl ReviewComments {
     }
 }
 
+/// A helper function to create a [`Diff`] and its associated [`InternedInput`] from
+/// a `patched` buffer and the `original_content`` of the file.
 pub fn make_patch<'buffer>(
     patched: &'buffer str,
     original_content: &'buffer str,

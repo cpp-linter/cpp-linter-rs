@@ -1,4 +1,3 @@
-#![deny(clippy::unwrap_used)]
 #![cfg(feature = "bin")]
 //! A module to initialize and customize the logger object used in (most) stdout.
 
@@ -26,6 +25,7 @@ impl SimpleLogger {
     }
 }
 
+#[allow(clippy::expect_used)]
 impl Log for SimpleLogger {
     fn enabled(&self, metadata: &Metadata) -> bool {
         metadata.level() <= log::max_level()
