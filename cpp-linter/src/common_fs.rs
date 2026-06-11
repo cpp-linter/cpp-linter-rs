@@ -90,6 +90,11 @@ impl FileObj {
         };
         // lines.len() cannot be 0 at this point
         let last_index = lines.len() - 1;
+        if last_index == 0 {
+            // Single element case: push range and return
+            ranges.push(RangeInclusive::new(range_start, range_start));
+            return ranges;
+        }
         for (index, number) in line_iter {
             // use let chain to avoid repeated lookup of lines[index - 1].
             // should always yield some value since we entered the for loop at index 1.
@@ -279,6 +284,14 @@ mod test {
         );
         let ranges = file_obj.get_ranges(&LinesChangedOnly::On);
         assert_eq!(ranges, vec![4..=5, 9..=9]);
+    }
+
+    #[test]
+    fn get_ranges_single_added_line() {
+        let added_lines = vec![5];
+        let file_obj = FileObj::from(PathBuf::from("tests/demo/demo.cpp"), added_lines, vec![]);
+        let ranges = file_obj.get_ranges(&LinesChangedOnly::On);
+        assert_eq!(ranges, vec![5..=5]);
     }
 
     #[test]
