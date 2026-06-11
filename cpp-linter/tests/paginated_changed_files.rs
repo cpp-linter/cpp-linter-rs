@@ -7,11 +7,7 @@ use mockito::Matcher;
 use tempfile::{NamedTempFile, TempDir};
 
 use cpp_linter::{logger, rest_client::RestClient};
-use std::{
-    env,
-    io::Write,
-    path::{Path, PathBuf},
-};
+use std::{env, io::Write, path::Path};
 
 #[derive(PartialEq, Default)]
 enum EventType {
@@ -36,9 +32,8 @@ const RESET_RATE_LIMIT_HEADER: &str = "x-ratelimit-reset";
 const REMAINING_RATE_LIMIT_HEADER: &str = "x-ratelimit-remaining";
 const MALFORMED_RESPONSE_PAYLOAD: &str = "{\"message\":\"Resource not accessible by integration\"}";
 
-async fn get_paginated_changes(lib_root: &Path, _tmp_dir: &TempDir, test_params: &TestParams) {
-    let tmp = TempDir::new().expect("Failed to create a temp dir for test");
-    let mut event_payload = NamedTempFile::new_in(tmp.path())
+async fn get_paginated_changes(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
+    let mut event_payload = NamedTempFile::new_in(tmp_dir.path())
         .expect("Failed to spawn a tmp file for test event payload");
     unsafe {
         env::set_var("GITHUB_ACTIONS", "true");
@@ -88,7 +83,6 @@ async fn get_paginated_changes(lib_root: &Path, _tmp_dir: &TempDir, test_params:
     unsafe {
         env::set_var("GITHUB_API_URL", server.url());
     }
-    env::set_current_dir(tmp.path()).unwrap();
     logger::try_init();
     log::set_max_level(log::LevelFilter::Debug);
     let gh_client = RestClient::new();
@@ -149,7 +143,7 @@ async fn get_paginated_changes(lib_root: &Path, _tmp_dir: &TempDir, test_params:
             &LinesChangedOnly::Off,
             &None::<String>,
             false,
-            &PathBuf::from("."),
+            tmp_dir.path(),
         )
         .await;
     match files {
