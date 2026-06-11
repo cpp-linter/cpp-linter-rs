@@ -32,9 +32,8 @@ const RESET_RATE_LIMIT_HEADER: &str = "x-ratelimit-reset";
 const REMAINING_RATE_LIMIT_HEADER: &str = "x-ratelimit-remaining";
 const MALFORMED_RESPONSE_PAYLOAD: &str = "{\"message\":\"Resource not accessible by integration\"}";
 
-async fn get_paginated_changes(lib_root: &Path, test_params: &TestParams) {
-    let tmp = TempDir::new().expect("Failed to create a temp dir for test");
-    let mut event_payload = NamedTempFile::new_in(tmp.path())
+async fn get_paginated_changes(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
+    let mut event_payload = NamedTempFile::new_in(tmp_dir.path())
         .expect("Failed to spawn a tmp file for test event payload");
     unsafe {
         env::set_var("GITHUB_ACTIONS", "true");
@@ -84,7 +83,6 @@ async fn get_paginated_changes(lib_root: &Path, test_params: &TestParams) {
     unsafe {
         env::set_var("GITHUB_API_URL", server.url());
     }
-    env::set_current_dir(tmp.path()).unwrap();
     logger::try_init();
     log::set_max_level(log::LevelFilter::Debug);
     let gh_client = RestClient::new();
@@ -140,7 +138,13 @@ async fn get_paginated_changes(lib_root: &Path, test_params: &TestParams) {
 
     let file_filter = FileFilter::new(&[], &["cpp", "hpp"], None);
     let files = client
-        .get_list_of_changed_files(&file_filter, &LinesChangedOnly::Off, &None::<String>, false)
+        .get_list_of_changed_files(
+            &file_filter,
+            &LinesChangedOnly::Off,
+            &None::<String>,
+            false,
+            tmp_dir.path(),
+        )
         .await;
     match files {
         Err(e) => {
@@ -171,9 +175,7 @@ async fn get_paginated_changes(lib_root: &Path, test_params: &TestParams) {
 async fn test_get_changes(test_params: &TestParams) {
     let tmp_dir = create_test_space(false);
     let lib_root = env::current_dir().unwrap();
-    env::set_current_dir(tmp_dir.path()).unwrap();
-    get_paginated_changes(&lib_root, test_params).await;
-    env::set_current_dir(lib_root.as_path()).unwrap();
+    get_paginated_changes(&lib_root, &tmp_dir, test_params).await;
     drop(tmp_dir);
 }
 

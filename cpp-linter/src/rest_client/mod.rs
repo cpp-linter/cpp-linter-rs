@@ -1,6 +1,6 @@
 use std::{
     env,
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
 
@@ -54,6 +54,7 @@ impl RestClient {
         lines_changed_only: &LinesChangedOnly,
         base_diff: &Option<String>,
         ignore_index: bool,
+        repo_root: &Path,
     ) -> Result<Vec<FileObj>, ClientError> {
         let files = self
             .client
@@ -72,8 +73,12 @@ impl RestClient {
                     .iter()
                     .map(|hunk| hunk.start..=hunk.end)
                     .collect();
+                let file_path = PathBuf::from(file_name);
                 FileObj::from(
-                    PathBuf::from(&file_name),
+                    file_path
+                        .strip_prefix(repo_root)
+                        .map(PathBuf::from)
+                        .unwrap_or(file_path),
                     diff_lines.added_lines.clone(),
                     diff_chunks,
                 )
@@ -176,7 +181,11 @@ impl RestClient {
                 let file = file
                     .lock()
                     .map_err(|e| ClientError::MutexPoisoned(e.to_string()))?;
-                file.make_suggestions_from_patch(&mut review_comments, summary_only)?;
+                file.make_suggestions_from_patch(
+                    &mut review_comments,
+                    summary_only,
+                    &feedback_inputs.repo_root,
+                )?;
             }
 
             let mut options = ReviewOptions {

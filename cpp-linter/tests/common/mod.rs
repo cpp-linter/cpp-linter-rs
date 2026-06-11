@@ -21,7 +21,7 @@ use tempfile::TempDir;
 /// The returned directory object will automatically delete the
 /// temporary folder when it is dropped out of scope.
 pub fn create_test_space(setup_meson: bool) -> TempDir {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::with_prefix("cpp-linter-test").unwrap();
     fs::create_dir(tmp.path().join("src")).unwrap();
     let src = fs::read_dir("tests/demo").unwrap();
     for file in src {
@@ -48,11 +48,10 @@ pub fn create_test_space(setup_meson: bool) -> TempDir {
         "demo.cpp",
         "demo.hpp",
     ]);
-    let output = cmd.output().expect("Failed to run 'meson init'");
-    println!(
-        "meson init stdout:\n{}",
-        String::from_utf8(output.stdout.to_vec()).unwrap()
-    );
+    let status = cmd.status().expect("Failed to run 'meson init'");
+    if !status.success() {
+        panic!("Failed to initialize meson project with 'meson init'");
+    }
     let meson_build_dir = tmp.path().join("build");
     let mut cmd = Command::new("meson");
     cmd.args([
@@ -61,13 +60,12 @@ pub fn create_test_space(setup_meson: bool) -> TempDir {
         meson_build_dir.as_path().to_str().unwrap(),
         test_dir.to_str().unwrap(),
     ]);
-    let output = cmd
-        .output()
+    let status = cmd
+        .status()
         .expect("Failed to generate build assets with 'meson setup'");
-    println!(
-        "meson setup stdout:\n{}",
-        String::from_utf8(output.stdout.to_vec()).unwrap()
-    );
+    if !status.success() {
+        panic!("Failed to generate build assets with 'meson setup'");
+    }
     let db = fs::File::open(meson_build_dir.join("compile_commands.json"))
         .expect("Failed to open compilation database");
     for line in io::BufReader::new(db).lines().map_while(Result::ok) {

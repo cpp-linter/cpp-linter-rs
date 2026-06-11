@@ -2,9 +2,9 @@
 //! output.
 
 use std::{
-    env::{consts::OS, current_dir},
+    env::consts::OS,
     fs,
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::Command,
     sync::{Arc, Mutex, MutexGuard},
 };
@@ -144,13 +144,13 @@ const NOTE_HEADER: &str = r"^(.+):(\d+):(\d+):\s(\w+):(.*)\[([a-zA-Z\d\-\.]+),?[
 fn parse_tidy_output(
     tidy_stdout: &[u8],
     database_json: &Option<Vec<CompilationUnit>>,
+    repo_root: &Path,
 ) -> Result<TidyAdvice, ClangCaptureError> {
     let note_header = Regex::new(NOTE_HEADER)?;
     let fixed_note = Regex::new(r"^.+:(\d+):\d+:\snote: FIX-IT applied suggested code changes$")?;
     let mut found_fix = false;
     let mut notification = None;
     let mut result = Vec::new();
-    let cur_dir = current_dir().map_err(ClangCaptureError::UnknownWorkingDirectory)?;
     for line in String::from_utf8(tidy_stdout.to_vec())
         .map_err(|e| ClangCaptureError::NonUtf8Output {
             task: "convert clang-tidy stdout".to_string(),
@@ -191,16 +191,16 @@ fn parse_tidy_output(
                         // file was not a named unit in the database;
                         // try to normalize path as if relative to working directory.
                         // NOTE: This shouldn't happen with a properly formed JSON database
-                        filename = normalize_path(&PathBuf::from_iter([&cur_dir, &filename]));
+                        filename = normalize_path(&PathBuf::from_iter([repo_root, &filename]));
                     }
                 } else {
                     // still need to normalize the relative path despite missing database info.
                     // let's assume the file is relative to current working directory.
-                    filename = normalize_path(&PathBuf::from_iter([&cur_dir, &filename]));
+                    filename = normalize_path(&PathBuf::from_iter([repo_root, &filename]));
                 }
-                debug_assert!(filename.is_absolute());
+
                 if filename.is_absolute()
-                    && let Ok(file_n) = filename.strip_prefix(&cur_dir)
+                    && let Ok(file_n) = filename.strip_prefix(repo_root)
                 {
                     // if this filename can't be made into a relative path, then it is
                     // likely not a member of the project's sources (ie /usr/include/stdio.h)
@@ -273,6 +273,7 @@ pub fn run_clang_tidy(
         .as_ref()
         .ok_or(ClangCaptureError::ToolPathUnknown("clang-tidy"))?;
     let mut cmd = Command::new(cmd_path);
+    cmd.current_dir(&clang_params.repo_root);
     let mut logs = vec![];
     if !clang_params.tidy_checks.is_empty() {
         cmd.args(["-checks", &clang_params.tidy_checks]);
@@ -296,16 +297,17 @@ pub fn run_clang_tidy(
         );
         cmd.args(["--line-filter", filter.as_str()]);
     }
+    let repo_file_path = clang_params.repo_root.join(&file.name);
     let original_content = if !clang_params.tidy_review {
         None
     } else {
         cmd.arg("--fix-errors");
-        Some(
-            fs::read_to_string(&file.name).map_err(|e| ClangCaptureError::ReadFileFailed {
+        Some(fs::read_to_string(&repo_file_path).map_err(|e| {
+            ClangCaptureError::ReadFileFailed {
                 file_name: file_name.clone(),
                 source: e,
-            })?,
-        )
+            }
+        })?)
     };
     if !clang_params.style.is_empty() {
         cmd.args(["--format-style", clang_params.style.as_str()]);
@@ -347,6 +349,7 @@ pub fn run_clang_tidy(
     file.tidy_advice = Some(parse_tidy_output(
         &output.stdout,
         &clang_params.database_json,
+        &clang_params.repo_root,
     )?);
     if clang_params.tidy_review
         && let Some(original_content) = &original_content
@@ -355,14 +358,14 @@ pub fn run_clang_tidy(
             // cache file changes in a buffer and restore the original contents for further analysis
             tidy_advice.patched =
                 Some(
-                    fs::read(&file_name).map_err(|e| ClangCaptureError::ReadFileFailed {
+                    fs::read(&repo_file_path).map_err(|e| ClangCaptureError::ReadFileFailed {
                         file_name: file_name.clone(),
                         source: e,
                     })?,
                 );
         }
         // original_content is guaranteed to be Some() value at this point
-        fs::write(&file_name, original_content).map_err(|e| {
+        fs::write(&repo_file_path, original_content).map_err(|e| {
             ClangCaptureError::WriteFileFailed {
                 file_name,
                 source: e,
@@ -496,7 +499,7 @@ mod test {
             format_review: false,
             clang_tidy_command: Some(exe_path),
             clang_format_command: None,
-            project_cache_dir: PathBuf::from(".").join(".cpp-linter-cache"),
+            repo_root: PathBuf::from("."),
         };
         let mut file_lock = arc_file.lock().unwrap();
         let logs = run_clang_tidy(&mut file_lock, &clang_params)
@@ -564,7 +567,7 @@ TrenchBroom/TrenchBroom/common/test/src/mdl/tst_ReadFreeImageTexture.cpp:44:48: 
    44 |   return diskFS.openFile(name) | kdl::and_then([](const auto& file) {
       |                                                ^
 "#;
-        let advice = parse_tidy_output(tidy_out.as_bytes(), &None).unwrap();
+        let advice = parse_tidy_output(tidy_out.as_bytes(), &None, &PathBuf::from(".")).unwrap();
         assert_eq!(advice.notes.len(), 4);
         for note in advice.notes {
             assert!(note.diagnostic.contains('-'));

@@ -178,7 +178,7 @@ pub struct ClangParams {
     pub format_filter: Option<FileFilter>,
     pub tidy_review: bool,
     pub format_review: bool,
-    pub project_cache_dir: PathBuf,
+    pub repo_root: PathBuf,
 }
 
 #[cfg(feature = "bin")]
@@ -203,10 +203,23 @@ impl From<&Cli> for ClangParams {
                 let ignore_format: Vec<&str> = ignore_format.iter().map(|s| s.as_str()).collect();
                 FileFilter::new(&ignore_format, &extensions, Some("clang-format"))
             });
+        let repo_root = args.source_options.repo_root.clone();
+        let database = args
+            .tidy_options
+            .database
+            .as_ref()
+            .map(PathBuf::from)
+            .map(|db| {
+                if db.is_relative() {
+                    repo_root.join(db)
+                } else {
+                    db
+                }
+            });
         ClangParams {
             tidy_checks: args.tidy_options.tidy_checks.clone(),
             lines_changed_only: args.source_options.lines_changed_only.clone(),
-            database: args.tidy_options.database.clone(),
+            database,
             extra_args: args.tidy_options.extra_arg.clone(),
             database_json: None,
             style: args.format_options.style.clone(),
@@ -216,8 +229,7 @@ impl From<&Cli> for ClangParams {
             format_filter,
             tidy_review: args.feedback_options.tidy_review,
             format_review: args.feedback_options.format_review,
-            project_cache_dir: PathBuf::from(&args.source_options.repo_root)
-                .join(".cpp-linter-cache"),
+            repo_root,
         }
     }
 }
@@ -233,6 +245,7 @@ pub struct FeedbackInput {
     pub tidy_review: bool,
     pub format_review: bool,
     pub passive_reviews: bool,
+    pub repo_root: PathBuf,
 }
 
 #[cfg(feature = "bin")]
@@ -248,6 +261,7 @@ impl From<&Cli> for FeedbackInput {
             tidy_review: args.feedback_options.tidy_review,
             format_review: args.feedback_options.format_review,
             passive_reviews: args.feedback_options.passive_reviews,
+            repo_root: args.source_options.repo_root.clone(),
         }
     }
 }
@@ -264,6 +278,7 @@ impl Default for FeedbackInput {
             tidy_review: false,
             format_review: false,
             passive_reviews: false,
+            repo_root: PathBuf::from("."),
         }
     }
 }
@@ -274,7 +289,7 @@ mod test {
 
     use clap::{Parser, ValueEnum};
 
-    use super::{Cli, LinesChangedOnly, ThreadComments};
+    use super::{ClangParams, Cli, LinesChangedOnly, ThreadComments};
 
     #[test]
     fn parse_positional() {
@@ -312,5 +327,13 @@ mod test {
             ThreadComments::from_str(input, false).unwrap(),
             ThreadComments::Off
         );
+    }
+
+    #[test]
+    fn absolute_db_path() {
+        let tmp_dir = tempfile::tempdir().unwrap();
+        let cli = Cli::parse_from(["cpp-linter", "--database", tmp_dir.path().to_str().unwrap()]);
+        let clang_params = ClangParams::from(&cli);
+        assert_eq!(clang_params.database, Some(tmp_dir.path().to_path_buf()));
     }
 }
