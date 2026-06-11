@@ -5,13 +5,21 @@
     html_favicon_url = "https://github.com/cpp-linter/cpp-linter-rs/raw/main/docs/docs/images/favicon.ico"
 )]
 #![doc = include_str!("../README.md")]
+#![deny(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::unimplemented,
+    clippy::todo,
+    missing_docs
+)]
 
 // project specific modules/crates
 pub mod clang_tools;
 pub mod cli;
 pub mod common_fs;
 pub mod error;
-pub mod git;
+mod git;
 pub mod logger;
 pub mod rest_client;
 pub mod run;

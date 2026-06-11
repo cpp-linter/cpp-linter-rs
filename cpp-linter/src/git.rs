@@ -1,11 +1,13 @@
 //! This module was primarily used to parse diff blobs.
 //!
 //! Since migrating to git-bot-feedback crate, this module is now purely for regression testing.
-//! Any logic that parses diffs from 2 text blobs has been moved to git-bot-feedback.
-//! Some diff creation/parsing logic remains in clang_tools/mod.rs module using libgit2 API instead.
+//! Any logic that parses diffs has been moved to git-bot-feedback.
+//! Some diff creation/parsing logic remains in clang_tools/mod.rs module using gix-imara-diff API instead.
+#![cfg(test)]
 
-#[cfg(test)]
 mod test {
+    #![allow(clippy::unwrap_used, clippy::panic, clippy::expect_used)]
+
     use std::{
         env::{self, current_dir, set_current_dir},
         fs,

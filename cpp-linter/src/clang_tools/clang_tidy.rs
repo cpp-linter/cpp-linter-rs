@@ -70,6 +70,7 @@ pub struct TidyNotification {
 }
 
 impl TidyNotification {
+    /// Get a markdown-formatted link to the clang-tidy documentation page for [`Self::diagnostic`].
     pub fn diagnostic_link(&self) -> String {
         if self.diagnostic.starts_with("clang-diagnostic-") {
             // clang-diagnostic-* diagnostics are compiler diagnostics and don't have
@@ -101,6 +102,8 @@ impl TidyNotification {
 pub struct TidyAdvice {
     /// A list of notifications parsed from clang-tidy stdout.
     pub notes: Vec<TidyNotification>,
+
+    /// A buffer to hold the contents of the file after applying clang-tidy fixes.
     pub patched: Option<Vec<u8>>,
 }
 
@@ -377,7 +380,7 @@ pub fn run_clang_tidy(
 
 #[cfg(test)]
 mod test {
-    #![allow(clippy::unwrap_used)]
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
 
     use std::{
         env,

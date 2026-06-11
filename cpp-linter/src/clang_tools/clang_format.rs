@@ -16,11 +16,13 @@ use log::Level;
 use super::{CACHE_DIR, MakeSuggestions};
 use crate::{cli::ClangParams, common_fs::FileObj, error::ClangCaptureError};
 
+/// A struct to hold clang-format advice for a single file.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct FormatAdvice {
     /// A list of line ranges that clang-format wants to replace.
     pub replacements: Vec<RangeInclusive<u32>>,
 
+    /// A path to a cached file containing the full contents of the file after applying clang-format fixes.
     pub patched: PathBuf,
 }
 

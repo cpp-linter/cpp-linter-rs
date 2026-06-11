@@ -1,5 +1,4 @@
 #![cfg(not(test))]
-#![deny(clippy::unwrap_used)]
 /// This crate is the binary executable's entrypoint.
 use std::env;
 

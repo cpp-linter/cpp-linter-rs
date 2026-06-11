@@ -3,6 +3,7 @@
 use std::{
     fmt::Debug,
     fs,
+    num::NonZeroU32,
     ops::RangeInclusive,
     path::{Path, PathBuf},
 };
@@ -61,10 +62,15 @@ impl FileObj {
         added_lines: Vec<u32>,
         diff_chunks: Vec<RangeInclusive<u32>>,
     ) -> Self {
+        // filter out any line numbers that are 0 since line numbers are always 1-indexed in diffs
+        let added_lines: Vec<NonZeroU32> = added_lines
+            .into_iter()
+            .filter_map(NonZeroU32::new)
+            .collect();
         let added_ranges = FileObj::consolidate_numbers_to_ranges(&added_lines);
         FileObj {
             name,
-            added_lines,
+            added_lines: added_lines.into_iter().map(|v| v.get()).collect(),
             added_ranges,
             diff_chunks,
             format_advice: None,
@@ -75,23 +81,33 @@ impl FileObj {
     /// A helper function to consolidate a [Vec<u32>] of line numbers into a
     /// [Vec<RangeInclusive<u32>>] in which each range describes the beginning and
     /// ending of a group of consecutive line numbers.
-    fn consolidate_numbers_to_ranges(lines: &[u32]) -> Vec<RangeInclusive<u32>> {
-        let mut range_start = None;
+    fn consolidate_numbers_to_ranges(lines: &[NonZeroU32]) -> Vec<RangeInclusive<u32>> {
         let mut ranges: Vec<RangeInclusive<u32>> = Vec::new();
-        for (index, number) in lines.iter().enumerate() {
-            if index == 0 {
-                range_start = Some(*number);
-            } else if number - 1 != lines[index - 1] {
-                ranges.push(RangeInclusive::new(range_start.unwrap(), lines[index - 1]));
-                range_start = Some(*number);
+        let mut line_iter = lines.iter().enumerate();
+        let mut range_start = match line_iter.next() {
+            Some((_, number)) => number.get(),
+            None => return ranges, // return empty vector if no lines
+        };
+        // lines.len() cannot be 0 at this point
+        let last_index = lines.len() - 1;
+        for (index, number) in line_iter {
+            // use let chain to avoid repeated lookup of lines[index - 1].
+            // should always yield some value since we entered the for loop at index 1.
+            if let Some(prev_line) = lines.get(index - 1)
+                && number.get() - 1 != prev_line.get()
+            {
+                ranges.push(RangeInclusive::new(range_start, prev_line.get()));
+                range_start = number.get();
             }
-            if index == lines.len() - 1 {
-                ranges.push(RangeInclusive::new(range_start.unwrap(), *number));
+            if index == last_index {
+                ranges.push(RangeInclusive::new(range_start, number.get()));
             }
         }
         ranges
     }
 
+    /// Get the list of line ranges to consider based on the given
+    /// [`LinesChangedOnly`] configuration.
     pub fn get_ranges(&self, lines_changed_only: &LinesChangedOnly) -> Vec<RangeInclusive<u32>> {
         match lines_changed_only {
             LinesChangedOnly::Diff => self.diff_chunks.to_vec(),
