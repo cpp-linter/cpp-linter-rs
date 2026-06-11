@@ -297,7 +297,7 @@ pub fn run_clang_tidy(
         );
         cmd.args(["--line-filter", filter.as_str()]);
     }
-    let repo_file_path = PathBuf::from_iter([&clang_params.repo_root, &file.name]);
+    let repo_file_path = clang_params.repo_root.join(&file.name);
     let original_content = if !clang_params.tidy_review {
         None
     } else {
