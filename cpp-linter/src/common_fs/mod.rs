@@ -1,6 +1,11 @@
 //! A module to hold all common file system functionality.
 
-use std::{fmt::Debug, fs, ops::RangeInclusive, path::PathBuf};
+use std::{
+    fmt::Debug,
+    fs,
+    ops::RangeInclusive,
+    path::{Path, PathBuf},
+};
 
 use gix_imara_diff::Hunk;
 
@@ -140,8 +145,10 @@ impl FileObj {
         &self,
         review_comments: &mut ReviewComments,
         summary_only: bool,
+        repo_root: &Path,
     ) -> Result<(), FileObjError> {
-        let original_content = fs::read_to_string(&self.name).map_err(FileObjError::ReadFile)?;
+        let original_content =
+            fs::read_to_string(repo_root.join(&self.name)).map_err(FileObjError::ReadFile)?;
         let file_name = self.name.to_str().unwrap_or_default().replace("\\", "/");
         if let Some(advice) = &self.format_advice {
             let patched = fs::read_to_string(&advice.patched).map_err(FileObjError::ReadFile)?;

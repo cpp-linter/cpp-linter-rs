@@ -5,7 +5,7 @@ use cpp_linter::run::run_main;
 use git_bot_feedback::LinesChangedOnly;
 use mockito::Matcher;
 use std::{env, fmt::Display, io::Write, path::Path};
-use tempfile::NamedTempFile;
+use tempfile::{NamedTempFile, TempDir};
 
 mod common;
 use common::{create_test_space, mock_server};
@@ -62,7 +62,7 @@ impl Default for TestParams {
     }
 }
 
-async fn setup(lib_root: &Path, test_params: &TestParams) {
+async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
     let mut event_payload_path = NamedTempFile::new_in("./").unwrap();
     let tmp_out_file = NamedTempFile::new().unwrap();
     unsafe {
@@ -253,6 +253,7 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
         format!("--no-lgtm={}", test_params.no_lgtm),
         "-p=build".to_string(),
         "-i=build".to_string(),
+        format!("--repo-root={}", tmp_dir.path().to_str().unwrap()),
     ];
     if test_params.force_lgtm {
         args.push("-e=c".to_string());
@@ -278,9 +279,7 @@ async fn setup(lib_root: &Path, test_params: &TestParams) {
 async fn test_comment(test_params: &TestParams) {
     let tmp_dir = create_test_space(true);
     let lib_root = env::current_dir().unwrap();
-    env::set_current_dir(tmp_dir.path()).unwrap();
-    setup(&lib_root, test_params).await;
-    env::set_current_dir(lib_root.as_path()).unwrap();
+    setup(&lib_root, &tmp_dir, test_params).await;
     drop(tmp_dir);
 }
 

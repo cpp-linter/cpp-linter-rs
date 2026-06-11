@@ -7,7 +7,11 @@ use mockito::Matcher;
 use tempfile::{NamedTempFile, TempDir};
 
 use cpp_linter::{logger, rest_client::RestClient};
-use std::{env, io::Write, path::Path};
+use std::{
+    env,
+    io::Write,
+    path::{Path, PathBuf},
+};
 
 #[derive(PartialEq, Default)]
 enum EventType {
@@ -32,7 +36,7 @@ const RESET_RATE_LIMIT_HEADER: &str = "x-ratelimit-reset";
 const REMAINING_RATE_LIMIT_HEADER: &str = "x-ratelimit-remaining";
 const MALFORMED_RESPONSE_PAYLOAD: &str = "{\"message\":\"Resource not accessible by integration\"}";
 
-async fn get_paginated_changes(lib_root: &Path, test_params: &TestParams) {
+async fn get_paginated_changes(lib_root: &Path, _tmp_dir: &TempDir, test_params: &TestParams) {
     let tmp = TempDir::new().expect("Failed to create a temp dir for test");
     let mut event_payload = NamedTempFile::new_in(tmp.path())
         .expect("Failed to spawn a tmp file for test event payload");
@@ -145,7 +149,7 @@ async fn get_paginated_changes(lib_root: &Path, test_params: &TestParams) {
             &LinesChangedOnly::Off,
             &None::<String>,
             false,
-            ".",
+            &PathBuf::from("."),
         )
         .await;
     match files {
@@ -177,9 +181,7 @@ async fn get_paginated_changes(lib_root: &Path, test_params: &TestParams) {
 async fn test_get_changes(test_params: &TestParams) {
     let tmp_dir = create_test_space(false);
     let lib_root = env::current_dir().unwrap();
-    env::set_current_dir(tmp_dir.path()).unwrap();
-    get_paginated_changes(&lib_root, test_params).await;
-    env::set_current_dir(lib_root.as_path()).unwrap();
+    get_paginated_changes(&lib_root, &tmp_dir, test_params).await;
     drop(tmp_dir);
 }
 

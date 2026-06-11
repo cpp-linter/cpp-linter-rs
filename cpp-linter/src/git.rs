@@ -9,6 +9,7 @@ mod test {
     use std::{
         env::{self, current_dir, set_current_dir},
         fs,
+        path::PathBuf,
         process::Command,
     };
 
@@ -101,7 +102,7 @@ mod test {
                 &LinesChangedOnly::Off.into(),
                 &base_diff,
                 ignore_staged,
-                ".",
+                &PathBuf::from("."),
             )
             .await
             .unwrap()

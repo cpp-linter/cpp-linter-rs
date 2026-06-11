@@ -232,6 +232,7 @@ pub struct FeedbackInput {
     pub tidy_review: bool,
     pub format_review: bool,
     pub passive_reviews: bool,
+    pub repo_root: PathBuf,
 }
 
 #[cfg(feature = "bin")]
@@ -247,6 +248,7 @@ impl From<&Cli> for FeedbackInput {
             tidy_review: args.feedback_options.tidy_review,
             format_review: args.feedback_options.format_review,
             passive_reviews: args.feedback_options.passive_reviews,
+            repo_root: PathBuf::from(&args.source_options.repo_root),
         }
     }
 }
@@ -263,6 +265,7 @@ impl Default for FeedbackInput {
             tidy_review: false,
             format_review: false,
             passive_reviews: false,
+            repo_root: PathBuf::from("."),
         }
     }
 }

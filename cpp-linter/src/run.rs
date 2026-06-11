@@ -101,6 +101,7 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
     }
 
     rest_api_client.start_log_group("Get list of specified source files");
+    let repo_root_path = PathBuf::from(&cli.source_options.repo_root);
     let files = if !matches!(cli.source_options.lines_changed_only, LinesChangedOnly::Off)
         || cli.source_options.files_changed_only
     {
@@ -111,7 +112,7 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
                 &cli.source_options.lines_changed_only.clone().into(),
                 &cli.source_options.diff_base,
                 cli.source_options.ignore_index,
-                &cli.source_options.repo_root,
+                &repo_root_path,
             )
             .await?
     } else {
@@ -123,7 +124,7 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
                 let file_path = PathBuf::from(&file_name);
                 FileObj::new(
                     file_path
-                        .strip_prefix(&cli.source_options.repo_root)
+                        .strip_prefix(&repo_root_path)
                         .map(PathBuf::from)
                         .unwrap_or(file_path),
                 )
@@ -136,7 +137,7 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
                     &LinesChangedOnly::Off.into(),
                     &cli.source_options.diff_base,
                     cli.source_options.ignore_index,
-                    &cli.source_options.repo_root,
+                    &repo_root_path,
                 )
                 .await?;
             for changed_file in changed_files {
