@@ -140,7 +140,15 @@ pub async fn capture_clang_tools_output(
 
     // parse database (if provided) to match filenames when parsing clang-tidy's stdout
     if let Some(db_path) = &clang_params.database
-        && let Ok(db_str) = fs::read(db_path.join("compile_commands.json"))
+        && let Ok(db_str) = fs::read(
+            if db_path.is_relative() {
+                clang_params.repo_root.join(db_path)
+            } else {
+                db_path.to_path_buf()
+            }
+            .join(db_path)
+            .join("compile_commands.json"),
+        )
     {
         clang_params.database_json = Some(
             // A compilation database should be UTF-8 encoded, but file paths are not; use lossy conversion.
