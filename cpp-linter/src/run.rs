@@ -197,7 +197,8 @@ pub(crate) mod test {
     #![allow(clippy::unwrap_used)]
 
     use super::run_main;
-    use std::{env, fs, path::PathBuf};
+    use crate::test_common::setup_tmp_workspace;
+    use std::env;
 
     /// helper to avoid writing to the same GITHUB_OUTPUT file in parallel-running tests.
     fn setup_tmp_gh_out_path() -> tempfile::NamedTempFile {
@@ -209,22 +210,6 @@ pub(crate) mod test {
             );
         }
         gh_out_path
-    }
-
-    /// helper to avoid concurrent writes by executing (& processing the output of)
-    /// clang tools on the same test assets.
-    pub fn setup_tmp_workspace() -> tempfile::TempDir {
-        let tmp_workspace = tempfile::TempDir::with_prefix("cpp-linter-unit-tests_").unwrap();
-        let demo_path = tmp_workspace.path().join("demo");
-        fs::create_dir(&demo_path).unwrap();
-        for asset in ["demo.cpp", "demo.hpp"] {
-            fs::copy(
-                PathBuf::from("tests/demo").join(asset),
-                demo_path.join(asset),
-            )
-            .unwrap();
-        }
-        tmp_workspace
     }
 
     #[tokio::test]

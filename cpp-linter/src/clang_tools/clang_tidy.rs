@@ -105,7 +105,7 @@ pub struct TidyAdvice {
     /// A list of notifications parsed from clang-tidy stdout.
     pub notes: Vec<TidyNotification>,
 
-    /// A buffer to hold the contents of the file after applying clang-tidy fixes.
+    /// A path to the cached contents of the file after applying clang-tidy fixes.
     pub patched: PathBuf,
 }
 
@@ -519,7 +519,7 @@ mod test {
                 .unwrap(),
             )
             .unwrap();
-        let tmp_workspace = crate::run::test::setup_tmp_workspace();
+        let tmp_workspace = crate::test_common::setup_tmp_workspace();
         let file = FileObj::new(PathBuf::from("demo/demo.cpp"));
         let arc_file = Arc::new(Mutex::new(file));
         let extra_args = vec!["-std=c++17".to_string(), "-Wall".to_string()];
@@ -614,22 +614,23 @@ TrenchBroom/TrenchBroom/common/test/src/mdl/tst_ReadFreeImageTexture.cpp:44:48: 
 
     #[test]
     fn restore_on_drop_fires() {
-        let tmp = tempfile::NamedTempFile::new().unwrap();
+        let tmp = tempfile::tempdir().unwrap();
+        let file_path = tmp.path().join("test_file.txt");
         let original = "original content";
-        fs::write(tmp.path(), original).unwrap();
+        fs::write(&file_path, original).unwrap();
 
         {
             let guard = RestoreOnDrop {
-                path: tmp.path(),
+                path: &file_path,
                 content: original.to_string(),
                 armed: true,
             };
             // Simulate clang-tidy mutating the file
-            fs::write(tmp.path(), "patched content").unwrap();
+            fs::write(&file_path, "patched content").unwrap();
             // Explicit drop triggers restoration
             drop(guard);
         }
 
-        assert_eq!(fs::read_to_string(tmp.path()).unwrap(), original);
+        assert_eq!(fs::read_to_string(&file_path).unwrap(), original);
     }
 }

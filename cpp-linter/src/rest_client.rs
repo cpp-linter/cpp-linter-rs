@@ -442,10 +442,10 @@ fn make_tidy_comment(
                         cols = tidy_note.cols,
                         severity = tidy_note.severity,
                         diagnostic = tidy_note.diagnostic_link(),
-                        auto_fixable = if tidy_note.fixed_lines.contains(&tidy_note.line) {
-                            "\n   :zap: auto-fix available"
-                        } else {
+                        auto_fixable = if tidy_note.fixed_lines.is_empty() {
                             ""
+                        } else {
+                            "\n   :zap: auto-fix available"
                         },
                         rationale = tidy_note.rationale,
                         concerned_code = if tidy_note.suggestion.is_empty() {String::from("")} else {
