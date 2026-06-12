@@ -16,9 +16,20 @@ use std::{fs, io::Read, num::NonZero, path::Path};
 pub enum HashAlgorithm {
     /// SHA-256 hash algorithm with the expected checksum value.
     Sha256(String),
+
     /// BLAKE2b-256 hash algorithm with the expected checksum value.
     Blake2b256(String),
+
     /// SHA-512 hash algorithm with the expected checksum value.
+    #[cfg(any(
+        // Windows support is only for x86_64 architecture (for now)
+        all(target_os = "windows", target_arch = "x86_64"),
+        // Linux and macOS support only x86_64 and aarch64 architectures
+        all(
+            any(target_os = "linux", target_os = "macos"),
+            any(target_arch = "x86_64", target_arch = "aarch64")
+        ),
+    ))]
     Sha512(String),
 }
 
@@ -74,6 +85,15 @@ impl HashAlgorithm {
                 let hasher = Blake2b::<U32>::new();
                 Self::hash_file(hasher, file_path, expected)
             }
+            #[cfg(any(
+                // Windows support is only for x86_64 architecture (for now)
+                all(target_os = "windows", target_arch = "x86_64"),
+                // Linux and macOS support only x86_64 and aarch64 architectures
+                all(
+                    any(target_os = "linux", target_os = "macos"),
+                    any(target_arch = "x86_64", target_arch = "aarch64")
+                ),
+            ))]
             HashAlgorithm::Sha512(expected) => {
                 use sha2::{Digest, Sha512};
 
