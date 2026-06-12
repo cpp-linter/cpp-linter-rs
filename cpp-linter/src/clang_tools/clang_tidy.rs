@@ -265,6 +265,26 @@ pub fn tally_tidy_advice(files: &[Arc<Mutex<FileObj>>]) -> Result<u64, String> {
     Ok(total)
 }
 
+/// RAII guard that restores a file's original content on drop.
+///
+/// This is a best-effort when an error gets propagated before
+/// we can explicitly restore a file's contents.
+struct RestoreOnDrop<'a> {
+    path: &'a Path,
+    content: String,
+    // lock:
+    armed: bool,
+}
+
+impl Drop for RestoreOnDrop<'_> {
+    fn drop(&mut self) {
+        if self.armed {
+            // We have to ignore any error here and hope for the best.
+            let _ = fs::write(self.path, &self.content);
+        }
+    }
+}
+
 /// Run clang-tidy, then parse and return it's output.
 pub fn run_clang_tidy(
     file: &mut MutexGuard<FileObj>,
@@ -301,11 +321,6 @@ pub fn run_clang_tidy(
     }
     let repo_file_path = clang_params.repo_root.join(&file.name);
     cmd.arg("--fix-errors");
-    let original_content =
-        fs::read_to_string(&repo_file_path).map_err(|e| ClangCaptureError::ReadFileFailed {
-            file_name: file_name.clone(),
-            source: e,
-        })?;
     if !clang_params.style.is_empty() {
         cmd.args(["--format-style", clang_params.style.as_str()]);
     }
@@ -321,12 +336,50 @@ pub fn run_clang_tidy(
                 .join(" ")
         ),
     ));
+    let cache_patch_path = clang_params
+        .repo_root
+        .join(CACHE_DIR)
+        .join(file.name.with_added_extension("tidy"));
+    fs::create_dir_all(
+        cache_patch_path
+            .parent()
+            .ok_or(ClangCaptureError::UnknownCacheParentPath)?,
+    )
+    .map_err(ClangCaptureError::MkDirFailed)?;
+    let mut drop_guard = RestoreOnDrop {
+        content: fs::read_to_string(&repo_file_path).map_err(|e| {
+            ClangCaptureError::ReadFileFailed {
+                file_name: file_name.clone(),
+                source: e,
+            }
+        })?,
+        armed: true,
+        path: repo_file_path.as_path(),
+    };
+    // run clang-tidy to patch the file in-place.
     let output = cmd
         .output()
         .map_err(|e| ClangCaptureError::FailedToRunCommand {
             task: format!("execute clang-tidy on file {file_name}"),
             source: e,
         })?;
+    // move the patched file content into cache
+    fs::copy(&repo_file_path, &cache_patch_path).map_err(|e| {
+        ClangCaptureError::WriteFileFailed {
+            file_name: cache_patch_path.to_string_lossy().to_string(),
+            source: e,
+        }
+    })?;
+    // restore the original file content to avoid unexpected behavior in later steps of dev workflow
+    fs::write(&repo_file_path, &drop_guard.content).map_err(|e| {
+        ClangCaptureError::WriteFileFailed {
+            file_name: file_name.clone(),
+            source: e,
+        }
+    })?;
+    // disarm the drop guard since we've already restored the original content
+    drop_guard.armed = false;
+
     logs.push((
         log::Level::Debug,
         format!(
@@ -343,38 +396,12 @@ pub fn run_clang_tidy(
             ),
         ));
     }
+
     let notes = parse_tidy_output(
         &output.stdout,
         &clang_params.database_json,
         &clang_params.repo_root,
     )?;
-
-    // move the patched file content into cache
-    let patched_content =
-        fs::read_to_string(&repo_file_path).map_err(|e| ClangCaptureError::ReadFileFailed {
-            file_name: file_name.clone(),
-            source: e,
-        })?;
-    let cache_patch_path = clang_params
-        .repo_root
-        .join(CACHE_DIR)
-        .join(file.name.with_added_extension("tidy"));
-    if let Some(parent) = cache_patch_path.parent() {
-        fs::create_dir_all(parent).map_err(ClangCaptureError::MkDirFailed)?;
-    }
-    fs::write(&cache_patch_path, &patched_content).map_err(|e| {
-        ClangCaptureError::WriteFileFailed {
-            file_name: cache_patch_path.to_string_lossy().to_string(),
-            source: e,
-        }
-    })?;
-    // restore the original file content to avoid unexpected behavior in later steps of dev workflow
-    fs::write(&repo_file_path, &original_content).map_err(|e| {
-        ClangCaptureError::WriteFileFailed {
-            file_name: file_name.clone(),
-            source: e,
-        }
-    })?;
 
     let tidy_advice = TidyAdvice {
         notes,
@@ -389,7 +416,7 @@ mod test {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
 
     use std::{
-        env,
+        env, fs,
         path::PathBuf,
         str::FromStr,
         sync::{Arc, Mutex},
@@ -404,7 +431,7 @@ mod test {
         common_fs::FileObj,
     };
 
-    use super::{NOTE_HEADER, TidyNotification, run_clang_tidy};
+    use super::{NOTE_HEADER, RestoreOnDrop, TidyNotification, run_clang_tidy};
 
     #[test]
     fn clang_diagnostic_link() {
@@ -492,7 +519,8 @@ mod test {
                 .unwrap(),
             )
             .unwrap();
-        let file = FileObj::new(PathBuf::from("tests/demo/demo.cpp"));
+        let tmp_workspace = crate::run::test::setup_tmp_workspace();
+        let file = FileObj::new(PathBuf::from("demo/demo.cpp"));
         let arc_file = Arc::new(Mutex::new(file));
         let extra_args = vec!["-std=c++17".to_string(), "-Wall".to_string()];
         let clang_params = ClangParams {
@@ -508,7 +536,7 @@ mod test {
             format_review: false,
             clang_tidy_command: Some(exe_path),
             clang_format_command: None,
-            repo_root: PathBuf::from("."),
+            repo_root: tmp_workspace.path().to_path_buf(),
         };
         let mut file_lock = arc_file.lock().unwrap();
         let logs = run_clang_tidy(&mut file_lock, &clang_params)
@@ -582,5 +610,26 @@ TrenchBroom/TrenchBroom/common/test/src/mdl/tst_ReadFreeImageTexture.cpp:44:48: 
             assert!(note.diagnostic.contains('-'));
             assert!(!note.diagnostic.contains(' '));
         }
+    }
+
+    #[test]
+    fn restore_on_drop_fires() {
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        let original = "original content";
+        fs::write(tmp.path(), original).unwrap();
+
+        {
+            let guard = RestoreOnDrop {
+                path: tmp.path(),
+                content: original.to_string(),
+                armed: true,
+            };
+            // Simulate clang-tidy mutating the file
+            fs::write(tmp.path(), "patched content").unwrap();
+            // Explicit drop triggers restoration
+            drop(guard);
+        }
+
+        assert_eq!(fs::read_to_string(tmp.path()).unwrap(), original);
     }
 }
