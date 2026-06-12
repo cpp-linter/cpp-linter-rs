@@ -436,12 +436,17 @@ fn make_tidy_comment(
                 if file_path == file.name {
                     let mut tmp_note = format!("- {}\n\n", tidy_note.filename);
                     tmp_note.push_str(&format!(
-                        "   <strong>{filename}:{line}:{cols}:</strong> {severity}: [{diagnostic}]\n   > {rationale}\n{concerned_code}",
+                        "   <strong>{filename}:{line}:{cols}:</strong> {severity}: [{diagnostic}]{auto_fixable}\n   > {rationale}\n{concerned_code}",
                         filename = tidy_note.filename,
                         line = tidy_note.line,
                         cols = tidy_note.cols,
                         severity = tidy_note.severity,
                         diagnostic = tidy_note.diagnostic_link(),
+                        auto_fixable = if tidy_note.fixed_lines.contains(&tidy_note.line) {
+                            "\n   :zap: auto-fix available"
+                        } else {
+                            ""
+                        },
                         rationale = tidy_note.rationale,
                         concerned_code = if tidy_note.suggestion.is_empty() {String::from("")} else {
                             format!("\n   ```{ext}\n   {suggestion}\n   ```\n",
@@ -526,7 +531,7 @@ mod test {
                 }];
                 file.tidy_advice = Some(TidyAdvice {
                     notes,
-                    patched: None,
+                    patched: PathBuf::new(),
                 });
                 file.format_advice = Some(FormatAdvice {
                     #[allow(clippy::single_range_in_vec_init)]

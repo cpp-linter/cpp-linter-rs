@@ -178,12 +178,9 @@ impl FileObj {
         }
 
         if let Some(advice) = &self.tidy_advice {
-            if let Some(patched) = &advice.patched {
-                let patched = String::from_utf8(patched.to_vec())
-                    .map_err(|e| FileObjError::FromUtf8Error(file_name.clone(), e))?;
-                let (diff, input) = make_patch(patched.as_str(), &original_content);
-                advice.get_suggestions(review_comments, self, &diff, &input, summary_only);
-            }
+            let patched = fs::read_to_string(&advice.patched).map_err(FileObjError::ReadFile)?;
+            let (diff, input) = make_patch(patched.as_str(), &original_content);
+            advice.get_suggestions(review_comments, self, &diff, &input, summary_only);
 
             if summary_only {
                 return Ok(());

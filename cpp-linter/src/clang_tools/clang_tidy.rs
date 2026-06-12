@@ -16,7 +16,9 @@ use serde::Deserialize;
 
 // project-specific modules/crates
 use super::MakeSuggestions;
-use crate::{cli::ClangParams, common_fs::FileObj, error::ClangCaptureError};
+use crate::{
+    clang_tools::CACHE_DIR, cli::ClangParams, common_fs::FileObj, error::ClangCaptureError,
+};
 
 /// Used to deserialize a json compilation database's translation unit.
 ///
@@ -104,7 +106,7 @@ pub struct TidyAdvice {
     pub notes: Vec<TidyNotification>,
 
     /// A buffer to hold the contents of the file after applying clang-tidy fixes.
-    pub patched: Option<Vec<u8>>,
+    pub patched: PathBuf,
 }
 
 impl MakeSuggestions for TidyAdvice {
@@ -148,7 +150,7 @@ fn parse_tidy_output(
     tidy_stdout: &[u8],
     database_json: &Option<Vec<CompilationUnit>>,
     repo_root: &Path,
-) -> Result<TidyAdvice, ClangCaptureError> {
+) -> Result<Vec<TidyNotification>, ClangCaptureError> {
     let note_header = Regex::new(NOTE_HEADER)?;
     let fixed_note = Regex::new(r"^.+:(\d+):\d+:\snote: FIX-IT applied suggested code changes$")?;
     let mut found_fix = false;
@@ -243,10 +245,7 @@ fn parse_tidy_output(
     if let Some(note) = notification {
         result.push(note);
     }
-    Ok(TidyAdvice {
-        notes: result,
-        patched: None,
-    })
+    Ok(result)
 }
 
 /// Get a total count of clang-tidy advice from the given list of [FileObj]s.
@@ -301,17 +300,12 @@ pub fn run_clang_tidy(
         cmd.args(["--line-filter", filter.as_str()]);
     }
     let repo_file_path = clang_params.repo_root.join(&file.name);
-    let original_content = if !clang_params.tidy_review {
-        None
-    } else {
-        cmd.arg("--fix-errors");
-        Some(fs::read_to_string(&repo_file_path).map_err(|e| {
-            ClangCaptureError::ReadFileFailed {
-                file_name: file_name.clone(),
-                source: e,
-            }
-        })?)
-    };
+    cmd.arg("--fix-errors");
+    let original_content =
+        fs::read_to_string(&repo_file_path).map_err(|e| ClangCaptureError::ReadFileFailed {
+            file_name: file_name.clone(),
+            source: e,
+        })?;
     if !clang_params.style.is_empty() {
         cmd.args(["--format-style", clang_params.style.as_str()]);
     }
@@ -349,32 +343,44 @@ pub fn run_clang_tidy(
             ),
         ));
     }
-    file.tidy_advice = Some(parse_tidy_output(
+    let notes = parse_tidy_output(
         &output.stdout,
         &clang_params.database_json,
         &clang_params.repo_root,
-    )?);
-    if clang_params.tidy_review
-        && let Some(original_content) = &original_content
-    {
-        if let Some(tidy_advice) = &mut file.tidy_advice {
-            // cache file changes in a buffer and restore the original contents for further analysis
-            tidy_advice.patched =
-                Some(
-                    fs::read(&repo_file_path).map_err(|e| ClangCaptureError::ReadFileFailed {
-                        file_name: file_name.clone(),
-                        source: e,
-                    })?,
-                );
-        }
-        // original_content is guaranteed to be Some() value at this point
-        fs::write(&repo_file_path, original_content).map_err(|e| {
-            ClangCaptureError::WriteFileFailed {
-                file_name,
-                source: e,
-            }
+    )?;
+
+    // move the patched file content into cache
+    let patched_content =
+        fs::read_to_string(&repo_file_path).map_err(|e| ClangCaptureError::ReadFileFailed {
+            file_name: file_name.clone(),
+            source: e,
         })?;
+    let cache_patch_path = clang_params
+        .repo_root
+        .join(CACHE_DIR)
+        .join(file.name.with_added_extension("tidy"));
+    if let Some(parent) = cache_patch_path.parent() {
+        fs::create_dir_all(parent).map_err(ClangCaptureError::MkDirFailed)?;
     }
+    fs::write(&cache_patch_path, &patched_content).map_err(|e| {
+        ClangCaptureError::WriteFileFailed {
+            file_name: cache_patch_path.to_string_lossy().to_string(),
+            source: e,
+        }
+    })?;
+    // restore the original file content to avoid unexpected behavior in later steps of dev workflow
+    fs::write(&repo_file_path, &original_content).map_err(|e| {
+        ClangCaptureError::WriteFileFailed {
+            file_name: file_name.clone(),
+            source: e,
+        }
+    })?;
+
+    let tidy_advice = TidyAdvice {
+        notes,
+        patched: cache_patch_path.to_path_buf(),
+    };
+    file.tidy_advice = Some(tidy_advice);
     Ok(logs)
 }
 
@@ -571,8 +577,8 @@ TrenchBroom/TrenchBroom/common/test/src/mdl/tst_ReadFreeImageTexture.cpp:44:48: 
       |                                                ^
 "#;
         let advice = parse_tidy_output(tidy_out.as_bytes(), &None, &PathBuf::from(".")).unwrap();
-        assert_eq!(advice.notes.len(), 4);
-        for note in advice.notes {
+        assert_eq!(advice.len(), 4);
+        for note in advice {
             assert!(note.diagnostic.contains('-'));
             assert!(!note.diagnostic.contains(' '));
         }
