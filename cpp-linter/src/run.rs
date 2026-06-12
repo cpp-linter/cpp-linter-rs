@@ -193,10 +193,11 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
 }
 
 #[cfg(test)]
-mod test {
+pub(crate) mod test {
     #![allow(clippy::unwrap_used)]
 
     use super::run_main;
+    use crate::test_common::setup_tmp_workspace;
     use std::env;
 
     /// helper to avoid writing to the same GITHUB_OUTPUT file in parallel-running tests.
@@ -214,12 +215,13 @@ mod test {
     #[tokio::test]
     async fn normal() {
         let tmp_gh_out = setup_tmp_gh_out_path();
+        let tmp_workspace = setup_tmp_workspace();
         run_main(vec![
             "cpp-linter".to_string(),
             "-l".to_string(),
             "false".to_string(),
             "--repo-root".to_string(),
-            "tests".to_string(),
+            tmp_workspace.path().to_str().unwrap().to_string(),
             "demo/demo.cpp".to_string(),
         ])
         .await
@@ -239,12 +241,15 @@ mod test {
     #[tokio::test]
     async fn force_debug_output() {
         let tmp_gh_out = setup_tmp_gh_out_path();
+        let tmp_workspace = setup_tmp_workspace();
         run_main(vec![
             "cpp-linter".to_string(),
             "-l".to_string(),
             "false".to_string(),
             "-v".to_string(),
             "-i=target|benches/libgit2".to_string(),
+            "--repo-root".to_string(),
+            tmp_workspace.path().to_str().unwrap().to_string(),
         ])
         .await
         .unwrap();
@@ -254,11 +259,15 @@ mod test {
     #[tokio::test]
     async fn no_version_input() {
         let tmp_gh_out = setup_tmp_gh_out_path();
+        let tmp_workspace = setup_tmp_workspace();
         run_main(vec![
             "cpp-linter".to_string(),
             "-l".to_string(),
             "false".to_string(),
             "-V".to_string(),
+            "-i=target|benches/libgit2".to_string(),
+            "--repo-root".to_string(),
+            tmp_workspace.path().to_str().unwrap().to_string(),
         ])
         .await
         .unwrap();
@@ -271,11 +280,15 @@ mod test {
         unsafe {
             env::set_var("PRE_COMMIT", "1");
         }
+        let tmp_workspace = setup_tmp_workspace();
         run_main(vec![
             "cpp-linter".to_string(),
             "--lines-changed-only".to_string(),
             "false".to_string(),
+            "-v".to_string(),
             "--ignore=target|benches/libgit2".to_string(),
+            "--repo-root".to_string(),
+            tmp_workspace.path().to_str().unwrap().to_string(),
         ])
         .await
         .unwrap_err();
