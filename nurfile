@@ -70,7 +70,6 @@ export def "nur test" [
     --profile (-p): string  = "default", # The nextest profile to use.
     --clean (-c), # Clean before testing
 ] {
-    # run-cmd uv sync --group test
     if $clean {
         run-cmd cargo llvm-cov clean
     }
