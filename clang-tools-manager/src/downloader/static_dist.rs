@@ -144,7 +144,8 @@ mod supported_platform {
         ///
         /// The distribution is maintained at <https://github.com/cpp-linter/clang-tools-static-binaries>.
         /// Supported platforms includes Windows, Linux, and MacOS.
-        /// Supported architectures is limited to `x86_64` (`amd64`).
+        /// Supported architectures is limited to `x86_64` (`amd64`) and `aarch64` (`arm64`);
+        /// Windows only supports x86_64 architecture (for now).
         pub async fn download_tool(
             tool: &ClangTool,
             requested_version: &VersionReq,
