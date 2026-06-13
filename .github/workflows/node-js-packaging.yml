@@ -39,22 +39,8 @@ concurrency:
 
 jobs:
   seed-build-script:
-    runs-on: ubuntu-latest
     name: Pre-seed static binaries' versions
-    steps:
-      - env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: >-
-          gh release download
-          -R cpp-linter/clang-tools-static-binaries
-          --pattern versions.json
-          --output versions.json
-      - name: Upload versions.json
-        uses: actions/upload-artifact@v7
-        with:
-          name: static-binary-versions
-          path: versions.json
-          if-no-files-found: error
+    uses: ./.github/workflows/pre-seed-versions.yml
 
   build:
     needs: [seed-build-script]
@@ -143,7 +129,7 @@ jobs:
       - name: Restore build script seed
         uses: actions/download-artifact@v8
         with:
-          name: static-binary-versions
+          name: ${{ needs.seed-build-script.outputs.artifact-name }}
           path: clang-tools-manager
       - name: Build
         run: ${{ matrix.settings.build }}
@@ -178,7 +164,7 @@ jobs:
       - name: Restore build script seed
         uses: actions/download-artifact@v8
         with:
-          name: static-binary-versions
+          name: ${{ needs.seed-build-script.outputs.artifact-name }}
           path: clang-tools-manager
       - name: Build
         shell: cpa.sh {0}

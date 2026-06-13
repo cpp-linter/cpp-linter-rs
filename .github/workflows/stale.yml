@@ -1,7 +1,8 @@
 name: 'Close stale issues'
 on:
   schedule:
-    - cron: '30 1 * * *'
+    # Run at 1:30 AM every Monday, Wednesday, and Friday
+    - cron: '30 1 * * 1,3,5'
 
 permissions: {}
 

@@ -1,0 +1,29 @@
+name: Pre-seed versions
+
+on:
+  workflow_call:
+    outputs:
+      artifact-name:
+        description: >-
+          The name of uploaded artifact containing the versions.json file.
+        value: static-binary-versions
+
+permissions: {}
+
+jobs:
+  pre-seed-versions:
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: >-
+          gh release download
+          -R cpp-linter/clang-tools-static-binaries
+          --pattern versions.json
+          --output versions.json
+      - name: Upload versions.json
+        uses: actions/upload-artifact@v7
+        with:
+          name: static-binary-versions
+          path: versions.json
+          if-no-files-found: error
