@@ -25,7 +25,7 @@ clap = { version = "4.6.1", features = ["derive"] }
 colored = "3.1.1"
 log = { version = "0.4.31", features = ["std"] }
 mockito = "1.7.2"
-pyo3 = {version = "0.28.3", features = ["extension-module"] }
+pyo3 = {version = "0.29.0", features = ["extension-module"] }
 regex = "1.12.3"
 reqwest = { version = "0.13.4", default-features = false, features = ["http2", "charset"] }
 thiserror = "2.0.18"

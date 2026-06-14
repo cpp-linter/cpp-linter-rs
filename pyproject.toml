@@ -39,7 +39,6 @@ source =  "https://github.com/cpp-linter/cpp-linter-rs"
 tracker = "https://github.com/cpp-linter/cpp-linter-rs/issues"
 
 [tool.maturin]
-features = ["pyo3/extension-module"]
 include = [
     {path = "cpp_linter.pyi", format = "sdist"},
     {path = "LICENSE", format = "sdist"},
@@ -53,9 +52,7 @@ manifest-path = "bindings/python/Cargo.toml"
 
 [dependency-groups]
 dev = [
-    "maturin==1.13.3",
     "mypy==2.1.0",
-    "patchelf==0.17.2.2 ; sys_platform == 'linux'",
     "pre-commit>=4.3.0",
     "ruff==0.15.16",
 ]
