@@ -8,12 +8,13 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use gix_imara_diff::Hunk;
+use gix_imara_diff::{
+    BasicLineDiffPrinter, Diff, Hunk, InternedInput, UnifiedDiffConfig, UnifiedDiffPrinter,
+};
 
 use crate::{
     clang_tools::{
-        MakeSuggestions, ReviewComments, Suggestion, clang_format::FormatAdvice,
-        clang_tidy::TidyAdvice, make_patch,
+        ReviewComments, Suggestion, clang_format::FormatAdvice, clang_tidy::TidyAdvice, make_patch,
     },
     cli::LinesChangedOnly,
     error::FileObjError,
@@ -39,6 +40,9 @@ pub struct FileObj {
 
     /// The collection of clang-format advice for this file.
     pub tidy_advice: Option<TidyAdvice>,
+
+    /// A path to a cached file with all/any patches applied.
+    pub(crate) patched_path: Option<PathBuf>,
 }
 
 impl FileObj {
@@ -53,6 +57,7 @@ impl FileObj {
             diff_chunks: Vec::<RangeInclusive<u32>>::new(),
             format_advice: None,
             tidy_advice: None,
+            patched_path: None,
         }
     }
 
@@ -75,6 +80,7 @@ impl FileObj {
             diff_chunks,
             format_advice: None,
             tidy_advice: None,
+            patched_path: None,
         }
     }
 
@@ -168,24 +174,23 @@ impl FileObj {
         summary_only: bool,
         repo_root: &Path,
     ) -> Result<(), FileObjError> {
+        let patched = match &self.patched_path {
+            Some(patched_path) if patched_path.exists() => {
+                fs::read_to_string(patched_path).map_err(FileObjError::ReadFile)?
+            }
+            _ => return Ok(()),
+        };
         let original_content =
             fs::read_to_string(repo_root.join(&self.name)).map_err(FileObjError::ReadFile)?;
+        let (diff, input) = make_patch(patched.as_str(), &original_content);
         let file_name = self.name.to_str().unwrap_or_default().replace("\\", "/");
-        if let Some(advice) = &self.format_advice {
-            let patched = fs::read_to_string(&advice.patched).map_err(FileObjError::ReadFile)?;
-            let (diff, input) = make_patch(patched.as_str(), &original_content);
-            advice.get_suggestions(review_comments, self, &diff, &input, summary_only);
+
+        self.get_suggestions(review_comments, &diff, &input, summary_only)
+            .map_err(FileObjError::DisplayStringFailed)?;
+        if summary_only {
+            return Ok(());
         }
-
         if let Some(advice) = &self.tidy_advice {
-            let patched = fs::read_to_string(&advice.patched).map_err(FileObjError::ReadFile)?;
-            let (diff, input) = make_patch(patched.as_str(), &original_content);
-            advice.get_suggestions(review_comments, self, &diff, &input, summary_only);
-
-            if summary_only {
-                return Ok(());
-            }
-
             // now check for clang-tidy warnings with no fixes applied
             let file_ext = self
                 .name
@@ -234,9 +239,86 @@ impl FileObj {
                     }
                 }
             }
-            review_comments.tool_total[1] =
-                Some(review_comments.tool_total[1].unwrap_or_default() + total);
+            review_comments.tool_total += total;
         }
+        Ok(())
+    }
+
+    /// Create a bunch of suggestions from a [`FileObj`]'s advice's generated `patched` buffer.
+    fn get_suggestions(
+        &self,
+        review_comments: &mut ReviewComments,
+        diff: &Diff,
+        input: &InternedInput<&str>,
+        summary_only: bool,
+    ) -> Result<(), std::fmt::Error> {
+        let file_name = self
+            .name
+            .to_string_lossy()
+            .replace("\\", "/")
+            .trim_start_matches("./")
+            .to_owned();
+        let mut config = UnifiedDiffConfig::default();
+        config.context_len(0);
+        let printer = BasicLineDiffPrinter(&input.interner);
+        let mut patch_buff = String::new();
+        let mut hunks_in_patch = 0u32;
+        for hunk in diff.hunks() {
+            hunks_in_patch += 1;
+            let hunk_range = self.is_hunk_in_diff(&hunk);
+            match hunk_range {
+                Some((start_line, end_line)) if !summary_only => {
+                    let mut suggestion = String::new();
+                    let suggestion_help = self
+                        .tidy_advice
+                        .as_ref()
+                        .map(|t| t.get_suggestion_help(start_line, end_line))
+                        .unwrap_or_default();
+                    if hunk.is_pure_removal() {
+                        suggestion.push_str(
+                            format!(
+                                "Please remove the line(s)\n- {}",
+                                hunk.before
+                                    .map(|l| l.to_string())
+                                    .collect::<Vec<String>>()
+                                    .join("\n- ")
+                            )
+                            .as_str(),
+                        );
+                    } else {
+                        suggestion.push_str("```suggestion\n");
+                        for token in
+                            &input.after[hunk.after.start as usize..hunk.after.end as usize]
+                        {
+                            let line = &input.interner[*token];
+                            suggestion.push_str(line);
+                        }
+                        suggestion.push_str("```\n");
+                    }
+                    let comment = Suggestion {
+                        line_start: start_line,
+                        line_end: end_line,
+                        suggestion: format!("{suggestion_help}\n{suggestion}"),
+                        path: file_name.clone(),
+                    };
+                    if !review_comments.is_comment_in_suggestions(&comment) {
+                        review_comments.comments.push(comment);
+                    }
+                }
+                _ => {
+                    printer.display_hunk(
+                        &mut patch_buff,
+                        &input.before[hunk.before.start as usize..hunk.before.end as usize],
+                        &input.after[hunk.after.start as usize..hunk.after.end as usize],
+                    )?;
+                }
+            }
+        }
+        if !patch_buff.is_empty() {
+            let patch_buf = format!("--- a/{file_name}\n+++ b/{file_name}\n{patch_buff}");
+            review_comments.full_patch.push_str(patch_buf.as_str());
+        }
+        review_comments.tool_total += hunks_in_patch;
         Ok(())
     }
 }

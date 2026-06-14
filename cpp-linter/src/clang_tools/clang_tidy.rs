@@ -15,10 +15,7 @@ use regex::Regex;
 use serde::Deserialize;
 
 // project-specific modules/crates
-use super::MakeSuggestions;
-use crate::{
-    clang_tools::CACHE_DIR, cli::ClangParams, common_fs::FileObj, error::ClangCaptureError,
-};
+use crate::{cli::ClangParams, common_fs::FileObj, error::ClangCaptureError};
 
 /// Used to deserialize a json compilation database's translation unit.
 ///
@@ -104,13 +101,10 @@ impl TidyNotification {
 pub struct TidyAdvice {
     /// A list of notifications parsed from clang-tidy stdout.
     pub notes: Vec<TidyNotification>,
-
-    /// A path to the cached contents of the file after applying clang-tidy fixes.
-    pub patched: PathBuf,
 }
 
-impl MakeSuggestions for TidyAdvice {
-    fn get_suggestion_help(&self, start_line: u32, end_line: u32) -> String {
+impl TidyAdvice {
+    pub(crate) fn get_suggestion_help(&self, start_line: u32, end_line: u32) -> String {
         let mut diagnostics = vec![];
         for note in &self.notes {
             for fixed_line in &note.fixed_lines {
@@ -132,10 +126,6 @@ impl MakeSuggestions for TidyAdvice {
             },
             diagnostics.join("")
         )
-    }
-
-    fn get_tool_name(&self) -> String {
-        "clang-tidy".to_string()
     }
 }
 
@@ -336,10 +326,8 @@ pub fn run_clang_tidy(
                 .join(" ")
         ),
     ));
-    let cache_patch_path = clang_params
-        .repo_root
-        .join(CACHE_DIR)
-        .join(file.name.with_added_extension("tidy"));
+    let cache_path = clang_params.get_cache_path();
+    let cache_patch_path = cache_path.join(&file.name);
     fs::create_dir_all(
         cache_patch_path
             .parent()
@@ -403,10 +391,8 @@ pub fn run_clang_tidy(
         &clang_params.repo_root,
     )?;
 
-    let tidy_advice = TidyAdvice {
-        notes,
-        patched: cache_patch_path.to_path_buf(),
-    };
+    let tidy_advice = TidyAdvice { notes };
+    file.patched_path = Some(cache_patch_path.to_path_buf());
     file.tidy_advice = Some(tidy_advice);
     Ok(logs)
 }
@@ -539,6 +525,7 @@ mod test {
             repo_root: tmp_workspace.path().to_path_buf(),
         };
         let mut file_lock = arc_file.lock().unwrap();
+        fs::create_dir_all(clang_params.get_cache_path()).unwrap();
         let logs = run_clang_tidy(&mut file_lock, &clang_params)
             .unwrap()
             .into_iter()

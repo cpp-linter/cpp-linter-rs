@@ -18,7 +18,7 @@ use log::{LevelFilter, set_max_level};
 
 // project specific modules/crates
 use crate::{
-    clang_tools::{CACHE_DIR, capture_clang_tools_output},
+    clang_tools::capture_clang_tools_output,
     cli::{ClangParams, Cli, CliCommand, FeedbackInput, LinesChangedOnly},
     common_fs::FileObj,
     logger,
@@ -155,7 +155,7 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
 
     let mut clang_params = ClangParams::from(&cli);
     // mkdir -p .cpp-linter-cache/
-    let cache_dir = clang_params.repo_root.join(CACHE_DIR);
+    let cache_dir = clang_params.repo_root.join(ClangParams::CACHE_DIR);
     std::fs::create_dir_all(&cache_dir)
         .with_context(|| "Failed to create a local cache directory.")?;
     // add gitignore file in project cache dir

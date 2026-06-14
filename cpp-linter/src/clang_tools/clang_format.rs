@@ -4,36 +4,22 @@
 use std::{
     fs,
     ops::RangeInclusive,
-    path::PathBuf,
     process::Command,
     sync::{Arc, Mutex, MutexGuard},
 };
 
-use gix_imara_diff::{Diff, InternedInput};
 use log::Level;
 
 // project-specific crates/modules
-use super::{CACHE_DIR, MakeSuggestions};
-use crate::{cli::ClangParams, common_fs::FileObj, error::ClangCaptureError};
+use crate::{
+    clang_tools::make_patch, cli::ClangParams, common_fs::FileObj, error::ClangCaptureError,
+};
 
 /// A struct to hold clang-format advice for a single file.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct FormatAdvice {
     /// A list of line ranges that clang-format wants to replace.
     pub replacements: Vec<RangeInclusive<u32>>,
-
-    /// A path to a cached file containing the full contents of the file after applying clang-format fixes.
-    pub patched: PathBuf,
-}
-
-impl MakeSuggestions for FormatAdvice {
-    fn get_suggestion_help(&self, _start_line: u32, _end_line: u32) -> String {
-        String::from("### clang-format suggestions\n")
-    }
-
-    fn get_tool_name(&self) -> String {
-        "clang-format".to_string()
-    }
 }
 
 /// Get a string that summarizes the given `--style`
@@ -82,14 +68,7 @@ pub fn run_clang_format(
     for range in &ranges {
         cmd.arg(format!("--lines={}:{}", range.start(), range.end()));
     }
-    let cache_path = clang_params.repo_root.join(CACHE_DIR).join("patches");
-    let cache_format_fixes = cache_path.join(file.name.with_added_extension("format"));
-    fs::create_dir_all(
-        cache_format_fixes
-            .parent()
-            .ok_or(ClangCaptureError::UnknownCacheParentPath)?,
-    )
-    .map_err(ClangCaptureError::MkDirFailed)?;
+    let cache_path = clang_params.get_cache_path();
     let file_name = file.name.to_string_lossy().to_string();
     cmd.arg(file.name.to_path_buf().as_os_str());
     logs.push((
@@ -109,12 +88,6 @@ pub fn run_clang_format(
             task: format!("get fixes from clang-format {file_name}"),
             source: e,
         })?;
-    fs::write(&cache_format_fixes, &output.stdout).map_err(|e| {
-        ClangCaptureError::WriteFileFailed {
-            file_name: cache_format_fixes.to_string_lossy().to_string(),
-            source: e,
-        }
-    })?;
 
     if !output.stderr.is_empty() || !output.status.success() {
         logs.push((
@@ -140,9 +113,7 @@ pub fn run_clang_format(
             source: e,
         }
     })?;
-    let input = InternedInput::new(original_contents.as_str(), patched_contents.as_str());
-    let mut diff = Diff::compute(gix_imara_diff::Algorithm::Histogram, &input);
-    diff.postprocess_lines(&input);
+    let (diff, _) = make_patch(&patched_contents, &original_contents);
     let format_advice = FormatAdvice {
         replacements: diff
             .hunks()
@@ -166,8 +137,88 @@ pub fn run_clang_format(
                 }
             })
             .collect(),
-        patched: cache_format_fixes,
     };
+
+    // if a clang-tidy patched file exists in cache,
+    // get the diff between it and the original file,
+    // then format both clang-tidy fixes and any other changes by clang-format fixes.
+    if let Some(patched_path) = &file.patched_path
+        && patched_path.exists()
+    {
+        let tidy_patch_contents =
+            fs::read_to_string(patched_path).map_err(|e| ClangCaptureError::ReadFileFailed {
+                file_name: patched_path.to_string_lossy().to_string(),
+                source: e,
+            })?;
+        let (tidy_diff, _) = make_patch(&tidy_patch_contents, &original_contents);
+        let mut cmd = Command::new(cmd_path);
+        cmd.current_dir(&cache_path);
+        // edit the clang-tody patched file in-place (`-i`)
+        cmd.args(["--style", &clang_params.style, "-i"]);
+        // if ranges is empty, then we're just formatting the entire file.
+        if !ranges.is_empty() {
+            // We're concerned about formatting what clang-tidy changed (tidy_diff.hunks().before),
+            // but we also want to include any clang-format changes that do not overlap clang-tidy fixes.
+            let mut joint_ranges = tidy_diff
+                .hunks()
+                // hunk is partially inclusive: [start, end),
+                // but clang-format expects fully inclusive line ranges.
+                // subtract 1 from hunk.before.end
+                .map(|hunk| {
+                    RangeInclusive::new(hunk.before.start, hunk.before.end.saturating_sub(1))
+                })
+                .collect::<Vec<_>>();
+            for range in &ranges {
+                let mut contained = false;
+                for hunk in tidy_diff.hunks() {
+                    if hunk.before.contains(range.start()) && hunk.before.contains(range.end()) {
+                        contained = true;
+                        break;
+                    }
+                }
+                if !contained {
+                    joint_ranges.push(range.clone());
+                }
+            }
+            for range in &joint_ranges {
+                cmd.arg(format!("--lines={}:{}", range.start(), range.end()).as_str());
+            }
+        }
+        cmd.arg(&file_name);
+        let output = cmd
+            .output()
+            .map_err(|e| ClangCaptureError::FailedToRunCommand {
+                task: format!("apply clang-format to clang-tidy fixes ({file_name})"),
+                source: e,
+            })?;
+        if !output.stderr.is_empty() || !output.status.success() {
+            logs.push((
+                log::Level::Debug,
+                format!(
+                    "clang-format raised the follow errors about clang-tidy fixes:\n{}",
+                    String::from_utf8_lossy(&output.stderr)
+                ),
+            ));
+        }
+    } else {
+        // clang-tidy was not run on this file,
+        // so just use the clang-format fixes as the patched content.
+        let cache_format_fixes = cache_path.join(&file.name);
+        fs::create_dir_all(
+            cache_format_fixes
+                .parent()
+                .ok_or(ClangCaptureError::UnknownCacheParentPath)?,
+        )
+        .map_err(ClangCaptureError::MkDirFailed)?;
+        fs::write(&cache_format_fixes, &output.stdout).map_err(|e| {
+            ClangCaptureError::WriteFileFailed {
+                file_name: cache_format_fixes.to_string_lossy().to_string(),
+                source: e,
+            }
+        })?;
+        file.patched_path = Some(cache_format_fixes);
+    }
+
     file.format_advice = Some(format_advice);
     Ok(logs)
 }
