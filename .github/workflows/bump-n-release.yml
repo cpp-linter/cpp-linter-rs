@@ -74,7 +74,7 @@ jobs:
           --no-default-features
           --features set-version
       - name: Install nushell
-        uses: hustcer/setup-nu@92c296ba1ba2ba04cc948ab64ddefe192dc13f0c # v3.23
+        uses: hustcer/setup-nu@ccd5bb5426b05a32009c2ba967946231f3919c97 # v3.25
       - name: Bump ${{ inputs.component }} version
         env:
           GITHUB_TOKEN: ${{ secrets.BUMP_N_RELEASE }}
@@ -93,7 +93,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Install nushell
-        uses: hustcer/setup-nu@92c296ba1ba2ba04cc948ab64ddefe192dc13f0c # v3.23
+        uses: hustcer/setup-nu@ccd5bb5426b05a32009c2ba967946231f3919c97 # v3.25
       - name: Get changed packages
         id: get-pkgs
         shell: nu {0}
@@ -124,7 +124,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - name: Install nushell
-        uses: hustcer/setup-nu@92c296ba1ba2ba04cc948ab64ddefe192dc13f0c # v3.23
+        uses: hustcer/setup-nu@ccd5bb5426b05a32009c2ba967946231f3919c97 # v3.25
       - name: Generate a release notes
         env:
           PKG: ${{ matrix.pkg }}
