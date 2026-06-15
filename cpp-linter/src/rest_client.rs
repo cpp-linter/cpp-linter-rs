@@ -2,7 +2,7 @@
 
 use std::{
     env,
-    path::{Path, PathBuf},
+    path::PathBuf,
     sync::{Arc, Mutex},
 };
 
@@ -69,7 +69,6 @@ impl RestClient {
         lines_changed_only: &LinesChangedOnly,
         base_diff: &Option<String>,
         ignore_index: bool,
-        repo_root: &Path,
     ) -> Result<Vec<FileObj>, ClientError> {
         let files = self
             .client
@@ -89,14 +88,7 @@ impl RestClient {
                     .map(|hunk| hunk.start..=hunk.end)
                     .collect();
                 let file_path = PathBuf::from(file_name);
-                FileObj::from(
-                    file_path
-                        .strip_prefix(repo_root)
-                        .map(PathBuf::from)
-                        .unwrap_or(file_path),
-                    diff_lines.added_lines.clone(),
-                    diff_chunks,
-                )
+                FileObj::from(file_path, diff_lines.added_lines.clone(), diff_chunks)
             })
             .collect())
     }

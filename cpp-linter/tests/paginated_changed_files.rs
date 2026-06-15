@@ -143,7 +143,6 @@ async fn get_paginated_changes(lib_root: &Path, tmp_dir: &TempDir, test_params: 
             &LinesChangedOnly::Off,
             &None::<String>,
             false,
-            tmp_dir.path(),
         )
         .await;
     match files {
