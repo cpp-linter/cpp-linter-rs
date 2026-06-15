@@ -138,12 +138,7 @@ async fn get_paginated_changes(lib_root: &Path, tmp_dir: &TempDir, test_params: 
 
     let file_filter = FileFilter::new(&[], &["cpp", "hpp"], None);
     let files = client
-        .get_list_of_changed_files(
-            &file_filter,
-            &LinesChangedOnly::Off,
-            &None::<String>,
-            false,
-        )
+        .get_list_of_changed_files(&file_filter, &LinesChangedOnly::Off, &None::<String>, false)
         .await;
     match files {
         Err(e) => {
