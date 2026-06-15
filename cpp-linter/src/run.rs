@@ -82,7 +82,8 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
             .collect::<Vec<&str>>(),
         None,
     );
-    file_filter.parse_submodules();
+    let gitmodules = cli.source_options.repo_root.join(".gitmodules");
+    file_filter.parse_submodules(Some(gitmodules.as_path()));
     if let Some(files) = &cli.not_ignored {
         file_filter.not_ignored.extend(files.clone());
     }
@@ -101,7 +102,6 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
     }
 
     rest_api_client.start_log_group("Get list of specified source files");
-    let repo_root_path = PathBuf::from(&cli.source_options.repo_root);
     let files = if !matches!(cli.source_options.lines_changed_only, LinesChangedOnly::Off)
         || cli.source_options.files_changed_only
     {
@@ -112,7 +112,6 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
                 &cli.source_options.lines_changed_only.clone().into(),
                 &cli.source_options.diff_base,
                 cli.source_options.ignore_index,
-                &repo_root_path,
             )
             .await?
     } else {
@@ -122,12 +121,7 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
             .into_iter()
             .map(|file_name| {
                 let file_path = PathBuf::from(&file_name);
-                FileObj::new(
-                    file_path
-                        .strip_prefix(&repo_root_path)
-                        .map(PathBuf::from)
-                        .unwrap_or(file_path),
-                )
+                FileObj::new(file_path)
             })
             .collect();
         if is_pr && (cli.feedback_options.tidy_review || cli.feedback_options.format_review) {
@@ -137,7 +131,6 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
                     &LinesChangedOnly::Off.into(),
                     &cli.source_options.diff_base,
                     cli.source_options.ignore_index,
-                    &repo_root_path,
                 )
                 .await?;
             for changed_file in changed_files {
