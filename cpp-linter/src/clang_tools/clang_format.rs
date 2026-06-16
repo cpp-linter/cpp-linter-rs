@@ -227,7 +227,21 @@ pub fn run_clang_format(
 mod tests {
     #![allow(clippy::unwrap_used)]
 
-    use super::summarize_style;
+    use std::{
+        env, fs,
+        path::PathBuf,
+        str::FromStr,
+        sync::{Arc, Mutex},
+    };
+
+    use clang_tools_manager::RequestedVersion;
+
+    use super::{run_clang_format, summarize_style};
+    use crate::{
+        clang_tools::ClangTool,
+        cli::{ClangParams, LinesChangedOnly},
+        common_fs::FileObj,
+    };
 
     fn formalize_style(style: &str, expected: &str) {
         assert_eq!(summarize_style(style), expected);
@@ -246,5 +260,169 @@ mod tests {
     #[test]
     fn formalize_custom_style() {
         formalize_style("file", "Custom");
+    }
+
+    fn get_clang_format_exe() -> PathBuf {
+        ClangTool::ClangFormat
+            .get_exe_path(
+                &RequestedVersion::from_str(
+                    env::var("CLANG_VERSION").unwrap_or_default().as_str(),
+                )
+                .unwrap(),
+            )
+            .unwrap()
+    }
+
+    /// Case 1: Only clang-format runs (no prior clang-tidy patch).
+    ///
+    /// Verifies that `run_clang_format` caches the format fixes and sets
+    /// `file.patched_path` when clang-tidy was not run on the file.
+    #[test]
+    fn format_only_sets_patched_path() {
+        let exe_path = get_clang_format_exe();
+        let tmp_workspace = crate::test_common::setup_tmp_workspace();
+        let file = FileObj::new(PathBuf::from("demo/demo.cpp"));
+        let arc_file = Arc::new(Mutex::new(file));
+        let clang_params = ClangParams {
+            // Use LLVM style directly (no .clang-format lookup needed)
+            style: "llvm".to_string(),
+            lines_changed_only: LinesChangedOnly::Off,
+            clang_format_command: Some(exe_path),
+            repo_root: tmp_workspace.path().to_path_buf(),
+            ..Default::default()
+        };
+        fs::create_dir_all(clang_params.get_cache_path()).unwrap();
+        let mut file_lock = arc_file.lock().unwrap();
+
+        // patched_path is not set before running clang-format
+        assert!(file_lock.patched_path.is_none());
+
+        run_clang_format(&mut file_lock, &clang_params).unwrap();
+
+        // demo/demo.cpp has formatting issues, so clang-format should produce fixes
+        let advice = file_lock.format_advice.as_ref().unwrap();
+        assert!(
+            !advice.replacements.is_empty(),
+            "expected clang-format to report replacements for demo.cpp"
+        );
+        // patched_path should now be set to the cached format output
+        let patched_path = file_lock
+            .patched_path
+            .as_ref()
+            .expect("expected patched_path to be set after format-only run");
+        assert!(
+            patched_path.exists(),
+            "expected cached format file to exist at {patched_path:?}"
+        );
+        let expected_cache = clang_params
+            .get_cache_path()
+            .join("demo/demo.cpp");
+        assert_eq!(patched_path, &expected_cache);
+    }
+
+    /// Case 2: clang-format runs after clang-tidy (patched_path already exists).
+    ///
+    /// Verifies that when a clang-tidy patch is already cached, `run_clang_format`
+    /// applies formatting in-place to the cached tidy-patched file rather than
+    /// creating a new cache entry.
+    #[test]
+    fn format_after_tidy_formats_tidy_patch_in_place() {
+        let exe_path = get_clang_format_exe();
+        let tmp_workspace = crate::test_common::setup_tmp_workspace();
+        // Simulate clang-tidy having run: copy demo.cpp (unformatted) into cache
+        // as if tidy patched it but left it still needing clang-format fixes.
+        let cache_path = tmp_workspace
+            .path()
+            .join(ClangParams::CACHE_DIR)
+            .join("patched");
+        let tidy_cached_file = cache_path.join("demo/demo.cpp");
+        fs::create_dir_all(tidy_cached_file.parent().unwrap()).unwrap();
+        // Use the original (unformatted) file content to simulate a tidy patch
+        // that hasn't been formatted yet.
+        let original =
+            fs::read_to_string(tmp_workspace.path().join("demo/demo.cpp")).unwrap();
+        fs::write(&tidy_cached_file, &original).unwrap();
+
+        let file = FileObj {
+            patched_path: Some(tidy_cached_file.clone()),
+            ..FileObj::new(PathBuf::from("demo/demo.cpp"))
+        };
+        let arc_file = Arc::new(Mutex::new(file));
+        let clang_params = ClangParams {
+            // Use LLVM style directly (no .clang-format lookup needed)
+            style: "llvm".to_string(),
+            lines_changed_only: LinesChangedOnly::Off,
+            clang_format_command: Some(exe_path),
+            repo_root: tmp_workspace.path().to_path_buf(),
+            ..Default::default()
+        };
+
+        let mut file_lock = arc_file.lock().unwrap();
+        run_clang_format(&mut file_lock, &clang_params).unwrap();
+
+        // patched_path should remain pointing to the same tidy cache file
+        let patched_path = file_lock
+            .patched_path
+            .as_ref()
+            .expect("expected patched_path to remain set");
+        assert_eq!(
+            patched_path, &tidy_cached_file,
+            "patched_path should still point to the tidy cache file"
+        );
+        // The tidy-cached file should have been formatted in-place and now
+        // differ from the original unformatted content.
+        let formatted = fs::read_to_string(&tidy_cached_file).unwrap();
+        assert_ne!(
+            formatted, original,
+            "expected clang-format to modify the tidy-cached file in-place"
+        );
+    }
+
+    /// Case 3: Only clang-tidy runs (no clang-format step).
+    ///
+    /// Verifies that `run_clang_tidy` sets `file.patched_path` to the cached tidy
+    /// output and that the cache file exists, ready for an optional clang-format pass.
+    #[test]
+    fn tidy_only_sets_patched_path() {
+        use crate::clang_tools::clang_tidy::run_clang_tidy;
+
+        let exe_path = ClangTool::ClangTidy
+            .get_exe_path(
+                &RequestedVersion::from_str(
+                    env::var("CLANG_VERSION").unwrap_or_default().as_str(),
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        let tmp_workspace = crate::test_common::setup_tmp_workspace();
+        let file = FileObj::new(PathBuf::from("demo/demo.cpp"));
+        let arc_file = Arc::new(Mutex::new(file));
+        let clang_params = ClangParams {
+            style: "llvm".to_string(),
+            tidy_checks: "".to_string(), // use .clang-tidy config file
+            lines_changed_only: LinesChangedOnly::Off,
+            clang_tidy_command: Some(exe_path),
+            repo_root: tmp_workspace.path().to_path_buf(),
+            ..Default::default()
+        };
+        fs::create_dir_all(clang_params.get_cache_path()).unwrap();
+        let mut file_lock = arc_file.lock().unwrap();
+
+        // patched_path is not set before running clang-tidy
+        assert!(file_lock.patched_path.is_none());
+
+        run_clang_tidy(&mut file_lock, &clang_params).unwrap();
+
+        // After running clang-tidy, patched_path should be set
+        let patched_path = file_lock
+            .patched_path
+            .as_ref()
+            .expect("expected patched_path to be set after tidy-only run");
+        assert!(
+            patched_path.exists(),
+            "expected cached tidy file to exist at {patched_path:?}"
+        );
+        let expected_cache = clang_params.get_cache_path().join("demo/demo.cpp");
+        assert_eq!(patched_path, &expected_cache);
     }
 }
