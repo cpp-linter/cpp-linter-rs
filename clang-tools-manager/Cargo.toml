@@ -21,7 +21,7 @@ required-features = ["bin"]
 [dependencies]
 anyhow = { workspace = true, optional = true }
 blake2 = "0.10.6"
-clap = { workspace = true, features = ["derive"], optional = true }
+clap = { workspace = true, features = ["derive", "env"], optional = true }
 colored = { workspace = true, optional = true }
 directories = "6.0.0"
 log = { workspace = true }

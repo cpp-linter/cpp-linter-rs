@@ -172,6 +172,12 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
         &cli.general_options.version,
         clang_params,
         &rest_api_client,
+        if cli.general_options.no_mod_sys {
+            false // explicitly false
+        } else {
+            cli.general_options.mod_sys // explicitly true
+                || env::var("CI").is_ok_and(|v| ["true", "on", "1"].contains(&v.to_lowercase().as_str())) // implicitly true in CI environments
+        },
     )
     .await?;
     rest_api_client.start_log_group("Posting feedback");

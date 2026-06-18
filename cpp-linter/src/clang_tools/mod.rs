@@ -94,13 +94,19 @@ pub struct ClangVersions {
 
 /// Runs clang-tidy and/or clang-format and returns the version used for each.
 ///
-/// If `tidy_checks` is `"-*"` then clang-tidy is not executed.
-/// If `style` is a blank string (`""`), then clang-format is not executed.
+/// If [`ClangParams::tidy_checks`] is `"-*"` then clang-tidy is not executed.
+/// If [`ClangParams::style`] is a blank string (`""`), then clang-format is not executed.
+///
+/// The `modify_system` parameter controls whether or not to use a systems' available
+/// package managers when installing the specified `version` of clang tools.
+///
+/// The provided `rest_api_client` is only used for consistent logging messages.
 pub async fn capture_clang_tools_output(
     files: &[Arc<Mutex<FileObj>>],
     version: &RequestedVersion,
     mut clang_params: ClangParams,
     rest_api_client: &RestClient,
+    modify_system: bool,
 ) -> Result<ClangVersions, ClangTaskError> {
     let mut clang_versions = ClangVersions::default();
     // find the executable paths for clang-tidy and/or clang-format and show version
@@ -108,7 +114,7 @@ pub async fn capture_clang_tools_output(
     if clang_params.tidy_checks != "-*" {
         let tool = ClangTool::ClangTidy;
         let tool_info = version
-            .eval_tool(&tool, false, None)
+            .eval_tool(&tool, false, None, modify_system)
             .await?
             .ok_or(ClangTaskError::FindToolError(tool.as_str()))?;
         log::info!(
@@ -123,7 +129,7 @@ pub async fn capture_clang_tools_output(
     if !clang_params.style.is_empty() {
         let tool = ClangTool::ClangFormat;
         let tool_info = version
-            .eval_tool(&tool, false, None)
+            .eval_tool(&tool, false, None, modify_system)
             .await?
             .ok_or(ClangTaskError::FindToolError(tool.as_str()))?;
         log::info!(
@@ -378,7 +384,7 @@ mod tests {
         let rest_client = RestClient::new().unwrap();
         #[cfg(feature = "bin")]
         try_init();
-        capture_clang_tools_output(&[], &version, clang_params, &rest_client).await
+        capture_clang_tools_output(&[], &version, clang_params, &rest_client, false).await
     }
 
     #[tokio::test]
