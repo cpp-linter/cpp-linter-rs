@@ -266,6 +266,10 @@ impl ReviewComments {
             );
         }
         if !summary_only && total_review_comments != self.tool_total {
+            log::info!(
+                "Only {total_review_comments} out of {} concerns fit within this pull request's diff.",
+                self.tool_total
+            );
             body.push_str(
                 format!(
                     "\nOnly {total_review_comments} out of {} concerns fit within this pull request's diff.\n",
@@ -276,12 +280,12 @@ impl ReviewComments {
         }
         // total number of comments can only go down after culling comments found in previous reviews.
         if total_review_comments > total {
+            let dupes = total_review_comments - total;
+            log::info!(
+                "Found and removed {dupes} concerns that were duplicates of previous reviews."
+            );
             body.push_str(
-                format!(
-                    "\n{} suggestions were duplicates of previous reviews.\n",
-                    total_review_comments - total,
-                )
-                .as_str(),
+                format!("\n{dupes} suggestions were duplicates of previous reviews.\n").as_str(),
             );
         }
         // The `full_patch` includes all suggestions that didn't fit in the diff.
@@ -313,6 +317,7 @@ impl ReviewComments {
             }
         } else if total_review_comments == 0 {
             // Only congratulate if there was no reused comments
+            log::info!("No concerns to report: LGTM");
             body.push_str("\nNo concerns to report. Great job! :tada:\n");
         }
         body.push_str(USER_OUTREACH);
@@ -391,6 +396,11 @@ mod tests {
 
     const PSEUDO_VERSION: Version = Version::new(15, 0, 0);
 
+    /// This test simulates removed suggestions that were reused in other PR reviews.
+    ///
+    /// We do this as a arbitrary unit test because different clang tools versions
+    /// produce different suggestions, which makes any attempt in integrations tests
+    /// rather non-deterministic.
     #[test]
     fn summarize_reused_reviews() {
         let comments = vec![ReviewComment {
@@ -411,6 +421,11 @@ mod tests {
             total_review_comments,
             summary_only,
         );
+        #[cfg(feature = "bin")]
+        {
+            crate::logger::try_init();
+            log::set_max_level(log::LevelFilter::Info);
+        }
         assert!(review_summary.contains("suggestions were duplicates of previous reviews"));
     }
 
