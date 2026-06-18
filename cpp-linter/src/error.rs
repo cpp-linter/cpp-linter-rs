@@ -13,6 +13,10 @@ pub enum FileObjError {
     /// Error when failing to convert a file's contents to a UTF-8 string.
     #[error("Failed to convert patch buffer to UTF-8 string for file {0}: {1}")]
     FromUtf8Error(String, #[source] std::string::FromUtf8Error),
+
+    /// Error when failing to generate a patch for a file.
+    #[error("Failed to print a hunk to a string buffer: {0}")]
+    DisplayStringFailed(#[source] std::fmt::Error),
 }
 
 /// Errors related to the REST client used for posting feedback and special logging.

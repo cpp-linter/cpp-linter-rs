@@ -215,8 +215,9 @@ impl RestClient {
                 ..Default::default()
             };
 
+            let total_review_comments = options.comments.len() as u32;
             self.client.cull_pr_reviews(&mut options).await?;
-            let has_changes = review_comments.full_patch.iter().any(|p| !p.is_empty());
+            let has_changes = review_comments.tool_total > 0;
             options.action = if feedback_inputs.passive_reviews {
                 ReviewAction::Comment
             } else if options.comments.is_empty() && !has_changes {
@@ -224,7 +225,12 @@ impl RestClient {
             } else {
                 ReviewAction::RequestChanges
             };
-            options.summary = review_comments.summarize(&clang_versions, &options.comments);
+            options.summary = review_comments.summarize(
+                &clang_versions,
+                &options.comments,
+                total_review_comments,
+                summary_only,
+            );
             self.client.post_pr_review(&options).await?;
         }
         Ok(format_checks_failed + tidy_checks_failed)
@@ -521,14 +527,10 @@ mod test {
                     suggestion: vec![],
                     fixed_lines: vec![],
                 }];
-                file.tidy_advice = Some(TidyAdvice {
-                    notes,
-                    patched: PathBuf::new(),
-                });
+                file.tidy_advice = Some(TidyAdvice { notes });
                 file.format_advice = Some(FormatAdvice {
                     #[allow(clippy::single_range_in_vec_init)]
                     replacements: vec![1..=2],
-                    patched: PathBuf::new(),
                 });
                 files.push(Arc::new(Mutex::new(file)));
             }

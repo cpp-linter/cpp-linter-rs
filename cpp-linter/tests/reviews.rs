@@ -59,17 +59,6 @@ impl Default for TestParams {
     }
 }
 
-fn generate_tool_summary(review_enabled: bool, force_lgtm: bool, tool_name: &str) -> String {
-    if !review_enabled {
-        return String::new();
-    }
-    if force_lgtm {
-        format!("No concerns reported by {}. Great job! :tada:", tool_name)
-    } else {
-        format!("Click here for the full {} patch", tool_name)
-    }
-}
-
 async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
     let mut event_payload_path = NamedTempFile::new_in("./").unwrap();
     let event_payload = if test_params.bad_pr_info {
@@ -185,18 +174,22 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
         } else {
             "REQUEST_CHANGES"
         };
-        let tidy_summary = generate_tool_summary(
-            test_params.tidy_review,
-            test_params.force_lgtm,
-            "clang-tidy",
-        );
-        let format_summary = generate_tool_summary(
-            test_params.format_review,
-            test_params.force_lgtm,
-            "clang-format",
-        );
+        let tool_summary = {
+            if !(test_params.format_review || test_params.tidy_review)
+                || test_params.lines_changed_only == LinesChangedOnly::On
+            {
+                // results can be non-deterministic because different clang-versions output different diagnostic/changes
+                ".*" // match anything
+            } else if test_params.force_lgtm {
+                ".*No concerns to report. Great job! :tada:.*"
+            } else if test_params.summary_only {
+                ".*Click here for the full patch of fixes.*"
+            } else {
+                ".*Click here for a patch of fixes outside the diff.*"
+            }
+        };
         let review_summary = format!(
-            "{}## Cpp-linter Review.*{format_summary}.*{tidy_summary}.*{}",
+            "{}## Cpp-linter Review{tool_summary}{}",
             regex::escape(format!("{}", COMMENT_MARKER.escape_default()).as_str()),
             regex::escape(format!("{}", USER_OUTREACH.escape_default()).as_str()),
         );

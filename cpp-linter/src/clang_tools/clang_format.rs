@@ -4,36 +4,23 @@
 use std::{
     fs,
     ops::RangeInclusive,
-    path::PathBuf,
     process::Command,
     sync::{Arc, Mutex, MutexGuard},
 };
 
-use gix_imara_diff::{Diff, InternedInput};
+use gix_imara_diff::Diff;
 use log::Level;
 
 // project-specific crates/modules
-use super::{CACHE_DIR, MakeSuggestions};
-use crate::{cli::ClangParams, common_fs::FileObj, error::ClangCaptureError};
+use crate::{
+    clang_tools::make_patch, cli::ClangParams, common_fs::FileObj, error::ClangCaptureError,
+};
 
 /// A struct to hold clang-format advice for a single file.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct FormatAdvice {
     /// A list of line ranges that clang-format wants to replace.
     pub replacements: Vec<RangeInclusive<u32>>,
-
-    /// A path to a cached file containing the full contents of the file after applying clang-format fixes.
-    pub patched: PathBuf,
-}
-
-impl MakeSuggestions for FormatAdvice {
-    fn get_suggestion_help(&self, _start_line: u32, _end_line: u32) -> String {
-        String::from("### clang-format suggestions\n")
-    }
-
-    fn get_tool_name(&self) -> String {
-        "clang-format".to_string()
-    }
 }
 
 /// Get a string that summarizes the given `--style`
@@ -82,14 +69,7 @@ pub fn run_clang_format(
     for range in &ranges {
         cmd.arg(format!("--lines={}:{}", range.start(), range.end()));
     }
-    let cache_path = clang_params.repo_root.join(CACHE_DIR).join("patches");
-    let cache_format_fixes = cache_path.join(file.name.with_added_extension("format"));
-    fs::create_dir_all(
-        cache_format_fixes
-            .parent()
-            .ok_or(ClangCaptureError::UnknownCacheParentPath)?,
-    )
-    .map_err(ClangCaptureError::MkDirFailed)?;
+    let cache_path = clang_params.get_cache_path();
     let file_name = file.name.to_string_lossy().to_string();
     cmd.arg(file.name.to_path_buf().as_os_str());
     logs.push((
@@ -109,12 +89,6 @@ pub fn run_clang_format(
             task: format!("get fixes from clang-format {file_name}"),
             source: e,
         })?;
-    fs::write(&cache_format_fixes, &output.stdout).map_err(|e| {
-        ClangCaptureError::WriteFileFailed {
-            file_name: cache_format_fixes.to_string_lossy().to_string(),
-            source: e,
-        }
-    })?;
 
     if !output.stderr.is_empty() || !output.status.success() {
         logs.push((
@@ -140,9 +114,7 @@ pub fn run_clang_format(
             source: e,
         }
     })?;
-    let input = InternedInput::new(original_contents.as_str(), patched_contents.as_str());
-    let mut diff = Diff::compute(gix_imara_diff::Algorithm::Histogram, &input);
-    diff.postprocess_lines(&input);
+    let (diff, _) = make_patch(&patched_contents, &original_contents);
     let format_advice = FormatAdvice {
         replacements: diff
             .hunks()
@@ -166,17 +138,184 @@ pub fn run_clang_format(
                 }
             })
             .collect(),
-        patched: cache_format_fixes,
     };
+
+    // if a clang-tidy patched file exists in cache,
+    // get the diff between it and the original file,
+    // then format both clang-tidy fixes and any other changes by clang-format fixes.
+    if let Some(patched_path) = &file.patched_path
+        && patched_path.exists()
+    {
+        let mut cmd = Command::new(cmd_path);
+        cmd.current_dir(&cache_path);
+        // edit the clang-tody patched file in-place (`-i`)
+        cmd.args(["--style", &clang_params.style, "-i"]);
+        // if ranges is empty, then we're just formatting the entire file.
+        if !ranges.is_empty() {
+            let tidy_patch_contents = fs::read_to_string(patched_path).map_err(|e| {
+                ClangCaptureError::ReadFileFailed {
+                    file_name: patched_path.to_string_lossy().to_string(),
+                    source: e,
+                }
+            })?;
+            let (tidy_diff, _) = make_patch(&tidy_patch_contents, &original_contents);
+            let joint_ranges = three_way_diff(&ranges, tidy_diff);
+            for range in &joint_ranges {
+                cmd.arg(format!("--lines={}:{}", range.start(), range.end()).as_str());
+            }
+        }
+        cmd.arg(&file_name);
+        let output = cmd
+            .output()
+            .map_err(|e| ClangCaptureError::FailedToRunCommand {
+                task: format!("apply clang-format to clang-tidy fixes ({file_name})"),
+                source: e,
+            })?;
+        if !output.stderr.is_empty() || !output.status.success() {
+            logs.push((
+                log::Level::Debug,
+                format!(
+                    "clang-format raised the follow errors about clang-tidy fixes:\n{}",
+                    String::from_utf8_lossy(&output.stderr)
+                ),
+            ));
+        }
+    } else {
+        // clang-tidy was not run on this file,
+        // so just use the clang-format fixes as the patched content.
+        let cache_format_fixes = cache_path.join(&file.name);
+        fs::create_dir_all(
+            cache_format_fixes
+                .parent()
+                .ok_or(ClangCaptureError::UnknownCacheParentPath)?,
+        )
+        .map_err(ClangCaptureError::MkDirFailed)?;
+        fs::write(&cache_format_fixes, &output.stdout).map_err(|e| {
+            ClangCaptureError::WriteFileFailed {
+                file_name: cache_format_fixes.to_string_lossy().to_string(),
+                source: e,
+            }
+        })?;
+        file.patched_path = Some(cache_format_fixes);
+    }
+
     file.format_advice = Some(format_advice);
     Ok(logs)
+}
+
+/// Essentially does a three way diff without the original source that generated the given `ranges` (simplified hunks).
+///
+/// The returned list of ranges are lines that need formatting in the clang-tidy patched file,
+/// provided by the `tidy_diff`. The given `ranges` are the line numbers in the original file
+/// that clang-tidy patched.
+fn three_way_diff(ranges: &[RangeInclusive<u32>], tidy_diff: Diff) -> Vec<RangeInclusive<u32>> {
+    // We're concerned about the formatting cases:
+    //
+    // 1. changes that clang-tidy made: `tidy_diff.hunks().after`
+    // 2. changes in the current CI event's diff (`ranges`)
+    //    that clang-tidy did not touch (`tidy_diff.hunks().before`)
+    // 3. changes that do not overlap clang-tidy fixes: `ranges` - `tidy_diff.hunks().before`
+    // 4. changes that overlap with clang-tidy fixes. This one is complex because
+    //    - tidy fixes can prefix an og range
+    //    - tidy fixes can suffix an og range
+    //    - tidy fixes can be contained within an og range
+    //    - multiple tidy fixes can (in order) suffix, be contained within, and prefix an og range
+    let mut joint_ranges = vec![];
+    let mut tidy_iter = tidy_diff.hunks().peekable();
+    let mut line_shift = 0i32;
+
+    /// Prevent pure removals from causing invalid inclusive ranges.
+    fn maybe_push_range(joint_ranges: &mut Vec<RangeInclusive<u32>>, start: u32, end: u32) {
+        if start <= end {
+            joint_ranges.push(RangeInclusive::new(start, end));
+        }
+    }
+
+    for og_range in ranges {
+        let og_start = *og_range.start();
+        let og_end = *og_range.end();
+
+        // track the start and end of a merged range that gets pushed into joint_ranges.
+        let mut merged_start = (og_start as i32 + line_shift) as u32;
+        let mut merged_end = (og_end as i32 + line_shift) as u32;
+
+        while let Some(tidy_hunk) = tidy_iter.peek() {
+            // alias for readability and prevent some repeated calculations
+            let before_start = tidy_hunk.before.start;
+            let before_end = tidy_hunk.before.end.saturating_sub(1);
+            let after_start = tidy_hunk.after.start;
+            let after_end = tidy_hunk.after.end.saturating_sub(1);
+            let delta = tidy_hunk.after.len() as i32 - tidy_hunk.before.len() as i32;
+
+            // The tidy hunk is a pure removal that exactly matches the og range.
+            if tidy_hunk.is_pure_removal() && before_start == og_start && before_end == og_end {
+                // Skip the og range and tidy hunk entirely.
+                // The line shift must still be adjusted for the pure removal though
+                line_shift += delta;
+                merged_end = 0; // causes invalid inclusive range which does not get pushed.
+                tidy_iter.next(); // skip this tidy hunk
+                break; // skip og range and iterate to the next one.
+            }
+
+            // tidy hunk is before the og range.
+            if before_end < og_start {
+                maybe_push_range(&mut joint_ranges, after_start, after_end);
+                line_shift += delta;
+                tidy_iter.next();
+                continue;
+            }
+
+            // tidy hunk is after the og range.
+            if before_start > og_end {
+                // handle the og range before iterating the next tidy hunk
+                break;
+            }
+
+            // tidy hunk overlaps with the og range in some way (case 4).
+            if tidy_hunk.before.contains(&og_start) {
+                merged_start = after_start;
+            }
+
+            // commit the line shift now that the tidy hunk start is checked.
+            line_shift += delta;
+
+            // tidy hunk suffixes the og range.
+            if tidy_hunk.before.contains(&og_end) {
+                merged_end = after_end;
+                tidy_iter.next(); // this tidy hunk is handled.
+                break; // break from loop to push the merged range into joint_ranges.
+            }
+
+            // tidy hunk is contained within the og range.
+            // so adjust the og range end accordingly and continue iterating tidy hunks
+            merged_end = (og_end as i32 + line_shift) as u32;
+            tidy_iter.next();
+        }
+
+        maybe_push_range(&mut joint_ranges, merged_start, merged_end);
+    }
+
+    // handle any remaining tidy hunks that are after all og ranges.
+    for tidy_hunk in tidy_iter {
+        maybe_push_range(
+            &mut joint_ranges,
+            tidy_hunk.after.start,
+            tidy_hunk.after.end.saturating_sub(1),
+        );
+    }
+
+    joint_ranges
 }
 
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used)]
 
-    use super::summarize_style;
+    use std::ops::RangeInclusive;
+
+    use gix_imara_diff::{Diff, InternedInput};
+
+    use super::{summarize_style, three_way_diff};
 
     fn formalize_style(style: &str, expected: &str) {
         assert_eq!(summarize_style(style), expected);
@@ -195,5 +334,43 @@ mod tests {
     #[test]
     fn formalize_custom_style() {
         formalize_style("file", "Custom");
+    }
+
+    #[test]
+    fn three_way_diff_mixed() {
+        const OG_SRC: &str =
+            "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10\nline11";
+        // TIDY_SRC replaces line3->StringA (hunk before=2..3) and
+        // line8+line9+line10->StringB+StringC (hunk before=7..10), then appends StringE.
+        // The second hunk's before=7..10 contains og_end=9 but not og_start=6,
+        // which exercises the "tidy hunk suffixes og range" branch.
+        const TIDY_SRC: &str =
+            "line1\nline2\nStringA\nline4\nline5\nline6\nline7\nStringB\nStringC\nline11\nStringE";
+        let input = InternedInput::new(OG_SRC, TIDY_SRC);
+        let mut tidy_diff = Diff::compute(gix_imara_diff::Algorithm::Histogram, &input);
+        tidy_diff.postprocess_lines(&input);
+        let ranges = vec![RangeInclusive::new(2, 4), RangeInclusive::new(6, 9)];
+        println!("tidy diff: {tidy_diff:#?}\ncompared to og ranges: {ranges:?}");
+        let joint_ranges = three_way_diff(&ranges, tidy_diff);
+        println!("joint ranges: {joint_ranges:#?}");
+        assert_eq!(joint_ranges, vec![2..=4, 6..=10]);
+    }
+
+    #[test]
+    fn three_way_diff_separated() {
+        const OG_SRC: &str =
+            "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10\nline11";
+        // TIDY_SRC removes "line3" (index 2) which decrements offsets in ranges[5,8] and removes ranges[2,2].
+        // TIDY_SRC appends StringE, which handles remaining tidy hunks after done iterating ranges
+        const TIDY_SRC: &str =
+            "line1\nline2\nline4\nline5\nline6\nline7\nline8\nline9\nline10\nline11\nStringE";
+        let input = InternedInput::new(OG_SRC, TIDY_SRC);
+        let mut tidy_diff = Diff::compute(gix_imara_diff::Algorithm::Histogram, &input);
+        tidy_diff.postprocess_lines(&input);
+        let ranges = vec![2..=2, 5..=8];
+        println!("tidy diff: {tidy_diff:#?}\ncompared to og ranges: {ranges:?}");
+        let joint_ranges = three_way_diff(&ranges, tidy_diff);
+        println!("joint ranges: {joint_ranges:#?}");
+        assert_eq!(joint_ranges, vec![4..=7, 9..=10]);
     }
 }

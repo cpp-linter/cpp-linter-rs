@@ -230,6 +230,14 @@ pub struct ClangParams {
     pub repo_root: PathBuf,
 }
 
+impl ClangParams {
+    /// The directory name to use for caching clang-tidy and clang-format results.
+    pub(crate) const CACHE_DIR: &str = ".cpp-linter-cache";
+    pub(crate) fn get_cache_path(&self) -> PathBuf {
+        self.repo_root.join(Self::CACHE_DIR).join("patched")
+    }
+}
+
 #[cfg(feature = "bin")]
 impl From<&Cli> for ClangParams {
     /// Construct a [`ClangParams`] instance from a [`Cli`] instance.
