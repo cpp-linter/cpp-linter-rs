@@ -415,17 +415,17 @@ mod tests {
         };
         let total_review_comments = 2;
         let summary_only = false;
+        #[cfg(feature = "bin")]
+        {
+            crate::logger::try_init();
+            log::set_max_level(log::LevelFilter::Info);
+        }
         let review_summary = ReviewComments::default().summarize(
             &clang_versions,
             &comments,
             total_review_comments,
             summary_only,
         );
-        #[cfg(feature = "bin")]
-        {
-            crate::logger::try_init();
-            log::set_max_level(log::LevelFilter::Info);
-        }
         assert!(review_summary.contains("suggestions were duplicates of previous reviews"));
     }
 
