@@ -250,6 +250,7 @@ impl ReviewComments {
         ];
         for (tool_name, tool_version) in versions {
             if let Some(ver) = tool_version {
+                // If a tool was used, then we know it's version at this point.
                 body.push_str(format!("### Used {tool_name} v{ver}\n").as_str());
             }
         }
@@ -286,19 +287,29 @@ impl ReviewComments {
         // The `full_patch` includes all suggestions that didn't fit in the diff.
         // It can also contain suggestions that were duplicates of previous reviews.
         if !self.full_patch.is_empty() {
-            body.push_str("\n<details><summary>Click here for ");
+            let current_len = body.len() + USER_OUTREACH.len();
+            let mut patch_prefix = "\n<details><summary>Click here for ".to_string();
             if summary_only {
-                body.push_str("the full patch of fixes");
+                patch_prefix.push_str("the full patch of fixes");
             } else {
-                body.push_str("a patch of fixes outside the diff");
+                patch_prefix.push_str("a patch of fixes outside the diff");
             }
-            body.push_str(
-                format!(
-                    "</summary><p>\n\n```diff\n{}```\n\n</p></details>\n",
-                    self.full_patch
-                )
-                .as_str(),
-            );
+            patch_prefix.push_str("</summary><p>\n\n```diff\n");
+            let patch_suffix = "```\n\n</p></details>\n";
+
+            if (current_len + patch_prefix.len() + self.full_patch.len() + patch_suffix.len())
+                > u16::MAX as usize
+            {
+                log::warn!(
+                    "\nThe full patch of fixes is too large to include in the review summary.\n"
+                );
+                body.push_str(
+                    "\nThe full patch of fixes is too large to include in this summary.\n",
+                );
+            } else {
+                body.push_str(&patch_prefix);
+                body.push_str(self.full_patch.as_str());
+            }
         } else if total_review_comments == 0 {
             // Only congratulate if there was no reused comments
             body.push_str("\nNo concerns to report. Great job! :tada:\n");
@@ -377,6 +388,8 @@ mod tests {
         test_db_parse(tmp_dir.path()).await.unwrap();
     }
 
+    const PSEUDO_VERSION: Version = Version::new(15, 0, 0);
+
     #[test]
     fn summarize_reused_reviews() {
         let comments = vec![ReviewComment {
@@ -385,10 +398,9 @@ mod tests {
             comment: "First comment".to_string(),
             path: "src/demo.cpp".to_string(),
         }];
-        let pseudo_version = Version::new(15, 0, 0);
         let clang_versions = ClangVersions {
-            format_version: Some(pseudo_version.clone()),
-            tidy_version: Some(pseudo_version),
+            format_version: Some(PSEUDO_VERSION.clone()),
+            tidy_version: Some(PSEUDO_VERSION),
         };
         let total_review_comments = 2;
         let summary_only = false;
@@ -399,5 +411,36 @@ mod tests {
             summary_only,
         );
         assert!(review_summary.contains("suggestions were duplicates of previous reviews"));
+    }
+
+    #[test]
+    fn summary_len_truncated() {
+        let comments = vec![ReviewComment {
+            line_start: Some(1),
+            line_end: 1,
+            comment: "First comment".to_string(),
+            path: "src/demo.cpp".to_string(),
+        }];
+        let clang_versions = ClangVersions {
+            format_version: Some(PSEUDO_VERSION.clone()),
+            tidy_version: Some(PSEUDO_VERSION),
+        };
+        let total_review_comments = 2;
+        let summary_only = false;
+        let long_patch = "a".repeat(u16::MAX as usize);
+        let review_summary = ReviewComments {
+            full_patch: long_patch,
+            ..Default::default()
+        }
+        .summarize(
+            &clang_versions,
+            &comments,
+            total_review_comments,
+            summary_only,
+        );
+        assert!(
+            review_summary
+                .contains("The full patch of fixes is too large to include in this summary.")
+        );
     }
 }
