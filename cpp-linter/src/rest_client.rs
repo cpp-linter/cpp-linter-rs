@@ -156,13 +156,13 @@ impl RestClient {
 
         if feedback_inputs.thread_comments != ThreadComments::Off {
             // post thread comment for PR or push event
-            if comment.as_ref().is_none_or(|c| c.len() > 65535) {
+            if comment.as_ref().is_none_or(|c| c.len() > u16::MAX as usize) {
                 comment = Some(Self::make_comment(
                     files,
                     format_checks_failed,
                     tidy_checks_failed,
                     &clang_versions,
-                    Some(65535),
+                    Some(u16::MAX as u64),
                 )?);
             }
             let options = ThreadCommentOptions {
@@ -514,7 +514,7 @@ mod test {
         }
         let mut files = vec![];
         if !is_lgtm {
-            for _i in 0..65535 {
+            for _i in 0..u16::MAX {
                 let filename = String::from("tests/demo/demo.cpp");
                 let mut file = FileObj::new(PathBuf::from(&filename));
                 let notes = vec![TidyNotification {
