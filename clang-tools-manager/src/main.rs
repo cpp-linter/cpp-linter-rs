@@ -138,6 +138,26 @@ pub struct CliOptions {
     /// This will only overwrite an existing symlink.
     #[arg(short, long)]
     pub force: bool,
+
+    /// Whether to use the system's available package managers.
+    ///
+    /// By default, this matches the value of a CI environment variable.
+    /// For non-CI contexts, this allows users to opt-in to using
+    /// system package managers as a fallback in case PyPI offerings
+    /// are unsatisfactory.
+    ///
+    /// If system package managers are not allowed or fail, then
+    /// static binaries built by cpp-linter are sought (for
+    /// compatible platforms).
+    #[arg(long, action = clap::ArgAction::SetTrue, conflicts_with = "no_mod_sys")]
+    pub mod_sys: bool,
+
+    /// Strictly disallow using system package managers.
+    ///
+    /// This can be used to override the default behavior of `--mod-sys`,
+    /// useful in sensitive CI environments, like self-hosted runners.
+    #[arg(long, action = clap::ArgAction::SetTrue, conflicts_with = "mod_sys")]
+    pub no_mod_sys: bool,
 }
 
 #[tokio::main]
@@ -161,7 +181,19 @@ async fn main() -> Result<()> {
             let mut map_tools = HashMap::new();
             for t in tool {
                 if let Some(version) = req_ver
-                    .eval_tool(&t, options.force, options.directory.as_ref())
+                    .eval_tool(
+                        &t,
+                        options.force,
+                        options.directory.as_ref(),
+                        if options.no_mod_sys {
+                            false // explicitly false
+                        } else {
+                            options.mod_sys // explicitly true
+                                || std::env::var("CI").is_ok_and(|v| {
+                                    ["true", "on", "1"].contains(&v.to_lowercase().as_str())
+                                }) // implicitly true in CI environments
+                        },
+                    )
                     .await?
                 {
                     map_tools.entry(t).or_insert(version);

@@ -78,6 +78,7 @@ impl RequestedVersion {
         tool: &ClangTool,
         overwrite_symlink: bool,
         directory: Option<&PathBuf>,
+        allow_system_package_manager: bool,
     ) -> Result<Option<ClangVersion>, GetToolError> {
         match self {
             RequestedVersion::Path(_) => {
@@ -139,8 +140,9 @@ impl RequestedVersion {
                     Ok(bin) => bin,
                     Err(e) => {
                         log::error!("Failed to download {tool} {version_req} from PyPi: {e}");
-                        if let Some(result) =
-                            try_install_package(tool, version_req, &min_ver).await?
+                        if allow_system_package_manager
+                            && let Some(result) =
+                                try_install_package(tool, version_req, &min_ver).await?
                         {
                             return Ok(Some(result));
                         }
@@ -245,7 +247,7 @@ impl FromStr for RequestedVersion {
 
 #[cfg(test)]
 mod tests {
-    use std::{path::PathBuf, str::FromStr};
+    use std::{env, path::PathBuf, str::FromStr};
 
     use semver::VersionReq;
     use tempfile::TempDir;
@@ -281,7 +283,7 @@ mod tests {
     #[tokio::test]
     async fn eval_no_value() {
         let result = RequestedVersion::NoValue
-            .eval_tool(&ClangTool::ClangFormat, false, None)
+            .eval_tool(&ClangTool::ClangFormat, false, None, false)
             .await
             .unwrap();
         assert!(result.is_none());
@@ -301,14 +303,19 @@ mod tests {
         let version_req =
             VersionReq::parse(option_env!("MIN_CLANG_TOOLS_VERSION").unwrap_or("16")).unwrap();
         let downloaded_clang = RequestedVersion::Requirement(version_req.clone())
-            .eval_tool(&tool, false, Some(&PathBuf::from(tmp_cache_dir.path())))
+            .eval_tool(
+                &tool,
+                false,
+                Some(&PathBuf::from(tmp_cache_dir.path())),
+                false,
+            )
             .await
             .unwrap()
             .unwrap();
         println!("Downloaded clang-format: {downloaded_clang:?}");
         let req_ver = RequestedVersion::Path(downloaded_clang.path.parent().unwrap().to_owned());
         let result = req_ver
-            .eval_tool(&tool, false, None)
+            .eval_tool(&tool, false, None, false)
             .await
             .unwrap()
             .unwrap();
@@ -331,7 +338,13 @@ mod tests {
             let version_req = VersionReq::parse(clang_version).unwrap();
             println!("Installing {tool} with version requirement: {version_req}");
             let clang_path = RequestedVersion::Requirement(version_req.clone())
-                .eval_tool(&tool, false, None)
+                .eval_tool(
+                    &tool,
+                    false,
+                    None,
+                    env::var("CI")
+                        .is_ok_and(|v| ["true", "on", "1"].contains(&v.to_lowercase().as_str())),
+                )
                 .await
                 .unwrap()
                 .unwrap();

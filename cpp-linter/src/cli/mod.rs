@@ -120,7 +120,7 @@ pub struct GeneralOptions {
     )]
     pub version: RequestedVersion,
 
-    /// This controls the action's verbosity in the workflow's logs.
+    /// This controls the log messages' verbosity.
     ///
     /// This option does not affect the verbosity of resulting
     /// thread comments or file annotations.
@@ -136,6 +136,38 @@ pub struct GeneralOptions {
         )
     )]
     pub verbosity: Verbosity,
+
+    /// Whether to use the system's available package managers.
+    ///
+    /// By default, this matches the value of a CI environment variable.
+    /// For non-CI contexts, this allows users to opt-in to using
+    /// system package managers as a fallback in case PyPI offerings
+    /// are unsatisfactory.
+    ///
+    /// If system package managers are not allowed or fail, then
+    /// static binaries built by cpp-linter are sought (for
+    /// compatible platforms).
+    #[arg(
+        long,
+        default_missing_value = "false",
+        action = ArgAction::SetTrue,
+        value_parser = FalseyValueParser::new(),
+        conflicts_with = "no_mod_sys",
+    )]
+    pub mod_sys: bool,
+
+    /// Strictly disallow using the system's package managers.
+    ///
+    /// This can be used to override the default behavior of `--mod-sys`,
+    /// useful in sensitive CI environments like self-hosted runners.
+    #[arg(
+        long,
+        default_missing_value = "false",
+        action = ArgAction::SetTrue,
+        value_parser = FalseyValueParser::new(),
+        conflicts_with = "mod_sys",
+    )]
+    pub no_mod_sys: bool,
 }
 
 /// A struct to describe the CLI's source options.
