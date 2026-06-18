@@ -187,9 +187,6 @@ impl FileObj {
 
         self.get_suggestions(review_comments, &diff, &input, summary_only)
             .map_err(FileObjError::DisplayStringFailed)?;
-        if summary_only {
-            return Ok(());
-        }
         if let Some(advice) = &self.tidy_advice {
             // now check for clang-tidy warnings with no fixes applied
             let file_ext = self
@@ -203,6 +200,10 @@ impl FileObj {
             for note in &advice.notes {
                 if note.fixed_lines.is_empty() && self.is_line_in_diff(&note.line) {
                     // notification had no suggestion applied in `patched`
+                    total += 1;
+                    if summary_only {
+                        continue;
+                    }
                     let mut suggestion = format!(
                         "### clang-tidy diagnostic\n**{file_name}:{}:{}** {}: [{}]\n\n> {}\n",
                         &note.line,
@@ -217,7 +218,6 @@ impl FileObj {
                                 .as_str(),
                         );
                     }
-                    total += 1;
                     let mut is_merged = false;
                     for s in &mut review_comments.comments {
                         if s.path == file_name
@@ -306,6 +306,13 @@ impl FileObj {
                     }
                 }
                 _ => {
+                    printer.display_header(
+                        &mut patch_buff,
+                        hunk.before.start,
+                        hunk.after.start,
+                        hunk.before.len() as u32,
+                        hunk.after.len() as u32,
+                    )?;
                     printer.display_hunk(
                         &mut patch_buff,
                         &input.before[hunk.before.start as usize..hunk.before.end as usize],
