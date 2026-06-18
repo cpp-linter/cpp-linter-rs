@@ -301,7 +301,7 @@ impl ReviewComments {
                 > u16::MAX as usize
             {
                 log::warn!(
-                    "\nThe full patch of fixes is too large to include in the review summary.\n"
+                    "The full patch of fixes is too large to include in the review summary."
                 );
                 body.push_str(
                     "\nThe full patch of fixes is too large to include in this summary.\n",
@@ -309,6 +309,7 @@ impl ReviewComments {
             } else {
                 body.push_str(&patch_prefix);
                 body.push_str(self.full_patch.as_str());
+                body.push_str(patch_suffix);
             }
         } else if total_review_comments == 0 {
             // Only congratulate if there was no reused comments
