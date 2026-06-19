@@ -12,7 +12,7 @@ use std::{
 
 // non-std crates
 use anyhow::{Context, Result, anyhow};
-use clang_tools_manager::RequestedVersion;
+use clang_tools_manager::{RequestedVersion, logger::try_init_logger};
 use clap::Parser;
 use log::{LevelFilter, set_max_level};
 
@@ -21,7 +21,6 @@ use crate::{
     clang_tools::capture_clang_tools_output,
     cli::{ClangParams, Cli, CliCommand, FeedbackInput, LinesChangedOnly},
     common_fs::FileObj,
-    logger,
     rest_client::RestClient,
 };
 use git_bot_feedback::FileFilter;
@@ -57,7 +56,7 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
         return Ok(());
     }
 
-    logger::try_init();
+    try_init_logger();
 
     let mut rest_api_client = RestClient::new()?;
     set_max_level(

@@ -364,11 +364,10 @@ mod tests {
 
     use std::{env, fs, path::Path};
 
+    use clang_tools_manager::logger::try_init_logger;
     use git_bot_feedback::ReviewComment;
 
     use super::*;
-    #[cfg(feature = "bin")]
-    use crate::logger::try_init;
 
     async fn test_db_parse<P: AsRef<Path>>(path: P) -> Result<ClangVersions, ClangTaskError> {
         let clang_params = ClangParams {
@@ -382,8 +381,7 @@ mod tests {
             env::remove_var("GITHUB_ACTIONS");
         }
         let rest_client = RestClient::new().unwrap();
-        #[cfg(feature = "bin")]
-        try_init();
+        try_init_logger();
         capture_clang_tools_output(&[], &version, clang_params, &rest_client, false).await
     }
 
@@ -421,11 +419,8 @@ mod tests {
         };
         let total_review_comments = 2;
         let summary_only = false;
-        #[cfg(feature = "bin")]
-        {
-            crate::logger::try_init();
-            log::set_max_level(log::LevelFilter::Info);
-        }
+        try_init_logger();
+        log::set_max_level(log::LevelFilter::Info);
         let review_summary = ReviewComments::default().summarize(
             &clang_versions,
             &comments,

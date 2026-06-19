@@ -493,8 +493,8 @@ mod test {
         },
         cli::FeedbackInput,
         common_fs::FileObj,
-        logger,
     };
+    use clang_tools_manager::logger::try_init_logger;
 
     // ************************* tests for step-summary and output variables
 
@@ -507,7 +507,8 @@ mod test {
             env::set_var("GITHUB_SHA", "deadbeef123");
         }
         let mut rest_api_client = RestClient::new().unwrap();
-        logger::try_init();
+        #[cfg(feature = "bin")]
+        try_init_logger();
         if env::var("ACTIONS_STEP_DEBUG").is_ok_and(|var| var == "true") {
             // assert!(rest_api_client.debug_enabled);
             log::set_max_level(log::LevelFilter::Debug);

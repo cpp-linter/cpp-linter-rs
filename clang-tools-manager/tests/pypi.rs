@@ -1,14 +1,18 @@
 use std::{env, process::Command};
 
-use semver::VersionReq;
-
+#[cfg(feature = "bin")]
+use clang_tools_manager::logger::try_init_logger;
 use clang_tools_manager::{ClangTool, PyPiDownloader};
+
+use semver::VersionReq;
 use tempfile::TempDir;
-mod common;
 
 async fn setup() {
-    common::initialize_logger();
-    log::set_max_level(log::LevelFilter::Debug);
+    #[cfg(feature = "bin")]
+    {
+        try_init_logger();
+        log::set_max_level(log::LevelFilter::Debug);
+    }
 
     let tmp_cache_dir = TempDir::new().unwrap();
     // Override cache directory to ensure test isolation and avoid interference with other tests' caches

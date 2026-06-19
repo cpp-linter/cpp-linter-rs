@@ -6,7 +6,7 @@ use std::str::FromStr;
 
 // non-std crates
 #[cfg(feature = "bin")]
-use clang_tools_manager::RequestedVersion;
+use clang_tools_manager::{RequestedVersion, logger::CLI_HELP_STYLE};
 #[cfg(feature = "bin")]
 use clap::{
     ArgAction, Args, Parser, Subcommand, ValueEnum,
@@ -38,7 +38,7 @@ impl Verbosity {
 /// A structure to contain parsed CLI options.
 #[cfg(feature = "bin")]
 #[derive(Debug, Clone, Parser)]
-#[command(author, about)]
+#[command(author, about, color = clap::ColorChoice::Auto, styles(CLI_HELP_STYLE))]
 pub struct Cli {
     /// The CLI's general options, such as `--version` and `--verbosity`.
     #[command(flatten)]

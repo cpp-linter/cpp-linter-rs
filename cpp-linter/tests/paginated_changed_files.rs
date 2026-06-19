@@ -6,7 +6,8 @@ use git_bot_feedback::{FileFilter, LinesChangedOnly};
 use mockito::Matcher;
 use tempfile::{NamedTempFile, TempDir};
 
-use cpp_linter::{logger, rest_client::RestClient};
+use clang_tools_manager::logger::try_init_logger;
+use cpp_linter::rest_client::RestClient;
 use std::{env, io::Write, path::Path};
 
 #[derive(PartialEq, Default)]
@@ -83,7 +84,7 @@ async fn get_paginated_changes(lib_root: &Path, tmp_dir: &TempDir, test_params: 
     unsafe {
         env::set_var("GITHUB_API_URL", server.url());
     }
-    logger::try_init();
+    try_init_logger();
     log::set_max_level(log::LevelFilter::Debug);
     let gh_client = RestClient::new();
     if test_params.fail_serde_event_payload || test_params.no_event_payload {

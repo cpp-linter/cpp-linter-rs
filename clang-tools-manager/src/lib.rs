@@ -23,3 +23,5 @@ pub use version::{ClangVersion, GetToolError, RequestedVersion, RequestedVersion
 
 mod progress_bar;
 pub use progress_bar::ProgressBar;
+
+pub mod logger;

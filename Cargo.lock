@@ -383,7 +383,6 @@ dependencies = [
  "chrono",
  "clang-tools-manager",
  "clap",
- "colored",
  "fast-glob",
  "futures",
  "git-bot-feedback",
