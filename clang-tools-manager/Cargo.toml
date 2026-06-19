@@ -24,8 +24,8 @@ required-features = ["bin"]
 [dependencies]
 anyhow = { workspace = true, optional = true }
 blake2 = "0.10.6"
-clap = { workspace = true, features = ["derive"], optional = true }
-colored = { workspace = true, optional = true }
+clap = { workspace = true, optional = true }
+colored = { version = "3.1.1", optional = true }
 directories = "6.0.0"
 log = { workspace = true }
 regex = { workspace = true }
@@ -41,7 +41,6 @@ which = "8.0.2"
 zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]
-colored = { workspace = true }
 mockito = { workspace = true }
 reqwest = { workspace = true, features = ["default-tls"] }
 tempfile = { workspace = true }

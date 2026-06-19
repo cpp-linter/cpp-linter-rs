@@ -41,8 +41,15 @@ The `clang-tools` binary's Command Line Interface (CLI) is rather simple.
 <details><summary><code>clang-tools --help</code></summary>
 <p>
 
-```sh
-Usage: clang-tools [OPTIONS]
+```txt
+Usage: clang-tools.exe [OPTIONS] [TOOL]...
+
+Arguments:
+  [TOOL]...
+          The clang tool to install
+
+          [default: clang-format clang-tidy]
+          [possible values: clang-tidy, clang-format]
 
 Options:
   -v, --version [<VERSION>]
@@ -56,12 +63,6 @@ Options:
           This will include more DEBUG level log messages.
           Without it, log level is set to INFO by default.
 
-  -t, --tool <TOOL>
-          The clang tool to install
-
-          [default: "clang-format clang-tidy"]
-          [possible values: clang-tidy, clang-format]
-
   -d, --directory <DIRECTORY>
           The directory where the clang tools should be installed
 
@@ -69,6 +70,24 @@ Options:
           Force overwriting symlink to the installed binary.
 
           This will only overwrite an existing symlink.
+
+      --mod-sys
+          Whether to use the system's available package managers.
+
+          By default, this matches the value of a CI environment variable.
+          For non-CI contexts, this allows users to opt-in to using
+          system package managers as a fallback in case PyPI offerings are
+          unsatisfactory.
+
+          If system package managers are not allowed or fail, then
+          static binaries built by cpp-linter are sought
+          (for compatible platforms).
+
+      --no-mod-sys
+          Strictly disallow using system package managers.
+
+          This can be used to override the default behavior of `--mod-sys`,
+          useful in sensitive CI environments, like self-hosted runners.
 
   -h, --help
           Print help (see a summary with '-h')

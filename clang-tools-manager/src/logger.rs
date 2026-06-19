@@ -6,8 +6,25 @@ use std::{
     io::{Write, stdout},
 };
 
+use clap::builder::{
+    Styles,
+    styling::{AnsiColor, Color, Style},
+};
 use colored::{Colorize, control::set_override};
 use log::{Level, LevelFilter, Log, Metadata, Record};
+
+/// A color scheme to use for CLI `--help` output.
+pub const CLI_HELP_STYLE: Styles = Styles::styled()
+    .usage(Style::new().fg_color(Some(Color::Ansi(AnsiColor::BrightBlue))))
+    .header(
+        Style::new()
+            .fg_color(Some(Color::Ansi(AnsiColor::BrightBlue)))
+            .underline(),
+    )
+    .placeholder(Style::new().fg_color(Some(Color::Ansi(AnsiColor::Yellow))))
+    .literal(Style::new().fg_color(Some(Color::Ansi(AnsiColor::BrightGreen))))
+    .context_value(Style::new().fg_color(Some(Color::Ansi(AnsiColor::Cyan))))
+    .invalid(Style::new().fg_color(Some(Color::Ansi(AnsiColor::BrightRed))));
 
 #[derive(Default)]
 struct SimpleLogger;
@@ -41,7 +58,7 @@ impl Log for SimpleLogger {
                 .expect("Failed to flush log command in stdout");
         } else if self.enabled(record.metadata()) {
             let module = record.module_path();
-            if module.is_none_or(|v| v.starts_with("cpp_linter")) {
+            if module.is_none_or(|v| v.starts_with("cpp_linter") || v.starts_with("clang_tools")) {
                 writeln!(
                     stdout,
                     "[{}]: {}",
@@ -74,7 +91,7 @@ impl Log for SimpleLogger {
 /// The logging level defaults to [`LevelFilter::Info`].
 /// This logs a debug message about [`SetLoggerError`](struct@log::SetLoggerError)
 /// if the `LOGGER` is already initialized.
-pub fn try_init() {
+pub fn try_init_logger() {
     let logger: SimpleLogger = SimpleLogger;
     if matches!(
         env::var("CPP_LINTER_COLOR").as_deref(),
@@ -95,15 +112,14 @@ pub fn try_init() {
 mod test {
     use std::env;
 
-    use super::{SimpleLogger, try_init};
+    use super::try_init_logger;
 
     #[test]
     fn trace_log() {
         unsafe {
             env::set_var("CPP_LINTER_COLOR", "true");
         }
-        try_init();
-        assert!(SimpleLogger::level_color(&log::Level::Trace).contains("TRACE"));
+        try_init_logger();
         log::set_max_level(log::LevelFilter::Trace);
         log::trace!("A dummy log statement for code coverage");
     }

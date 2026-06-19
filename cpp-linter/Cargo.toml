@@ -17,9 +17,8 @@ license.workspace = true
 anyhow = { workspace = true, optional = true }
 async-trait = "0.1.89"
 chrono = "0.4.44"
-clang-tools-manager = { path = "../clang-tools-manager", version = "0.2.1" }
+clang-tools-manager = { path = "../clang-tools-manager", features = ["bin"], version = "0.2.1" }
 clap = { workspace = true, optional = true }
-colored = { workspace = true, optional = true }
 fast-glob = "1.0.1"
 futures = "0.3.32"
 gix-imara-diff = { version = "0.2.2", features = ["unified_diff"] }
@@ -45,7 +44,7 @@ tempfile = { workspace = true }
 reqwest = { workspace = true, features = ["default-tls"] }
 
 [features]
-bin = ["reqwest/default-tls", "dep:clap", "dep:colored", "dep:anyhow"]
+bin = ["reqwest/default-tls", "dep:clap", "dep:anyhow"]
 
 [lib]
 bench = false

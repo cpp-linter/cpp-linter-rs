@@ -32,10 +32,10 @@ default-filter = "(kind(test) + test(use_extra_args)) - package(clang-tools-mana
 # show log output from each failing test
 failure-output = "final"
 
+# set slow-timeout to 30 seconds and
+# terminate tests after hitting the period 8 times (30s x 8 = 4 minutes).
+slow-timeout = { period = "30s", terminate-after = 8 }
+
 [profile.all]
 # A profile to run all tests (including tests that run longer than 10 seconds)
 default-filter = "all() - test(#*eval_version)"
-
-# Revert slow-timeout to nextest default value.
-# Otherwise, default profile value (10s) is inherited.
-slow-timeout = "60s"
