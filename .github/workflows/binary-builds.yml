@@ -186,7 +186,7 @@ jobs:
   publish:
     if: startswith(github.ref, 'refs/tags/cpp-linter/v') || startswith(github.ref, 'refs/tags/clang-tools-manager/v')
     runs-on: ubuntu-latest
-    needs: [create-assets]
+    needs: [create-assets, seed-build-script]
     permissions:
       id-token: write
       contents: write
@@ -210,6 +210,12 @@ jobs:
         run: |
           files=$(ls dist/${BIN_NAME}*)
           gh release upload "${GIT_REF}" ${files}
+      - name: Restore build script seed
+        if: startsWith(github.ref_name, 'clang-tools-manager/v')
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ needs.seed-build-script.outputs.artifact-name }}
+          path: clang-tools-manager
       - name: Establish provenance
         id: auth
         uses: rust-lang/crates-io-auth-action@bbd81622f20ce9e2dd9622e3218b975523e45bbe # v1.0.4
