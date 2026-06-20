@@ -218,12 +218,6 @@ pub struct ClangParams {
     /// An optional [`FileFilter`] to exclude files only from clang-format analysis.
     pub format_filter: Option<FileFilter>,
 
-    /// Assert this if preparing a PR review with clang-tidy advice.
-    pub tidy_review: bool,
-
-    /// Assert this if preparing a PR review with clang-format advice.
-    pub format_review: bool,
-
     /// The root of the repository, used to locate relative file paths in processing.
     ///
     /// A project-specific cache folder is created in this path.
@@ -284,8 +278,6 @@ impl From<&Cli> for ClangParams {
             clang_format_command: None,
             tidy_filter,
             format_filter,
-            tidy_review: args.feedback_options.tidy_review,
-            format_review: args.feedback_options.format_review,
             repo_root,
         }
     }
@@ -309,11 +301,8 @@ pub struct FeedbackInput {
     /// The clang-format style to show in file annotations.
     pub style: String,
 
-    /// Whether to post a PR review with clang-tidy suggestions/notes.
-    pub tidy_review: bool,
-
-    /// Whether to post a PR review with clang-format suggestions.
-    pub format_review: bool,
+    /// Whether to post a PR review.
+    pub pr_review: bool,
 
     /// Should PR reviews be commentary?
     ///
@@ -334,8 +323,7 @@ impl From<&Cli> for FeedbackInput {
             step_summary: args.feedback_options.step_summary,
             thread_comments: args.feedback_options.thread_comments.clone(),
             file_annotations: args.feedback_options.file_annotations,
-            tidy_review: args.feedback_options.tidy_review,
-            format_review: args.feedback_options.format_review,
+            pr_review: args.feedback_options.pr_review,
             passive_reviews: args.feedback_options.passive_reviews,
             repo_root: args.source_options.repo_root.clone(),
         }
@@ -351,8 +339,7 @@ impl Default for FeedbackInput {
             step_summary: false,
             file_annotations: true,
             style: "llvm".to_string(),
-            tidy_review: false,
-            format_review: false,
+            pr_review: false,
             passive_reviews: false,
             repo_root: PathBuf::from("."),
         }

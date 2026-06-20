@@ -123,7 +123,7 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
                 FileObj::new(file_path)
             })
             .collect();
-        if is_pr && (cli.feedback_options.tidy_review || cli.feedback_options.format_review) {
+        if is_pr && cli.feedback_options.pr_review {
             let changed_files = rest_api_client
                 .get_list_of_changed_files(
                     &file_filter,
@@ -152,7 +152,7 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
     }
     rest_api_client.end_log_group("Get list of specified source files");
 
-    let mut clang_params = ClangParams::from(&cli);
+    let clang_params = ClangParams::from(&cli);
     // mkdir -p .cpp-linter-cache/
     let cache_dir = clang_params.repo_root.join(ClangParams::CACHE_DIR);
     std::fs::create_dir_all(&cache_dir)
@@ -163,8 +163,6 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
         "# Automatically created by cpp-linter\n*\n",
     )
     .with_context(|| "Failed to write .cpp-linter-cache/.gitignore file")?;
-    clang_params.format_review &= is_pr;
-    clang_params.tidy_review &= is_pr;
     let user_inputs = FeedbackInput::from(&cli);
     let clang_versions = capture_clang_tools_output(
         &arc_files,
