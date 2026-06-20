@@ -517,6 +517,7 @@ pub struct FeedbackOptions {
         value_parser = FalseyValueParser::new(),
         help_heading = "Feedback options",
         aliases = ["format-review", "tidy-review"],
+        short_aliases = ['d', 'm'],
     ))]
     pub pr_review: bool,
 
