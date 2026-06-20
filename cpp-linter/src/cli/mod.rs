@@ -506,9 +506,9 @@ pub struct FeedbackOptions {
     ))]
     pub file_annotations: bool,
 
-    /// Set to `true` to enable Pull Request reviews from clang-tidy.
+    /// Set to `true` to enable Pull Request reviews.
     #[cfg_attr(feature = "bin", arg(
-        short = 'd',
+        short = 'P',
         long,
         default_value_t = false,
         default_missing_value = "true",
@@ -516,21 +516,9 @@ pub struct FeedbackOptions {
         action = ArgAction::Set,
         value_parser = FalseyValueParser::new(),
         help_heading = "Feedback options",
+        aliases = ["format-review", "tidy-review"],
     ))]
-    pub tidy_review: bool,
-
-    /// Set to `true` to enable Pull Request reviews from clang-format.
-    #[cfg_attr(feature = "bin", arg(
-        short = 'm',
-        long,
-        default_value_t = false,
-        default_missing_value = "true",
-        num_args = 0..=1,
-        action = ArgAction::Set,
-        value_parser = FalseyValueParser::new(),
-        help_heading = "Feedback options",
-    ))]
-    pub format_review: bool,
+    pub pr_review: bool,
 
     /// Set to `true` to prevent Pull Request reviews from
     /// approving or requesting changes.

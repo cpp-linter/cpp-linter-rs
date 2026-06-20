@@ -183,9 +183,7 @@ impl RestClient {
             };
             self.client.post_thread_comment(options).await?;
         }
-        if self.client.is_pr_event()
-            && (feedback_inputs.tidy_review || feedback_inputs.format_review)
-        {
+        if self.client.is_pr_event() && feedback_inputs.pr_review {
             let summary_only = ["true", "on", "1"].contains(
                 &env::var("CPP_LINTER_PR_REVIEW_SUMMARY_ONLY")
                     .unwrap_or("false".to_string())

@@ -518,8 +518,6 @@ mod test {
             database_json: None,
             format_filter: None,
             tidy_filter: None,
-            tidy_review: false,
-            format_review: false,
             clang_tidy_command: Some(exe_path),
             clang_format_command: None,
             repo_root: tmp_workspace.path().to_path_buf(),

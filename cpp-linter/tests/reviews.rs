@@ -23,8 +23,7 @@ const REMAINING_RATE_LIMIT_HEADER: &str = "x-ratelimit-remaining";
 
 struct TestParams {
     pub lines_changed_only: LinesChangedOnly,
-    pub tidy_review: bool,
-    pub format_review: bool,
+    pub pr_review: bool,
     pub passive_reviews: bool,
     pub no_lgtm: bool,
     pub force_lgtm: bool,
@@ -42,8 +41,7 @@ impl Default for TestParams {
     fn default() -> Self {
         Self {
             lines_changed_only: LinesChangedOnly::On,
-            tidy_review: true,
-            format_review: true,
+            pr_review: true,
             passive_reviews: false,
             no_lgtm: true,
             force_lgtm: false,
@@ -175,9 +173,7 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
             "REQUEST_CHANGES"
         };
         let tool_summary = {
-            if !(test_params.format_review || test_params.tidy_review)
-                || test_params.lines_changed_only == LinesChangedOnly::On
-            {
+            if !test_params.pr_review || test_params.lines_changed_only == LinesChangedOnly::On {
                 // results can be non-deterministic because different clang-versions output different diagnostic/changes
                 ".*" // match anything
             } else if test_params.force_lgtm {
@@ -226,8 +222,7 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
         format!("-l={}", test_params.lines_changed_only),
         format!("--ignore-tidy={}", tidy_ignore),
         format!("--ignore-format={}", format_ignore),
-        format!("--tidy-review={}", test_params.tidy_review),
-        format!("--format-review={}", test_params.format_review),
+        format!("--pr-review={}", test_params.pr_review),
         format!("--passive-reviews={}", test_params.passive_reviews),
         format!("--no-lgtm={}", test_params.no_lgtm),
         "-p=build".to_string(),
@@ -235,15 +230,14 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
         format!("--repo-root={}", tmp_dir.path().to_str().unwrap()),
     ];
     if test_params.force_lgtm {
-        if test_params.tidy_review {
+        if test_params.pr_review {
             // only use a check that doesn't trigger concern on test assets
             args.push("--tidy-checks=-*,bugprone-infinite-loop".to_string());
-        }
-        if test_params.format_review {
             // explicitly disable formatting using `DisableFormat: true`
             args.push("--style={DisableFormat: true}".to_string());
         }
     } else {
+        // use default --tidy-checks value
         args.push("--style=file".to_string()); // use .clang-format file
     }
     match run_main(args).await {
@@ -274,26 +268,6 @@ async fn test_review(test_params: &TestParams) {
 async fn all_lines() {
     test_review(&TestParams {
         lines_changed_only: LinesChangedOnly::Off,
-        ..Default::default()
-    })
-    .await;
-}
-
-#[tokio::test]
-async fn all_lines_tidy_only() {
-    test_review(&TestParams {
-        lines_changed_only: LinesChangedOnly::Off,
-        format_review: false,
-        ..Default::default()
-    })
-    .await;
-}
-
-#[tokio::test]
-async fn all_lines_format_only() {
-    test_review(&TestParams {
-        lines_changed_only: LinesChangedOnly::Off,
-        tidy_review: false,
         ..Default::default()
     })
     .await;
