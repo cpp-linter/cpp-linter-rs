@@ -226,7 +226,7 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
         format!("--passive-reviews={}", test_params.passive_reviews),
         format!("--no-lgtm={}", test_params.no_lgtm),
         "-p=build".to_string(),
-        "-i=build".to_string(),
+        "-i=build/**".to_string(),
         format!("--repo-root={}", tmp_dir.path().to_str().unwrap()),
     ];
     if test_params.force_lgtm {

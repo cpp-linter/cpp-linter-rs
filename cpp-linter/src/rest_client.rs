@@ -18,7 +18,7 @@ use crate::{
         clang_format::{summarize_style, tally_format_advice},
         clang_tidy::tally_tidy_advice,
     },
-    cli::{FeedbackInput, ThreadComments},
+    cli::{ClangParams, FeedbackInput, ThreadComments},
     common_fs::FileObj,
     error::ClientError,
 };
@@ -230,6 +230,23 @@ impl RestClient {
                 summary_only,
             );
             self.client.post_pr_review(&options).await?;
+        } else {
+            for file in files {
+                let file = file
+                    .lock()
+                    .map_err(|e| ClientError::MutexPoisoned(e.to_string()))?;
+                file.maybe_append_patch(&feedback_inputs.repo_root)?;
+            }
+        }
+        let auto_fix_patch_path = feedback_inputs
+            .repo_root
+            .join(ClangParams::CACHE_DIR)
+            .join(ClangParams::AUTO_FIX_PATCH);
+        if auto_fix_patch_path.exists() {
+            self.client.write_output_variables(&[OutputVariable {
+                name: "fix-patch-path".to_string(),
+                value: auto_fix_patch_path.to_string_lossy().replace("\\", "/"),
+            }])?;
         }
         Ok(format_checks_failed + tidy_checks_failed)
     }
