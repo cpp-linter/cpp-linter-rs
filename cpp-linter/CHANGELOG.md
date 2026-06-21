@@ -6,6 +6,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
+## [cpp-linter/v2.0.0-rc.19] - 2026-06-21
+
+### <!-- 1 --> 🚀 Added
+
+- Use diff instead of clang-format XML output by @2bndy5 in [#347](https://github.com/cpp-linter/cpp-linter-rs/pull/347)
+- Use stricter linting rules by @2bndy5 in [#353](https://github.com/cpp-linter/cpp-linter-rs/pull/353)
+- Get clang-tidy fixes regardless of tidy-review value by @2bndy5 in [#354](https://github.com/cpp-linter/cpp-linter-rs/pull/354)
+- Merge review suggestions from both clang tools by @2bndy5 in [#358](https://github.com/cpp-linter/cpp-linter-rs/pull/358)
+- Add logs about summarizing PR reviews by @2bndy5 in [#371](https://github.com/cpp-linter/cpp-linter-rs/pull/371)
+- Allow explicit use of package managers by @2bndy5 in [#372](https://github.com/cpp-linter/cpp-linter-rs/pull/372)
+- Add colors to `--help` output and uniform logging by @2bndy5 in [#374](https://github.com/cpp-linter/cpp-linter-rs/pull/374)
+- Add `fix-patch-path` output variable by @2bndy5 in [#378](https://github.com/cpp-linter/cpp-linter-rs/pull/378)
+
+### <!-- 2 --> 🚫 Deprecated
+
+- Replace `--tidy-review`/`--format-review` with `--pr-review` by @2bndy5 in [#377](https://github.com/cpp-linter/cpp-linter-rs/pull/377)
+
+### <!-- 4 --> 🛠️ Fixed
+
+- Respect verbosity per GitHub Actions env var by @2bndy5 in [#346](https://github.com/cpp-linter/cpp-linter-rs/pull/346)
+- Do not change directory to `repo-root` by @2bndy5 in [#349](https://github.com/cpp-linter/cpp-linter-rs/pull/349)
+- Bump git-bot-feedback to v0.6.1 by @2bndy5 in [#363](https://github.com/cpp-linter/cpp-linter-rs/pull/363)
+- Prevent PR review summary exceeding 65535 len by @2bndy5 in [#370](https://github.com/cpp-linter/cpp-linter-rs/pull/370)
+
+### <!-- 6 --> 📦 Dependency updates
+
+- Bump version to clang-tools-manager/v0.3.0 by @2bndy5 in [`f7f7b25`](https://github.com/cpp-linter/cpp-linter-rs/commit/f7f7b254f037d5817574494481fd18ca652a42e3)
+
+### <!-- 8 --> 📝 Documentation
+
+- Expand clang-tools-manager/README by @2bndy5 in [#366](https://github.com/cpp-linter/cpp-linter-rs/pull/366)
+
+[cpp-linter/v2.0.0-rc.19]: https://github.com/cpp-linter/cpp-linter-rs/compare/cpp-linter/v2.0.0-rc.18...cpp-linter/v2.0.0-rc.19
+
+Full commit diff: [`cpp-linter/v2.0.0-rc.18...cpp-linter/v2.0.0-rc.19`][cpp-linter/v2.0.0-rc.19]
+
 ## [cpp-linter/v2.0.0-rc.18] - 2026-06-10
 
 ### <!-- 1 --> 🚀 Added
@@ -16,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### <!-- 6 --> 📦 Dependency updates
 
 - Bump version to clang-tools-manager/v0.2.1 by @2bndy5 in [`f4033b5`](https://github.com/cpp-linter/cpp-linter-rs/commit/f4033b5c1807fb3889cbb3c396d0f292bac92d25)
+- Bump version to cpp-linter/v2.0.0-rc.18 by @2bndy5 in [`83c1b4a`](https://github.com/cpp-linter/cpp-linter-rs/commit/83c1b4aa29c8e388372351724c395a6a3bad7769)
 
 [cpp-linter/v2.0.0-rc.18]: https://github.com/cpp-linter/cpp-linter-rs/compare/cpp-linter/v2.0.0-rc.17...cpp-linter/v2.0.0-rc.18
 
