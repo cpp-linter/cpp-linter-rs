@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
+## [clang-tools-manager/v0.3.0] - 2026-06-21
+
+### <!-- 1 --> 🚀 Added
+
+- Allow explicit use of package managers by @2bndy5 in [#372](https://github.com/cpp-linter/cpp-linter-rs/pull/372)
+- Add colors to `--help` output and uniform logging by @2bndy5 in [#374](https://github.com/cpp-linter/cpp-linter-rs/pull/374)
+
+### <!-- 4 --> 🛠️ Fixed
+
+- Refactor for unsupported static binary platforms by @2bndy5 in [#356](https://github.com/cpp-linter/cpp-linter-rs/pull/356)
+- Cache the versions.json in build script by @2bndy5 in [#373](https://github.com/cpp-linter/cpp-linter-rs/pull/373)
+
+### <!-- 8 --> 📝 Documentation
+
+- Expand clang-tools-manager/README by @2bndy5 in [#366](https://github.com/cpp-linter/cpp-linter-rs/pull/366)
+
+[clang-tools-manager/v0.3.0]: https://github.com/cpp-linter/cpp-linter-rs/compare/clang-tools-manager/v0.2.1...clang-tools-manager/v0.3.0
+
+Full commit diff: [`clang-tools-manager/v0.2.1...clang-tools-manager/v0.3.0`][clang-tools-manager/v0.3.0]
+
 ## [clang-tools-manager/v0.2.1] - 2026-06-10
 
 ### <!-- 1 --> 🚀 Added
@@ -15,6 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### <!-- 4 --> 🛠️ Fixed
 
 - Do not fail on check for tool presence (via package managers) by @2bndy5 in [#345](https://github.com/cpp-linter/cpp-linter-rs/pull/345)
+
+### <!-- 6 --> 📦 Dependency updates
+
+- Bump version to clang-tools-manager/v0.2.1 by @2bndy5 in [`f4033b5`](https://github.com/cpp-linter/cpp-linter-rs/commit/f4033b5c1807fb3889cbb3c396d0f292bac92d25)
 
 [clang-tools-manager/v0.2.1]: https://github.com/cpp-linter/cpp-linter-rs/compare/clang-tools-manager/v0.2.0...clang-tools-manager/v0.2.1
 
