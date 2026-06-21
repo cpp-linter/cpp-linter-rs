@@ -227,6 +227,10 @@ pub struct ClangParams {
 impl ClangParams {
     /// The directory name to use for caching clang-tidy and clang-format results.
     pub(crate) const CACHE_DIR: &str = ".cpp-linter-cache";
+
+    /// The file name for aggregating auto-fixes into a unified patch.
+    pub(crate) const AUTO_FIX_PATCH: &str = "auto-fix.patch";
+
     pub(crate) fn get_cache_path(&self) -> PathBuf {
         self.repo_root.join(Self::CACHE_DIR).join("patched")
     }

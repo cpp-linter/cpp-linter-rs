@@ -4,7 +4,7 @@ use cpp_linter::cli::ThreadComments;
 use cpp_linter::run::run_main;
 use git_bot_feedback::LinesChangedOnly;
 use mockito::Matcher;
-use std::{env, fmt::Display, io::Write, path::Path};
+use std::{env, fmt::Display, fs, io::Write, path::Path};
 use tempfile::{NamedTempFile, TempDir};
 
 mod common;
@@ -252,7 +252,7 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
         format!("--thread-comments={}", test_params.thread_comments),
         format!("--no-lgtm={}", test_params.no_lgtm),
         "-p=build".to_string(),
-        "-i=build".to_string(),
+        "-i=build/**".to_string(),
         format!("--repo-root={}", tmp_dir.path().to_str().unwrap()),
     ];
     if test_params.force_lgtm {
@@ -273,6 +273,29 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
     }
     for mock in mocks {
         mock.assert();
+    }
+
+    // Read the GITHUB_OUTPUT file to check for the patch path
+    let output_vars = fs::read_to_string(tmp_out_file.path()).unwrap();
+    let patch_path_from_output = output_vars
+        .lines()
+        .find(|line| line.starts_with("fix-patch-path="))
+        .map(|line| {
+            line.trim_start_matches("fix-patch-path=")
+                .trim()
+                .to_string()
+        });
+    if let Some(patch_path_from_output) = patch_path_from_output {
+        // verify patch path exists and print its content
+        println!("Patch path from GITHUB_OUTPUT: {patch_path_from_output}");
+        let patch_path = Path::new(&patch_path_from_output);
+        assert!(
+            patch_path.exists(),
+            "Patch file does not exist at expected path."
+        );
+        let patch_content =
+            std::fs::read_to_string(patch_path).expect("Failed to read generated patch file.");
+        println!("Generated patch content:\n{patch_content}");
     }
 }
 

@@ -157,6 +157,12 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
     let cache_dir = clang_params.repo_root.join(ClangParams::CACHE_DIR);
     std::fs::create_dir_all(&cache_dir)
         .with_context(|| "Failed to create a local cache directory.")?;
+    // delete old patch file
+    let patch_file = cache_dir.join(ClangParams::AUTO_FIX_PATCH);
+    if patch_file.exists() {
+        std::fs::remove_file(&patch_file)
+            .with_context(|| "Failed to remove old patch file from previous runs.")?;
+    }
     // add gitignore file in project cache dir
     std::fs::write(
         cache_dir.join(".gitignore"),
@@ -193,7 +199,7 @@ pub(crate) mod test {
     #![allow(clippy::unwrap_used)]
 
     use super::run_main;
-    use crate::test_common::setup_tmp_workspace;
+    use crate::{cli::ClangParams, test_common::setup_tmp_workspace};
     use std::env;
 
     /// helper to avoid writing to the same GITHUB_OUTPUT file in parallel-running tests.
@@ -238,6 +244,13 @@ pub(crate) mod test {
     async fn force_debug_output() {
         let tmp_gh_out = setup_tmp_gh_out_path();
         let tmp_workspace = setup_tmp_workspace();
+
+        // create a dummy patch file to ensure it is deleted (in code coverage).
+        let cache_dir = tmp_workspace.path().join(ClangParams::CACHE_DIR);
+        std::fs::create_dir_all(&cache_dir).unwrap();
+        let patch_path = cache_dir.join(ClangParams::AUTO_FIX_PATCH);
+        std::fs::write(&patch_path, "").unwrap();
+
         run_main(vec![
             "cpp-linter".to_string(),
             "-l".to_string(),

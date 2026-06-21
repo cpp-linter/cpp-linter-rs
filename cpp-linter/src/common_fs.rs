@@ -3,6 +3,7 @@
 use std::{
     fmt::Debug,
     fs,
+    io::Write,
     num::NonZeroU32,
     ops::RangeInclusive,
     path::{Path, PathBuf},
@@ -16,7 +17,7 @@ use crate::{
     clang_tools::{
         ReviewComments, Suggestion, clang_format::FormatAdvice, clang_tidy::TidyAdvice, make_patch,
     },
-    cli::LinesChangedOnly,
+    cli::{ClangParams, LinesChangedOnly},
     error::FileObjError,
 };
 
@@ -162,6 +163,57 @@ impl FileObj {
         false
     }
 
+    /// If the file has a cached fixes, then append them to a unified patched file.
+    ///
+    /// This is the alternative to [`FileObj::make_suggestions_from_patch()`] when
+    /// a PR review is not being posted. Both function have to create a patch by
+    /// reading the original file and patched file (in cache), but
+    /// [`FileObj::make_suggestions_from_patch()`] does more with the diff than this function.
+    pub fn maybe_append_patch(&self, repo_root: &Path) -> Result<(), FileObjError> {
+        let patched = match &self.patched_path {
+            Some(patched_path) if patched_path.exists() => {
+                fs::read_to_string(patched_path).map_err(FileObjError::ReadFile)?
+            }
+            _ => return Ok(()),
+        };
+        let original_content =
+            fs::read_to_string(repo_root.join(&self.name)).map_err(FileObjError::ReadFile)?;
+        let (diff, input) = make_patch(patched.as_str(), &original_content);
+        let file_name = self.name.to_string_lossy().replace("\\", "/");
+        Self::append_patch(&file_name, &input, &diff, repo_root)?;
+        Ok(())
+    }
+
+    /// write fixes to a unified patch file in the cache directory.
+    fn append_patch(
+        file_name: &str,
+        input: &InternedInput<&str>,
+        diff: &Diff,
+        repo_root: &Path,
+    ) -> Result<(), FileObjError> {
+        let printer = BasicLineDiffPrinter(&input.interner);
+        let mut diff_config = UnifiedDiffConfig::default();
+        diff_config.context_len(0);
+        let unified_diff = diff.unified_diff(&printer, diff_config, input).to_string();
+        if !unified_diff.is_empty() {
+            let patch_path_parent = repo_root.join(ClangParams::CACHE_DIR);
+            fs::create_dir_all(&patch_path_parent).map_err(FileObjError::MkDirFailed)?;
+            let patch_file_path = patch_path_parent.join(ClangParams::AUTO_FIX_PATCH);
+            let mut patch_file = fs::OpenOptions::new()
+                .append(true)
+                .create(true)
+                .truncate(false)
+                .open(&patch_file_path)
+                .map_err(FileObjError::OpenPatchFileFailed)?;
+            patch_file
+                .write_all(
+                    format!("--- a/{file_name}\n+++ b/{file_name}\n{unified_diff}",).as_bytes(),
+                )
+                .map_err(FileObjError::WritePatchFailed)?;
+        }
+        Ok(())
+    }
+
     /// Create a list of [`Suggestion`](struct@crate::clang_tools::Suggestion) from a
     /// generated diff and store them in the given
     /// [`ReviewComments`](struct@crate::clang_tools::ReviewComments).
@@ -183,7 +235,8 @@ impl FileObj {
         let original_content =
             fs::read_to_string(repo_root.join(&self.name)).map_err(FileObjError::ReadFile)?;
         let (diff, input) = make_patch(patched.as_str(), &original_content);
-        let file_name = self.name.to_str().unwrap_or_default().replace("\\", "/");
+        let file_name = self.name.to_string_lossy().replace("\\", "/");
+        Self::append_patch(&file_name, &input, &diff, repo_root)?;
 
         self.get_suggestions(review_comments, &diff, &input, summary_only)
             .map_err(FileObjError::DisplayStringFailed)?;

@@ -17,6 +17,18 @@ pub enum FileObjError {
     /// Error when failing to generate a patch for a file.
     #[error("Failed to print a hunk to a string buffer: {0}")]
     DisplayStringFailed(#[source] std::fmt::Error),
+
+    /// Error when failing to create the cache directory for the patch file.
+    #[error("Failed to create cache directory for the patch file: {0}")]
+    MkDirFailed(#[source] std::io::Error),
+
+    /// Error when failing to open the patch file for writing.
+    #[error("Failed to open patch file for writing: {0}")]
+    OpenPatchFileFailed(#[source] std::io::Error),
+
+    /// Error when failing to write to the patch file.
+    #[error("Failed to write to the patch file: {0}")]
+    WritePatchFailed(#[source] std::io::Error),
 }
 
 /// Errors related to the REST client used for posting feedback and special logging.
