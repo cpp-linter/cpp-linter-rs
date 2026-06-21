@@ -6,6 +6,53 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
+## [cpp-linter-py/v2.0.0-rc.19] - 2026-06-21
+
+### <!-- 1 --> 🚀 Added
+
+- Use diff instead of clang-format XML output by @2bndy5 in [#347](https://github.com/cpp-linter/cpp-linter-rs/pull/347)
+- Use stricter linting rules by @2bndy5 in [#353](https://github.com/cpp-linter/cpp-linter-rs/pull/353)
+- Get clang-tidy fixes regardless of tidy-review value by @2bndy5 in [#354](https://github.com/cpp-linter/cpp-linter-rs/pull/354)
+- Merge review suggestions from both clang tools by @2bndy5 in [#358](https://github.com/cpp-linter/cpp-linter-rs/pull/358)
+- Add logs about summarizing PR reviews by @2bndy5 in [#371](https://github.com/cpp-linter/cpp-linter-rs/pull/371)
+- Allow explicit use of package managers by @2bndy5 in [#372](https://github.com/cpp-linter/cpp-linter-rs/pull/372)
+- Add colors to `--help` output and uniform logging by @2bndy5 in [#374](https://github.com/cpp-linter/cpp-linter-rs/pull/374)
+- Add `fix-patch-path` output variable by @2bndy5 in [#378](https://github.com/cpp-linter/cpp-linter-rs/pull/378)
+
+### <!-- 2 --> 🚫 Deprecated
+
+- Replace `--tidy-review`/`--format-review` with `--pr-review` by @2bndy5 in [#377](https://github.com/cpp-linter/cpp-linter-rs/pull/377)
+
+### <!-- 4 --> 🛠️ Fixed
+
+- Respect verbosity per GitHub Actions env var by @2bndy5 in [#346](https://github.com/cpp-linter/cpp-linter-rs/pull/346)
+- Do not change directory to `repo-root` by @2bndy5 in [#349](https://github.com/cpp-linter/cpp-linter-rs/pull/349)
+- Refactor for unsupported static binary platforms by @2bndy5 in [#356](https://github.com/cpp-linter/cpp-linter-rs/pull/356)
+- Bump git-bot-feedback to v0.6.1 by @2bndy5 in [#363](https://github.com/cpp-linter/cpp-linter-rs/pull/363)
+- Prevent PR review summary exceeding 65535 len by @2bndy5 in [#370](https://github.com/cpp-linter/cpp-linter-rs/pull/370)
+- Cache the versions.json in build script by @2bndy5 in [#373](https://github.com/cpp-linter/cpp-linter-rs/pull/373)
+
+### <!-- 6 --> 📦 Dependency updates
+
+- Bump version to cpp-linter-js/v2.0.0-rc.18 by @2bndy5 in [`45cfec0`](https://github.com/cpp-linter/cpp-linter-rs/commit/45cfec016eae56ae5b0442f5cfcef43ce1657247)
+- Bump urllib3 from 2.6.3 to 2.7.0 by @dependabot[bot] in [#352](https://github.com/cpp-linter/cpp-linter-rs/pull/352)
+- Bump pyo3 from 0.28.3 to 0.29.0 by @dependabot[bot] in [#355](https://github.com/cpp-linter/cpp-linter-rs/pull/355)
+- Bump the uv-pip group across 1 directory with 4 updates by @dependabot[bot] in [#357](https://github.com/cpp-linter/cpp-linter-rs/pull/357)
+- Bump the cargo group with 2 updates by @dependabot[bot] in [#360](https://github.com/cpp-linter/cpp-linter-rs/pull/360)
+- Bump version to clang-tools-manager/v0.3.0 by @2bndy5 in [`f7f7b25`](https://github.com/cpp-linter/cpp-linter-rs/commit/f7f7b254f037d5817574494481fd18ca652a42e3)
+- Bump version to cpp-linter/v2.0.0-rc.19 by @2bndy5 in [`8f49650`](https://github.com/cpp-linter/cpp-linter-rs/commit/8f49650b709e0b6dbc347c30d79c1c224aebc798)
+- Force use versions.json in docs.rs build by @2bndy5 in [`7d112b9`](https://github.com/cpp-linter/cpp-linter-rs/commit/7d112b9798dbda8e75f4c504915ca31409e308e8)
+- Bump version to clang-tools-manager/v0.3.1 by @2bndy5 in [`7cc03b5`](https://github.com/cpp-linter/cpp-linter-rs/commit/7cc03b532394b03ec333de0aed292d72a71d1374)
+- Bump version to cpp-linter/v2.0.0-rc.20 by @2bndy5 in [`9eb5f6c`](https://github.com/cpp-linter/cpp-linter-rs/commit/9eb5f6cf686d4278f56fb14a8ee4e4cf3a407164)
+
+### <!-- 8 --> 📝 Documentation
+
+- Expand clang-tools-manager/README by @2bndy5 in [#366](https://github.com/cpp-linter/cpp-linter-rs/pull/366)
+
+[cpp-linter-py/v2.0.0-rc.19]: https://github.com/cpp-linter/cpp-linter-rs/compare/cpp-linter-py/v2.0.0-rc.18...cpp-linter-py/v2.0.0-rc.19
+
+Full commit diff: [`cpp-linter-py/v2.0.0-rc.18...cpp-linter-py/v2.0.0-rc.19`][cpp-linter-py/v2.0.0-rc.19]
+
 ## [cpp-linter-py/v2.0.0-rc.18] - 2026-06-10
 
 ### <!-- 1 --> 🚀 Added
@@ -22,6 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump version to cpp-linter-js/v2.0.0-rc.17 by @2bndy5 in [`1529d72`](https://github.com/cpp-linter/cpp-linter-rs/commit/1529d7214611e45a6876ef20580565b1af3ca491)
 - Bump version to clang-tools-manager/v0.2.1 by @2bndy5 in [`f4033b5`](https://github.com/cpp-linter/cpp-linter-rs/commit/f4033b5c1807fb3889cbb3c396d0f292bac92d25)
 - Bump version to cpp-linter/v2.0.0-rc.18 by @2bndy5 in [`83c1b4a`](https://github.com/cpp-linter/cpp-linter-rs/commit/83c1b4aa29c8e388372351724c395a6a3bad7769)
+- Bump version to cpp-linter-py/v2.0.0-rc.18 by @2bndy5 in [`43220ef`](https://github.com/cpp-linter/cpp-linter-rs/commit/43220ef57786a7ee16e5284cbef95894e7e4b457)
 
 [cpp-linter-py/v2.0.0-rc.18]: https://github.com/cpp-linter/cpp-linter-rs/compare/cpp-linter-py/v2.0.0-rc.17...cpp-linter-py/v2.0.0-rc.18
 
