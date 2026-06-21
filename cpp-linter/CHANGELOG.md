@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
+## [cpp-linter/v2.0.0-rc.20] - 2026-06-21
+
+### <!-- 6 --> 📦 Dependency updates
+
+- Bump version to clang-tools-manager/v0.3.1 by @2bndy5 in [`7cc03b5`](https://github.com/cpp-linter/cpp-linter-rs/commit/7cc03b532394b03ec333de0aed292d72a71d1374)
+
+[cpp-linter/v2.0.0-rc.20]: https://github.com/cpp-linter/cpp-linter-rs/compare/cpp-linter/v2.0.0-rc.19...cpp-linter/v2.0.0-rc.20
+
+Full commit diff: [`cpp-linter/v2.0.0-rc.19...cpp-linter/v2.0.0-rc.20`][cpp-linter/v2.0.0-rc.20]
+
 ## [cpp-linter/v2.0.0-rc.19] - 2026-06-21
 
 ### <!-- 1 --> 🚀 Added
@@ -33,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### <!-- 6 --> 📦 Dependency updates
 
 - Bump version to clang-tools-manager/v0.3.0 by @2bndy5 in [`f7f7b25`](https://github.com/cpp-linter/cpp-linter-rs/commit/f7f7b254f037d5817574494481fd18ca652a42e3)
+- Bump version to cpp-linter/v2.0.0-rc.19 by @2bndy5 in [`8f49650`](https://github.com/cpp-linter/cpp-linter-rs/commit/8f49650b709e0b6dbc347c30d79c1c224aebc798)
 
 ### <!-- 8 --> 📝 Documentation
 
