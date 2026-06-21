@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
+## [clang-tools-manager/v0.3.1] - 2026-06-21
+
+### <!-- 6 --> 📦 Dependency updates
+
+- Force use versions.json in docs.rs build by @2bndy5 in [`7d112b9`](https://github.com/cpp-linter/cpp-linter-rs/commit/7d112b9798dbda8e75f4c504915ca31409e308e8)
+
+[clang-tools-manager/v0.3.1]: https://github.com/cpp-linter/cpp-linter-rs/compare/clang-tools-manager/v0.3.0...clang-tools-manager/v0.3.1
+
+Full commit diff: [`clang-tools-manager/v0.3.0...clang-tools-manager/v0.3.1`][clang-tools-manager/v0.3.1]
+
 ## [clang-tools-manager/v0.3.0] - 2026-06-21
 
 ### <!-- 1 --> 🚀 Added
@@ -17,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Refactor for unsupported static binary platforms by @2bndy5 in [#356](https://github.com/cpp-linter/cpp-linter-rs/pull/356)
 - Cache the versions.json in build script by @2bndy5 in [#373](https://github.com/cpp-linter/cpp-linter-rs/pull/373)
+
+### <!-- 6 --> 📦 Dependency updates
+
+- Bump version to clang-tools-manager/v0.3.0 by @2bndy5 in [`f7f7b25`](https://github.com/cpp-linter/cpp-linter-rs/commit/f7f7b254f037d5817574494481fd18ca652a42e3)
 
 ### <!-- 8 --> 📝 Documentation
 
