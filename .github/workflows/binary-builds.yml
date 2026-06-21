@@ -228,4 +228,4 @@ jobs:
           # but docs.rs build requires the versions.json file present to
           # avoid clang-tools-manager/build.rs using network access.
           PUB_ARG: ${{ startsWith(github.ref_name, 'clang-tools-manager/v') && '--allow-dirty' || '' }}
-        run: cargo publish -p ${PKG_NAME}
+        run: cargo publish -p ${PKG_NAME} ${PUB_ARG}

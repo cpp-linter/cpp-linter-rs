@@ -18,13 +18,16 @@ fn main() {
     let pre_seed = PathBuf::from("versions.json");
     let version_info_str = if pre_seed.exists()
         && let Ok(metadata) = fs::metadata(&pre_seed)
-        && metadata.modified().is_ok_and(|d| {
-            SystemTime::now()
-                .duration_since(d)
-                // repopulate cached file in case of error
-                .unwrap_or(Duration::from_hours(25))
-                < Duration::from_hours(24)
-        }) {
+        // if this is a docs.rs build, then use the versions,json present in the package.
+        && (std::env::var_os("DOCS_RS").is_some()
+            // otherwise, check if the file is not too old (24 hours)
+            || metadata.modified().is_ok_and(|d| {
+                SystemTime::now()
+                    .duration_since(d)
+                    // repopulate cached file in case of error
+                    .unwrap_or(Duration::from_hours(25))
+                    < Duration::from_hours(24)
+            })) {
         println!("cargo:warning=Using pre-seeded version info from {pre_seed:?}");
         fs::read_to_string(&pre_seed).unwrap()
     } else {
