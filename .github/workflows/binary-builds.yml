@@ -223,4 +223,9 @@ jobs:
         env:
           PKG_NAME: ${{ startsWith(github.ref_name, 'cpp-linter') && 'cpp-linter' || 'clang-tools-manager' }}
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+          # `--allow-dirty` is required for clang-tools-manager
+          # because the versions.json file is flagged as "not checked in",
+          # but docs.rs build requires the versions.json file present to
+          # avoid clang-tools-manager/build.rs using network access.
+          PUB_ARG: ${{ startsWith(github.ref_name, 'clang-tools-manager/v') && '--allow-dirty' || '' }}
         run: cargo publish -p ${PKG_NAME}
