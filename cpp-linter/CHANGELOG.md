@@ -6,11 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
+## [cpp-linter/v2.0.0-rc.21] - 2026-06-23
+
+### <!-- 4 --> 🛠️ Fixed
+
+- Pass `--extra-arg`s to clang-tidy properly by @2bndy5 in [#386](https://github.com/cpp-linter/cpp-linter-rs/pull/386)
+- Make repo-root path absolute by @2bndy5 in [#387](https://github.com/cpp-linter/cpp-linter-rs/pull/387)
+
+[cpp-linter/v2.0.0-rc.21]: https://github.com/cpp-linter/cpp-linter-rs/compare/cpp-linter/v2.0.0-rc.20...cpp-linter/v2.0.0-rc.21
+
+Full commit diff: [`cpp-linter/v2.0.0-rc.20...cpp-linter/v2.0.0-rc.21`][cpp-linter/v2.0.0-rc.21]
+
 ## [cpp-linter/v2.0.0-rc.20] - 2026-06-21
 
 ### <!-- 6 --> 📦 Dependency updates
 
 - Bump version to clang-tools-manager/v0.3.1 by @2bndy5 in [`7cc03b5`](https://github.com/cpp-linter/cpp-linter-rs/commit/7cc03b532394b03ec333de0aed292d72a71d1374)
+- Bump version to cpp-linter/v2.0.0-rc.20 by @2bndy5 in [`9eb5f6c`](https://github.com/cpp-linter/cpp-linter-rs/commit/9eb5f6cf686d4278f56fb14a8ee4e4cf3a407164)
 
 [cpp-linter/v2.0.0-rc.20]: https://github.com/cpp-linter/cpp-linter-rs/compare/cpp-linter/v2.0.0-rc.19...cpp-linter/v2.0.0-rc.20
 
