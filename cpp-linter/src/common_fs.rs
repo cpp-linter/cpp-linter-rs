@@ -383,6 +383,20 @@ impl FileObj {
     }
 }
 
+/// Make the given `path` absolute.
+///
+/// This function will canonicalize the path and remove any `\\?\` prefix
+/// returned by Windows API, which is really only designed for other Windows API.
+///
+/// This function can error if the given path fails to be canonicalized.
+/// This may happen if the path does not exist or a non-final path
+/// component is not a directory.
+pub(crate) fn mk_path_abs<P: AsRef<Path>>(path: P) -> Result<PathBuf, std::io::Error> {
+    let abs_path = path.as_ref().canonicalize()?;
+    let abs_path_str = abs_path.to_string_lossy();
+    Ok(PathBuf::from(abs_path_str.trim_start_matches(r"\\?\")))
+}
+
 #[cfg(test)]
 mod test {
     use std::path::PathBuf;
@@ -437,5 +451,14 @@ mod test {
     fn line_not_in_diff() {
         let file_obj = FileObj::new(PathBuf::from("tests/demo/demo.cpp"));
         assert!(!file_obj.is_line_in_diff(&42));
+    }
+
+    #[test]
+    fn canonical_path() {
+        let file_obj = FileObj::new(PathBuf::from("tests/demo/demo.cpp"));
+        let canonical_path = super::mk_path_abs(&file_obj.name).unwrap();
+        assert!(canonical_path.is_file());
+        println!("Canonical path: {}", canonical_path.display());
+        assert!(!canonical_path.to_string_lossy().starts_with(r"\\?\"));
     }
 }
