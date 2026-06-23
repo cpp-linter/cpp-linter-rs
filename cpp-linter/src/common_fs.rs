@@ -399,6 +399,7 @@ pub(crate) fn mk_path_abs<P: AsRef<Path>>(path: P) -> Result<PathBuf, std::io::E
 
 #[cfg(test)]
 mod test {
+    #![allow(clippy::unwrap_used)]
     use std::path::PathBuf;
 
     use super::FileObj;

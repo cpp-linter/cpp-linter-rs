@@ -281,7 +281,6 @@ pub(crate) mod test {
             "-l".to_string(),
             "false".to_string(),
             "-V".to_string(),
-            "-i=target|benches/libgit2".to_string(),
             "--repo-root".to_string(),
             tmp_workspace.path().to_str().unwrap().to_string(),
         ])
@@ -302,7 +301,6 @@ pub(crate) mod test {
             "--lines-changed-only".to_string(),
             "false".to_string(),
             "-v".to_string(),
-            "--ignore=target|benches/libgit2".to_string(),
             "--repo-root".to_string(),
             tmp_workspace.path().to_str().unwrap().to_string(),
         ])
@@ -326,6 +324,19 @@ pub(crate) mod test {
         ])
         .await
         .unwrap();
+        drop(tmp_gh_out);
+    }
+
+    #[tokio::test]
+    async fn bad_repo_root() {
+        let tmp_gh_out = setup_tmp_gh_out_path();
+        run_main(vec![
+            "cpp-linter".to_string(),
+            "--repo-root".to_string(),
+            "non-existent_path".to_string(),
+        ])
+        .await
+        .unwrap_err();
         drop(tmp_gh_out);
     }
 }
