@@ -4,7 +4,7 @@ use std::{fmt::Display, path::PathBuf};
 use clap::{ValueEnum, builder::PossibleValue};
 
 #[cfg(feature = "bin")]
-use super::Cli;
+use super::{Cli, convert_extra_arg_val};
 use crate::clang_tools::clang_tidy::CompilationUnit;
 
 use git_bot_feedback::FileFilter;
@@ -275,7 +275,7 @@ impl From<&Cli> for ClangParams {
             tidy_checks: args.tidy_options.tidy_checks.clone(),
             lines_changed_only: args.source_options.lines_changed_only.clone(),
             database,
-            extra_args: args.tidy_options.extra_arg.clone(),
+            extra_args: convert_extra_arg_val(&args.tidy_options.extra_arg),
             database_json: None,
             style: args.format_options.style.clone(),
             clang_tidy_command: None,

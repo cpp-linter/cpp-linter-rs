@@ -294,7 +294,12 @@ pub fn run_clang_tidy(
         cmd.args(["-p", &db.to_string_lossy()]);
     }
     for arg in &clang_params.extra_args {
-        cmd.args(["--extra-arg", format!("\"{}\"", arg).as_str()]);
+        // Use `--extra-arg=...` syntax to prevent values getting
+        // interpreted as a clang-tidy options.
+        // At this point, values should already be split by
+        // whitespace in `ClangParams::from(&cli)` via
+        // `crate::cli::convert_extra_arg_val()`.
+        cmd.arg(format!("--extra-arg={arg}").as_str());
     }
     let file_name = file.name.to_string_lossy().to_string();
     let ranges = file.get_ranges(&clang_params.lines_changed_only);
@@ -390,6 +395,10 @@ pub fn run_clang_tidy(
         &clang_params.database_json,
         &clang_params.repo_root,
     )?;
+    logs.push((
+        log::Level::Debug,
+        format!("Parsed {} clang-tidy notifications", notes.len()),
+    ));
 
     let tidy_advice = TidyAdvice { notes };
     file.patched_path = Some(cache_patch_path.to_path_buf());
@@ -474,7 +483,7 @@ mod test {
     // ***************** test for regex parsing of clang-tidy stdout
 
     #[test]
-    fn test_capture() {
+    fn regex_capture() {
         let src = "tests/demo/demo.hpp:11:11: \
         warning: use a trailing return type for this function \
         [modernize-use-trailing-return-type,-warnings-as-errors]";
@@ -540,8 +549,9 @@ mod test {
             .expect("expected a log message about invoked clang-tidy command")
             .split(' ')
             .collect::<Vec<&str>>();
+        println!("args: {:?}", args);
         for arg in &extra_args {
-            let extra_arg = format!("\"{arg}\"");
+            let extra_arg = format!("--extra-arg={arg}");
             assert!(args.contains(&extra_arg.as_str()));
         }
     }
