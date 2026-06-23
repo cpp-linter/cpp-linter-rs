@@ -10,7 +10,6 @@ mod test {
 
     use std::{
         env::{self, current_dir, set_current_dir},
-        fs,
         process::Command,
     };
 
@@ -41,12 +40,8 @@ mod test {
             }
         }
         if let Some(patch) = patch_path {
-            let canonical_patch_path = fs::canonicalize(patch).unwrap();
-            let patch_path = canonical_patch_path
-                .to_str()
-                .unwrap()
-                // on Windows, canonical paths can have a prefix of "\\?\" which git does not recognize
-                .trim_start_matches("\\\\?\\");
+            let canonical_patch_path = crate::common_fs::mk_path_abs(patch).unwrap();
+            let patch_path = canonical_patch_path.to_str().unwrap();
             let ok = Command::new("git")
                 .args(["apply", "--index", patch_path])
                 .current_dir(path)

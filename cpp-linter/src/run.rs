@@ -20,7 +20,7 @@ use log::{LevelFilter, set_max_level};
 use crate::{
     clang_tools::capture_clang_tools_output,
     cli::{ClangParams, Cli, CliCommand, FeedbackInput, LinesChangedOnly},
-    common_fs::FileObj,
+    common_fs::{FileObj, mk_path_abs},
     rest_client::RestClient,
 };
 use git_bot_feedback::FileFilter;
@@ -47,7 +47,7 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// alias ("path/to/cpp-linter.exe"). Thus, the parser in [`crate::cli`] will halt on an error
 /// because it is not configured to handle positional arguments.
 pub async fn run_main(args: Vec<String>) -> Result<()> {
-    let cli = Cli::parse_from(args);
+    let mut cli = Cli::parse_from(args);
 
     if matches!(cli.commands, Some(CliCommand::Version))
         || cli.general_options.version == RequestedVersion::NoValue
@@ -81,7 +81,14 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
             .collect::<Vec<&str>>(),
         None,
     );
-    let gitmodules = cli.source_options.repo_root.join(".gitmodules");
+    let repo_root_abs = mk_path_abs(&cli.source_options.repo_root).with_context(|| {
+        format!(
+            "Failed to canonicalize the repo root path: {}",
+            cli.source_options.repo_root.to_string_lossy()
+        )
+    })?;
+    let gitmodules = repo_root_abs.join(".gitmodules");
+    cli.source_options.repo_root = repo_root_abs;
     file_filter.parse_submodules(Some(gitmodules.as_path()));
     if let Some(files) = &cli.not_ignored {
         file_filter.not_ignored.extend(files.clone());
@@ -274,7 +281,6 @@ pub(crate) mod test {
             "-l".to_string(),
             "false".to_string(),
             "-V".to_string(),
-            "-i=target|benches/libgit2".to_string(),
             "--repo-root".to_string(),
             tmp_workspace.path().to_str().unwrap().to_string(),
         ])
@@ -295,7 +301,6 @@ pub(crate) mod test {
             "--lines-changed-only".to_string(),
             "false".to_string(),
             "-v".to_string(),
-            "--ignore=target|benches/libgit2".to_string(),
             "--repo-root".to_string(),
             tmp_workspace.path().to_str().unwrap().to_string(),
         ])
@@ -319,6 +324,19 @@ pub(crate) mod test {
         ])
         .await
         .unwrap();
+        drop(tmp_gh_out);
+    }
+
+    #[tokio::test]
+    async fn bad_repo_root() {
+        let tmp_gh_out = setup_tmp_gh_out_path();
+        run_main(vec![
+            "cpp-linter".to_string(),
+            "--repo-root".to_string(),
+            "non-existent_path".to_string(),
+        ])
+        .await
+        .unwrap_err();
         drop(tmp_gh_out);
     }
 }

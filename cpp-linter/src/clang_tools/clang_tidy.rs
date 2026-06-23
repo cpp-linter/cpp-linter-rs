@@ -395,10 +395,6 @@ pub fn run_clang_tidy(
         &clang_params.database_json,
         &clang_params.repo_root,
     )?;
-    logs.push((
-        log::Level::Debug,
-        format!("Parsed {} clang-tidy notifications", notes.len()),
-    ));
 
     let tidy_advice = TidyAdvice { notes };
     file.patched_path = Some(cache_patch_path.to_path_buf());
