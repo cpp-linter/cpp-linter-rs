@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
+## [cpp-linter-py/v2.0.0-rc.20] - 2026-06-24
+
+### <!-- 4 --> 🛠️ Fixed
+
+- Pass `--extra-arg`s to clang-tidy properly by @2bndy5 in [#386](https://github.com/cpp-linter/cpp-linter-rs/pull/386)
+- Make repo-root path absolute by @2bndy5 in [#387](https://github.com/cpp-linter/cpp-linter-rs/pull/387)
+
+### <!-- 6 --> 📦 Dependency updates
+
+- Bump version to cpp-linter-js/v2.0.0-rc.19 by @2bndy5 in [`7949a3c`](https://github.com/cpp-linter/cpp-linter-rs/commit/7949a3c62fce83be53721bc507a5ce630afdcb1d)
+- Bump the cargo group with 3 updates by @dependabot[bot] in [#381](https://github.com/cpp-linter/cpp-linter-rs/pull/381)
+- Bump version to cpp-linter/v2.0.0-rc.21 by @2bndy5 in [`9a9fe54`](https://github.com/cpp-linter/cpp-linter-rs/commit/9a9fe5432bdc279c0cd9f8ccce390caafcb27a34)
+
+[cpp-linter-py/v2.0.0-rc.20]: https://github.com/cpp-linter/cpp-linter-rs/compare/cpp-linter-py/v2.0.0-rc.19...cpp-linter-py/v2.0.0-rc.20
+
+Full commit diff: [`cpp-linter-py/v2.0.0-rc.19...cpp-linter-py/v2.0.0-rc.20`][cpp-linter-py/v2.0.0-rc.20]
+
 ## [cpp-linter-py/v2.0.0-rc.19] - 2026-06-21
 
 ### <!-- 1 --> 🚀 Added
@@ -44,6 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Force use versions.json in docs.rs build by @2bndy5 in [`7d112b9`](https://github.com/cpp-linter/cpp-linter-rs/commit/7d112b9798dbda8e75f4c504915ca31409e308e8)
 - Bump version to clang-tools-manager/v0.3.1 by @2bndy5 in [`7cc03b5`](https://github.com/cpp-linter/cpp-linter-rs/commit/7cc03b532394b03ec333de0aed292d72a71d1374)
 - Bump version to cpp-linter/v2.0.0-rc.20 by @2bndy5 in [`9eb5f6c`](https://github.com/cpp-linter/cpp-linter-rs/commit/9eb5f6cf686d4278f56fb14a8ee4e4cf3a407164)
+- Bump version to cpp-linter-py/v2.0.0-rc.19 by @2bndy5 in [`178b7f4`](https://github.com/cpp-linter/cpp-linter-rs/commit/178b7f425fba50c40221cbeed11f86fcb5233135)
 
 ### <!-- 8 --> 📝 Documentation
 
