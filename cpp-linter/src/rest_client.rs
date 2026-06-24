@@ -144,11 +144,11 @@ impl RestClient {
                 value: format!("{}", format_checks_failed + tidy_checks_failed),
             },
             OutputVariable {
-                name: "format-checks-failed".to_string(),
+                name: "clang-format-checks-failed".to_string(),
                 value: format_checks_failed.to_string(),
             },
             OutputVariable {
-                name: "tidy-checks-failed".to_string(),
+                name: "clang-tidy-checks-failed".to_string(),
                 value: tidy_checks_failed.to_string(),
             },
         ];
@@ -590,8 +590,8 @@ mod test {
     async fn check_comment_concerns() {
         let (comment, gh_out) = create_comment(false).await;
         assert!(&comment.contains(":warning:\nSome files did not pass the configured checks!\n"));
-        let fmt_pattern = Regex::new(r"format-checks-failed=(\d+)\n").unwrap();
-        let tidy_pattern = Regex::new(r"tidy-checks-failed=(\d+)\n").unwrap();
+        let fmt_pattern = Regex::new(r"clang-format-checks-failed=(\d+)\n").unwrap();
+        let tidy_pattern = Regex::new(r"clang-tidy-checks-failed=(\d+)\n").unwrap();
         for pattern in [fmt_pattern, tidy_pattern] {
             let number = pattern
                 .captures(&gh_out)
@@ -614,7 +614,7 @@ mod test {
         assert!(comment.contains(":heavy_check_mark:\nNo problems need attention."));
         assert_eq!(
             gh_out,
-            "checks-failed=0\nformat-checks-failed=0\ntidy-checks-failed=0\n"
+            "checks-failed=0\nclang-format-checks-failed=0\nclang-tidy-checks-failed=0\n"
         );
     }
 }
