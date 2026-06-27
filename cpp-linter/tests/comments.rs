@@ -1,7 +1,8 @@
 #![cfg(feature = "bin")]
 use chrono::Utc;
-use cpp_linter::cli::ThreadComments;
+use cpp_linter::rest_client::USER_OUTREACH;
 use cpp_linter::run::run_main;
+use cpp_linter::{cli::ThreadComments, rest_client::COMMENT_MARKER};
 use git_bot_feedback::LinesChangedOnly;
 use mockito::Matcher;
 use std::{env, fmt::Display, fs, io::Write, path::Path};
@@ -18,6 +19,8 @@ const MOCK_ASSETS_PATH: &str = "tests/comment_test_assets/";
 
 const RESET_RATE_LIMIT_HEADER: &str = "x-ratelimit-reset";
 const REMAINING_RATE_LIMIT_HEADER: &str = "x-ratelimit-remaining";
+
+const SUMMARY_OUT_FILE_NAME: &str = "summary_output.md";
 
 #[derive(PartialEq, Clone, Copy, Debug)]
 enum EventType {
@@ -44,6 +47,7 @@ struct TestParams {
     pub fail_dismissal: bool,
     pub fail_posting: bool,
     pub bad_existing_comments: bool,
+    pub relative_summary_out_file: bool,
 }
 
 impl Default for TestParams {
@@ -58,6 +62,7 @@ impl Default for TestParams {
             fail_dismissal: false,
             fail_posting: false,
             bad_existing_comments: false,
+            relative_summary_out_file: false,
         }
     }
 }
@@ -242,6 +247,12 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
         );
     }
 
+    let summary_out_file_path = if test_params.relative_summary_out_file {
+        std::path::PathBuf::from(SUMMARY_OUT_FILE_NAME)
+    } else {
+        tmp_dir.path().join(SUMMARY_OUT_FILE_NAME)
+    };
+
     let mut args = vec![
         "cpp-linter".to_string(),
         "-v=debug".to_string(),
@@ -254,6 +265,10 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
         "-p=build".to_string(),
         "-i=build/**".to_string(),
         format!("--repo-root={}", tmp_dir.path().to_str().unwrap()),
+        format!(
+            "--summary-output-file={}",
+            summary_out_file_path.to_str().unwrap()
+        ),
     ];
     if test_params.force_lgtm {
         args.push("-e=c".to_string());
@@ -297,6 +312,15 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
             std::fs::read_to_string(patch_path).expect("Failed to read generated patch file.");
         println!("Generated patch content:\n{patch_content}");
     }
+
+    let summary_out_file_abs_path = if test_params.relative_summary_out_file {
+        tmp_dir.path().join(SUMMARY_OUT_FILE_NAME)
+    } else {
+        summary_out_file_path.clone()
+    };
+    let summary_content = std::fs::read_to_string(&summary_out_file_abs_path).unwrap();
+    assert!(summary_content.contains(COMMENT_MARKER));
+    assert!(summary_content.contains(USER_OUTREACH));
 }
 
 async fn test_comment(test_params: &TestParams) {
@@ -469,6 +493,15 @@ async fn bad_existing_comments() {
     test_comment(&TestParams {
         bad_existing_comments: true,
         force_lgtm: true,
+        ..Default::default()
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn relative_summary_out_file() {
+    test_comment(&TestParams {
+        relative_summary_out_file: true,
         ..Default::default()
     })
     .await;

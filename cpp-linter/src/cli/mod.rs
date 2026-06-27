@@ -494,6 +494,19 @@ pub struct FeedbackOptions {
     ))]
     pub step_summary: bool,
 
+    /// Provide this option with a path to which a summary comment is written.
+    ///
+    /// If the given path is relative, then it shall be relative to the given
+    /// [`--repo-root`](#-r-repo-root) path.
+    #[cfg_attr(feature = "bin", arg(
+        short = 'o',
+        long,
+        value_name = "PATH",
+        value_parser = value_parser!(PathBuf),
+        help_heading = "Feedback options",
+    ))]
+    pub summary_output_file: Option<PathBuf>,
+
     /// Set this option to false to disable the use of
     /// file annotations as feedback.
     #[cfg_attr(feature = "bin", arg(

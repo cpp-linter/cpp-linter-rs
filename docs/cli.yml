@@ -31,6 +31,8 @@ inputs:
     minimum-version: '1.6.1'
   step-summary:
     minimum-version: '1.6.0'
+  summary-output-file:
+    minimum-version: '1.13.0'
   file-annotations:
     minimum-version: '1.4.3'
   database:
@@ -47,8 +49,6 @@ inputs:
   passive-reviews:
     minimum-version: '1.10.0'
     required-permission: 'pull-requests: write #pull-request-reviews'
-  jobs:
-    minimum-version: '1.8.1'
   diff-base:
     minimum-version: '1.12.0'
   ignore-index:
@@ -60,3 +60,5 @@ outputs:
     minimum-version: '1.6.2'
   clang-format-checks-failed:
     minimum-version: '1.6.2'
+  fix-patch-path:
+    minimum-version: '2.0.0'

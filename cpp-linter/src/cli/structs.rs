@@ -299,6 +299,9 @@ pub struct FeedbackInput {
     /// Whether to post a step summary comment.
     pub step_summary: bool,
 
+    /// An optional file path to which a summary comment is written.
+    pub summary_output_file: Option<PathBuf>,
+
     /// Whether to post file annotations.
     pub file_annotations: bool,
 
@@ -330,6 +333,7 @@ impl From<&Cli> for FeedbackInput {
             pr_review: args.feedback_options.pr_review,
             passive_reviews: args.feedback_options.passive_reviews,
             repo_root: args.source_options.repo_root.clone(),
+            summary_output_file: args.feedback_options.summary_output_file.clone(),
         }
     }
 }
@@ -346,6 +350,7 @@ impl Default for FeedbackInput {
             pr_review: false,
             passive_reviews: false,
             repo_root: PathBuf::from("."),
+            summary_output_file: None,
         }
     }
 }
