@@ -133,11 +133,11 @@ impl FileObj {
     pub fn is_hunk_in_diff(&self, hunk: &Hunk) -> Option<(u32, u32)> {
         let (start_line, end_line) = if !hunk.before.is_empty() {
             // if old hunk's total lines is > 0
-            let start = hunk.before.start;
-            (start, start + hunk.before.len() as u32 - 1)
+            let start = hunk.before.start.saturating_add(1); // convert to 1-based line numbers
+            (start, hunk.before.start + hunk.before.len() as u32)
         } else {
             // old hunk's total lines is 0, meaning changes were only added
-            let start = hunk.after.start;
+            let start = hunk.after.start.saturating_add(1); // convert to 1-based line numbers
             // make old hunk's range span 1 line
             (start, start)
         };
@@ -207,7 +207,7 @@ impl FileObj {
                 .map_err(FileObjError::OpenPatchFileFailed)?;
             patch_file
                 .write_all(
-                    format!("--- a/{file_name}\n+++ b/{file_name}\n{unified_diff}",).as_bytes(),
+                    format!("--- a/{file_name}\n+++ b/{file_name}\n{unified_diff}").as_bytes(),
                 )
                 .map_err(FileObjError::WritePatchFailed)?;
         }
@@ -332,7 +332,7 @@ impl FileObj {
                             format!(
                                 "Please remove the line(s)\n- {}",
                                 hunk.before
-                                    .map(|l| l.to_string())
+                                    .map(|l| l.saturating_add(1).to_string())
                                     .collect::<Vec<String>>()
                                     .join("\n- ")
                             )
@@ -401,10 +401,12 @@ pub(crate) fn mk_path_abs<P: AsRef<Path>>(path: P) -> Result<PathBuf, std::io::E
 #[cfg(test)]
 mod test {
     #![allow(clippy::unwrap_used)]
-    use std::path::PathBuf;
+    use std::{fs, path::PathBuf};
+
+    use tempfile::{NamedTempFile, TempDir};
 
     use super::FileObj;
-    use crate::cli::LinesChangedOnly;
+    use crate::{clang_tools::ReviewComments, cli::LinesChangedOnly};
 
     // *********************** tests for FileObj::get_ranges()
 
@@ -462,5 +464,36 @@ mod test {
         assert!(canonical_path.is_file());
         println!("Canonical path: {}", canonical_path.display());
         assert!(!canonical_path.to_string_lossy().starts_with(r"\\?\"));
+    }
+
+    #[test]
+    fn pure_removal_suggestion() {
+        let repo_root = TempDir::new().unwrap();
+        let file_name = PathBuf::from("test_file.cpp");
+
+        // Write original file with 3 lines
+        let original_content = "line1\nline2\nline3\n";
+        fs::write(repo_root.path().join(&file_name), original_content).unwrap();
+
+        // Patched file has line2 removed
+        let patched_content = "line1\nline3\n";
+        let patched_file = NamedTempFile::new().unwrap();
+        fs::write(patched_file.path(), patched_content).unwrap();
+
+        // line2 is 1-indexed line 2; diff_chunks must contain it
+        let mut file_obj = FileObj::from(file_name, vec![2], vec![2..=2]);
+        file_obj.patched_path = Some(patched_file.path().to_path_buf());
+
+        let mut review_comments = ReviewComments::default();
+        file_obj
+            .make_suggestions_from_patch(&mut review_comments, false, repo_root.path())
+            .unwrap();
+
+        assert_eq!(review_comments.comments.len(), 1);
+        let suggestion = &review_comments.comments[0].suggestion;
+        assert!(
+            suggestion.contains("Please remove the line(s)\n- 2"),
+            "unexpected suggestion: {suggestion}"
+        );
     }
 }
