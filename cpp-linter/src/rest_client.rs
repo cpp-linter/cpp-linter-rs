@@ -142,15 +142,14 @@ impl RestClient {
                 let output_file = if summary_output_file.is_absolute() {
                     summary_output_file
                 } else {
-                    let out = feedback_inputs.repo_root.join(&summary_output_file);
-                    if let Some(parent) = out.parent() {
-                        std::fs::create_dir_all(parent).map_err(|e| ClientError::MkDirFailed {
-                            file_path: out.clone(),
-                            source: e,
-                        })?;
-                    }
-                    out
+                    feedback_inputs.repo_root.join(&summary_output_file)
                 };
+                if let Some(parent) = output_file.parent() {
+                    std::fs::create_dir_all(parent).map_err(|e| ClientError::MkDirFailed {
+                        file_path: output_file.clone(),
+                        source: e,
+                    })?;
+                }
                 std::fs::write(&output_file, &summary).map_err(|e| {
                     ClientError::SummaryOutputFileWriteFailed {
                         file_path: output_file,
