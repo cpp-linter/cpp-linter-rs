@@ -322,6 +322,14 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
             };
             println!("{style}{l}{style:#}");
         }
+
+        let apply_patch_status = std::process::Command::new("git")
+            .arg("apply")
+            .arg(patch_path)
+            .current_dir(tmp_dir.path())
+            .status()
+            .expect("Failed to execute `git apply` command.");
+        assert!(apply_patch_status.success());
     }
 
     let summary_out_file_abs_path = if test_params.relative_summary_out_file {

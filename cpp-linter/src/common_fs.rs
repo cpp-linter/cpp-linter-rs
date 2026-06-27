@@ -192,8 +192,7 @@ impl FileObj {
         repo_root: &Path,
     ) -> Result<(), FileObjError> {
         let printer = BasicLineDiffPrinter(&input.interner);
-        let mut diff_config = UnifiedDiffConfig::default();
-        diff_config.context_len(0);
+        let diff_config = UnifiedDiffConfig::default();
         let unified_diff = diff.unified_diff(&printer, diff_config, input).to_string();
         if !unified_diff.is_empty() {
             let patch_path_parent = repo_root.join(ClangParams::CACHE_DIR);
