@@ -302,8 +302,8 @@ fn three_way_diff(ranges: &[RangeInclusive<u32>], tidy_diff: Diff) -> Vec<RangeI
     for tidy_hunk in tidy_iter {
         maybe_push_range(
             &mut joint_ranges,
-            tidy_hunk.after.start,
-            tidy_hunk.after.end.saturating_sub(1),
+            tidy_hunk.after.start.saturating_add(1), // convert to 1-based line numbers
+            tidy_hunk.after.end, // exclusive end is inclusive for 1-based line numbers
         );
     }
 
@@ -371,7 +371,7 @@ mod tests {
         println!("tidy diff: {tidy_diff:#?}\ncompared to og ranges: {ranges:?}");
         let joint_ranges = three_way_diff(&ranges, tidy_diff);
         println!("joint ranges: {joint_ranges:#?}");
-        assert_eq!(joint_ranges, vec![4..=7, 9..=10]);
+        assert_eq!(joint_ranges, vec![4..=7, 10..=11]);
     }
 
     #[cfg(feature = "bin")]
