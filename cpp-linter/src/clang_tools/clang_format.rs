@@ -119,10 +119,13 @@ pub fn run_clang_format(
         replacements: diff
             .hunks()
             .filter_map(|hunk| {
+                let altered_start = hunk.after.start.saturating_add(1); // convert to 1-based line numbers
+                let og_start = hunk.before.start.saturating_add(1); // convert to 1-based line numbers
+                let og_end = hunk.before.end; // exclusive end is inclusive for 1-based line numbers
                 let replacement = if hunk.is_pure_insertion() {
-                    RangeInclusive::new(hunk.after.start, hunk.after.start)
+                    RangeInclusive::new(altered_start, altered_start)
                 } else {
-                    RangeInclusive::new(hunk.before.start, hunk.before.end.saturating_sub(1))
+                    RangeInclusive::new(og_start, og_end)
                 };
                 if ranges.is_empty() {
                     Some(replacement)
@@ -241,14 +244,14 @@ fn three_way_diff(ranges: &[RangeInclusive<u32>], tidy_diff: Diff) -> Vec<RangeI
 
         while let Some(tidy_hunk) = tidy_iter.peek() {
             // alias for readability and prevent some repeated calculations
-            let before_start = tidy_hunk.before.start;
-            let before_end = tidy_hunk.before.end.saturating_sub(1);
-            let after_start = tidy_hunk.after.start;
-            let after_end = tidy_hunk.after.end.saturating_sub(1);
+            let before_start = tidy_hunk.before.start.saturating_add(1); // convert to 1-based line numbers
+            let before_end = tidy_hunk.before.end; // exclusive end is inclusive for 1-based line numbers
+            let after_start = tidy_hunk.after.start.saturating_add(1); // convert to 1-based line numbers
+            let after_end = tidy_hunk.after.end; // exclusive end is inclusive for 1-based line numbers
             let delta = tidy_hunk.after.len() as i32 - tidy_hunk.before.len() as i32;
 
-            // The tidy hunk is a pure removal that exactly matches the og range.
-            if tidy_hunk.is_pure_removal() && before_start == og_start && before_end == og_end {
+            // The tidy hunk is a pure removal that encompasses the og range.
+            if tidy_hunk.is_pure_removal() && before_start <= og_start && before_end >= og_end {
                 // Skip the og range and tidy hunk entirely.
                 // The line shift must still be adjusted for the pure removal though
                 line_shift += delta;
@@ -272,7 +275,7 @@ fn three_way_diff(ranges: &[RangeInclusive<u32>], tidy_diff: Diff) -> Vec<RangeI
             }
 
             // tidy hunk overlaps with the og range in some way (case 4).
-            if tidy_hunk.before.contains(&og_start) {
+            if (before_start..=before_end).contains(&og_start) {
                 merged_start = after_start;
             }
 
@@ -280,7 +283,7 @@ fn three_way_diff(ranges: &[RangeInclusive<u32>], tidy_diff: Diff) -> Vec<RangeI
             line_shift += delta;
 
             // tidy hunk suffixes the og range.
-            if tidy_hunk.before.contains(&og_end) {
+            if (before_start..=before_end).contains(&og_end) {
                 merged_end = after_end;
                 tidy_iter.next(); // this tidy hunk is handled.
                 break; // break from loop to push the merged range into joint_ranges.
@@ -313,9 +316,8 @@ mod tests {
 
     use std::ops::RangeInclusive;
 
-    use gix_imara_diff::{Diff, InternedInput};
-
     use super::{summarize_style, three_way_diff};
+    use crate::clang_tools::make_patch;
 
     fn formalize_style(style: &str, expected: &str) {
         assert_eq!(summarize_style(style), expected);
@@ -339,38 +341,70 @@ mod tests {
     #[test]
     fn three_way_diff_mixed() {
         const OG_SRC: &str =
-            "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10\nline11";
-        // TIDY_SRC replaces line3->StringA (hunk before=2..3) and
-        // line8+line9+line10->StringB+StringC (hunk before=7..10), then appends StringE.
-        // The second hunk's before=7..10 contains og_end=9 but not og_start=6,
-        // which exercises the "tidy hunk suffixes og range" branch.
+            "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10\nline11\nline12";
+        // The first hunk line2-3->StringA-B (hunk 2..4 prefixes og range[3..=5]).
+        // The second hunk line8-11->StringC-D\nline11\n (hunk 8..12 suffixes og range[7..=9]).
         const TIDY_SRC: &str =
-            "line1\nline2\nStringA\nline4\nline5\nline6\nline7\nStringB\nStringC\nline11\nStringE";
-        let input = InternedInput::new(OG_SRC, TIDY_SRC);
-        let mut tidy_diff = Diff::compute(gix_imara_diff::Algorithm::Histogram, &input);
-        tidy_diff.postprocess_lines(&input);
-        let ranges = vec![RangeInclusive::new(2, 4), RangeInclusive::new(6, 9)];
+            "line1\nStringA\nStringB\nline4\nline5\nline6\nline7\nline8\nStringC\nStringD\nline11";
+        let (tidy_diff, _input) = make_patch(TIDY_SRC, OG_SRC);
+        #[cfg(feature = "bin")]
+        print_diff(OG_SRC, TIDY_SRC, &tidy_diff, &_input);
+        let ranges = vec![RangeInclusive::new(3, 5), RangeInclusive::new(7, 9)];
         println!("tidy diff: {tidy_diff:#?}\ncompared to og ranges: {ranges:?}");
         let joint_ranges = three_way_diff(&ranges, tidy_diff);
         println!("joint ranges: {joint_ranges:#?}");
-        assert_eq!(joint_ranges, vec![2..=4, 6..=10]);
+        assert_eq!(joint_ranges, vec![2..=5, 7..=11]);
     }
 
     #[test]
     fn three_way_diff_separated() {
         const OG_SRC: &str =
             "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10\nline11";
-        // TIDY_SRC removes "line3" (index 2) which decrements offsets in ranges[5,8] and removes ranges[2,2].
+        // TIDY_SRC removes "line3" which decrements offsets in ranges[5,8] and removes ranges[3,3].
         // TIDY_SRC appends StringE, which handles remaining tidy hunks after done iterating ranges
         const TIDY_SRC: &str =
             "line1\nline2\nline4\nline5\nline6\nline7\nline8\nline9\nline10\nline11\nStringE";
-        let input = InternedInput::new(OG_SRC, TIDY_SRC);
-        let mut tidy_diff = Diff::compute(gix_imara_diff::Algorithm::Histogram, &input);
-        tidy_diff.postprocess_lines(&input);
-        let ranges = vec![2..=2, 5..=8];
+        let (tidy_diff, _input) = make_patch(TIDY_SRC, OG_SRC);
+        #[cfg(feature = "bin")]
+        print_diff(OG_SRC, TIDY_SRC, &tidy_diff, &_input);
+        let ranges = vec![3..=3, 5..=8];
         println!("tidy diff: {tidy_diff:#?}\ncompared to og ranges: {ranges:?}");
         let joint_ranges = three_way_diff(&ranges, tidy_diff);
         println!("joint ranges: {joint_ranges:#?}");
         assert_eq!(joint_ranges, vec![4..=7, 9..=10]);
+    }
+
+    #[cfg(feature = "bin")]
+    fn print_diff(
+        og: &str,
+        altered: &str,
+        diff: &gix_imara_diff::Diff,
+        input: &gix_imara_diff::InternedInput<&str>,
+    ) {
+        use clap::builder::styling::{AnsiColor, Color, Style};
+        use gix_imara_diff::{BasicLineDiffPrinter, UnifiedDiffConfig};
+
+        println!("---\nOG SRC:");
+        for (i, l) in og.lines().enumerate() {
+            println!("{i:>2}|{l}");
+        }
+        println!("---\nALTERED SRC:");
+        for (i, l) in altered.lines().enumerate() {
+            println!("{i:>2}|{l}");
+        }
+        let printer = BasicLineDiffPrinter(&input.interner);
+        let mut config = UnifiedDiffConfig::default();
+        config.context_len(0);
+        let unified = diff.unified_diff(&printer, config, input).to_string();
+        for l in unified.lines() {
+            let style = if l.starts_with('+') {
+                Style::new().fg_color(Some(Color::Ansi(AnsiColor::Green)))
+            } else if l.starts_with('-') {
+                Style::new().fg_color(Some(Color::Ansi(AnsiColor::Red)))
+            } else {
+                Style::new()
+            };
+            println!("{style}{l}{style:#}");
+        }
     }
 }

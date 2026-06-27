@@ -133,11 +133,11 @@ impl FileObj {
     pub fn is_hunk_in_diff(&self, hunk: &Hunk) -> Option<(u32, u32)> {
         let (start_line, end_line) = if !hunk.before.is_empty() {
             // if old hunk's total lines is > 0
-            let start = hunk.before.start;
-            (start, start + hunk.before.len() as u32 - 1)
+            let start = hunk.before.start.saturating_add(1); // convert to 1-based line numbers
+            (start, hunk.before.start + hunk.before.len() as u32)
         } else {
             // old hunk's total lines is 0, meaning changes were only added
-            let start = hunk.after.start;
+            let start = hunk.after.start.saturating_add(1); // convert to 1-based line numbers
             // make old hunk's range span 1 line
             (start, start)
         };
@@ -207,7 +207,7 @@ impl FileObj {
                 .map_err(FileObjError::OpenPatchFileFailed)?;
             patch_file
                 .write_all(
-                    format!("--- a/{file_name}\n+++ b/{file_name}\n{unified_diff}",).as_bytes(),
+                    format!("--- a/{file_name}\n+++ b/{file_name}\n{unified_diff}").as_bytes(),
                 )
                 .map_err(FileObjError::WritePatchFailed)?;
         }
@@ -332,7 +332,7 @@ impl FileObj {
                             format!(
                                 "Please remove the line(s)\n- {}",
                                 hunk.before
-                                    .map(|l| l.to_string())
+                                    .map(|l| l.saturating_add(1).to_string())
                                     .collect::<Vec<String>>()
                                     .join("\n- ")
                             )
