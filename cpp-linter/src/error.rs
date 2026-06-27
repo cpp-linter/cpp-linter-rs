@@ -49,6 +49,27 @@ pub enum ClientError {
     /// Error to propagate a [`FileObjError`] encountered during file processing.
     #[error(transparent)]
     FileObjError(#[from] FileObjError),
+
+    /// Error when failing to write a given summary output file.
+    #[error("Failed to write summary comment to file '{file_path:?}': {source}")]
+    SummaryOutputFileWriteFailed {
+        /// The path to the summary output file that failed to be written.
+        file_path: std::path::PathBuf,
+
+        /// The underlying error from trying to write the summary output file.
+        #[source]
+        source: std::io::Error,
+    },
+
+    /// Error when failing to determine the parent directory of a given file path.
+    #[error("Failed to create a parent directory for the path '{file_path:?}'")]
+    MkDirFailed {
+        /// The path to the summary output file that failed to be written.
+        file_path: std::path::PathBuf,
+        /// The underlying error from trying to create the parent directory.
+        #[source]
+        source: std::io::Error,
+    },
 }
 
 /// Errors related to invoking clang tools and processing their output.

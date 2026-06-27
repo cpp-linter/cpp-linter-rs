@@ -391,6 +391,7 @@ impl FileObj {
 /// This function can error if the given path fails to be canonicalized.
 /// This may happen if the path does not exist or a non-final path
 /// component is not a directory.
+#[cfg(any(test, feature = "bin"))]
 pub(crate) fn mk_path_abs<P: AsRef<Path>>(path: P) -> Result<PathBuf, std::io::Error> {
     let abs_path = path.as_ref().canonicalize()?;
     let abs_path_str = abs_path.to_string_lossy();

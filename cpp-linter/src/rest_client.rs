@@ -127,7 +127,7 @@ impl RestClient {
             let annotations = Self::make_annotations(files, &feedback_inputs.style)?;
             self.client.write_file_annotations(&annotations)?;
         }
-        if feedback_inputs.step_summary {
+        if feedback_inputs.step_summary || feedback_inputs.summary_output_file.is_some() {
             let summary = Self::make_comment(
                 files,
                 format_checks_failed,
@@ -135,7 +135,29 @@ impl RestClient {
                 &clang_versions,
                 None,
             )?;
-            self.client.append_step_summary(&summary)?;
+            if feedback_inputs.step_summary {
+                self.client.append_step_summary(&summary)?;
+            }
+            if let Some(summary_output_file) = feedback_inputs.summary_output_file {
+                let output_file = if summary_output_file.is_absolute() {
+                    summary_output_file
+                } else {
+                    let out = feedback_inputs.repo_root.join(&summary_output_file);
+                    if let Some(parent) = out.parent() {
+                        std::fs::create_dir_all(parent).map_err(|e| ClientError::MkDirFailed {
+                            file_path: out.clone(),
+                            source: e,
+                        })?;
+                    }
+                    out
+                };
+                std::fs::write(&output_file, &summary).map_err(|e| {
+                    ClientError::SummaryOutputFileWriteFailed {
+                        file_path: output_file,
+                        source: e,
+                    }
+                })?;
+            }
             comment = Some(summary);
         }
         let output_vars = [
