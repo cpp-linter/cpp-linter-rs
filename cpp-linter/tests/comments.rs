@@ -1,5 +1,6 @@
 #![cfg(feature = "bin")]
 use chrono::Utc;
+use clap::builder::styling::{AnsiColor, Color, Style};
 use cpp_linter::rest_client::USER_OUTREACH;
 use cpp_linter::run::run_main;
 use cpp_linter::{cli::ThreadComments, rest_client::COMMENT_MARKER};
@@ -310,7 +311,17 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
         );
         let patch_content =
             std::fs::read_to_string(patch_path).expect("Failed to read generated patch file.");
-        println!("Generated patch content:\n{patch_content}");
+        println!("Generated patch content:");
+        for l in patch_content.lines() {
+            let style = if l.starts_with('+') {
+                Style::new().fg_color(Some(Color::Ansi(AnsiColor::Green))) // Green for additions
+            } else if l.starts_with('-') {
+                Style::new().fg_color(Some(Color::Ansi(AnsiColor::Red))) // Red for deletions
+            } else {
+                Style::new() // Default style for context lines
+            };
+            println!("{style}{l}{style:#}");
+        }
     }
 
     let summary_out_file_abs_path = if test_params.relative_summary_out_file {
