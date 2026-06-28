@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
+## [cpp-linter-js/v2.0.0-rc.21] - 2026-06-28
+
+### <!-- 1 --> 🚀 Added
+
+- Add option for custom path to summary comment output by @2bndy5 in [#388](https://github.com/cpp-linter/cpp-linter-rs/pull/388)
+
+### <!-- 4 --> 🛠️ Fixed
+
+- Use correct output variable names by @2bndy5 in [`7ad731f`](https://github.com/cpp-linter/cpp-linter-rs/commit/7ad731fb5e81fbcd455713c9d2b41de7e78e32e8)
+- Use diff line index as 1-based line numbers by @2bndy5 in [#389](https://github.com/cpp-linter/cpp-linter-rs/pull/389)
+- Add context lines to generated patch by @2bndy5 in [#390](https://github.com/cpp-linter/cpp-linter-rs/pull/390)
+
+### <!-- 6 --> 📦 Dependency updates
+
+- Bump version to cpp-linter/v2.0.0-rc.22 by @2bndy5 in [`3f3647c`](https://github.com/cpp-linter/cpp-linter-rs/commit/3f3647c8860946dfc4e5a1cdf112822692136e7e)
+- Bump version to cpp-linter-py/v2.0.0-rc.21 by @2bndy5 in [`1808e4a`](https://github.com/cpp-linter/cpp-linter-rs/commit/1808e4a67b9463eb3b338da7fd2906197ae72c2c)
+
+[cpp-linter-js/v2.0.0-rc.21]: https://github.com/cpp-linter/cpp-linter-rs/compare/cpp-linter-js/v2.0.0-rc.20...cpp-linter-js/v2.0.0-rc.21
+
+Full commit diff: [`cpp-linter-js/v2.0.0-rc.20...cpp-linter-js/v2.0.0-rc.21`][cpp-linter-js/v2.0.0-rc.21]
+
 ## [cpp-linter-js/v2.0.0-rc.20] - 2026-06-24
 
 ### <!-- 4 --> 🛠️ Fixed
@@ -19,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump the npm group across 1 directory with 2 updates by @dependabot[bot] in [#382](https://github.com/cpp-linter/cpp-linter-rs/pull/382)
 - Bump version to cpp-linter/v2.0.0-rc.21 by @2bndy5 in [`9a9fe54`](https://github.com/cpp-linter/cpp-linter-rs/commit/9a9fe5432bdc279c0cd9f8ccce390caafcb27a34)
 - Bump version to cpp-linter-py/v2.0.0-rc.20 by @2bndy5 in [`bac1838`](https://github.com/cpp-linter/cpp-linter-rs/commit/bac1838924bb614bf2d02d27792d1d976942dd3f)
+- Bump version to cpp-linter-js/v2.0.0-rc.20 by @2bndy5 in [`2489719`](https://github.com/cpp-linter/cpp-linter-rs/commit/2489719d03db7c4cbf2100cc6962e5fb9b2b639c)
 
 [cpp-linter-js/v2.0.0-rc.20]: https://github.com/cpp-linter/cpp-linter-rs/compare/cpp-linter-js/v2.0.0-rc.19...cpp-linter-js/v2.0.0-rc.20
 
