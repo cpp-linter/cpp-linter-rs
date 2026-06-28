@@ -6,12 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
+## [cpp-linter/v2.0.0-rc.22] - 2026-06-28
+
+### <!-- 1 --> 🚀 Added
+
+- Add option for custom path to summary comment output by @2bndy5 in [#388](https://github.com/cpp-linter/cpp-linter-rs/pull/388)
+
+### <!-- 4 --> 🛠️ Fixed
+
+- Use correct output variable names by @2bndy5 in [`7ad731f`](https://github.com/cpp-linter/cpp-linter-rs/commit/7ad731fb5e81fbcd455713c9d2b41de7e78e32e8)
+- Use diff line index as 1-based line numbers by @2bndy5 in [#389](https://github.com/cpp-linter/cpp-linter-rs/pull/389)
+- Add context lines to generated patch by @2bndy5 in [#390](https://github.com/cpp-linter/cpp-linter-rs/pull/390)
+
+[cpp-linter/v2.0.0-rc.22]: https://github.com/cpp-linter/cpp-linter-rs/compare/cpp-linter/v2.0.0-rc.21...cpp-linter/v2.0.0-rc.22
+
+Full commit diff: [`cpp-linter/v2.0.0-rc.21...cpp-linter/v2.0.0-rc.22`][cpp-linter/v2.0.0-rc.22]
+
 ## [cpp-linter/v2.0.0-rc.21] - 2026-06-23
 
 ### <!-- 4 --> 🛠️ Fixed
 
 - Pass `--extra-arg`s to clang-tidy properly by @2bndy5 in [#386](https://github.com/cpp-linter/cpp-linter-rs/pull/386)
 - Make repo-root path absolute by @2bndy5 in [#387](https://github.com/cpp-linter/cpp-linter-rs/pull/387)
+
+### <!-- 6 --> 📦 Dependency updates
+
+- Bump version to cpp-linter/v2.0.0-rc.21 by @2bndy5 in [`9a9fe54`](https://github.com/cpp-linter/cpp-linter-rs/commit/9a9fe5432bdc279c0cd9f8ccce390caafcb27a34)
 
 [cpp-linter/v2.0.0-rc.21]: https://github.com/cpp-linter/cpp-linter-rs/compare/cpp-linter/v2.0.0-rc.20...cpp-linter/v2.0.0-rc.21
 
