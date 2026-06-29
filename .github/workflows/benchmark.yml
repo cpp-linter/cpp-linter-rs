@@ -44,7 +44,7 @@ jobs:
       BIN: target/release/cpp-linter
     steps:
       - name: Checkout ${{ matrix.name }}
-        uses: actions/checkout@v6.0.3
+        uses: actions/checkout@v7.0.0
         with:
           ref: ${{ matrix.commit }}
           persist-credentials: false
@@ -82,7 +82,7 @@ jobs:
   # build-py-binding:
   #   runs-on: ubuntu-latest
   #   steps:
-  #     - uses: actions/checkout@v6.0.3
+  #     - uses: actions/checkout@v7.0.0
   #       with:
   #         persist-credentials: false
   #     - name: Set up Python
@@ -112,11 +112,11 @@ jobs:
     needs: [build-bin] #, build-py-binding]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v7.0.0
         with:
           persist-credentials: false
       - name: Checkout libgit2
-        uses: actions/checkout@v6.0.3
+        uses: actions/checkout@v7.0.0
         with:
           repository: libgit2/libgit2
           ref: v1.8.1
@@ -127,7 +127,7 @@ jobs:
         uses: actions/download-artifact@v8
 
       - name: Install cargo-binstall
-        uses: cargo-bins/cargo-binstall@30b5ca8b54e1dcffd9548bc87ede1531310fdc67 # v1.20.0
+        uses: cargo-bins/cargo-binstall@732870f031d2fb36309d0deaf36abcc704a7be65 # v1.20.1
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - name: Install hyperfine
