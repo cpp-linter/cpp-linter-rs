@@ -19,7 +19,7 @@ pub enum StaticDistDownloadError {
     UnsupportedVersion,
 
     /// The static binaries are only built for
-    /// x86_64 and aarch64 architecture on Linux MacOS, and Windows.
+    /// x86_64 and aarch64 architecture on Linux, MacOS, and Windows.
     #[error("The static binaries are not built for {OS} {ARCH} architecture")]
     UnsupportedArchitecture,
 
