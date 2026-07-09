@@ -306,7 +306,7 @@ pub fn run_clang_tidy(
     if !ranges.is_empty() {
         let filter = format!(
             "[{{\"name\":{:?},\"lines\":{:?}}}]",
-            &file_name.replace('/', if OS == "windows" { "\\" } else { "/" }),
+            file_name.replace('/', if OS == "windows" { "\\" } else { "/" }),
             ranges
                 .iter()
                 .map(|r| [r.start(), r.end()])

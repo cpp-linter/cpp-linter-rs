@@ -35,7 +35,7 @@ fn generate_cli_doc(metadata: HashMap<String, HashMap<String, Py<PyAny>>>) -> Py
         out.push_str(
             format!(
                 "{}\n",
-                &cmd.get_about()
+                cmd.get_about()
                     .ok_or(PyValueError::new_err(format!(
                         "{} command has no help message",
                         cmd.get_name()
