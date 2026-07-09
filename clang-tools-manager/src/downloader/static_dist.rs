@@ -120,7 +120,7 @@ mod supported_platform {
 
         /// Verifies the SHA512 checksum of the downloaded file.
         ///
-        /// The expected checksum is extracted from another downloaded `*.sha512sum` file
+        /// The expected checksum is extracted from another downloaded `SHA512SUMS` file
         /// (pointed to by `sha512_path`).
         fn verify_sha512(
             file_path: &Path,
