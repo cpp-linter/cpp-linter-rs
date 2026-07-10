@@ -258,15 +258,15 @@ impl FileObj {
                     }
                     let mut suggestion = format!(
                         "### clang-tidy diagnostic\n**{file_name}:{}:{}** {}: [{}]\n\n> {}\n",
-                        &note.line,
-                        &note.cols,
-                        &note.severity,
+                        note.line,
+                        note.cols,
+                        note.severity,
                         note.diagnostic_link(),
-                        &note.rationale
+                        note.rationale
                     );
                     if !note.suggestion.is_empty() {
                         suggestion.push_str(
-                            format!("\n```{file_ext}\n{}\n```\n", &note.suggestion.join("\n"))
+                            format!("\n```{file_ext}\n{}\n```\n", note.suggestion.join("\n"))
                                 .as_str(),
                         );
                     }

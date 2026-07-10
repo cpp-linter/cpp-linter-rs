@@ -19,8 +19,7 @@ pub enum StaticDistDownloadError {
     UnsupportedVersion,
 
     /// The static binaries are only built for
-    /// x86_64 and aarch64 architecture on Linux MacOS, and
-    /// Windows (not aarch64 for Windows currently).
+    /// x86_64 and aarch64 architecture on Linux, MacOS, and Windows.
     #[error("The static binaries are not built for {OS} {ARCH} architecture")]
     UnsupportedArchitecture,
 
@@ -54,11 +53,9 @@ impl StaticDistDownloader {
 }
 
 #[cfg(any(
-    // Windows support is only for x86_64 architecture (for now)
-    all(target_os = "windows", not(target_arch = "x86_64")),
-    // Linux and macOS support only x86_64 and aarch64 architectures
+    // Windows, Linux, and MacOS support only x86_64 and aarch64 architectures
     all(
-        any(target_os = "linux", target_os = "macos"),
+        any(target_os = "windows", target_os = "linux", target_os = "macos"),
         not(any(target_arch = "x86_64", target_arch = "aarch64"))
     ),
     // Any OS other than Windows, Linux, or macOS is unsupported
@@ -81,18 +78,17 @@ mod unsupported_platform {
     }
 }
 
-#[cfg(any(
-    // Windows support is only for x86_64 architecture (for now)
-    all(target_os = "windows", target_arch = "x86_64"),
-    // Linux and macOS support only x86_64 and aarch64 architectures
+#[cfg(
+    // Windows, Linux, and MacOS support only x86_64 and aarch64 architectures
     all(
-        any(target_os = "linux", target_os = "macos"),
+        any(target_os = "windows", target_os = "linux", target_os = "macos"),
         any(target_arch = "x86_64", target_arch = "aarch64")
     ),
-))]
+)]
 mod supported_platform {
     use std::{
         fs,
+        io::{BufRead, BufReader},
         ops::RangeInclusive,
         path::{Path, PathBuf},
     };
@@ -125,18 +121,28 @@ mod supported_platform {
 
         /// Verifies the SHA512 checksum of the downloaded file.
         ///
-        /// The expected checksum is extracted from another downloaded `*.sha512sum` file
+        /// The expected checksum is extracted from another downloaded `SHA512SUMS` file
         /// (pointed to by `sha512_path`).
         fn verify_sha512(
             file_path: &Path,
+            tool: &str,
             sha512_path: &Path,
         ) -> Result<(), StaticDistDownloadError> {
-            let checksum_file_content = fs::read_to_string(sha512_path)?;
-            let expected = checksum_file_content
-                .split(' ')
-                .next()
-                .ok_or(StaticDistDownloadError::Sha512Corruption)?;
-            HashAlgorithm::Sha512(expected.to_string()).verify(file_path)?;
+            let expected = {
+                let checksum_file_handle = fs::File::open(sha512_path)?;
+                let checksum_file_content = BufReader::new(checksum_file_handle);
+                let mut found = None;
+                for line in checksum_file_content.lines() {
+                    let line = line?;
+                    if line.ends_with(tool) {
+                        found = line.split(' ').next().map(|s| s.trim().to_string());
+                        break;
+                    }
+                }
+                found
+            }
+            .ok_or(StaticDistDownloadError::Sha512Corruption)?;
+            HashAlgorithm::Sha512(expected).verify(file_path)?;
             Ok(())
         }
 
@@ -169,15 +175,14 @@ mod supported_platform {
                 "linux"
             };
 
-            let base_url = format!(
-                "{CLANG_TOOLS_REPO}/releases/download/{CLANG_TOOLS_TAG}/{tool}-{ver_str}_{platform}-{arch}",
-            );
+            let base_url = format!("{CLANG_TOOLS_REPO}/releases/download/{CLANG_TOOLS_TAG}/",);
             let suffix = if cfg!(target_os = "windows") {
                 ".exe"
             } else {
                 ""
             };
-            let url = Url::parse(format!("{base_url}{suffix}").as_str())?;
+            let tool_url_path = format!("{tool}-{ver_str}_{platform}-{arch}{suffix}");
+            let url = Url::parse(format!("{base_url}{tool_url_path}").as_str())?;
             let cache_path = Self::get_cache_dir();
             let bin_name = format!("{tool}-{ver_str}{suffix}");
             let download_path = match directory {
@@ -196,22 +201,18 @@ mod supported_platform {
                 #[cfg(unix)]
                 super::super::chmod_file(&download_path, None)?;
             }
-            let sha512_cache_path = cache_path
-                .join("static_dist")
-                .join(format!("{tool}-{ver_str}.sha512"));
+            let sha512_cache_path = cache_path.join("static_dist").join("SHA512SUMS");
             if sha512_cache_path.exists() {
                 log::info!(
-                    "Using cached SHA512 checksum for {tool} version {ver_str} from {:?}",
+                    "Using cached SHA512 checksums for static binaries from {:?}",
                     sha512_cache_path.to_string_lossy()
                 );
             } else {
-                let sha512_url = Url::parse(format!("{base_url}{suffix}.sha512sum").as_str())?;
-                log::info!(
-                    "Downloading SHA512 checksum for {tool} version {ver_str} from {sha512_url}"
-                );
+                let sha512_url = Url::parse(format!("{base_url}SHA512SUMS").as_str())?;
+                log::info!("Downloading SHA512 checksum for static binaries from {sha512_url}");
                 download(&sha512_url, &sha512_cache_path, 10).await?;
             }
-            Self::verify_sha512(&download_path, &sha512_cache_path)?;
+            Self::verify_sha512(&download_path, &tool_url_path, &sha512_cache_path)?;
             file_lock.unlock()?;
             Ok(download_path)
         }
