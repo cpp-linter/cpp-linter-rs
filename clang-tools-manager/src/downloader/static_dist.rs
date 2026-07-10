@@ -88,6 +88,7 @@ mod unsupported_platform {
 mod supported_platform {
     use std::{
         fs,
+        io::{BufRead, BufReader},
         ops::RangeInclusive,
         path::{Path, PathBuf},
     };
@@ -127,13 +128,21 @@ mod supported_platform {
             tool: &str,
             sha512_path: &Path,
         ) -> Result<(), StaticDistDownloadError> {
-            let checksum_file_content = fs::read_to_string(sha512_path)?;
-            let expected = checksum_file_content
-                .lines()
-                .find(|line| line.ends_with(tool))
-                .and_then(|line| line.split(' ').next())
-                .ok_or(StaticDistDownloadError::Sha512Corruption)?;
-            HashAlgorithm::Sha512(expected.to_string()).verify(file_path)?;
+            let expected = {
+                let checksum_file_handle = fs::File::open(sha512_path)?;
+                let checksum_file_content = BufReader::new(checksum_file_handle);
+                let mut found = None;
+                for line in checksum_file_content.lines() {
+                    let line = line?;
+                    if line.ends_with(tool) {
+                        found = line.split(' ').next().map(|s| s.trim().to_string());
+                        break;
+                    }
+                }
+                found
+            }
+            .ok_or(StaticDistDownloadError::Sha512Corruption)?;
+            HashAlgorithm::Sha512(expected).verify(file_path)?;
             Ok(())
         }
 
