@@ -55,7 +55,7 @@ impl RestClient {
     }
 
     /// Returns the kind of client being used.
-    /// 
+    ///
     /// Supported options include "local", "github" and "gitea".
     pub fn client_kind(&self) -> String {
         self.client.client_kind()
