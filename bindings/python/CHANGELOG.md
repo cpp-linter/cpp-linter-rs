@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
+## [cpp-linter-py/v2.0.0-rc.22] - 2026-07-14
+
+### <!-- 4 --> 🛠️ Fixed
+
+- Updates for latest static binaries by @2bndy5 in [#398](https://github.com/cpp-linter/cpp-linter-rs/pull/398)
+
+### <!-- 6 --> 📦 Dependency updates
+
+- Bump version to cpp-linter-js/v2.0.0-rc.21 by @2bndy5 in [`115cdcf`](https://github.com/cpp-linter/cpp-linter-rs/commit/115cdcf560be209f8f3130720f15915852c9477d)
+- Bump the cargo group across 1 directory with 7 updates by @dependabot[bot] in [#399](https://github.com/cpp-linter/cpp-linter-rs/pull/399)
+- Bump ruff from 0.15.16 to 0.15.20 in the uv-pip group across 1 directory by @dependabot[bot] in [#383](https://github.com/cpp-linter/cpp-linter-rs/pull/383)
+- Bump version to cpp-linter/v2.0.0-rc.23 by @2bndy5 in [`fbdcfa4`](https://github.com/cpp-linter/cpp-linter-rs/commit/fbdcfa468b2705d090b43e9198c4c928d8fcbe2d)
+
+[cpp-linter-py/v2.0.0-rc.22]: https://github.com/cpp-linter/cpp-linter-rs/compare/cpp-linter-py/v2.0.0-rc.21...cpp-linter-py/v2.0.0-rc.22
+
+Full commit diff: [`cpp-linter-py/v2.0.0-rc.21...cpp-linter-py/v2.0.0-rc.22`][cpp-linter-py/v2.0.0-rc.22]
+
 ## [cpp-linter-py/v2.0.0-rc.21] - 2026-06-28
 
 ### <!-- 1 --> 🚀 Added
@@ -22,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Bump version to cpp-linter-js/v2.0.0-rc.20 by @2bndy5 in [`2489719`](https://github.com/cpp-linter/cpp-linter-rs/commit/2489719d03db7c4cbf2100cc6962e5fb9b2b639c)
 - Bump version to cpp-linter/v2.0.0-rc.22 by @2bndy5 in [`3f3647c`](https://github.com/cpp-linter/cpp-linter-rs/commit/3f3647c8860946dfc4e5a1cdf112822692136e7e)
+- Bump version to cpp-linter-py/v2.0.0-rc.21 by @2bndy5 in [`1808e4a`](https://github.com/cpp-linter/cpp-linter-rs/commit/1808e4a67b9463eb3b338da7fd2906197ae72c2c)
 
 [cpp-linter-py/v2.0.0-rc.21]: https://github.com/cpp-linter/cpp-linter-rs/compare/cpp-linter-py/v2.0.0-rc.20...cpp-linter-py/v2.0.0-rc.21
 
