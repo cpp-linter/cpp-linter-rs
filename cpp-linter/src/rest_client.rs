@@ -54,6 +54,13 @@ impl RestClient {
         Ok(Self { client })
     }
 
+    /// Returns the kind of client being used.
+    ///
+    /// Supported options include "local", "github" and "gitea".
+    pub fn client_kind(&self) -> String {
+        self.client.client_kind()
+    }
+
     /// Is this a pull request event?
     pub fn is_pr(&self) -> bool {
         self.client.is_pr_event()

@@ -85,6 +85,7 @@ mod test {
             env::set_var("CI", "false");
         }
         let rest_api_client = RestClient::new().unwrap();
+        assert_eq!(rest_api_client.client_kind(), "local");
         let file_filter = FileFilter::new(&["target"], extensions, None);
         set_current_dir(tmp).unwrap();
         let base_diff = if ignore_staged {
