@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
+## [cpp-linter/v2.0.0-rc.23] - 2026-07-14
+
+### <!-- 4 --> 🛠️ Fixed
+
+- Updates for latest static binaries by @2bndy5 in [#398](https://github.com/cpp-linter/cpp-linter-rs/pull/398)
+
+### <!-- 6 --> 📦 Dependency updates
+
+- Bump the cargo group across 1 directory with 7 updates by @dependabot[bot] in [#399](https://github.com/cpp-linter/cpp-linter-rs/pull/399)
+
+[cpp-linter/v2.0.0-rc.23]: https://github.com/cpp-linter/cpp-linter-rs/compare/cpp-linter/v2.0.0-rc.22...cpp-linter/v2.0.0-rc.23
+
+Full commit diff: [`cpp-linter/v2.0.0-rc.22...cpp-linter/v2.0.0-rc.23`][cpp-linter/v2.0.0-rc.23]
+
 ## [cpp-linter/v2.0.0-rc.22] - 2026-06-28
 
 ### <!-- 1 --> 🚀 Added
@@ -17,6 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Use correct output variable names by @2bndy5 in [`7ad731f`](https://github.com/cpp-linter/cpp-linter-rs/commit/7ad731fb5e81fbcd455713c9d2b41de7e78e32e8)
 - Use diff line index as 1-based line numbers by @2bndy5 in [#389](https://github.com/cpp-linter/cpp-linter-rs/pull/389)
 - Add context lines to generated patch by @2bndy5 in [#390](https://github.com/cpp-linter/cpp-linter-rs/pull/390)
+
+### <!-- 6 --> 📦 Dependency updates
+
+- Bump version to cpp-linter/v2.0.0-rc.22 by @2bndy5 in [`3f3647c`](https://github.com/cpp-linter/cpp-linter-rs/commit/3f3647c8860946dfc4e5a1cdf112822692136e7e)
 
 [cpp-linter/v2.0.0-rc.22]: https://github.com/cpp-linter/cpp-linter-rs/compare/cpp-linter/v2.0.0-rc.21...cpp-linter/v2.0.0-rc.22
 
