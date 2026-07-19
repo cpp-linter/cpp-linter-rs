@@ -1266,9 +1266,9 @@ dependencies = [
 
 [[package]]
 name = "napi"
-version = "3.10.3"
+version = "3.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c71997d6f7ad4a756966e452426848ac27d3b37a295302d63afbbcce0270f93"
+checksum = "59b7fbd5f12adbf51ddec954d4ef9cecb3542a9d53bce2fe0653696c4cd06d73"
 dependencies = [
  "bitflags",
  "ctor",
@@ -1288,9 +1288,9 @@ checksum = "c9c366d2c8c60b86fa632df75f745509b52f9128f91a6bad4c796e44abb505e1"
 
 [[package]]
 name = "napi-derive"
-version = "3.5.9"
+version = "3.5.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d4ba572deef53e2c386759a8c2014175a62679d74ff83adc205c8bc0e0285727"
+checksum = "b0fe526e81c105d3640516fcde83909dd1afe757c0d7a15af58830b5bc0fb9a1"
 dependencies = [
  "convert_case",
  "ctor",
@@ -1315,9 +1315,9 @@ dependencies = [
 
 [[package]]
 name = "napi-sys"
-version = "3.2.2"
+version = "3.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f5bcdf71abd3a50d00b49c1c2c75251cb3c913777d6139cd37dabc093a5e400"
+checksum = "73e43cf2eb0bd1bf95a43c07c076ebd2da5d1e015a71c3d201faeffffcc0ecac"
 dependencies = [
  "libloading",
 ]
@@ -1624,9 +1624,9 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.12.4"
+version = "1.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f1292b7759ae1cb9ec195452d1390a074f0cd8541ab7a5a8c31cd6db45d4a6ba"
+checksum = "f020237b6c8eed93db2e2cb53c00c60a8e1bc73da7d073199a1180401450218d"
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -1636,9 +1636,9 @@ dependencies = [
 
 [[package]]
 name = "regex-automata"
-version = "0.4.14"
+version = "0.4.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e1dd4122fc1595e8162618945476892eefca7b88c52820e74af6262213cae8f"
+checksum = "8fcfdb36bda0c880c5931cdc7a2bcdc8ba4556847b9d912bca70bc94708711ad"
 dependencies = [
  "aho-corasick",
  "memchr",
