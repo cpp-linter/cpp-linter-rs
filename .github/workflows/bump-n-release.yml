@@ -58,7 +58,7 @@ jobs:
           python-version: 3.x
       - name: Install Node.js
         if: inputs.package == 'cpp-linter-js'
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v6.4.0
         with:
           node-version: 24.x
       - run: yarn install

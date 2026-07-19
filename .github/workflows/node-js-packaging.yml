@@ -85,7 +85,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v6.4.0
         with:
           node-version: 22
           cache: yarn # zizmor: ignore[cache-poisoning]
@@ -225,7 +225,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v6.4.0
         with:
           node-version: ${{ matrix.node }}
           cache: yarn # zizmor: ignore[cache-poisoning]
@@ -267,7 +267,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v6.4.0
         with:
           node-version: ${{ matrix.node }}
           cache: yarn # zizmor: ignore[cache-poisoning]
@@ -339,7 +339,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v6.4.0
         with:
           node-version: 24
           package-manager-cache: false
