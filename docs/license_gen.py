@@ -1,6 +1,7 @@
 import re
-import mkdocs_gen_files
 from subprocess import run
+
+import mkdocs_gen_files
 
 FILENAME = "other-licenses.md"
 

@@ -1,7 +1,8 @@
 from pathlib import Path
-from typing import Dict, Any
-import yaml
+from typing import Any
+
 import mkdocs_gen_files
+import yaml
 from cli_gen import generate_cli_doc
 
 FILENAME = "cli.md"
@@ -25,7 +26,7 @@ VERSION_DISCLAIMER = """
 
 with mkdocs_gen_files.open(FILENAME, "w") as io_doc:
     options_versions = Path(__file__).parent / "cli.yml"
-    versions: Dict[str, Any] = yaml.safe_load(options_versions.read_bytes())
+    versions: dict[str, Any] = yaml.safe_load(options_versions.read_bytes())
 
     print("# Command Line Interface\n", file=io_doc)
     print(VERSION_DISCLAIMER, file=io_doc)

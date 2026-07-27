@@ -2,6 +2,7 @@
 
 import re
 from re import Match
+
 from mkdocs.config.defaults import MkDocsConfig
 from mkdocs.structure.files import Files
 from mkdocs.structure.pages import Page
@@ -25,7 +26,9 @@ def on_page_markdown(markdown: str, *, page: Page, config: MkDocsConfig, files: 
         raise RuntimeError(f"Unknown badge type: {badge_type}")
 
     # Find and replace all external asset URLs in current page
-    return re.sub(r"<!-- md:(\w+) (.*) -->", replace, markdown, flags=re.I | re.M)
+    return re.sub(
+        r"<!-- md:(\w+) (.*) -->", replace, markdown, flags=re.IGNORECASE | re.MULTILINE
+    )
 
 
 # -----------------------------------------------------------------------------
