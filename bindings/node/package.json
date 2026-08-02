@@ -21,9 +21,9 @@
   },
   "license": "MIT",
   "devDependencies": {
-    "@napi-rs/cli": "3.7.3",
+    "@napi-rs/cli": "3.7.4",
     "ava": "^8.0.1",
-    "oxlint": "^1.74.0"
+    "oxlint": "^1.75.0"
   },
   "ava": {
     "timeout": "3m"
