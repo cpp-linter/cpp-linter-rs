@@ -52,12 +52,12 @@ manifest-path = "bindings/python/Cargo.toml"
 
 [dependency-groups]
 dev = [
-    "mypy==2.3.0",
+    "mypy==2.3.1",
     "pre-commit>=4.3.0",
     "ruff==0.16.1",
 ]
 test = [
-    "meson==1.11.2",
+    "meson==1.12.0",
 ]
 
 [tool.uv]
