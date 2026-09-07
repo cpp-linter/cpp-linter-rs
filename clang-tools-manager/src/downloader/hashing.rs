@@ -60,7 +60,7 @@ impl HashAlgorithm {
         let actual = hasher
             .finalize()
             .iter()
-            .map(|byte| format!("{byte:x}"))
+            .map(|byte| format!("{byte:02x}"))
             .collect::<String>();
         if actual == expected.to_ascii_lowercase() {
             Ok(())
@@ -129,7 +129,7 @@ mod test {
         let expected = hasher
             .finalize()
             .iter()
-            .map(|b| format!("{b:x}"))
+            .map(|b| format!("{b:02x}"))
             .collect::<String>()
             .to_string();
         let hash_algorithm = HashAlgorithm::Sha256(expected);
@@ -151,7 +151,7 @@ mod test {
         let expected = hasher
             .finalize()
             .iter()
-            .map(|b| format!("{b:x}"))
+            .map(|b| format!("{b:02x}"))
             .collect::<String>()
             .to_string();
         let hash_algorithm = HashAlgorithm::Sha512(expected);
@@ -173,7 +173,7 @@ mod test {
         let expected = hasher
             .finalize()
             .iter()
-            .map(|b| format!("{b:x}"))
+            .map(|b| format!("{b:02x}"))
             .collect::<String>()
             .to_string();
         let hash_algorithm = HashAlgorithm::Blake2b256(expected);
