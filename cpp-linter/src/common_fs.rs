@@ -417,6 +417,7 @@ mod test {
     }
 
     #[test]
+    #[allow(clippy::single_range_in_vec_init)]
     fn get_ranges_diff() {
         let diff_chunks = vec![1..=10];
         let added_lines = vec![4, 5, 9];
@@ -430,6 +431,7 @@ mod test {
     }
 
     #[test]
+    #[allow(clippy::single_range_in_vec_init)]
     fn get_ranges_added() {
         let diff_chunks = vec![1..=10];
         let added_lines = vec![4, 5, 9];
@@ -466,6 +468,7 @@ mod test {
     }
 
     #[test]
+    #[allow(clippy::single_range_in_vec_init)]
     fn pure_removal_suggestion() {
         let repo_root = TempDir::new().unwrap();
         let file_name = PathBuf::from("test_file.cpp");

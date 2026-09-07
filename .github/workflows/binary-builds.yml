@@ -36,7 +36,7 @@ concurrency:
 jobs:
   seed-build-script:
     name: Pre-seed static binaries' versions
-    uses: ./.github/workflows/pre-seed-versions.yml
+    uses: $/.github/workflows/pre-seed-versions.yml
 
   create-assets:
     needs: [seed-build-script]

@@ -45,7 +45,7 @@ concurrency:
 jobs:
   seed-build-script:
     name: Pre-seed static binaries' versions
-    uses: ./.github/workflows/pre-seed-versions.yml
+    uses: $/.github/workflows/pre-seed-versions.yml
 
   linux:
     needs: [seed-build-script]
@@ -89,7 +89,7 @@ jobs:
           args: >-
             --release --out dist --find-interpreter --zig
           # avoid cache-poisoning potential for actually distributed builds
-          sccache: ${{ startsWith(github.ref, 'refs/tags') && 'false' || 'true' }}
+          sccache: ${{ startsWith(github.ref, 'refs/tags') && 'false' || 'true' }} # zizmor: ignore[cache-poisoning]
           manylinux: 'auto'
       - name: Upload wheels
         uses: actions/upload-artifact@v7

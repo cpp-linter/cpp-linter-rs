@@ -46,7 +46,7 @@ jobs:
 
   seed-build-script:
     name: Pre-seed static binaries' versions
-    uses: ./.github/workflows/pre-seed-versions.yml
+    uses: $/.github/workflows/pre-seed-versions.yml
 
   build-mkdocs:
     runs-on: ubuntu-latest
