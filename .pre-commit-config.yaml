@@ -21,7 +21,7 @@ repos:
         exclude: '^\.yarn/releases/yarn.*js'
         args: ["--fix=lf"]
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.3
+    rev: v0.16.6
     hooks:
       # Run the python linter.
       - id: ruff-check
@@ -29,6 +29,6 @@ repos:
       # Run the python formatter.
       - id: ruff-format
   - repo: https://github.com/streetsidesoftware/cspell-cli
-    rev: v10.0.1
+    rev: v10.2.0
     hooks:
       - id: cspell # Spell check changed files
