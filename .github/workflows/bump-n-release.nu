@@ -206,10 +206,10 @@ export def gen-changes [
         {out_path: ($out_path | path relative-to (pwd)), log_prefix: 'Updated'}
     }
     if (($paths | get 'include' | length) > 0) {
-        $args = $args | append ['--include-path', ...($paths | get 'include')]
+        $args = $args | append ['--include-path', ($paths | get 'include' | str join " ")]
     }
     if (($paths | get 'exclude' | length) > 0) {
-        $args = $args | append ['--exclude-path', ...($paths | get 'exclude')]
+        $args = $args | append ['--exclude-path', ($paths | get 'exclude' | str join " ")]
     }
     run-cmd 'git-cliff' ...$args
     print ($prompt | format pattern '{log_prefix} {out_path}')
