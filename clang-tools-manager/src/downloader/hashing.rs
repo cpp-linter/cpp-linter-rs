@@ -1,4 +1,4 @@
-use sha2::digest::{Digest, OutputSizeUser, generic_array::ArrayLength};
+use sha2::digest::{Digest, OutputSizeUser};
 
 use super::DownloadError;
 use crate::progress_bar::ProgressBar;
@@ -42,7 +42,6 @@ impl HashAlgorithm {
     where
         H: Digest + OutputSizeUser,
         <H as OutputSizeUser>::OutputSize: std::ops::Add,
-        <<H as OutputSizeUser>::OutputSize as std::ops::Add>::Output: ArrayLength<u8>,
     {
         let mut file_reader = fs::OpenOptions::new().read(true).open(file_path)?;
         let file_size = file_reader.metadata()?.len();
@@ -58,7 +57,11 @@ impl HashAlgorithm {
             hasher.update(&buf[..bytes_read]);
         }
         progress_bar.finish()?;
-        let actual = format!("{:x}", hasher.finalize());
+        let actual = hasher
+            .finalize()
+            .iter()
+            .map(|byte| format!("{byte:x}"))
+            .collect::<String>();
         if actual == expected.to_ascii_lowercase() {
             Ok(())
         } else {
@@ -123,7 +126,12 @@ mod test {
         let mut temp_file = NamedTempFile::new().unwrap();
         fs::write(&mut temp_file, CONTENT).unwrap();
         let hasher = sha2::Sha256::new().chain_update(CONTENT);
-        let expected = format!("{:x}", hasher.finalize());
+        let expected = hasher
+            .finalize()
+            .iter()
+            .map(|b| format!("{b:x}"))
+            .collect::<String>()
+            .to_string();
         let hash_algorithm = HashAlgorithm::Sha256(expected);
         assert!(hash_algorithm.verify(temp_file.path()).is_ok());
         assert!(
@@ -140,7 +148,12 @@ mod test {
         let mut temp_file = NamedTempFile::new().unwrap();
         fs::write(&mut temp_file, CONTENT).unwrap();
         let hasher = sha2::Sha512::new().chain_update(CONTENT);
-        let expected = format!("{:x}", hasher.finalize());
+        let expected = hasher
+            .finalize()
+            .iter()
+            .map(|b| format!("{b:x}"))
+            .collect::<String>()
+            .to_string();
         let hash_algorithm = HashAlgorithm::Sha512(expected);
         assert!(hash_algorithm.verify(temp_file.path()).is_ok());
         assert!(
@@ -157,7 +170,12 @@ mod test {
         let mut temp_file = NamedTempFile::new().unwrap();
         fs::write(&mut temp_file, CONTENT).unwrap();
         let hasher = Blake2b::<U32>::new().chain_update(CONTENT);
-        let expected = format!("{:x}", hasher.finalize());
+        let expected = hasher
+            .finalize()
+            .iter()
+            .map(|b| format!("{b:x}"))
+            .collect::<String>()
+            .to_string();
         let hash_algorithm = HashAlgorithm::Blake2b256(expected);
         assert!(hash_algorithm.verify(temp_file.path()).is_ok());
         assert!(
