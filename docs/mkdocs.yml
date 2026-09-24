@@ -18,6 +18,7 @@ nav:
     - changelog/clang-tools-manager.md
   - contributing.md
   - other-licenses.md
+  - "← cpp-linter hub": https://cpp-linter.github.io/
 
 theme:
   name: material
@@ -41,7 +42,7 @@ theme:
   palette:
     # Palette toggle for automatic mode
     - media: "(prefers-color-scheme)"
-      primary: blue
+      primary: indigo
       accent: cyan
       toggle:
         icon: material/brightness-auto
@@ -50,7 +51,7 @@ theme:
     # Palette toggle for light mode
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: blue
+      primary: indigo
       accent: cyan
       toggle:
         icon: material/lightbulb-outline
@@ -59,7 +60,7 @@ theme:
     # Palette toggle for dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: blue
+      primary: indigo
       accent: cyan
       toggle:
         icon: material/lightbulb
@@ -76,7 +77,7 @@ extra:
       link: https://crates.io/crates/cpp-linter
 
 extra_css:
-  - stylesheets/extra.css
+  - https://cpp-linter.github.io/stylesheets/shared.css
 
 plugins:
   - search
