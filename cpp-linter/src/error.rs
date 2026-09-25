@@ -70,6 +70,10 @@ pub enum ClientError {
         #[source]
         source: std::io::Error,
     },
+
+    /// Error when failing to write to stdout.
+    #[error("Failed to write to stdout: {0}")]
+    StdoutWriteFailed(#[source] std::io::Error),
 }
 
 /// Errors related to invoking clang tools and processing their output.
