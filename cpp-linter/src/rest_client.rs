@@ -424,7 +424,9 @@ impl RestClient {
             let mut reader = std::io::BufReader::new(patch_file);
             let mut line_buf = String::new();
             let mut stdout_lock = stdout_handle.lock();
-            while let Ok(bytes_read) = reader.read_line(&mut line_buf)
+            while let bytes_read = reader
+                .read_line(&mut line_buf)
+                .map_err(ClientError::PatchReadFailed)?
                 && bytes_read > 0
             {
                 if line_buf.starts_with('+') {
