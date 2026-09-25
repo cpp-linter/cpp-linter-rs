@@ -2,10 +2,12 @@
 
 use std::{
     env,
+    io::{BufRead, Write, stdout},
     path::PathBuf,
     sync::{Arc, Mutex},
 };
 
+use colored::Colorize;
 use git_bot_feedback::{
     AnnotationLevel, CommentKind, CommentPolicy, FileAnnotation, FileFilter, LinesChangedOnly,
     OutputVariable, RestApiClient, ReviewAction, ReviewOptions, ThreadCommentOptions,
@@ -145,11 +147,11 @@ impl RestClient {
             if feedback_inputs.step_summary {
                 self.client.append_step_summary(&summary)?;
             }
-            if let Some(summary_output_file) = feedback_inputs.summary_output_file {
+            if let Some(summary_output_file) = &feedback_inputs.summary_output_file {
                 let output_file = if summary_output_file.is_absolute() {
                     summary_output_file
                 } else {
-                    feedback_inputs.repo_root.join(&summary_output_file)
+                    &feedback_inputs.repo_root.join(summary_output_file)
                 };
                 if let Some(parent) = output_file.parent() {
                     std::fs::create_dir_all(parent).map_err(|e| ClientError::MkDirFailed {
@@ -157,9 +159,9 @@ impl RestClient {
                         source: e,
                     })?;
                 }
-                std::fs::write(&output_file, &summary).map_err(|e| {
+                std::fs::write(output_file, &summary).map_err(|e| {
                     ClientError::SummaryOutputFileWriteFailed {
-                        file_path: output_file,
+                        file_path: output_file.to_owned(),
                         source: e,
                     }
                 })?;
@@ -182,35 +184,6 @@ impl RestClient {
         ];
         self.client.write_output_variables(&output_vars)?;
 
-        if feedback_inputs.thread_comments != ThreadComments::Off {
-            // post thread comment for PR or push event
-            if comment.as_ref().is_none_or(|c| c.len() > u16::MAX as usize) {
-                comment = Some(Self::make_comment(
-                    files,
-                    format_checks_failed,
-                    tidy_checks_failed,
-                    &clang_versions,
-                    Some(u16::MAX as u64),
-                )?);
-            }
-            let options = ThreadCommentOptions {
-                policy: if feedback_inputs.thread_comments == ThreadComments::Update {
-                    CommentPolicy::Update
-                } else {
-                    // feedback_inputs.thread_comments is not Off and not Update, so it must be just On.
-                    CommentPolicy::Anew
-                },
-                comment: comment.unwrap_or_default(),
-                kind: if format_checks_failed == 0 && tidy_checks_failed == 0 {
-                    CommentKind::Lgtm
-                } else {
-                    CommentKind::Concerns
-                },
-                marker: COMMENT_MARKER.to_string(),
-                no_lgtm: feedback_inputs.no_lgtm,
-            };
-            self.client.post_thread_comment(options).await?;
-        }
         if self.client.is_pr_event() && feedback_inputs.pr_review {
             let summary_only = ["true", "on", "1"].contains(
                 &env::var("CPP_LINTER_PR_REVIEW_SUMMARY_ONLY")
@@ -228,6 +201,7 @@ impl RestClient {
                     &feedback_inputs.repo_root,
                 )?;
             }
+            self.show_patch(&feedback_inputs)?;
 
             let mut options = ReviewOptions {
                 marker: COMMENT_MARKER.to_string(),
@@ -265,16 +239,37 @@ impl RestClient {
                     .map_err(|e| ClientError::MutexPoisoned(e.to_string()))?;
                 file.maybe_append_patch(&feedback_inputs.repo_root)?;
             }
+            self.show_patch(&feedback_inputs)?;
         }
-        let auto_fix_patch_path = feedback_inputs
-            .repo_root
-            .join(ClangParams::CACHE_DIR)
-            .join(ClangParams::AUTO_FIX_PATCH);
-        if auto_fix_patch_path.exists() {
-            self.client.write_output_variables(&[OutputVariable {
-                name: "fix-patch-path".to_string(),
-                value: auto_fix_patch_path.to_string_lossy().replace("\\", "/"),
-            }])?;
+
+        if feedback_inputs.thread_comments != ThreadComments::Off {
+            // post thread comment for PR or push event
+            if comment.as_ref().is_none_or(|c| c.len() > u16::MAX as usize) {
+                comment = Some(Self::make_comment(
+                    files,
+                    format_checks_failed,
+                    tidy_checks_failed,
+                    &clang_versions,
+                    Some(u16::MAX as u64),
+                )?);
+            }
+            let options = ThreadCommentOptions {
+                policy: if feedback_inputs.thread_comments == ThreadComments::Update {
+                    CommentPolicy::Update
+                } else {
+                    // feedback_inputs.thread_comments is not Off and not Update, so it must be just On.
+                    CommentPolicy::Anew
+                },
+                comment: comment.unwrap_or_default(),
+                kind: if format_checks_failed == 0 && tidy_checks_failed == 0 {
+                    CommentKind::Lgtm
+                } else {
+                    CommentKind::Concerns
+                },
+                marker: COMMENT_MARKER.to_string(),
+                no_lgtm: feedback_inputs.no_lgtm,
+            };
+            self.client.post_thread_comment(options).await?;
         }
         Ok(format_checks_failed + tidy_checks_failed)
     }
@@ -408,6 +403,52 @@ impl RestClient {
         }
         comment.push_str(USER_OUTREACH);
         Ok(comment)
+    }
+
+    /// Show the generated patch content in the console output.
+    ///
+    /// And also write the patch path to the output variable `fix-patch-path` for CI platforms.
+    fn show_patch(&self, feedback_inputs: &FeedbackInput) -> Result<(), ClientError> {
+        let auto_fix_patch_path = feedback_inputs
+            .repo_root
+            .join(ClangParams::CACHE_DIR)
+            .join(ClangParams::AUTO_FIX_PATCH);
+        if let Ok(patch_file) = std::fs::File::open(&auto_fix_patch_path) {
+            self.client.write_output_variables(&[OutputVariable {
+                name: "fix-patch-path".to_string(),
+                value: auto_fix_patch_path.to_string_lossy().replace("\\", "/"),
+            }])?;
+
+            log::info!("Generated patch content:");
+            let stdout_handle = stdout();
+            let mut reader = std::io::BufReader::new(patch_file);
+            let mut line_buf = String::new();
+            let mut stdout_lock = stdout_handle.lock();
+            while let bytes_read = reader
+                .read_line(&mut line_buf)
+                .map_err(ClientError::PatchReadFailed)?
+                && bytes_read > 0
+            {
+                if line_buf.starts_with('+') {
+                    // Green for additions
+                    stdout_lock
+                        .write_all(line_buf.green().to_string().as_bytes())
+                        .map_err(ClientError::StdoutWriteFailed)?;
+                } else if line_buf.starts_with('-') {
+                    // Red for deletions
+                    stdout_lock
+                        .write_all(line_buf.red().to_string().as_bytes())
+                        .map_err(ClientError::StdoutWriteFailed)?;
+                } else {
+                    // Default style for context lines
+                    stdout_lock
+                        .write_all(line_buf.as_bytes())
+                        .map_err(ClientError::StdoutWriteFailed)?;
+                }
+                line_buf.clear();
+            }
+        }
+        Ok(())
     }
 }
 
