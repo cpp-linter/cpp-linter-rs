@@ -478,7 +478,7 @@ fn make_tidy_comment(
             for tidy_note in &tidy_advice.notes {
                 let file_path = PathBuf::from(&tidy_note.filename);
                 if file_path == file.name {
-                    let uses_auto_fix = tidy_note.fixed_lines.is_empty();
+                    let uses_auto_fix = !tidy_note.fixed_lines.is_empty();
                     let mut tmp_note = format!("- {}\n\n", tidy_note.filename);
                     tmp_note.push_str(&format!(
                         "   <strong>{filename}:{line}:{cols}:</strong> {severity}: [{diagnostic}]{auto_fixable}\n   > {rationale}\n{concerned_code}",
@@ -488,9 +488,9 @@ fn make_tidy_comment(
                         severity = tidy_note.severity,
                         diagnostic = tidy_note.diagnostic_link(),
                         auto_fixable = if uses_auto_fix {
-                            ""
-                        } else {
                             "\n   :zap: auto-fix included in generated patch[^1]"
+                        } else {
+                            ""
                         },
                         rationale = tidy_note.rationale,
                         concerned_code = if tidy_note.suggestion.is_empty() {String::from("")} else {
