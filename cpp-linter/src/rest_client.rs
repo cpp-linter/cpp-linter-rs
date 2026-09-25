@@ -473,6 +473,8 @@ fn make_format_comment(
     Ok(())
 }
 
+const TIDY_FIX_EXPLANATION: &str = "\n\n[^1]: Cpp-linter generates a patch with fixes from both clang-tidy and clang-format. In the CI workflow, the patch can be found using cpp-linter's output `fix-patch-path`.";
+
 fn make_tidy_comment(
     files: &[Arc<Mutex<FileObj>>],
     comment: &mut String,
@@ -483,6 +485,7 @@ fn make_tidy_comment(
     let opener = format!(
         "\n<details><summary>clang-tidy (v{version_used}) reports: {tidy_checks_failed}<strong> concern(s)</strong></summary>\n\n"
     );
+    let mut show_fix_explanation = false;
     let mut tidy_comment = String::new();
     *remaining_length = remaining_length.saturating_sub(opener.len() as u64 + CLOSER.len() as u64);
     for file in files {
@@ -493,6 +496,7 @@ fn make_tidy_comment(
             for tidy_note in &tidy_advice.notes {
                 let file_path = PathBuf::from(&tidy_note.filename);
                 if file_path == file.name {
+                    let uses_auto_fix = !tidy_note.fixed_lines.is_empty();
                     let mut tmp_note = format!("- {}\n\n", tidy_note.filename);
                     tmp_note.push_str(&format!(
                         "   <strong>{filename}:{line}:{cols}:</strong> {severity}: [{diagnostic}]{auto_fixable}\n   > {rationale}\n{concerned_code}",
@@ -501,10 +505,10 @@ fn make_tidy_comment(
                         cols = tidy_note.cols,
                         severity = tidy_note.severity,
                         diagnostic = tidy_note.diagnostic_link(),
-                        auto_fixable = if tidy_note.fixed_lines.is_empty() {
-                            ""
+                        auto_fixable = if uses_auto_fix {
+                            "\n   :zap: auto-fix included in generated patch[^1]"
                         } else {
-                            "\n   :zap: auto-fix available"
+                            ""
                         },
                         rationale = tidy_note.rationale,
                         concerned_code = if tidy_note.suggestion.is_empty() {String::from("")} else {
@@ -515,9 +519,20 @@ fn make_tidy_comment(
                         },
                     ).to_string());
 
-                    if (tmp_note.len() as u64) < *remaining_length {
+                    let note_len = tmp_note.len() as u64
+                        + if uses_auto_fix && !show_fix_explanation {
+                            TIDY_FIX_EXPLANATION.len() as u64
+                        } else {
+                            0
+                        };
+
+                    if note_len < *remaining_length {
                         tidy_comment.push_str(&tmp_note);
                         *remaining_length -= tmp_note.len() as u64;
+                        if !show_fix_explanation && uses_auto_fix {
+                            *remaining_length -= TIDY_FIX_EXPLANATION.len() as u64;
+                            show_fix_explanation = true;
+                        }
                     }
                 }
             }
@@ -526,6 +541,9 @@ fn make_tidy_comment(
     comment.push_str(&opener);
     comment.push_str(&tidy_comment);
     comment.push_str(CLOSER);
+    if show_fix_explanation {
+        comment.push_str(TIDY_FIX_EXPLANATION);
+    }
     Ok(())
 }
 
