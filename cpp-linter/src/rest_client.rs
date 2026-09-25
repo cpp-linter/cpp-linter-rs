@@ -2,10 +2,12 @@
 
 use std::{
     env,
+    io::BufRead,
     path::PathBuf,
     sync::{Arc, Mutex},
 };
 
+use colored::Colorize;
 use git_bot_feedback::{
     AnnotationLevel, CommentKind, CommentPolicy, FileAnnotation, FileFilter, LinesChangedOnly,
     OutputVariable, RestApiClient, ReviewAction, ReviewOptions, ThreadCommentOptions,
@@ -270,11 +272,27 @@ impl RestClient {
             .repo_root
             .join(ClangParams::CACHE_DIR)
             .join(ClangParams::AUTO_FIX_PATCH);
-        if auto_fix_patch_path.exists() {
+        if let Ok(patch_file) = std::fs::File::open(&auto_fix_patch_path) {
             self.client.write_output_variables(&[OutputVariable {
                 name: "fix-patch-path".to_string(),
                 value: auto_fix_patch_path.to_string_lossy().replace("\\", "/"),
             }])?;
+
+            log::info!("Generated patch content:");
+            let mut reader = std::io::BufReader::new(patch_file);
+            let mut line_buf = String::new();
+            while let Ok(bytes_read) = reader.read_line(&mut line_buf)
+                && bytes_read > 0
+            {
+                if line_buf.starts_with('+') {
+                    print!("{}", line_buf.green()); // Green for additions
+                } else if line_buf.starts_with('-') {
+                    print!("{}", line_buf.red()); // Red for deletions
+                } else {
+                    print!("{line_buf}"); // Default style for context lines
+                }
+                line_buf.clear();
+            }
         }
         Ok(format_checks_failed + tidy_checks_failed)
     }
