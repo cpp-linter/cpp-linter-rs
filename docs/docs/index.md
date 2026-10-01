@@ -3,8 +3,7 @@
 [file-annotations]: cli.md#-a-file-annotations
 [thread-comments]: cli.md#-g-thread-comments
 [step-summary]: cli.md#-w-step-summary
-[tidy-review]: cli.md#-d-tidy-review
-[format-review]: cli.md#-m-format-review
+[pr-review]: cli.md#-p-pr-review
 [other-licenses]: other-licenses.md
 
 [format-annotations-preview]: images/annotations-clang-format.png

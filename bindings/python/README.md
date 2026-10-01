@@ -3,22 +3,25 @@
 The python binding for the [cpp-linter-rs][this] rust project
 (built using [pyo3](https://pyo3.rs) and [maturin]).
 
+[Website](https://cpp-linter.github.io/) ·
+[Documentation](https://cpp-linter.github.io/cpp-linter-rs/) ·
+[Get started](https://cpp-linter.github.io/getting-started/#locally-or-in-other-ci) ·
+[Discussions](https://github.com/orgs/cpp-linter/discussions)
+
 [this]: https://github.com/cpp-linter/cpp-linter-rs
 [maturin]: https://maturin.rs
 
-## Install
-
-Install with `pip`:
-
-```text
-pip install cpp-linter
-```
+## Quick start
 
 Pre-releases are uploaded to [test-pypi](https://test.pypi.org/project/cpp-linter/):
 
 ```text
-pip install -i https://test.pypi.org/simple/ cpp-linter
+pip install --pre -i https://test.pypi.org/simple/ cpp-linter
 ```
+
+Until 2.0 is released, `pip install cpp-linter` installs the
+[pure python cpp-linter](https://github.com/cpp-linter/cpp-linter)
+package from PyPI.
 
 ## Usage
 
@@ -26,7 +29,7 @@ For usage in a CI workflow, see
 [the cpp-linter/cpp-linter-action repository](https://github.com/cpp-linter/cpp-linter-action).
 
 For the description of supported Command Line Interface options, see
-[the CLI documentation](https://cpp-linter.github.io/cpp-linter-rs/cli.html).
+[the CLI documentation](https://cpp-linter.github.io/cpp-linter-rs/cli/).
 
 ## Development
 
@@ -39,7 +42,7 @@ maturin dev
 Then invoke the executable script as a normal CLI app:
 
 ```text
-cpp-linter -help
+cpp-linter --help
 ```
 
 ### Folder structure
