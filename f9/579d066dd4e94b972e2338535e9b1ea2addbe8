@@ -1,0 +1,31 @@
+.github/workflows/node-js-packaging.yml
+  s_66212c309e21f0::t_0865c5cf95bedb 122
+  s_66212c309e21f0::t_6599d3dae1e8ba 43,281,288
+.github/workflows/binary-builds.yml
+  s_66212c309e21f0::t_7088c4a04b9f03 108
+  s_66212c309e21f0::t_6dda3e451ed7e8 39
+.github/workflows/benchmark.yml
+  s_66212c309e21f0::t_83c5f97d58e928 30
+.github/workflows/build-docs.yml
+  s_66212c309e21f0::t_06945e877aee59 49
+.github/workflows/python-packaging.yml
+  s_66212c309e21f0::t_1c353c9c0b61f4 48
+.github/workflows/run-dev-tests.yml
+  s_66212c309e21f0::t_8e2c44df48c65f 34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "f9579d066dd4e94b972e2338535e9b1ea2addbe8",
+  "prompts": {},
+  "sessions": {
+    "s_66212c309e21f0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8763d161-5362-48a1-ae9b-11f7bcd83469",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Xianpeng Shen <xianpeng.shen@gmail.com>"
+    }
+  }
+}
