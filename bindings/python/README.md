@@ -3,9 +3,9 @@
 The python binding for the [cpp-linter-rs][this] rust project
 (built using [pyo3](https://pyo3.rs) and [maturin]).
 
-[Website](https://cpp-linter.github.io/) ·
-[Documentation](https://cpp-linter.github.io/cpp-linter-rs/) ·
-[Get started](https://cpp-linter.github.io/getting-started/#locally-or-in-other-ci) ·
+[Website](https://cpp-linter.github.io/) |
+[Documentation](https://cpp-linter.github.io/cpp-linter-rs/) |
+[Get started](https://cpp-linter.github.io/getting-started/#locally-or-in-other-ci) |
 [Discussions](https://github.com/orgs/cpp-linter/discussions)
 
 [this]: https://github.com/cpp-linter/cpp-linter-rs
