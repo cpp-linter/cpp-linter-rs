@@ -20,7 +20,7 @@ pip install --pre -i https://test.pypi.org/simple/ cpp-linter
 ```
 
 Until 2.0 is released, `pip install cpp-linter` installs the
-[pure python cpp-linter](https://github.com/cpp-linter/cpp-linter)
+[pure python cpp-linter (v1.x)](https://github.com/cpp-linter/cpp-linter)
 package from PyPI.
 
 ## Usage
