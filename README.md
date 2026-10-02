@@ -52,7 +52,7 @@ so `--version` is required.
 Install from source code hosted at crates.io:
 
 ```text
-cargo install cpp-linter --version 2.0.0-rc.23 --features bin
+cargo install cpp-linter --version 2.0.0-rc.23 --features bin --locked
 ```
 
 Install a pre-compiled binary from GitHub releases:
