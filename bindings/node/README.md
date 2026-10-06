@@ -3,14 +3,19 @@
 The node.js binding for the [cpp-linter-rs][this] rust project
 (built using [napi-rs](https://napi.rs) and [yarn](https://yarnpkg.com)).
 
+[Website](https://cpp-linter.github.io/) |
+[Documentation](https://cpp-linter.github.io/cpp-linter-rs/) |
+[Get started](https://cpp-linter.github.io/getting-started/#locally-or-in-other-ci) |
+[Discussions](https://github.com/orgs/cpp-linter/discussions)
+
 [this]: https://github.com/cpp-linter/cpp-linter-rs
 
-## Install
+## Quick start
 
 Install with `npm`:
 
 ```text
-npm -g install @cpp-linter/cpp-linter
+npm -g install @cpp-linter/cpp-linter@next
 ```
 
 ## Usage
@@ -19,7 +24,7 @@ For usage in a CI workflow, see
 [the cpp-linter/cpp-linter-action repository](https://github.com/cpp-linter/cpp-linter-action).
 
 For the description of supported Command Line Interface options, see
-[the CLI documentation](https://cpp-linter.github.io/cpp-linter-rs/cli.html).
+[the CLI documentation](https://cpp-linter.github.io/cpp-linter-rs/cli/).
 
 ## Development
 
