@@ -12,11 +12,11 @@ This crate contains the library used as a backend for the
   - [x] file annotation
   - [x] pull request review suggestions
 
-[Website](https://cpp-linter.github.io/) ·
-[Documentation](https://cpp-linter.github.io/cpp-linter-rs/) ·
-[Get started](https://cpp-linter.github.io/getting-started/#locally-or-in-other-ci) ·
+[Website](https://cpp-linter.github.io/) |
+[Documentation](https://cpp-linter.github.io/cpp-linter-rs/) |
+[Get started](https://cpp-linter.github.io/getting-started/#locally-or-in-other-ci) |
 [Discussions](https://github.com/orgs/cpp-linter/discussions)
 
-See also the [CLI document hosted on GitHub][gh-pages].
+See also the [CLI document hosted on GitHub][cli-doc].
 
-[gh-pages]: https://cpp-linter.github.io/cpp-linter-rs/cli/
+[cli-doc]: https://cpp-linter.github.io/cpp-linter-rs/cli/

@@ -29,9 +29,9 @@ feedback provided in the form of [thread comments](#thread-comment), a
 [step summary](#step-summary), [file annotations](#annotations) and
 [pull request review](#pull-request-review) suggestions.
 
-[Website](https://cpp-linter.github.io/) ·
-[Documentation](https://cpp-linter.github.io/cpp-linter-rs/) ·
-[Get started](https://cpp-linter.github.io/getting-started/#locally-or-in-other-ci) ·
+[Website](https://cpp-linter.github.io/) |
+[Documentation](https://cpp-linter.github.io/cpp-linter-rs/) |
+[Get started](https://cpp-linter.github.io/getting-started/#locally-or-in-other-ci) |
 [Discussions](https://github.com/orgs/cpp-linter/discussions)
 
 > [!WARNING]
