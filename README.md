@@ -138,8 +138,7 @@ Using [`--pr-review`][pr-review]:
 ## Sponsors
 
 cpp-linter is maintained by two volunteers. [Sponsor the project](https://cpp-linter.github.io/sponsor/)
-through [GitHub Sponsors](https://github.com/sponsors/cpp-linter) or
-[Open Collective](https://opencollective.com/cpp-linter). Silver and Gold sponsors get their logo
+through [Open Collective](https://opencollective.com/cpp-linter). Silver and Gold sponsors get their logo
 here.
 
 ## Contributing
