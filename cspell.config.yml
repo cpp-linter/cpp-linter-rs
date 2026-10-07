@@ -57,6 +57,7 @@ words:
   - markdownlint
   - maturin
   - mdbook
+  - middot
   - mkdocs
   - mlugg
   - msvc
