@@ -135,6 +135,12 @@ Using [`--pr-review`][pr-review]:
 
 ![sample format-suggestion][format-suggestion-preview]
 
+## Sponsors
+
+cpp-linter is maintained by two volunteers. [Sponsor the project](https://cpp-linter.github.io/sponsor/)
+through [Open Collective](https://opencollective.com/cpp-linter). [Silver and Gold sponsors](https://cpp-linter.github.io/sponsor/#sponsor-tiers)
+get their logo here.
+
 ## Contributing
 
 To provide feedback (requesting a feature or reporting a bug) please post to
