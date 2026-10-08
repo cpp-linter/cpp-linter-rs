@@ -5,8 +5,7 @@
 [hiding a comment]: https://docs.github.com/en/communities/moderating-comments-and-conversations/managing-disruptive-comments#hiding-a-comment
 [resolve a conversation]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/commenting-on-a-pull-request#resolving-conversations
 
-[tidy-review]: cli.md#-d-tidy-review
-[format-review]: cli.md#-m-format-review
+[pr-review]: cli.md#-p-pr-review
 [lines-changed-only]: cli.md#-l-lines-changed-only
 [style]: cli.md#-s-style
 
@@ -41,14 +40,11 @@ The feature is auto-disabled for
 
 Clang-tidy and clang-format suggestions are shown in 1 Pull Request review.
 
-- Users are encouraged to choose either [`tidy-review`][tidy-review] or [`format-review`][format-review].
-  Enabling both will likely show duplicate or similar suggestions.
-  Remember, clang-tidy can be configured to use the same [`style`][style] that clang-format accepts.
 - Each generated review is specific to the commit that triggered the Continuous Integration
   workflow.
-- Outdated reviews are dismissed but not marked as resolved.
-  Also, the outdated review's summary comment is not automatically hidden.
-  To reduce the Pull Request's thread noise, users interaction is required.
+- Outdated reviews are dismissed and minimized if all suggestions/comments are resolved.
+  Some clang-tidy findings do not have automatic fixes to suggest. So, some review comments
+  may need user action to resolve. 
 
 > [!IMPORTANT]
 > Refer to GitHub's documentation about [hiding a comment][].

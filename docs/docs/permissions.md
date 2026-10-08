@@ -78,7 +78,7 @@ For [`pull_request` events][pr-events].
 
 ## Pull Request Reviews
 
-The [`tidy-review`](cli.md#-d-tidy-review), [`format-review`](cli.md#-m-format-review), and [`passive-reviews`](cli.md#-r-passive-reviews) features require the following permissions:
+The [`pr-review`](cli.md#-p-pr-review) and [`passive-reviews`](cli.md#-r-passive-reviews) features require the following permissions:
 
 ```yaml
     permissions:
