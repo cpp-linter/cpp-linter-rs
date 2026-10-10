@@ -21,6 +21,7 @@ const RESET_RATE_LIMIT_HEADER: &str = "x-ratelimit-reset";
 const REMAINING_RATE_LIMIT_HEADER: &str = "x-ratelimit-remaining";
 
 const SUMMARY_OUT_FILE_NAME: &str = "summary_output.md";
+const SARIF_FILE_NAME: &str = "results/clang-tidy.sarif";
 
 #[derive(PartialEq, Clone, Copy, Debug)]
 enum EventType {
@@ -269,6 +270,8 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
             "--summary-output-file={}",
             summary_out_file_path.to_str().unwrap()
         ),
+        // relative to repo root
+        format!("--sarif-file={SARIF_FILE_NAME}"),
     ];
     if test_params.force_lgtm {
         args.push("-e=c".to_string());
@@ -326,6 +329,34 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
     let summary_content = std::fs::read_to_string(&summary_out_file_abs_path).unwrap();
     assert!(summary_content.contains(COMMENT_MARKER));
     assert!(summary_content.contains(USER_OUTREACH));
+
+    // verify the SARIF log has 1 result per clang-tidy concern
+    let tidy_checks_failed = output_vars
+        .lines()
+        .find_map(|line| line.strip_prefix("clang-tidy-checks-failed="))
+        .expect("clang-tidy-checks-failed output variable not found")
+        .trim()
+        .parse::<usize>()
+        .unwrap();
+    let sarif: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(tmp_dir.path().join(SARIF_FILE_NAME)).unwrap())
+            .unwrap();
+    assert_eq!(sarif["version"], "2.1.0");
+    let run = &sarif["runs"][0];
+    assert_eq!(run["tool"]["driver"]["name"], "clang-tidy");
+    let results = run["results"].as_array().unwrap();
+    assert_eq!(results.len(), tidy_checks_failed);
+    for result in results {
+        let rule_index = result["ruleIndex"].as_u64().unwrap() as usize;
+        assert_eq!(
+            run["tool"]["driver"]["rules"][rule_index]["id"],
+            result["ruleId"]
+        );
+        let uri = result["locations"][0]["physicalLocation"]["artifactLocation"]["uri"]
+            .as_str()
+            .unwrap();
+        assert!(!uri.contains(' '), "URI should be percent-encoded: {uri}");
+    }
 }
 
 async fn test_comment(test_params: &TestParams) {

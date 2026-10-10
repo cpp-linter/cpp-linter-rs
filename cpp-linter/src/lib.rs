@@ -22,6 +22,7 @@ pub mod error;
 mod git;
 pub mod rest_client;
 pub mod run;
+pub mod sarif;
 
 #[cfg(test)]
 pub(crate) mod test_common {

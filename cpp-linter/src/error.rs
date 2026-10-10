@@ -61,6 +61,21 @@ pub enum ClientError {
         source: std::io::Error,
     },
 
+    /// Error when failing to serialize the SARIF log.
+    #[error("Failed to serialize the SARIF log: {0}")]
+    SarifSerialize(#[source] serde_json::Error),
+
+    /// Error when failing to write a given SARIF output file.
+    #[error("Failed to write SARIF log to file '{file_path:?}': {source}")]
+    SarifFileWriteFailed {
+        /// The path to the SARIF output file that failed to be written.
+        file_path: std::path::PathBuf,
+
+        /// The underlying error from trying to write the SARIF output file.
+        #[source]
+        source: std::io::Error,
+    },
+
     /// Error when failing to determine the parent directory of a given file path.
     #[error("Failed to create a parent directory for the path '{file_path:?}'")]
     MkDirFailed {
