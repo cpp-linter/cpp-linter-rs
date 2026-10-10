@@ -507,6 +507,31 @@ pub struct FeedbackOptions {
     ))]
     pub summary_output_file: Option<PathBuf>,
 
+    /// Provide this option with a path to which clang-tidy diagnostics are
+    /// written in the [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html)
+    /// format.
+    ///
+    /// If the given path is relative, then it shall be relative to the given
+    /// [`--repo-root`](#-r-repo-root) path.
+    ///
+    /// The SARIF file only includes clang-tidy diagnostics that are also
+    /// reported in other forms of feedback. So, source filters like
+    /// [`--lines-changed-only`](#-l-lines-changed-only) and
+    /// [`--ignore-tidy`](#-d-ignore-tidy) are respected.
+    /// The SARIF file is written even if no diagnostics were found.
+    ///
+    /// > [!TIP]
+    /// > In GitHub Actions, the SARIF file can be uploaded to
+    /// > [GitHub code scanning](https://docs.github.com/en/code-security/code-scanning/integrating-with-code-scanning/uploading-a-sarif-file-to-github)
+    /// > with the `github/codeql-action/upload-sarif` action.
+    #[cfg_attr(feature = "bin", arg(
+        long,
+        value_name = "PATH",
+        value_parser = value_parser!(PathBuf),
+        help_heading = "Feedback options",
+    ))]
+    pub sarif_file: Option<PathBuf>,
+
     /// Set this option to false to disable the use of
     /// file annotations as feedback.
     #[cfg_attr(feature = "bin", arg(

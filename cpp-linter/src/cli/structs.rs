@@ -302,6 +302,9 @@ pub struct FeedbackInput {
     /// An optional file path to which a summary comment is written.
     pub summary_output_file: Option<PathBuf>,
 
+    /// An optional file path to which clang-tidy diagnostics are written in SARIF format.
+    pub sarif_file: Option<PathBuf>,
+
     /// Whether to post file annotations.
     pub file_annotations: bool,
 
@@ -334,6 +337,7 @@ impl From<&Cli> for FeedbackInput {
             passive_reviews: args.feedback_options.passive_reviews,
             repo_root: args.source_options.repo_root.clone(),
             summary_output_file: args.feedback_options.summary_output_file.clone(),
+            sarif_file: args.feedback_options.sarif_file.clone(),
         }
     }
 }
@@ -351,6 +355,7 @@ impl Default for FeedbackInput {
             passive_reviews: false,
             repo_root: PathBuf::from("."),
             summary_output_file: None,
+            sarif_file: None,
         }
     }
 }

@@ -61,6 +61,7 @@ words:
   - mlugg
   - msvc
   - multiarch
+  - Multiformat
   - musleabihf
   - musllinux
   - mypy
@@ -96,6 +97,7 @@ words:
   - pypi
   - pyproject
   - pyyaml
+  - Qube
   - RAII
   - ratelimit
   - reqwest
@@ -105,12 +107,14 @@ words:
   - rustdoc
   - rustflags
   - rustup
+  - SARIF
   - sccache
   - sdist
   - serde
   - Shen
   - shenxianpeng
   - splitn
+  - SRCROOT
   - startswith
   - superfences
   - tada

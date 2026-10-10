@@ -33,6 +33,8 @@ inputs:
     minimum-version: '1.6.0'
   summary-output-file:
     minimum-version: '1.13.0'
+  sarif-file:
+    minimum-version: '2.0.0'
   file-annotations:
     minimum-version: '1.4.3'
   database:
