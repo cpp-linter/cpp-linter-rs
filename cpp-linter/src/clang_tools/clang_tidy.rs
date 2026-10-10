@@ -69,29 +69,34 @@ pub struct TidyNotification {
 }
 
 impl TidyNotification {
-    /// Get a markdown-formatted link to the clang-tidy documentation page for [`Self::diagnostic`].
-    pub fn diagnostic_link(&self) -> String {
+    /// Get the URL of the clang-tidy documentation page for [`Self::diagnostic`].
+    ///
+    /// Returns [`None`] for compiler diagnostics (`clang-diagnostic-*`) because they
+    /// don't have dedicated clang-tidy documentation pages.
+    pub fn diagnostic_url(&self) -> Option<String> {
         if self.diagnostic.starts_with("clang-diagnostic-") {
-            // clang-diagnostic-* diagnostics are compiler diagnostics and don't have
-            // dedicated clang-tidy documentation pages, so return the name as-is.
-            return self.diagnostic.clone();
+            return None;
         }
-        if let Some((category, name)) = if self.diagnostic.starts_with("clang-analyzer-") {
+        let (category, name) = if self.diagnostic.starts_with("clang-analyzer-") {
             self.diagnostic
                 .strip_prefix("clang-analyzer-")
                 .map(|n| ("clang-analyzer", n))
         } else {
             self.diagnostic.split_once('-')
-        } {
-            // In production, both category and name should be non-empty strings.
-            // Clang does not actually have a diagnostic name whose category or name is empty.
-            debug_assert!(!category.is_empty() && !name.is_empty());
-            format!(
-                "[{}](https://clang.llvm.org/extra/clang-tidy/checks/{category}/{name}.html)",
-                self.diagnostic
-            )
-        } else {
-            self.diagnostic.clone()
+        }?;
+        // In production, both category and name should be non-empty strings.
+        // Clang does not actually have a diagnostic name whose category or name is empty.
+        debug_assert!(!category.is_empty() && !name.is_empty());
+        Some(format!(
+            "https://clang.llvm.org/extra/clang-tidy/checks/{category}/{name}.html"
+        ))
+    }
+
+    /// Get a markdown-formatted link to the clang-tidy documentation page for [`Self::diagnostic`].
+    pub fn diagnostic_link(&self) -> String {
+        match self.diagnostic_url() {
+            Some(url) => format!("[{}]({url})", self.diagnostic),
+            None => self.diagnostic.clone(),
         }
     }
 }
