@@ -62,7 +62,7 @@ jobs:
       #   if: runner.os == 'Windows'
       #   run: vcpkg install openssl
 
-      - uses: cargo-bins/cargo-binstall@422f3094be6a0843857aa008b499caaf6bce0da8 # v1.24.0
+      - uses: cargo-bins/cargo-binstall@7bebc2e59eb8820162b7ac8f62a92bfdb2732447 # v1.25.1
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - name: Install third-party binaries
@@ -101,7 +101,7 @@ jobs:
         run: sudo apt-get update
 
       - name: Install nushell
-        uses: hustcer/setup-nu@9215c80adb545a85c419d5085b76eb6d082f49e7 # v3.27
+        uses: hustcer/setup-nu@95cd3bfe252450ef7d35dd9a7ddecf3484341134 # v3.28
 
       - name: Restore build script seed
         uses: actions/download-artifact@v8
