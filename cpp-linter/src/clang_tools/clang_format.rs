@@ -339,6 +339,34 @@ mod tests {
     }
 
     #[test]
+    fn tally_counts_only_nonempty_advice() {
+        use std::sync::{Arc, Mutex};
+
+        use super::{FormatAdvice, tally_format_advice};
+        use crate::common_fs::FileObj;
+
+        let mut with_advice = FileObj::new(std::path::PathBuf::from("demo.cpp"));
+        #[allow(clippy::single_range_in_vec_init)]
+        {
+            with_advice.format_advice = Some(FormatAdvice {
+                replacements: vec![1..=2],
+            });
+        }
+        let mut empty_advice = FileObj::new(std::path::PathBuf::from("empty.cpp"));
+        empty_advice.format_advice = Some(FormatAdvice {
+            replacements: vec![],
+        });
+        // a third file with no advice at all is also ignored
+        let no_advice = FileObj::new(std::path::PathBuf::from("none.cpp"));
+        let files = vec![
+            Arc::new(Mutex::new(with_advice)),
+            Arc::new(Mutex::new(empty_advice)),
+            Arc::new(Mutex::new(no_advice)),
+        ];
+        assert_eq!(tally_format_advice(&files).unwrap(), 1);
+    }
+
+    #[test]
     fn three_way_diff_mixed() {
         const OG_SRC: &str =
             "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10\nline11\nline12";

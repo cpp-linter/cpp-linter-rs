@@ -613,7 +613,7 @@ const EXTRACTED_CHUNK_SIZE: u64 = 1024;
 mod test {
     use std::str::FromStr;
 
-    use super::{PlatformTag, PyPiReleaseInfo, WheelTags};
+    use super::{LinuxLibC, PlatformOs, PlatformTag, PyPiReleaseInfo, WheelTags};
 
     #[test]
     fn bad_json_digest() {
@@ -654,5 +654,78 @@ mod test {
         let bad_wheel_name = "clang_format-17.0.0-py3-none_manylinux_2_17_x86_64.whl";
         let err = WheelTags::from_str(bad_wheel_name).unwrap_err();
         println!("{}", err);
+    }
+
+    #[test]
+    fn win32_tag() {
+        let tag = PlatformTag::from_str("win32").unwrap();
+        assert!(matches!(tag.os, PlatformOs::Windows));
+        assert_eq!(tag.arch.as_str(), "x86");
+    }
+
+    #[test]
+    fn win_amd64_tag() {
+        let tag = PlatformTag::from_str("win_amd64").unwrap();
+        assert!(matches!(tag.os, PlatformOs::Windows));
+        assert_eq!(tag.arch.as_str(), "amd64");
+    }
+
+    #[test]
+    fn win_missing_arch_tag() {
+        // "win" prefix without an "_<arch>" suffix is malformed.
+        let err = PlatformTag::from_str("win").unwrap_err();
+        println!("{}", err);
+    }
+
+    #[test]
+    fn macosx_tag() {
+        let tag = PlatformTag::from_str("macosx_11_0_arm64").unwrap();
+        assert!(matches!(tag.os, PlatformOs::MacOS));
+        assert_eq!(tag.arch.as_str(), "arm64");
+    }
+
+    #[test]
+    fn musllinux_tag() {
+        let tag = PlatformTag::from_str("musllinux_1_2_x86_64").unwrap();
+        assert!(matches!(
+            tag.os,
+            PlatformOs::Linux {
+                lib_c: LinuxLibC::Musl { .. }
+            }
+        ));
+        assert_eq!(tag.arch.as_str(), "x86_64");
+    }
+
+    #[test]
+    fn manylinux2_tag() {
+        let tag = PlatformTag::from_str("manylinux_2_17_x86_64").unwrap();
+        assert!(matches!(
+            tag.os,
+            PlatformOs::Linux {
+                lib_c: LinuxLibC::Glibc { .. }
+            }
+        ));
+        assert_eq!(tag.arch.as_str(), "x86_64");
+    }
+
+    #[test]
+    fn manylinux_dotted_tag() {
+        // A combined tag like "manylinux_2_17_x86_64.manylinux2014_x86_64" should
+        // select the "manylinux_" variant from the dotted alternatives.
+        let tag = PlatformTag::from_str("manylinux_2_17_x86_64.manylinux2014_x86_64").unwrap();
+        assert!(matches!(
+            tag.os,
+            PlatformOs::Linux {
+                lib_c: LinuxLibC::Glibc { .. }
+            }
+        ));
+        assert_eq!(tag.arch.as_str(), "x86_64");
+    }
+
+    #[test]
+    fn valid_wheel_tags() {
+        let wheel_name = "clang_format-17.0.0-py3-none-manylinux_2_17_x86_64.whl";
+        let tags = WheelTags::from_str(wheel_name).unwrap();
+        assert_eq!(tags.platform.arch.as_str(), "x86_64");
     }
 }

@@ -603,6 +603,52 @@ TrenchBroom/TrenchBroom/common/test/src/mdl/tst_ReadFreeImageTexture.cpp:44:48: 
         }
     }
 
+    fn dummy_note(filename: &str, fixed_lines: Vec<u32>) -> TidyNotification {
+        TidyNotification {
+            filename: filename.to_string(),
+            line: 5,
+            cols: 1,
+            severity: String::from("warning"),
+            rationale: String::from("a dummy rationale"),
+            diagnostic: String::from("modernize-use-auto"),
+            suggestion: vec![],
+            fixed_lines,
+        }
+    }
+
+    #[test]
+    fn tally_counts_matching_notes() {
+        use super::{TidyAdvice, tally_tidy_advice};
+
+        let mut file = FileObj::new(PathBuf::from("demo.cpp"));
+        file.tidy_advice = Some(TidyAdvice {
+            notes: vec![
+                // matches the file name -> counted
+                dummy_note("demo.cpp", vec![]),
+                // does not match the file name -> not counted
+                dummy_note("other.cpp", vec![]),
+            ],
+        });
+        let files = vec![Arc::new(Mutex::new(file))];
+        assert_eq!(tally_tidy_advice(&files).unwrap(), 1);
+    }
+
+    #[test]
+    fn suggestion_help_with_and_without_fixes() {
+        use super::TidyAdvice;
+
+        let advice = TidyAdvice {
+            notes: vec![dummy_note("demo.cpp", vec![5])],
+        };
+        // A fixed line within the range yields a "diagnostic(s)" header plus the rationale.
+        let help = advice.get_suggestion_help(1, 10);
+        assert!(help.contains("clang-tidy diagnostic(s)"));
+        assert!(help.contains("a dummy rationale"));
+        // No fixed line within the range falls back to a plain "suggestion" header.
+        let help = advice.get_suggestion_help(20, 30);
+        assert!(help.contains("clang-tidy suggestion"));
+    }
+
     #[test]
     fn restore_on_drop_fires() {
         let tmp = tempfile::tempdir().unwrap();
