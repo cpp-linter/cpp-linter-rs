@@ -44,7 +44,7 @@ Clang-tidy and clang-format suggestions are shown in 1 Pull Request review.
   workflow.
 - Outdated reviews are dismissed and minimized if all suggestions/comments are resolved.
   Some clang-tidy findings do not have automatic fixes to suggest. So, some review comments
-  may need user action to resolve. 
+  may need user action to resolve.
 
 > [!IMPORTANT]
 > Refer to GitHub's documentation about [hiding a comment][].
