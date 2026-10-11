@@ -49,7 +49,7 @@ struct TestParams {
     pub fail_dismissal: bool,
     pub fail_posting: bool,
     pub bad_existing_comments: bool,
-    pub relative_summary_out_file: bool,
+    pub relative_out_files: bool,
 }
 
 impl Default for TestParams {
@@ -64,7 +64,7 @@ impl Default for TestParams {
             fail_dismissal: false,
             fail_posting: false,
             bad_existing_comments: false,
-            relative_summary_out_file: false,
+            relative_out_files: false,
         }
     }
 }
@@ -249,10 +249,17 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
         );
     }
 
-    let summary_out_file_path = if test_params.relative_summary_out_file {
+    let summary_out_file_path = if test_params.relative_out_files {
         std::path::PathBuf::from(SUMMARY_OUT_FILE_NAME)
     } else {
         tmp_dir.path().join(SUMMARY_OUT_FILE_NAME)
+    };
+
+    // a relative path is resolved against the repo root
+    let sarif_file_path = if test_params.relative_out_files {
+        std::path::PathBuf::from(SARIF_FILE_NAME)
+    } else {
+        tmp_dir.path().join(SARIF_FILE_NAME)
     };
 
     let mut args = vec![
@@ -271,8 +278,7 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
             "--summary-output-file={}",
             summary_out_file_path.to_str().unwrap()
         ),
-        // relative to repo root
-        format!("--sarif-file={SARIF_FILE_NAME}"),
+        format!("--sarif-file={}", sarif_file_path.to_str().unwrap()),
     ];
     if test_params.force_lgtm {
         args.push("-e=c".to_string());
@@ -322,7 +328,7 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
         assert!(apply_patch_status.success());
     }
 
-    let summary_out_file_abs_path = if test_params.relative_summary_out_file {
+    let summary_out_file_abs_path = if test_params.relative_out_files {
         tmp_dir.path().join(SUMMARY_OUT_FILE_NAME)
     } else {
         summary_out_file_path.clone()
@@ -536,9 +542,9 @@ async fn bad_existing_comments() {
 }
 
 #[tokio::test]
-async fn relative_summary_out_file() {
+async fn relative_out_files() {
     test_comment(&TestParams {
-        relative_summary_out_file: true,
+        relative_out_files: true,
         ..Default::default()
     })
     .await;
