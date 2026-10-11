@@ -15,22 +15,20 @@ use semver::Version;
 use serde::Serialize;
 
 // project-specific modules/crates
-use crate::{clang_tools::clang_tidy::TidyNotification, common_fs::FileObj, error::ClientError};
+use crate::{
+    clang_tools::clang_tidy::{CLANG_TIDY_URL, TidyNotification},
+    common_fs::FileObj,
+    error::ClientError,
+};
 
 /// The URI of the JSON schema for SARIF 2.1.0.
 const SARIF_SCHEMA: &str = "https://json.schemastore.org/sarif-2.1.0.json";
 
 /// The version of the SARIF specification that is implemented.
-const SARIF_VERSION: &str = "2.1.0";
+pub const SARIF_VERSION: &str = "2.1.0";
 
 /// The symbolic name used for the repository root in artifact locations.
 const SRC_ROOT: &str = "%SRCROOT%";
-
-/// The URL to clang-tidy's documentation.
-const CLANG_TIDY_URL: &str = "https://clang.llvm.org/extra/clang-tidy/";
-
-/// The URL to clang's reference of compiler diagnostics (warning flags).
-const CLANG_DIAGNOSTICS_URL: &str = "https://clang.llvm.org/docs/DiagnosticsReference.html";
 
 /// A SARIF log that describes the diagnostics reported by clang-tidy.
 ///
@@ -190,23 +188,10 @@ fn repo_root_uri(repo_root: &Path) -> String {
     format!("file://{}", encode_uri_path(&path, true))
 }
 
-/// Get a URL to documentation about the given clang-tidy notification's diagnostic.
-fn help_uri(note: &TidyNotification) -> Option<String> {
-    if let Some(flag) = note.diagnostic.strip_prefix("clang-diagnostic-") {
-        // compiler errors (`clang-diagnostic-error`) are not warning flags
-        return if flag == "error" {
-            None
-        } else {
-            Some(format!("{CLANG_DIAGNOSTICS_URL}#w{flag}"))
-        };
-    }
-    note.diagnostic_url()
-}
-
 /// Create a SARIF rule (reporting descriptor) for the given clang-tidy notification's diagnostic.
 fn make_rule(note: &TidyNotification) -> ReportingDescriptor {
     let id = note.diagnostic.clone();
-    let help_uri = help_uri(note);
+    let help_uri = note.diagnostic_url();
     let description = if note.diagnostic.starts_with("clang-diagnostic-") {
         format!("Clang compiler diagnostic {id}")
     } else {

@@ -2,6 +2,7 @@
 use chrono::Utc;
 use cpp_linter::rest_client::USER_OUTREACH;
 use cpp_linter::run::run_main;
+use cpp_linter::sarif::SARIF_VERSION;
 use cpp_linter::{cli::ThreadComments, rest_client::COMMENT_MARKER};
 use git_bot_feedback::LinesChangedOnly;
 use mockito::Matcher;
@@ -341,7 +342,7 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
     let sarif: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(tmp_dir.path().join(SARIF_FILE_NAME)).unwrap())
             .unwrap();
-    assert_eq!(sarif["version"], "2.1.0");
+    assert_eq!(sarif["version"], SARIF_VERSION);
     let run = &sarif["runs"][0];
     assert_eq!(run["tool"]["driver"]["name"], "clang-tidy");
     let results = run["results"].as_array().unwrap();
