@@ -68,30 +68,47 @@ pub struct TidyNotification {
     pub fixed_lines: Vec<u32>,
 }
 
+/// The URL to clang-tidy's documentation.
+pub const CLANG_TIDY_URL: &str = "https://clang.llvm.org/extra/clang-tidy/";
+
+/// The URL to clang's reference of compiler diagnostics (warning flags).
+pub const CLANG_DIAGNOSTICS_URL: &str = "https://clang.llvm.org/docs/DiagnosticsReference.html";
+
 impl TidyNotification {
-    /// Get a markdown-formatted link to the clang-tidy documentation page for [`Self::diagnostic`].
-    pub fn diagnostic_link(&self) -> String {
-        if self.diagnostic.starts_with("clang-diagnostic-") {
-            // clang-diagnostic-* diagnostics are compiler diagnostics and don't have
-            // dedicated clang-tidy documentation pages, so return the name as-is.
-            return self.diagnostic.clone();
+    /// Get the URL of the documentation page for [`Self::diagnostic`].
+    ///
+    /// For clang-tidy checks, this is the check's page in [clang-tidy's documentation](CLANG_TIDY_URL).
+    /// For compiler diagnostics (`clang-diagnostic-*`), this is the warning flag's entry in
+    /// [clang's diagnostics reference](CLANG_DIAGNOSTICS_URL).
+    ///
+    /// Returns [`None`] for compiler errors (`clang-diagnostic-error`) because they are not
+    /// associated with a warning flag.
+    pub fn diagnostic_url(&self) -> Option<String> {
+        if let Some(flag) = self.diagnostic.strip_prefix("clang-diagnostic-") {
+            return if flag == "error" || flag.is_empty() {
+                None
+            } else {
+                Some(format!("{CLANG_DIAGNOSTICS_URL}#w{flag}"))
+            };
         }
-        if let Some((category, name)) = if self.diagnostic.starts_with("clang-analyzer-") {
+        let (category, name) = if self.diagnostic.starts_with("clang-analyzer-") {
             self.diagnostic
                 .strip_prefix("clang-analyzer-")
                 .map(|n| ("clang-analyzer", n))
         } else {
             self.diagnostic.split_once('-')
-        } {
-            // In production, both category and name should be non-empty strings.
-            // Clang does not actually have a diagnostic name whose category or name is empty.
-            debug_assert!(!category.is_empty() && !name.is_empty());
-            format!(
-                "[{}](https://clang.llvm.org/extra/clang-tidy/checks/{category}/{name}.html)",
-                self.diagnostic
-            )
-        } else {
-            self.diagnostic.clone()
+        }?;
+        // In production, both category and name should be non-empty strings.
+        // Clang does not actually have a diagnostic name whose category or name is empty.
+        debug_assert!(!category.is_empty() && !name.is_empty());
+        Some(format!("{CLANG_TIDY_URL}checks/{category}/{name}.html"))
+    }
+
+    /// Get a markdown-formatted link to the documentation page for [`Self::diagnostic`].
+    pub fn diagnostic_link(&self) -> String {
+        match self.diagnostic_url() {
+            Some(url) => format!("[{}]({url})", self.diagnostic),
+            None => self.diagnostic.clone(),
         }
     }
 }
@@ -422,7 +439,9 @@ mod test {
         common_fs::FileObj,
     };
 
-    use super::{NOTE_HEADER, RestoreOnDrop, TidyNotification, run_clang_tidy};
+    use super::{
+        CLANG_DIAGNOSTICS_URL, NOTE_HEADER, RestoreOnDrop, TidyNotification, run_clang_tidy,
+    };
 
     #[test]
     fn clang_diagnostic_link() {
@@ -437,6 +456,25 @@ mod test {
             fixed_lines: vec![],
         };
         assert_eq!(note.diagnostic_link(), note.diagnostic);
+    }
+
+    #[test]
+    fn clang_diagnostic_warning_link() {
+        let note = TidyNotification {
+            filename: String::from("some_src.cpp"),
+            line: 1504,
+            cols: 9,
+            rationale: String::from("unused variable 'x'"),
+            severity: String::from("warning"),
+            diagnostic: String::from("clang-diagnostic-unused-variable"),
+            suggestion: vec![],
+            fixed_lines: vec![],
+        };
+        let expected = format!(
+            "[{}]({CLANG_DIAGNOSTICS_URL}#w{})",
+            note.diagnostic, "unused-variable",
+        );
+        assert_eq!(note.diagnostic_link(), expected);
     }
 
     #[test]

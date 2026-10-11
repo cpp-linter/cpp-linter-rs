@@ -23,6 +23,7 @@ use crate::{
     cli::{ClangParams, FeedbackInput, ThreadComments},
     common_fs::FileObj,
     error::ClientError,
+    sarif::SarifLog,
 };
 
 /// The comment marker used to identify bot comments from other comments (from users or other bots).
@@ -170,6 +171,20 @@ impl RestClient {
                 })?;
             }
             comment = Some(summary);
+        }
+        if let Some(sarif_file) = &feedback_inputs.sarif_file {
+            let output_file = if sarif_file.is_absolute() {
+                sarif_file
+            } else {
+                &feedback_inputs.repo_root.join(sarif_file)
+            };
+            SarifLog::new(
+                files,
+                clang_versions.tidy_version.as_ref(),
+                &feedback_inputs.repo_root,
+            )?
+            .write(output_file)?;
+            log::info!("Wrote SARIF log to {}", output_file.to_string_lossy());
         }
         let output_vars = [
             OutputVariable {

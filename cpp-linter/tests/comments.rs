@@ -2,6 +2,7 @@
 use chrono::Utc;
 use cpp_linter::rest_client::USER_OUTREACH;
 use cpp_linter::run::run_main;
+use cpp_linter::sarif::SARIF_VERSION;
 use cpp_linter::{cli::ThreadComments, rest_client::COMMENT_MARKER};
 use git_bot_feedback::LinesChangedOnly;
 use mockito::Matcher;
@@ -21,6 +22,7 @@ const RESET_RATE_LIMIT_HEADER: &str = "x-ratelimit-reset";
 const REMAINING_RATE_LIMIT_HEADER: &str = "x-ratelimit-remaining";
 
 const SUMMARY_OUT_FILE_NAME: &str = "summary_output.md";
+const SARIF_FILE_NAME: &str = "results/clang-tidy.sarif";
 
 #[derive(PartialEq, Clone, Copy, Debug)]
 enum EventType {
@@ -47,7 +49,7 @@ struct TestParams {
     pub fail_dismissal: bool,
     pub fail_posting: bool,
     pub bad_existing_comments: bool,
-    pub relative_summary_out_file: bool,
+    pub relative_out_files: bool,
 }
 
 impl Default for TestParams {
@@ -62,7 +64,7 @@ impl Default for TestParams {
             fail_dismissal: false,
             fail_posting: false,
             bad_existing_comments: false,
-            relative_summary_out_file: false,
+            relative_out_files: false,
         }
     }
 }
@@ -247,10 +249,17 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
         );
     }
 
-    let summary_out_file_path = if test_params.relative_summary_out_file {
+    let summary_out_file_path = if test_params.relative_out_files {
         std::path::PathBuf::from(SUMMARY_OUT_FILE_NAME)
     } else {
         tmp_dir.path().join(SUMMARY_OUT_FILE_NAME)
+    };
+
+    // a relative path is resolved against the repo root
+    let sarif_file_path = if test_params.relative_out_files {
+        std::path::PathBuf::from(SARIF_FILE_NAME)
+    } else {
+        tmp_dir.path().join(SARIF_FILE_NAME)
     };
 
     let mut args = vec![
@@ -269,6 +278,7 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
             "--summary-output-file={}",
             summary_out_file_path.to_str().unwrap()
         ),
+        format!("--sarif-file={}", sarif_file_path.to_str().unwrap()),
     ];
     if test_params.force_lgtm {
         args.push("-e=c".to_string());
@@ -318,7 +328,7 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
         assert!(apply_patch_status.success());
     }
 
-    let summary_out_file_abs_path = if test_params.relative_summary_out_file {
+    let summary_out_file_abs_path = if test_params.relative_out_files {
         tmp_dir.path().join(SUMMARY_OUT_FILE_NAME)
     } else {
         summary_out_file_path.clone()
@@ -326,6 +336,46 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
     let summary_content = std::fs::read_to_string(&summary_out_file_abs_path).unwrap();
     assert!(summary_content.contains(COMMENT_MARKER));
     assert!(summary_content.contains(USER_OUTREACH));
+
+    // verify the SARIF log has 1 result per clang-tidy concern
+    let tidy_checks_failed = output_vars
+        .lines()
+        .find_map(|line| line.strip_prefix("clang-tidy-checks-failed="))
+        .expect("clang-tidy-checks-failed output variable not found")
+        .trim()
+        .parse::<usize>()
+        .unwrap();
+    let sarif: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(tmp_dir.path().join(SARIF_FILE_NAME)).unwrap())
+            .unwrap();
+    assert_eq!(sarif["version"], SARIF_VERSION);
+    let schema: serde_json::Value =
+        serde_json::from_str(include_str!("sarif-schema-2.1.0.json")).unwrap();
+    // the JSON Schema draft is detected from the schema's own `$schema` keyword
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    let errors = validator
+        .iter_errors(&sarif)
+        .map(|e| format!("{} at {}", e, e.instance_path()))
+        .collect::<Vec<_>>();
+    assert!(
+        errors.is_empty(),
+        "SARIF log is not schema-valid: {errors:#?}"
+    );
+    let run = &sarif["runs"][0];
+    assert_eq!(run["tool"]["driver"]["name"], "clang-tidy");
+    let results = run["results"].as_array().unwrap();
+    assert_eq!(results.len(), tidy_checks_failed);
+    for result in results {
+        let rule_index = result["ruleIndex"].as_u64().unwrap() as usize;
+        assert_eq!(
+            run["tool"]["driver"]["rules"][rule_index]["id"],
+            result["ruleId"]
+        );
+        let uri = result["locations"][0]["physicalLocation"]["artifactLocation"]["uri"]
+            .as_str()
+            .unwrap();
+        assert!(!uri.contains(' '), "URI should be percent-encoded: {uri}");
+    }
 }
 
 async fn test_comment(test_params: &TestParams) {
@@ -504,9 +554,9 @@ async fn bad_existing_comments() {
 }
 
 #[tokio::test]
-async fn relative_summary_out_file() {
+async fn relative_out_files() {
     test_comment(&TestParams {
-        relative_summary_out_file: true,
+        relative_out_files: true,
         ..Default::default()
     })
     .await;
