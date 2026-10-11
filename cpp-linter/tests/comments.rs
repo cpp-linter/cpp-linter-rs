@@ -349,6 +349,17 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
         serde_json::from_str(&fs::read_to_string(tmp_dir.path().join(SARIF_FILE_NAME)).unwrap())
             .unwrap();
     assert_eq!(sarif["version"], SARIF_VERSION);
+    let schema: serde_json::Value =
+        serde_json::from_str(include_str!("sarif-schema-2.1.0.json")).unwrap();
+    let validator = jsonschema::draft7::new(&schema).unwrap();
+    let errors = validator
+        .iter_errors(&sarif)
+        .map(|e| format!("{} at {}", e, e.instance_path()))
+        .collect::<Vec<_>>();
+    assert!(
+        errors.is_empty(),
+        "SARIF log is not schema-valid: {errors:#?}"
+    );
     let run = &sarif["runs"][0];
     assert_eq!(run["tool"]["driver"]["name"], "clang-tidy");
     let results = run["results"].as_array().unwrap();

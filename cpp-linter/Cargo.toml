@@ -40,6 +40,7 @@ features = ["file-changes"]
 # branch = "git-diff-no-staged"
 
 [dev-dependencies]
+jsonschema = { workspace = true }
 mockito = { workspace = true }
 tempfile = { workspace = true }
 reqwest = { workspace = true, features = ["default-tls"] }
