@@ -63,7 +63,7 @@ jobs:
           node-version: 24.x
       - run: yarn install
         if: inputs.package == 'cpp-linter-js'
-      - uses: cargo-bins/cargo-binstall@422f3094be6a0843857aa008b499caaf6bce0da8 # v1.24.0
+      - uses: cargo-bins/cargo-binstall@7bebc2e59eb8820162b7ac8f62a92bfdb2732447 # v1.25.1
       - run: cargo binstall -y git-cliff
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -74,7 +74,7 @@ jobs:
           --no-default-features
           --features set-version
       - name: Install nushell
-        uses: hustcer/setup-nu@9215c80adb545a85c419d5085b76eb6d082f49e7 # v3.27
+        uses: hustcer/setup-nu@95cd3bfe252450ef7d35dd9a7ddecf3484341134 # v3.28
       - name: Bump ${{ inputs.component }} version
         env:
           GITHUB_TOKEN: ${{ secrets.BUMP_N_RELEASE }}
@@ -93,7 +93,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Install nushell
-        uses: hustcer/setup-nu@9215c80adb545a85c419d5085b76eb6d082f49e7 # v3.27
+        uses: hustcer/setup-nu@95cd3bfe252450ef7d35dd9a7ddecf3484341134 # v3.28
       - name: Get changed packages
         id: get-pkgs
         shell: nu {0}
@@ -119,12 +119,12 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
           persist-credentials: false
-      - uses: cargo-bins/cargo-binstall@422f3094be6a0843857aa008b499caaf6bce0da8 # v1.24.0
+      - uses: cargo-bins/cargo-binstall@7bebc2e59eb8820162b7ac8f62a92bfdb2732447 # v1.25.1
       - run: cargo binstall -y git-cliff
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - name: Install nushell
-        uses: hustcer/setup-nu@9215c80adb545a85c419d5085b76eb6d082f49e7 # v3.27
+        uses: hustcer/setup-nu@95cd3bfe252450ef7d35dd9a7ddecf3484341134 # v3.28
       - name: Generate a release notes
         env:
           PKG: ${{ matrix.pkg }}
