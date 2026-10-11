@@ -351,7 +351,8 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
     assert_eq!(sarif["version"], SARIF_VERSION);
     let schema: serde_json::Value =
         serde_json::from_str(include_str!("sarif-schema-2.1.0.json")).unwrap();
-    let validator = jsonschema::draft7::new(&schema).unwrap();
+    // the JSON Schema draft is detected from the schema's own `$schema` keyword
+    let validator = jsonschema::validator_for(&schema).unwrap();
     let errors = validator
         .iter_errors(&sarif)
         .map(|e| format!("{} at {}", e, e.instance_path()))
