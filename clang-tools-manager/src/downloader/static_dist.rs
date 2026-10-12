@@ -220,14 +220,66 @@ mod supported_platform {
 
     #[cfg(test)]
     mod tests {
-        use super::StaticDistDownloader;
+        use std::fs;
+
+        use super::{StaticDistDownloadError, StaticDistDownloader};
+        use crate::ClangTool;
         use semver::VersionReq;
+        use tempfile::TempDir;
 
         #[test]
         fn find_none() {
             let req_ver = VersionReq::parse("=8").unwrap();
             let suitable_version = StaticDistDownloader::find_suitable_version(&req_ver);
             assert_eq!(suitable_version, None);
+        }
+
+        /// Uses a pre-seeded cache (binary and SHA512SUMS), so no network access is needed.
+        #[tokio::test]
+        async fn cached_in_directory() {
+            use sha2::{Digest, Sha512};
+
+            log::set_max_level(log::LevelFilter::Trace);
+            let cache = TempDir::new().unwrap();
+            unsafe {
+                std::env::set_var("CPP_LINTER_CACHE", cache.path());
+            }
+            let out_dir = TempDir::new().unwrap();
+            let suffix = std::env::consts::EXE_SUFFIX;
+            let bin = out_dir.path().join(format!("clang-format-17{suffix}"));
+            let content = b"not really clang-format";
+            fs::write(&bin, content).unwrap();
+            let hash = Sha512::digest(content)
+                .iter()
+                .map(|b| format!("{b:02x}"))
+                .collect::<String>();
+            // list checksums for all supported platforms
+            let mut sums = String::new();
+            for platform in ["linux", "macos", "windows"] {
+                for arch in ["amd64", "arm64"] {
+                    sums.push_str(&format!(
+                        "{hash}  clang-format-17_{platform}-{arch}{suffix}\n"
+                    ));
+                }
+            }
+            let sha512_sums = cache.path().join("static_dist").join("SHA512SUMS");
+            fs::create_dir_all(sha512_sums.parent().unwrap()).unwrap();
+            fs::write(&sha512_sums, sums).unwrap();
+
+            let req = VersionReq::parse("17").unwrap();
+            let tool = ClangTool::ClangFormat;
+            let out_dir_path = out_dir.path().to_path_buf();
+            let result = StaticDistDownloader::download_tool(&tool, &req, Some(&out_dir_path))
+                .await
+                .unwrap();
+            assert_eq!(result, bin);
+
+            // a corrupt SHA512SUMS file (missing the tool's entry)
+            fs::write(&sha512_sums, format!("{hash}  some-other-file\n")).unwrap();
+            let err = StaticDistDownloader::download_tool(&tool, &req, Some(&out_dir_path))
+                .await
+                .unwrap_err();
+            assert!(matches!(err, StaticDistDownloadError::Sha512Corruption));
         }
     }
 }

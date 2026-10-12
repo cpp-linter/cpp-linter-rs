@@ -117,6 +117,8 @@ fn chmod_file(path: &Path, mode: Option<u32>) -> std::io::Result<()> {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use crate::DownloadError;
 
     use super::download;
@@ -190,6 +192,29 @@ mod tests {
         let err = download(&url, tmp_file.path(), 1).await.unwrap_err();
         println!("{}", err);
         assert!(matches!(err, DownloadError::RequestError(_)));
+        mock.assert();
+    }
+
+    #[tokio::test]
+    async fn fail_temp_file() {
+        // initializing twice exercises the "already initialized" path.
+        initialize_logger();
+        initialize_logger();
+        let mut server = Server::new_async().await;
+        let url_path = "/test";
+        let url = Url::parse(server.url().as_str())
+            .unwrap()
+            .join(url_path)
+            .unwrap();
+        let mock = server
+            .mock("GET", url_path)
+            .with_status(200)
+            .with_body("some content")
+            .create();
+        // An empty path has no parent and cannot be opened as a (temporary) file.
+        let err = download(&url, Path::new(""), 1).await.unwrap_err();
+        println!("{}", err);
+        assert!(matches!(err, DownloadError::TempFile(..)));
         mock.assert();
     }
 }

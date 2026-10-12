@@ -611,9 +611,16 @@ const EXTRACTED_CHUNK_SIZE: u64 = 1024;
 
 #[cfg(test)]
 mod test {
-    use std::str::FromStr;
+    use std::{fs, io::Write, path::Path, str::FromStr};
 
-    use super::{LinuxLibC, PlatformOs, PlatformTag, PyPiReleaseInfo, WheelTags};
+    use semver::VersionReq;
+    use tempfile::TempDir;
+
+    use super::{
+        LinuxLibC, PlatformOs, PlatformTag, PyPiDownloadError, PyPiDownloader, PyPiProjectInfo,
+        PyPiReleaseInfo, WheelTags,
+    };
+    use crate::ClangTool;
 
     #[test]
     fn bad_json_digest() {
@@ -727,5 +734,192 @@ mod test {
         let wheel_name = "clang_format-17.0.0-py3-none-manylinux_2_17_x86_64.whl";
         let tags = WheelTags::from_str(wheel_name).unwrap();
         assert_eq!(tags.platform.arch.as_str(), "x86_64");
+    }
+
+    #[test]
+    fn skip_malformed_version() {
+        log::set_max_level(log::LevelFilter::Trace);
+        let json = r#"{ "releases": { "1.0": [], "not-a-version": [] } }"#;
+        let info = serde_json::from_str::<PyPiProjectInfo>(json).unwrap();
+        let err = PyPiDownloader::get_best_pypi_release(
+            &ClangTool::ClangFormat,
+            &info,
+            &VersionReq::STAR,
+        )
+        .unwrap_err();
+        assert!(matches!(err, PyPiDownloadError::NoVersionFound));
+    }
+
+    const BIN_PATH_IN_WHEEL: &str = if cfg!(windows) {
+        "clang_format/data/bin/clang-format.exe"
+    } else {
+        "clang_format/data/bin/clang-format"
+    };
+
+    /// Creates a (uncompressed) zip file at `path` with the given `entries` (name, content).
+    fn make_wheel(path: &Path, entries: &[(&str, &[u8])]) {
+        let mut zip = zip::ZipWriter::new(fs::File::create(path).unwrap());
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        for (name, content) in entries {
+            zip.start_file(*name, options).unwrap();
+            zip.write_all(content).unwrap();
+        }
+        zip.finish().unwrap();
+    }
+
+    #[test]
+    fn extract_bin() {
+        let tmp = TempDir::new().unwrap();
+        let wheel = tmp.path().join("test.whl");
+        // larger than the chunk size used for extraction
+        let content = vec![b'a'; 3000];
+        make_wheel(
+            &wheel,
+            &[("other.txt", b"ignored"), (BIN_PATH_IN_WHEEL, &content)],
+        );
+        let extracted = tmp.path().join("bin").join("clang-format-17");
+        PyPiDownloader::extract_bin(&ClangTool::ClangFormat, &wheel, &extracted).unwrap();
+        assert_eq!(fs::read(&extracted).unwrap(), content);
+        // extracting again is skipped because the existing file is the same size.
+        PyPiDownloader::extract_bin(&ClangTool::ClangFormat, &wheel, &extracted).unwrap();
+        assert_eq!(fs::read(&extracted).unwrap(), content);
+    }
+
+    #[test]
+    fn extract_bin_overwrite() {
+        let tmp = TempDir::new().unwrap();
+        let wheel = tmp.path().join("test.whl");
+        make_wheel(&wheel, &[(BIN_PATH_IN_WHEEL, b"new content")]);
+        let extracted = tmp.path().join("clang-format-17");
+        // an existing file of a different size is overwritten
+        fs::write(&extracted, b"old").unwrap();
+        PyPiDownloader::extract_bin(&ClangTool::ClangFormat, &wheel, &extracted).unwrap();
+        assert_eq!(fs::read(&extracted).unwrap(), b"new content");
+    }
+
+    #[test]
+    fn extract_empty_bin() {
+        let tmp = TempDir::new().unwrap();
+        let wheel = tmp.path().join("test.whl");
+        make_wheel(&wheel, &[(BIN_PATH_IN_WHEEL, b"")]);
+        let extracted = tmp.path().join("clang-format-17");
+        PyPiDownloader::extract_bin(&ClangTool::ClangFormat, &wheel, &extracted).unwrap();
+        assert!(fs::read(&extracted).unwrap().is_empty());
+    }
+
+    #[test]
+    fn extract_missing_bin() {
+        log::set_max_level(log::LevelFilter::Trace);
+        let tmp = TempDir::new().unwrap();
+        let wheel = tmp.path().join("test.whl");
+        make_wheel(
+            &wheel,
+            &[("clang_format/data/bin/clang-tidy", b"wrong tool")],
+        );
+        let extracted = tmp.path().join("clang-format-17");
+        let err =
+            PyPiDownloader::extract_bin(&ClangTool::ClangFormat, &wheel, &extracted).unwrap_err();
+        assert!(matches!(err, PyPiDownloadError::ExecutableNotFound));
+        assert!(!extracted.exists());
+    }
+
+    /// These tests use a fake `ldd` executable in an isolated `PATH`.
+    #[cfg(target_os = "linux")]
+    mod fake_ldd {
+        use std::fs;
+
+        use semver::{Version, VersionReq};
+        use tempfile::TempDir;
+
+        use super::{BIN_PATH_IN_WHEEL, make_wheel};
+        use crate::{
+            Cacher, ClangTool, PyPiDownloader,
+            downloader::pypi::LinuxLibC,
+            test_utils::{enable_logs, fake_exe, isolate_path, set_cache_dir},
+        };
+
+        fn setup(ldd_output: Option<&str>) -> TempDir {
+            enable_logs();
+            let tmp = TempDir::new().unwrap();
+            isolate_path(tmp.path());
+            if let Some(out) = ldd_output {
+                fake_exe(tmp.path(), "ldd", &format!("echo \"{out}\""));
+            }
+            tmp
+        }
+
+        #[test]
+        fn musl() {
+            let _tmp = setup(Some(
+                "musl libc (x86_64)\nVersion 1.2.2\nDynamic Program Loader",
+            ));
+            assert_eq!(LinuxLibC::get_musl_version(), Some(Version::new(1, 2, 2)));
+            assert_eq!(LinuxLibC::get_glibc_version(), None);
+            let musl = |minor| LinuxLibC::Musl {
+                version: Version::new(1, minor, 0),
+            };
+            assert!(musl(2).is_compatible_with_system());
+            assert!(!musl(3).is_compatible_with_system());
+            let glibc = LinuxLibC::Glibc {
+                version: Version::new(2, 17, 0),
+            };
+            assert!(!glibc.is_compatible_with_system());
+        }
+
+        #[test]
+        fn glibc() {
+            let _tmp = setup(Some(
+                "ldd (Ubuntu GLIBC 2.39-0ubuntu8.7) 2.39\nCopyright (C) 2024",
+            ));
+            assert_eq!(LinuxLibC::get_musl_version(), None);
+            assert_eq!(LinuxLibC::get_glibc_version(), Some(Version::new(2, 39, 0)));
+        }
+
+        #[test]
+        fn no_ldd() {
+            let _tmp = setup(None);
+            assert_eq!(LinuxLibC::get_musl_version(), None);
+            assert_eq!(LinuxLibC::get_glibc_version(), None);
+        }
+
+        /// Uses a pre-seeded cache (PyPI info and wheel), so no network access is needed.
+        #[tokio::test]
+        async fn download_cached_wheel_without_digest() {
+            let tmp = setup(Some("ldd (Ubuntu GLIBC 2.39-0ubuntu8.7) 2.39"));
+            let cache = TempDir::new().unwrap();
+            set_cache_dir(cache.path());
+            let pypi_cache = PyPiDownloader::get_cache_dir().join("pypi");
+            fs::create_dir_all(&pypi_cache).unwrap();
+            let filename = format!(
+                "clang_format-17.0.6-py2.py3-none-manylinux_2_17_{}.whl",
+                std::env::consts::ARCH
+            );
+            let json = format!(
+                r#"{{"releases": {{"17.0.6": [{{
+                    "url": "https://example.invalid/{filename}",
+                    "filename": "{filename}",
+                    "size": 1,
+                    "digests": {{}},
+                    "yanked": false
+                }}]}}}}"#
+            );
+            fs::write(pypi_cache.join("clang-format_pypi.json"), json).unwrap();
+            let content = b"#!/bin/sh\necho \"clang-format version 17.0.6\"\n";
+            make_wheel(
+                &pypi_cache.join("clang-format_17.0.6.whl"),
+                &[(BIN_PATH_IN_WHEEL, content)],
+            );
+            let out_dir = tmp.path().join("out");
+            let req = VersionReq::parse("17").unwrap();
+            for _ in 0..2 {
+                let bin =
+                    PyPiDownloader::download_tool(&ClangTool::ClangFormat, &req, Some(&out_dir))
+                        .await
+                        .unwrap();
+                assert_eq!(bin, out_dir.join("clang-format-17"));
+                assert_eq!(fs::read(&bin).unwrap(), content);
+            }
+        }
     }
 }

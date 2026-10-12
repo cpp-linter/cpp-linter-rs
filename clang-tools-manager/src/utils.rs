@@ -64,7 +64,19 @@ pub fn lock_path(path: &Path) -> Result<File, std::io::Error> {
 mod tests {
     use std::{env::current_dir, path::PathBuf};
 
-    use super::normalize_path;
+    use super::{lock_path, normalize_path};
+
+    #[test]
+    fn normalize_leading_current_dir() {
+        let src = PathBuf::from("./tests/ignored_paths");
+        assert_eq!(normalize_path(&src), PathBuf::from("tests/ignored_paths"));
+    }
+
+    #[test]
+    fn lock_empty_path() {
+        // An empty path has no parent and cannot be opened as a (lock) file.
+        assert!(lock_path(&PathBuf::new()).is_err());
+    }
 
     #[test]
     fn normalize_redirects() {
