@@ -149,7 +149,7 @@ pub struct GeneralOptions {
     /// compatible platforms).
     #[arg(
         long,
-        default_missing_value = "false",
+        default_missing_value = "true",
         action = ArgAction::SetTrue,
         value_parser = FalseyValueParser::new(),
         conflicts_with = "no_mod_sys",
@@ -162,7 +162,7 @@ pub struct GeneralOptions {
     /// useful in sensitive CI environments like self-hosted runners.
     #[arg(
         long,
-        default_missing_value = "false",
+        default_missing_value = "true",
         action = ArgAction::SetTrue,
         value_parser = FalseyValueParser::new(),
         conflicts_with = "mod_sys",
@@ -624,6 +624,23 @@ mod test {
         let cli = Cli::try_parse_from(vec!["cpp-linter", "-e", "c,,h"]);
         assert!(cli.is_err());
         println!("{}", cli.unwrap_err());
+    }
+
+    #[test]
+    fn mod_sys_flags() {
+        let args = Cli::parse_from(vec!["cpp-linter"]);
+        assert!(!args.general_options.mod_sys);
+        assert!(!args.general_options.no_mod_sys);
+
+        let args = Cli::parse_from(vec!["cpp-linter", "--mod-sys"]);
+        assert!(args.general_options.mod_sys);
+        assert!(!args.general_options.no_mod_sys);
+
+        let args = Cli::parse_from(vec!["cpp-linter", "--no-mod-sys"]);
+        assert!(!args.general_options.mod_sys);
+        assert!(args.general_options.no_mod_sys);
+
+        assert!(Cli::try_parse_from(vec!["cpp-linter", "--mod-sys", "--no-mod-sys"]).is_err());
     }
 
     #[test]
