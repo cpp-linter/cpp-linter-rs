@@ -328,6 +328,24 @@ pub(crate) mod test {
     }
 
     #[tokio::test]
+    async fn only_not_ignored() {
+        let tmp_gh_out = setup_tmp_gh_out_path();
+        let tmp_workspace = setup_tmp_workspace();
+        run_main(vec![
+            "cpp-linter".to_string(),
+            "-l".to_string(),
+            "false".to_string(),
+            // only specify a not-ignored pattern, so the ignored set is empty
+            "-i=!demo".to_string(),
+            "--repo-root".to_string(),
+            tmp_workspace.path().to_str().unwrap().to_string(),
+        ])
+        .await
+        .unwrap();
+        drop(tmp_gh_out);
+    }
+
+    #[tokio::test]
     async fn bad_repo_root() {
         let tmp_gh_out = setup_tmp_gh_out_path();
         run_main(vec![

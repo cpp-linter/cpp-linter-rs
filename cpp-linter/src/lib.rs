@@ -45,4 +45,30 @@ pub(crate) mod test_common {
         }
         tmp_workspace
     }
+
+    /// Poison the given `mutex` by panicking in a thread that holds its lock.
+    #[allow(clippy::panic)]
+    pub fn poison_mutex<T: Send + 'static>(mutex: &std::sync::Arc<std::sync::Mutex<T>>) {
+        let mutex = mutex.clone();
+        std::thread::spawn(move || {
+            let _lock = mutex.lock().unwrap();
+            panic!("intentionally poison the mutex");
+        })
+        .join()
+        .unwrap_err();
+    }
+
+    /// Create an executable shell script (in the given `dir`) that can be used in
+    /// place of a clang tool. The script's `body` is executed by `/bin/sh`.
+    ///
+    /// This is useful to simulate unusual behavior of clang tools.
+    #[cfg(unix)]
+    pub fn make_fake_tool(dir: &std::path::Path, name: &str, body: &str) -> PathBuf {
+        use std::os::unix::fs::PermissionsExt;
+
+        let path = dir.join(name);
+        fs::write(&path, format!("#!/bin/sh\n{body}\n")).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+        path
+    }
 }

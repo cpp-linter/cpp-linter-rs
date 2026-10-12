@@ -316,8 +316,143 @@ mod tests {
 
     use std::ops::RangeInclusive;
 
-    use super::{summarize_style, three_way_diff};
-    use crate::clang_tools::make_patch;
+    use std::{
+        fs,
+        path::{Path, PathBuf},
+        sync::Mutex,
+    };
+
+    use super::{run_clang_format, summarize_style, three_way_diff};
+    use crate::{
+        clang_tools::make_patch,
+        cli::{ClangParams, LinesChangedOnly},
+        common_fs::FileObj,
+        error::ClangCaptureError,
+        test_common::setup_tmp_workspace,
+    };
+
+    fn make_clang_params(repo_root: &Path, clang_format_command: PathBuf) -> ClangParams {
+        ClangParams {
+            style: "llvm".to_string(),
+            clang_format_command: Some(clang_format_command),
+            repo_root: repo_root.to_path_buf(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn format_command_not_found() {
+        let tmp_workspace = setup_tmp_workspace();
+        let clang_params = make_clang_params(
+            tmp_workspace.path(),
+            tmp_workspace.path().join("non-existent-clang-format"),
+        );
+        let file = Mutex::new(FileObj::new(PathBuf::from("demo/demo.cpp")));
+        let err = run_clang_format(&mut file.lock().unwrap(), &clang_params).unwrap_err();
+        assert!(matches!(err, ClangCaptureError::FailedToRunCommand { .. }));
+    }
+
+    #[cfg(unix)]
+    mod fake_tool {
+        use super::*;
+        use crate::test_common::make_fake_tool;
+
+        #[test]
+        fn missing_source_file() {
+            let tmp_workspace = setup_tmp_workspace();
+            let tools_dir = tempfile::tempdir().unwrap();
+            let fake_format = make_fake_tool(tools_dir.path(), "clang-format", "");
+            let clang_params = make_clang_params(tmp_workspace.path(), fake_format);
+            let file = Mutex::new(FileObj::new(PathBuf::from("demo/missing.cpp")));
+            let err = run_clang_format(&mut file.lock().unwrap(), &clang_params).unwrap_err();
+            assert!(matches!(err, ClangCaptureError::ReadFileFailed { .. }));
+        }
+
+        #[test]
+        fn non_utf8_output() {
+            let tmp_workspace = setup_tmp_workspace();
+            let tools_dir = tempfile::tempdir().unwrap();
+            let fake_format =
+                make_fake_tool(tools_dir.path(), "clang-format", r"printf '\377\376'");
+            let clang_params = make_clang_params(tmp_workspace.path(), fake_format);
+            let file = Mutex::new(FileObj::new(PathBuf::from("demo/demo.cpp")));
+            let err = run_clang_format(&mut file.lock().unwrap(), &clang_params).unwrap_err();
+            assert!(matches!(err, ClangCaptureError::NonUtf8Output { .. }));
+        }
+
+        #[test]
+        fn errors_reported_in_stderr() {
+            let tmp_workspace = setup_tmp_workspace();
+            let tools_dir = tempfile::tempdir().unwrap();
+            let fake_format = make_fake_tool(
+                tools_dir.path(),
+                "clang-format",
+                "echo 'some error' >&2; exit 1",
+            );
+            let clang_params = make_clang_params(tmp_workspace.path(), fake_format);
+            // simulate a file already patched by clang-tidy
+            let patched_path = clang_params.get_cache_path().join("demo/demo.cpp");
+            fs::create_dir_all(patched_path.parent().unwrap()).unwrap();
+            fs::copy("tests/demo/demo.cpp", &patched_path).unwrap();
+            let mut file = FileObj::new(PathBuf::from("demo/demo.cpp"));
+            file.patched_path = Some(patched_path);
+            let file = Mutex::new(file);
+            let logs = run_clang_format(&mut file.lock().unwrap(), &clang_params).unwrap();
+            let errors = logs
+                .iter()
+                .filter(|(lvl, msg)| *lvl == log::Level::Debug && msg.contains("some error"))
+                .count();
+            assert_eq!(errors, 2);
+        }
+
+        #[test]
+        fn tidy_patch_not_readable() {
+            let tmp_workspace = setup_tmp_workspace();
+            let tools_dir = tempfile::tempdir().unwrap();
+            let fake_format = make_fake_tool(tools_dir.path(), "clang-format", "");
+            let mut clang_params = make_clang_params(tmp_workspace.path(), fake_format);
+            clang_params.lines_changed_only = LinesChangedOnly::Diff;
+            // the patched path exists, but it is a directory
+            let patched_path = clang_params.get_cache_path().join("demo/demo.cpp");
+            fs::create_dir_all(&patched_path).unwrap();
+            #[allow(clippy::single_range_in_vec_init)]
+            let mut file = FileObj::from(PathBuf::from("demo/demo.cpp"), vec![2], vec![1..=5]);
+            file.patched_path = Some(patched_path);
+            let file = Mutex::new(file);
+            let err = run_clang_format(&mut file.lock().unwrap(), &clang_params).unwrap_err();
+            assert!(matches!(err, ClangCaptureError::ReadFileFailed { .. }));
+        }
+
+        #[test]
+        fn format_tidy_patch_fails() {
+            let tmp_workspace = setup_tmp_workspace();
+            let tools_dir = tempfile::tempdir().unwrap();
+            // the tool removes itself, so it cannot be invoked a second time
+            let fake_format = make_fake_tool(tools_dir.path(), "clang-format", r#"rm -f "$0""#);
+            let clang_params = make_clang_params(tmp_workspace.path(), fake_format);
+            let patched_path = clang_params.get_cache_path().join("demo/demo.cpp");
+            fs::create_dir_all(patched_path.parent().unwrap()).unwrap();
+            fs::copy("tests/demo/demo.cpp", &patched_path).unwrap();
+            let mut file = FileObj::new(PathBuf::from("demo/demo.cpp"));
+            file.patched_path = Some(patched_path);
+            let file = Mutex::new(file);
+            let err = run_clang_format(&mut file.lock().unwrap(), &clang_params).unwrap_err();
+            assert!(matches!(err, ClangCaptureError::FailedToRunCommand { .. }));
+        }
+
+        #[test]
+        fn cache_not_writable() {
+            let tmp_workspace = setup_tmp_workspace();
+            let tools_dir = tempfile::tempdir().unwrap();
+            let fake_format = make_fake_tool(tools_dir.path(), "clang-format", "");
+            let clang_params = make_clang_params(tmp_workspace.path(), fake_format);
+            // a directory where the patched file should be cached
+            fs::create_dir_all(clang_params.get_cache_path().join("demo/demo.cpp")).unwrap();
+            let file = Mutex::new(FileObj::new(PathBuf::from("demo/demo.cpp")));
+            let err = run_clang_format(&mut file.lock().unwrap(), &clang_params).unwrap_err();
+            assert!(matches!(err, ClangCaptureError::WriteFileFailed { .. }));
+        }
+    }
 
     fn formalize_style(style: &str, expected: &str) {
         assert_eq!(summarize_style(style), expected);

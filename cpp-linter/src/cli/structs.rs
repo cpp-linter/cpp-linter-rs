@@ -407,6 +407,29 @@ mod test {
     }
 
     #[test]
+    fn display_other_enum_variants() {
+        assert_eq!(format!("{}", LinesChangedOnly::Off), "false");
+        assert_eq!(format!("{}", LinesChangedOnly::On), "true");
+        assert_eq!(format!("{}", ThreadComments::On), "true");
+        assert_eq!(format!("{}", ThreadComments::Off), "false");
+    }
+
+    #[test]
+    fn lines_changed_only_validity() {
+        for (added_lines, diff_chunks) in [(false, false), (true, false), (false, true)] {
+            assert!(LinesChangedOnly::Off.is_change_valid(added_lines, diff_chunks));
+            assert_eq!(
+                LinesChangedOnly::Diff.is_change_valid(added_lines, diff_chunks),
+                diff_chunks
+            );
+            assert_eq!(
+                LinesChangedOnly::On.is_change_valid(added_lines, diff_chunks),
+                added_lines
+            );
+        }
+    }
+
+    #[test]
     fn absolute_db_path() {
         let tmp_dir = tempfile::tempdir().unwrap();
         let cli = Cli::parse_from(["cpp-linter", "--database", tmp_dir.path().to_str().unwrap()]);

@@ -440,7 +440,8 @@ mod test {
     };
 
     use super::{
-        CLANG_DIAGNOSTICS_URL, NOTE_HEADER, RestoreOnDrop, TidyNotification, run_clang_tidy,
+        CLANG_DIAGNOSTICS_URL, ClangCaptureError, CompilationUnit, NOTE_HEADER, RestoreOnDrop,
+        TidyNotification, run_clang_tidy,
     };
 
     #[test]
@@ -707,5 +708,129 @@ TrenchBroom/TrenchBroom/common/test/src/mdl/tst_ReadFreeImageTexture.cpp:44:48: 
         }
 
         assert_eq!(fs::read_to_string(&file_path).unwrap(), original);
+    }
+
+    #[test]
+    fn parse_non_utf8_output() {
+        let err = parse_tidy_output(&[0xFF, 0xFE], &None, &PathBuf::from(".")).unwrap_err();
+        assert!(matches!(err, ClangCaptureError::NonUtf8Output { .. }));
+    }
+
+    #[test]
+    fn parse_with_database_units() {
+        let build_dir = env::current_dir().unwrap().join("build");
+        let database_json = Some(vec![
+            CompilationUnit {
+                directory: build_dir.to_string_lossy().to_string(),
+                file: "../other.cpp".to_string(),
+            },
+            CompilationUnit {
+                directory: build_dir.to_string_lossy().to_string(),
+                file: "../demo.cpp".to_string(),
+            },
+        ]);
+        let tidy_out = format!(
+            "{}:1:1: warning: some rationale [modernize-use-auto]\n\
+            {}:2:1: warning: other rationale [modernize-use-auto]\n",
+            build_dir.join("../demo.cpp").to_string_lossy(),
+            build_dir.join("../unknown.cpp").to_string_lossy(),
+        );
+        let notes = parse_tidy_output(
+            tidy_out.as_bytes(),
+            &database_json,
+            &env::current_dir().unwrap(),
+        )
+        .unwrap();
+        assert_eq!(notes.len(), 2);
+        // path of a file in the database is resolved and made relative to the repo root
+        assert_eq!(notes[0].filename, "demo.cpp");
+        // path of a file not in the database is also made relative to the repo root
+        assert_eq!(notes[1].filename, "unknown.cpp");
+    }
+
+    fn make_clang_params(
+        repo_root: &std::path::Path,
+        clang_tidy_command: Option<PathBuf>,
+    ) -> ClangParams {
+        ClangParams {
+            tidy_checks: "-*,modernize-use-auto".to_string(),
+            clang_tidy_command,
+            repo_root: repo_root.to_path_buf(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn tidy_missing_source_file() {
+        let tmp_workspace = crate::test_common::setup_tmp_workspace();
+        let clang_params =
+            make_clang_params(tmp_workspace.path(), Some(PathBuf::from("clang-tidy")));
+        let file = Mutex::new(FileObj::new(PathBuf::from("demo/missing.cpp")));
+        let err = run_clang_tidy(&mut file.lock().unwrap(), &clang_params).unwrap_err();
+        assert!(matches!(err, ClangCaptureError::ReadFileFailed { .. }));
+    }
+
+    #[test]
+    fn tidy_command_not_found() {
+        let tmp_workspace = crate::test_common::setup_tmp_workspace();
+        let clang_params = make_clang_params(
+            tmp_workspace.path(),
+            Some(tmp_workspace.path().join("non-existent-clang-tidy")),
+        );
+        let file = Mutex::new(FileObj::new(PathBuf::from("demo/demo.cpp")));
+        let err = run_clang_tidy(&mut file.lock().unwrap(), &clang_params).unwrap_err();
+        assert!(matches!(err, ClangCaptureError::FailedToRunCommand { .. }));
+        // the source file is left untouched
+        assert_eq!(
+            fs::read_to_string(tmp_workspace.path().join("demo/demo.cpp")).unwrap(),
+            fs::read_to_string("tests/demo/demo.cpp").unwrap()
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn tidy_cache_not_writable() {
+        let tmp_workspace = crate::test_common::setup_tmp_workspace();
+        let tools_dir = tempfile::tempdir().unwrap();
+        let fake_tidy = crate::test_common::make_fake_tool(tools_dir.path(), "clang-tidy", "");
+        let clang_params = make_clang_params(tmp_workspace.path(), Some(fake_tidy));
+        // a directory where the patched file should be cached
+        fs::create_dir_all(clang_params.get_cache_path().join("demo/demo.cpp")).unwrap();
+        let file = Mutex::new(FileObj::new(PathBuf::from("demo/demo.cpp")));
+        let err = run_clang_tidy(&mut file.lock().unwrap(), &clang_params).unwrap_err();
+        assert!(matches!(err, ClangCaptureError::WriteFileFailed { .. }));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn tidy_source_not_restorable() {
+        let tmp_workspace = crate::test_common::setup_tmp_workspace();
+        let tools_dir = tempfile::tempdir().unwrap();
+        // replace the source file with a symlink to a readable (but not writable) file
+        let fake_tidy = crate::test_common::make_fake_tool(
+            tools_dir.path(),
+            "clang-tidy",
+            "rm -f demo/demo.cpp && ln -s /proc/version demo/demo.cpp",
+        );
+        let clang_params = make_clang_params(tmp_workspace.path(), Some(fake_tidy));
+        let file = Mutex::new(FileObj::new(PathBuf::from("demo/demo.cpp")));
+        let err = run_clang_tidy(&mut file.lock().unwrap(), &clang_params).unwrap_err();
+        assert!(matches!(err, ClangCaptureError::WriteFileFailed { .. }));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn tidy_non_utf8_output() {
+        let tmp_workspace = crate::test_common::setup_tmp_workspace();
+        let tools_dir = tempfile::tempdir().unwrap();
+        let fake_tidy = crate::test_common::make_fake_tool(
+            tools_dir.path(),
+            "clang-tidy",
+            r"printf '\377\376'; printf 'some summary' >&2",
+        );
+        let clang_params = make_clang_params(tmp_workspace.path(), Some(fake_tidy));
+        let file = Mutex::new(FileObj::new(PathBuf::from("demo/demo.cpp")));
+        let err = run_clang_tidy(&mut file.lock().unwrap(), &clang_params).unwrap_err();
+        assert!(matches!(err, ClangCaptureError::NonUtf8Output { .. }));
     }
 }
