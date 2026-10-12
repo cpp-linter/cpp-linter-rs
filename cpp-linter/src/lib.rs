@@ -26,7 +26,7 @@ pub mod sarif;
 
 #[cfg(test)]
 pub(crate) mod test_common {
-    #![allow(clippy::unwrap_used)]
+    #![allow(clippy::unwrap_used, clippy::panic)]
 
     use std::{fs, path::PathBuf};
 
@@ -47,7 +47,6 @@ pub(crate) mod test_common {
     }
 
     /// Poison the given `mutex` by panicking in a thread that holds its lock.
-    #[allow(clippy::panic)]
     pub fn poison_mutex<T: Send + 'static>(mutex: &std::sync::Arc<std::sync::Mutex<T>>) {
         let mutex = mutex.clone();
         std::thread::spawn(move || {

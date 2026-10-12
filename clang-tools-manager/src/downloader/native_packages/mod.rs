@@ -141,7 +141,7 @@ mod tests {
     use super::{get_available_package_managers, try_install_package};
     use crate::{
         ClangTool,
-        test_utils::{enable_logs, fake_clang_tool, fake_exe, isolate_path},
+        test_utils_unix::{enable_logs, fake_clang_tool, fake_exe, isolate_path},
         version::GetToolError,
     };
 

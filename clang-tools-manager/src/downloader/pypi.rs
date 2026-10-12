@@ -739,8 +739,8 @@ mod test {
     #[test]
     fn skip_malformed_version() {
         log::set_max_level(log::LevelFilter::Trace);
-        let json = r#"{ "releases": { "1.0": [], "not-a-version": [] } }"#;
-        let info = serde_json::from_str::<PyPiProjectInfo>(json).unwrap();
+        let json = serde_json::json!({ "releases": { "1.0": [], "not-a-version": [] } });
+        let info = serde_json::from_value::<PyPiProjectInfo>(json).unwrap();
         let err = PyPiDownloader::get_best_pypi_release(
             &ClangTool::ClangFormat,
             &info,
@@ -836,7 +836,7 @@ mod test {
         use crate::{
             Cacher, ClangTool, PyPiDownloader,
             downloader::pypi::LinuxLibC,
-            test_utils::{enable_logs, fake_exe, isolate_path, set_cache_dir},
+            test_utils_unix::{enable_logs, fake_exe, isolate_path, set_cache_dir},
         };
 
         fn setup(ldd_output: Option<&str>) -> TempDir {
@@ -895,15 +895,18 @@ mod test {
                 "clang_format-17.0.6-py2.py3-none-manylinux_2_17_{}.whl",
                 std::env::consts::ARCH
             );
-            let json = format!(
-                r#"{{"releases": {{"17.0.6": [{{
-                    "url": "https://example.invalid/{filename}",
-                    "filename": "{filename}",
-                    "size": 1,
-                    "digests": {{}},
-                    "yanked": false
-                }}]}}}}"#
-            );
+            let json = serde_json::json!({
+                "releases": {
+                    "17.0.6": [{
+                        "url": format!("https://example.invalid/{filename}"),
+                        "filename": filename,
+                        "size": 1,
+                        "digests": {},
+                        "yanked": false
+                    }]
+                }
+            })
+            .to_string();
             fs::write(pypi_cache.join("clang-format_pypi.json"), json).unwrap();
             let content = b"#!/bin/sh\necho \"clang-format version 17.0.6\"\n";
             make_wheel(

@@ -302,7 +302,7 @@ mod tests {
     use super::{PackageManager, PackageManagerError, UnixPackageManager};
     use crate::{
         ClangTool,
-        test_utils::{enable_logs, fake_exe, isolate_path},
+        test_utils_unix::{enable_logs, fake_exe, isolate_path},
     };
 
     /// A fake `sudo` that just runs the given command.
@@ -330,15 +330,11 @@ mod tests {
         tmp
     }
 
-    fn install(
+    async fn install(
         mgr: &UnixPackageManager,
         version: Option<&Version>,
     ) -> Result<(), PackageManagerError> {
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .unwrap()
-            .block_on(mgr.install_package("clang", version))
+        mgr.install_package("clang", version).await
     }
 
     fn assert_install_error(result: Result<(), PackageManagerError>, expected_mgr: &str) {
@@ -400,40 +396,40 @@ mod tests {
         }
     }
 
-    #[test]
-    fn install_with_sudo() {
+    #[tokio::test]
+    async fn install_with_sudo() {
         let tmp = setup();
         fake_exe(tmp.path(), "sudo", SUDO);
         for mgr in all_managers() {
             fake_exe(tmp.path(), mgr.as_str(), SUCCESS);
-            install(&mgr, Some(&Version::new(17, 0, 0))).unwrap();
+            install(&mgr, Some(&Version::new(17, 0, 0))).await.unwrap();
         }
     }
 
-    #[test]
-    fn install_without_sudo() {
+    #[tokio::test]
+    async fn install_without_sudo() {
         let tmp = setup();
         for mgr in all_managers() {
             fake_exe(tmp.path(), mgr.as_str(), SUCCESS);
-            install(&mgr, None).unwrap();
+            install(&mgr, None).await.unwrap();
         }
     }
 
-    #[test]
-    fn install_failure() {
+    #[tokio::test]
+    async fn install_failure() {
         let tmp = setup();
         for mgr in all_managers() {
             fake_exe(tmp.path(), mgr.as_str(), FAILURE);
             // `apt` falls back to LLVM's PPA only when a version is specified.
-            assert_install_error(install(&mgr, None), mgr.as_str());
+            assert_install_error(install(&mgr, None).await, mgr.as_str());
         }
     }
 
-    #[test]
-    fn install_missing_manager() {
+    #[tokio::test]
+    async fn install_missing_manager() {
         let _tmp = setup();
         for mgr in all_managers() {
-            let err = install(&mgr, None).unwrap_err();
+            let err = install(&mgr, None).await.unwrap_err();
             assert!(matches!(err, PackageManagerError::Io(_)));
         }
     }
@@ -452,7 +448,7 @@ mod tests {
                 PackageManagerError,
                 unix::{UnixPackageManager, llvm_apt_install::install_llvm_via_apt_from},
             },
-            test_utils::set_cache_dir,
+            test_utils_unix::set_cache_dir,
         };
 
         const MARKER: &str = "ppa_added";
@@ -483,31 +479,31 @@ mod tests {
             cache
         }
 
-        fn apt_install() -> Result<(), PackageManagerError> {
-            install(&UnixPackageManager::Apt, Some(&Version::new(17, 0, 0)))
+        async fn apt_install() -> Result<(), PackageManagerError> {
+            install(&UnixPackageManager::Apt, Some(&Version::new(17, 0, 0))).await
         }
 
-        #[test]
-        fn with_sudo() {
+        #[tokio::test]
+        async fn with_sudo() {
             let tmp = setup();
             let _cache = seed_cache(true);
             fake_exe(tmp.path(), "sudo", SUDO);
             fake_ppa(tmp.path(), true);
-            apt_install().unwrap();
+            apt_install().await.unwrap();
             assert!(tmp.path().join(MARKER).exists());
         }
 
-        #[test]
-        fn without_sudo() {
+        #[tokio::test]
+        async fn without_sudo() {
             let tmp = setup();
             let _cache = seed_cache(true);
             fake_ppa(tmp.path(), true);
-            apt_install().unwrap();
+            apt_install().await.unwrap();
             assert!(tmp.path().join(MARKER).exists());
         }
 
-        #[test]
-        fn script_failure() {
+        #[tokio::test]
+        async fn script_failure() {
             for sudo in [true, false] {
                 let tmp = setup();
                 let _cache = seed_cache(true);
@@ -515,7 +511,7 @@ mod tests {
                     fake_exe(tmp.path(), "sudo", SUDO);
                 }
                 fake_ppa(tmp.path(), false);
-                let err = apt_install().unwrap_err();
+                let err = apt_install().await.unwrap_err();
                 println!("{err}");
                 assert!(matches!(
                     err,
@@ -524,8 +520,8 @@ mod tests {
             }
         }
 
-        #[test]
-        fn apt_failure_after_ppa() {
+        #[tokio::test]
+        async fn apt_failure_after_ppa() {
             for sudo in [true, false] {
                 let tmp = setup();
                 let _cache = seed_cache(true);
@@ -534,7 +530,7 @@ mod tests {
                 }
                 fake_exe(tmp.path(), "bash", SUCCESS);
                 fake_exe(tmp.path(), "apt", FAILURE);
-                assert_install_error(apt_install(), "apt (with LLVM PPA)");
+                assert_install_error(apt_install().await, "apt (with LLVM PPA)");
             }
         }
 

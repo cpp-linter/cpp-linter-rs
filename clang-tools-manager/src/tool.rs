@@ -268,7 +268,7 @@ mod tests {
 
         use super::CLANG_FORMAT;
         use crate::{
-            test_utils::{enable_logs, fake_clang_tool, fake_exe},
+            test_utils_unix::{enable_logs, fake_clang_tool, fake_exe},
             tool::GetClangVersionError,
         };
 

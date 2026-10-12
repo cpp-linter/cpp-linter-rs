@@ -27,4 +27,4 @@ pub use progress_bar::ProgressBar;
 pub mod logger;
 
 #[cfg(all(test, unix))]
-mod test_utils;
+mod test_utils_unix;

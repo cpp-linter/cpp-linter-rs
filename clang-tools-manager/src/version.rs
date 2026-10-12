@@ -393,7 +393,9 @@ mod tests {
 
         use crate::{
             ClangTool, GetToolError, RequestedVersion,
-            test_utils::{enable_logs, fake_clang_tool, fake_exe, isolate_path, set_cache_dir},
+            test_utils_unix::{
+                enable_logs, fake_clang_tool, fake_exe, isolate_path, set_cache_dir,
+            },
         };
 
         const TOOL: ClangTool = ClangTool::ClangFormat;
@@ -424,7 +426,11 @@ mod tests {
             fn seed_empty_pypi(&self) {
                 let pypi = self.cache.path().join("pypi");
                 fs::create_dir_all(&pypi).unwrap();
-                fs::write(pypi.join("clang-format_pypi.json"), r#"{"releases": {}}"#).unwrap();
+                fs::write(
+                    pypi.join("clang-format_pypi.json"),
+                    serde_json::json!({"releases": {}}).to_string(),
+                )
+                .unwrap();
             }
 
             /// Seed the static binary (in the [`Self::out`] dir) and the cached SHA512SUMS file.
