@@ -498,4 +498,77 @@ mod test {
             "unexpected suggestion: {suggestion}"
         );
     }
+
+    #[test]
+    fn unfixed_tidy_diagnostics() {
+        use crate::clang_tools::clang_tidy::{TidyAdvice, TidyNotification};
+
+        let repo_root = TempDir::new().unwrap();
+        let file_name = PathBuf::from("test_file.cpp");
+        let original_content = "line1\nline2\nline3\nline4\n";
+        fs::write(repo_root.path().join(&file_name), original_content).unwrap();
+
+        // Patched file changes only line 1
+        let patched_content = "LINE1\nline2\nline3\nline4\n";
+        let patched_file = NamedTempFile::new().unwrap();
+        fs::write(patched_file.path(), patched_content).unwrap();
+
+        let note = |line: u32, suggestion: Vec<String>| TidyNotification {
+            filename: "test_file.cpp".to_string(),
+            line,
+            cols: 1,
+            severity: "warning".to_string(),
+            rationale: format!("rationale for line {line}"),
+            diagnostic: "readability-identifier-length".to_string(),
+            suggestion,
+            fixed_lines: vec![],
+        };
+        let mut file_obj = FileObj::from(file_name, vec![1, 3], vec![1..=1, 3..=4]);
+        file_obj.patched_path = Some(patched_file.path().to_path_buf());
+        file_obj.tidy_advice = Some(TidyAdvice {
+            notes: vec![
+                // merged into the existing suggestion for line 1
+                note(1, vec![]),
+                // not in any existing suggestion; creates a new suggestion
+                note(3, vec!["line3".to_string()]),
+            ],
+        });
+
+        let mut review_comments = ReviewComments::default();
+        file_obj
+            .make_suggestions_from_patch(&mut review_comments, false, repo_root.path())
+            .unwrap();
+        assert_eq!(review_comments.comments.len(), 2);
+        assert!(
+            review_comments.comments[0]
+                .suggestion
+                .contains("rationale for line 1")
+        );
+        let new_suggestion = &review_comments.comments[1];
+        assert_eq!(new_suggestion.line_start, 3);
+        assert_eq!(new_suggestion.line_end, 3);
+        assert!(new_suggestion.suggestion.contains("rationale for line 3"));
+        assert!(new_suggestion.suggestion.contains("```cpp\nline3\n```"));
+
+        // Processing the same file again merges duplicate suggestions
+        file_obj
+            .make_suggestions_from_patch(&mut review_comments, false, repo_root.path())
+            .unwrap();
+        assert_eq!(review_comments.comments.len(), 2);
+        assert_eq!(
+            review_comments.comments[0]
+                .suggestion
+                .matches("```suggestion\nLINE1\n```")
+                .count(),
+            2
+        );
+
+        // Only counts the unfixed diagnostics in summary-only mode
+        let mut summary_comments = ReviewComments::default();
+        file_obj
+            .make_suggestions_from_patch(&mut summary_comments, true, repo_root.path())
+            .unwrap();
+        assert!(summary_comments.comments.is_empty());
+        assert_eq!(summary_comments.tool_total, 3);
+    }
 }

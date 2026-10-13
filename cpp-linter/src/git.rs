@@ -6,7 +6,7 @@
 #![cfg(test)]
 
 mod test {
-    #![allow(clippy::unwrap_used, clippy::panic, clippy::expect_used)]
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
 
     use std::{
         env::{self, current_dir, set_current_dir},
@@ -21,24 +21,18 @@ mod test {
     const TEST_REPO_URL: &str = "https://github.com/cpp-linter/cpp-linter";
 
     // used to setup a testing stage
-    fn clone_repo(sha: Option<&str>, path: &str, patch_path: Option<&str>) {
+    fn clone_repo(sha: &str, path: &str, patch_path: Option<&str>) {
         let ok = Command::new("git")
             .args(["clone", TEST_REPO_URL, path])
             .status()
             .expect("Failed to clone repo");
-        if !ok.success() {
-            panic!("Failed to clone repo");
-        }
-        if let Some(sha) = sha {
-            let ok = Command::new("git")
-                .args(["-c", "advice.detachedHead=false", "checkout", sha])
-                .current_dir(path)
-                .status()
-                .expect("Failed to checkout commit");
-            if !ok.success() {
-                panic!("Failed to checkout commit");
-            }
-        }
+        assert!(ok.success(), "Failed to clone repo");
+        let ok = Command::new("git")
+            .args(["-c", "advice.detachedHead=false", "checkout", sha])
+            .current_dir(path)
+            .status()
+            .expect("Failed to checkout commit");
+        assert!(ok.success(), "Failed to checkout commit");
         if let Some(patch) = patch_path {
             let canonical_patch_path = crate::common_fs::mk_path_abs(patch).unwrap();
             let patch_path = canonical_patch_path.to_str().unwrap();
@@ -47,17 +41,16 @@ mod test {
                 .current_dir(path)
                 .status()
                 .expect("Failed to apply patch and stage its changes");
-            if !ok.success() {
-                panic!("Failed to apply patch and stage its changes");
-            }
+            assert!(ok.success(), "Failed to apply patch and stage its changes");
             let ok = Command::new("git")
                 .args(["status", "-s"])
                 .current_dir(path)
                 .status()
                 .expect("Failed to get git status after applying patch");
-            if !ok.success() {
-                panic!("Failed to get git status after applying patch");
-            }
+            assert!(
+                ok.success(),
+                "Failed to get git status after applying patch"
+            );
         }
     }
 
@@ -74,11 +67,7 @@ mod test {
         patch_path: Option<&str>,
         ignore_staged: bool,
     ) -> Vec<crate::common_fs::FileObj> {
-        clone_repo(
-            Some(sha),
-            tmp.path().as_os_str().to_str().unwrap(),
-            patch_path,
-        );
+        clone_repo(sha, tmp.path().as_os_str().to_str().unwrap(), patch_path);
         // avoid use of REST API when testing in CI
         unsafe {
             env::set_var("GITHUB_ACTIONS", "false");

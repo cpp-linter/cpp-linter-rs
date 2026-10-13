@@ -112,7 +112,9 @@ pub fn try_init_logger() {
 mod test {
     use std::env;
 
-    use super::try_init_logger;
+    use log::{Level, Log, Record};
+
+    use super::{SimpleLogger, try_init_logger};
 
     #[test]
     fn trace_log() {
@@ -122,5 +124,44 @@ mod test {
         try_init_logger();
         log::set_max_level(log::LevelFilter::Trace);
         log::trace!("A dummy log statement for code coverage");
+    }
+
+    #[test]
+    fn all_records() {
+        unsafe {
+            env::remove_var("CPP_LINTER_COLOR");
+        }
+        try_init_logger();
+        // initializing twice exercises the "already initialized" path.
+        try_init_logger();
+        let logger = SimpleLogger;
+        let levels = [
+            Level::Error,
+            Level::Warn,
+            Level::Info,
+            Level::Debug,
+            Level::Trace,
+        ];
+        for module in [Some("clang_tools_manager"), Some("other_crate"), None] {
+            for level in levels {
+                logger.log(
+                    &Record::builder()
+                        .args(format_args!("A dummy {level} log statement"))
+                        .level(level)
+                        .module_path(module)
+                        .line(Some(42))
+                        .build(),
+                );
+            }
+        }
+        // a log command used for CI log grouping (always written)
+        logger.log(
+            &Record::builder()
+                .args(format_args!("::group::dummy group"))
+                .target("CI_LOG_GROUPING")
+                .level(Level::Trace)
+                .build(),
+        );
+        logger.flush();
     }
 }

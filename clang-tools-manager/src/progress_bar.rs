@@ -171,4 +171,28 @@ mod tests {
         }
         progress_bar.finish().unwrap();
     }
+
+    #[test]
+    fn interactive_no_total() {
+        let mut progress_bar = ProgressBar::new(None, "Processing");
+        // simulate an interactive terminal
+        progress_bar.is_interactive = true;
+        progress_bar.render().unwrap();
+        for _ in 0..5 {
+            progress_bar.inc(1).unwrap();
+        }
+        progress_bar.finish().unwrap();
+    }
+
+    #[test]
+    fn interactive_with_total() {
+        let mut progress_bar = ProgressBar::new(Some(NonZero::new(100).unwrap()), "Processing");
+        // simulate an interactive terminal
+        progress_bar.is_interactive = true;
+        progress_bar.render().unwrap();
+        for _ in 0..100 {
+            progress_bar.inc(1).unwrap();
+        }
+        progress_bar.finish().unwrap();
+    }
 }

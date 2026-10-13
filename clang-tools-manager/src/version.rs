@@ -252,7 +252,7 @@ mod tests {
     use semver::VersionReq;
     use tempfile::TempDir;
 
-    use super::RequestedVersion;
+    use super::{RequestedVersion, RequestedVersionParsingError};
     use crate::{ClangTool, utils::normalize_path};
 
     // See also crate::tool::tests module for other `RequestedVersion::from_str()` tests.
@@ -265,23 +265,52 @@ mod tests {
         let parent = this_canonical.parent().unwrap();
         let expected = normalize_path(parent);
         let req_ver = RequestedVersion::from_str(this_path_str).unwrap();
-        if let RequestedVersion::Path(parsed) = req_ver {
-            assert_eq!(&parsed, &expected);
-        }
+        assert_eq!(req_ver, RequestedVersion::Path(expected));
 
-        assert!(RequestedVersion::from_str("file.rs").is_err());
+        assert!(matches!(
+            RequestedVersion::from_str("file.rs").unwrap_err(),
+            RequestedVersionParsingError::InvalidInput(_)
+        ));
+    }
+
+    #[test]
+    fn validate_version_dir() {
+        let req_ver = RequestedVersion::from_str("src").unwrap();
+        let expected = normalize_path(&PathBuf::from("src").canonicalize().unwrap());
+        assert_eq!(req_ver, RequestedVersion::Path(expected));
+    }
+
+    #[test]
+    fn validate_version_non_canonical_path() {
+        // A file in the working directory has an empty parent path, which cannot be canonicalized.
+        let err = RequestedVersion::from_str("Cargo.toml").unwrap_err();
+        println!("{err}");
+        assert!(matches!(
+            err,
+            RequestedVersionParsingError::NonCanonicalPath(..)
+        ));
+    }
+
+    #[test]
+    fn validate_version_no_value() {
+        assert_eq!(
+            RequestedVersion::from_str("CPP-LINTER-VERSION").unwrap(),
+            RequestedVersion::NoValue
+        );
     }
 
     #[test]
     fn validate_version_exact() {
         let req_ver = RequestedVersion::from_str("12").unwrap();
-        if let RequestedVersion::Requirement(req) = req_ver {
-            assert_eq!(req.to_string(), "^12");
-        }
+        assert_eq!(
+            req_ver,
+            RequestedVersion::Requirement(VersionReq::parse("^12").unwrap())
+        );
     }
 
     #[tokio::test]
     async fn eval_no_value() {
+        log::set_max_level(log::LevelFilter::Trace);
         let result = RequestedVersion::NoValue
             .eval_tool(&ClangTool::ClangFormat, false, None, false)
             .await
@@ -350,6 +379,210 @@ mod tests {
                 .unwrap();
             eprintln!("Using {clang_path:?}");
             // assert!(version_req.matches(&clang_path.version));
+        }
+    }
+
+    /// These tests use fake clang tools (and package managers) in an isolated `PATH`
+    /// and an isolated (pre-seeded) cache. Thus, no network access is needed.
+    #[cfg(unix)]
+    mod fake_tools {
+        use std::{fs, path::Path};
+
+        use semver::{Version, VersionReq};
+        use tempfile::TempDir;
+
+        use crate::{
+            ClangTool, GetToolError, RequestedVersion,
+            test_utils_unix::{
+                enable_logs, fake_clang_tool, fake_exe, isolate_path, set_cache_dir,
+            },
+        };
+
+        const TOOL: ClangTool = ClangTool::ClangFormat;
+
+        struct TestEnv {
+            /// The only directory in `PATH`.
+            bin: TempDir,
+            /// The cache directory.
+            cache: TempDir,
+            /// The directory to "download" binaries into.
+            out: TempDir,
+        }
+
+        impl TestEnv {
+            fn new() -> Self {
+                enable_logs();
+                let env = Self {
+                    bin: TempDir::new().unwrap(),
+                    cache: TempDir::new().unwrap(),
+                    out: TempDir::new().unwrap(),
+                };
+                isolate_path(env.bin.path());
+                set_cache_dir(env.cache.path());
+                env
+            }
+
+            /// Seed the PyPI cache with info that has no releases (so download from PyPI fails).
+            fn seed_empty_pypi(&self) {
+                let pypi = self.cache.path().join("pypi");
+                fs::create_dir_all(&pypi).unwrap();
+                fs::write(
+                    pypi.join("clang-format_pypi.json"),
+                    serde_json::json!({"releases": {}}).to_string(),
+                )
+                .unwrap();
+            }
+
+            /// Seed the static binary (in the [`Self::out`] dir) and the cached SHA512SUMS file.
+            ///
+            /// If `valid` is false, then the checksum will not match the binary.
+            fn seed_static_dist(&self, valid: bool) {
+                use sha2::{Digest, Sha512};
+
+                let bin = fake_clang_tool(self.out.path(), "clang-format-17", "17.0.6");
+                let hash = if valid {
+                    Sha512::digest(fs::read(bin).unwrap())
+                        .iter()
+                        .map(|b| format!("{b:02x}"))
+                        .collect::<String>()
+                } else {
+                    "deadbeef".to_string()
+                };
+                // list checksums for all supported (unix) platforms
+                let mut checksums = String::new();
+                for platform in ["linux", "macos"] {
+                    for arch in ["amd64", "arm64"] {
+                        checksums.push_str(&format!("{hash}  clang-format-17_{platform}-{arch}\n"));
+                    }
+                }
+                let sums = self.cache.path().join("static_dist");
+                fs::create_dir_all(&sums).unwrap();
+                fs::write(sums.join("SHA512SUMS"), checksums).unwrap();
+            }
+
+            async fn eval(
+                &self,
+                requested: RequestedVersion,
+                allow_pkg_mgr: bool,
+            ) -> Result<Option<crate::ClangVersion>, GetToolError> {
+                let out = self.out.path().to_path_buf();
+                requested
+                    .eval_tool(&TOOL, false, Some(&out), allow_pkg_mgr)
+                    .await
+            }
+        }
+
+        fn req(spec: &str) -> RequestedVersion {
+            RequestedVersion::Requirement(VersionReq::parse(spec).unwrap())
+        }
+
+        fn assert_version(path: &Path, result: crate::ClangVersion, version: &str) {
+            assert_eq!(result.path, path);
+            assert_eq!(result.version, Version::parse(version).unwrap());
+        }
+
+        #[tokio::test]
+        async fn eval_path() {
+            let env = TestEnv::new();
+            let exe = fake_clang_tool(env.bin.path(), "clang-format", "17.0.6");
+            let result = env
+                .eval(RequestedVersion::Path(env.bin.path().to_path_buf()), false)
+                .await
+                .unwrap()
+                .unwrap();
+            assert_version(&exe, result, "17.0.6");
+        }
+
+        #[tokio::test]
+        async fn eval_system_default() {
+            let env = TestEnv::new();
+            let exe = fake_clang_tool(env.bin.path(), "clang-format", "17.0.6");
+            let result = env
+                .eval(RequestedVersion::SystemDefault, false)
+                .await
+                .unwrap()
+                .unwrap();
+            assert_version(&exe, result, "17.0.6");
+        }
+
+        #[tokio::test]
+        async fn eval_installed_requirement() {
+            let env = TestEnv::new();
+            let exe = fake_clang_tool(env.bin.path(), "clang-format-17", "17.0.6");
+            let result = env.eval(req("17"), false).await.unwrap().unwrap();
+            assert_version(&exe, result, "17.0.6");
+        }
+
+        #[tokio::test]
+        async fn eval_unsupported_requirement() {
+            let env = TestEnv::new();
+            let err = env.eval(req("=8"), false).await.unwrap_err();
+            assert!(matches!(err, GetToolError::UnsupportedVersion));
+        }
+
+        #[tokio::test]
+        async fn eval_cached_bin() {
+            let env = TestEnv::new();
+            // installed version does not satisfy the requirement
+            fake_clang_tool(env.bin.path(), "clang-format", "16.0.0");
+            let cached_bin_dir = env.cache.path().join("bin");
+            fs::create_dir_all(&cached_bin_dir).unwrap();
+            let cached = fake_clang_tool(&cached_bin_dir, "clang-format-17.0.0", "17.0.6");
+            let result = env.eval(req("17"), false).await.unwrap().unwrap();
+            assert_version(&cached, result, "17.0.6");
+        }
+
+        #[tokio::test]
+        async fn eval_static_dist_fallback() {
+            let env = TestEnv::new();
+            // cached version does not satisfy the requirement
+            let cached_bin_dir = env.cache.path().join("bin");
+            fs::create_dir_all(&cached_bin_dir).unwrap();
+            fake_clang_tool(&cached_bin_dir, "clang-format-17.0.0", "16.0.0");
+            env.seed_empty_pypi();
+            env.seed_static_dist(true);
+            // no package managers are available.
+            let result = env.eval(req("17"), true).await.unwrap().unwrap();
+            assert_version(&env.out.path().join("clang-format-17"), result, "17.0.6");
+            let symlink = env.out.path().join("clang-format");
+            assert_eq!(
+                fs::read_link(symlink).unwrap(),
+                env.out.path().join("clang-format-17")
+            );
+        }
+
+        #[tokio::test]
+        async fn eval_static_dist_failure() {
+            let env = TestEnv::new();
+            env.seed_empty_pypi();
+            env.seed_static_dist(false);
+            let err = env.eval(req("17"), false).await.unwrap_err();
+            assert!(matches!(err, GetToolError::NotFound));
+        }
+
+        #[tokio::test]
+        async fn eval_package_manager() {
+            let env = TestEnv::new();
+            env.seed_empty_pypi();
+            let marker = env.bin.path().join("installed");
+            let marker = marker.to_string_lossy();
+            // A fake `brew` that "installs" clang-format v17 (by creating a marker file).
+            fake_exe(
+                env.bin.path(),
+                "brew",
+                &format!("if [ \"$1\" = \"list\" ]; then exit 1; fi\n: > \"{marker}\""),
+            );
+            // A fake clang-format that reports v17 only after being "installed".
+            let exe = fake_exe(
+                env.bin.path(),
+                "clang-format-17",
+                &format!(
+                    "if [ -f \"{marker}\" ]; then echo \"version 17.0.6\"; \
+                    else echo \"version 16.0.0\"; fi"
+                ),
+            );
+            let result = env.eval(req("17"), true).await.unwrap().unwrap();
+            assert_version(&exe, result, "17.0.6");
         }
     }
 }

@@ -604,6 +604,8 @@ mod test {
     use semver::Version;
     use tempfile::{NamedTempFile, tempdir};
 
+    use git_bot_feedback::AnnotationLevel;
+
     use super::{RestClient, USER_OUTREACH};
     use crate::{
         clang_tools::{
@@ -611,8 +613,9 @@ mod test {
             clang_format::FormatAdvice,
             clang_tidy::{TidyAdvice, TidyNotification},
         },
-        cli::FeedbackInput,
+        cli::{FeedbackInput, ThreadComments},
         common_fs::FileObj,
+        error::ClientError,
     };
     use clang_tools_manager::logger::try_init_logger;
 
@@ -721,5 +724,182 @@ mod test {
             gh_out,
             "checks-failed=0\nclang-format-checks-failed=0\nclang-tidy-checks-failed=0\n"
         );
+    }
+
+    // ************************* tests for other feedback paths
+
+    fn make_dummy_files(severity: &str) -> Vec<Arc<Mutex<FileObj>>> {
+        let filename = String::from("tests/demo/demo.cpp");
+        let mut file = FileObj::new(PathBuf::from(&filename));
+        file.tidy_advice = Some(TidyAdvice {
+            notes: vec![TidyNotification {
+                filename,
+                line: 1,
+                cols: 1,
+                severity: severity.to_string(),
+                rationale: String::from("A test dummy rationale"),
+                diagnostic: String::from("clang-diagnostic-error"),
+                suggestion: vec![String::from("int main() {}")],
+                fixed_lines: vec![1],
+            }],
+        });
+        file.format_advice = Some(FormatAdvice {
+            #[allow(clippy::single_range_in_vec_init)]
+            replacements: vec![1..=2],
+        });
+        vec![Arc::new(Mutex::new(file))]
+    }
+
+    fn dummy_versions() -> ClangVersions {
+        ClangVersions {
+            format_version: Some(Version::new(1, 2, 3)),
+            tidy_version: Some(Version::new(1, 2, 3)),
+        }
+    }
+
+    #[tokio::test]
+    async fn thread_comment_without_summary() {
+        unsafe {
+            env::remove_var("GITHUB_ACTIONS");
+        }
+        let tmp_dir = tempdir().unwrap();
+        let mut rest_api_client = RestClient::new().unwrap();
+        for thread_comments in [ThreadComments::On, ThreadComments::Update] {
+            let feedback_inputs = FeedbackInput {
+                thread_comments,
+                repo_root: tmp_dir.path().to_path_buf(),
+                ..Default::default()
+            };
+            let checks_failed = rest_api_client
+                .post_feedback(
+                    &make_dummy_files("error"),
+                    feedback_inputs,
+                    dummy_versions(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(checks_failed, 2);
+        }
+    }
+
+    #[test]
+    fn annotation_severity() {
+        let annotations = RestClient::make_annotations(&make_dummy_files("error"), "llvm").unwrap();
+        assert!(
+            annotations
+                .iter()
+                .any(|a| matches!(a.severity, AnnotationLevel::Error))
+        );
+        let annotations = RestClient::make_annotations(&make_dummy_files("note"), "llvm").unwrap();
+        // both the clang-format and clang-tidy annotations are notices
+        assert_eq!(annotations.len(), 2);
+        assert!(
+            annotations
+                .iter()
+                .all(|a| matches!(a.severity, AnnotationLevel::Notice))
+        );
+    }
+
+    #[test]
+    fn comment_without_tidy_concerns() {
+        let files = make_dummy_files("warning");
+        let comment = RestClient::make_comment(&files, 1, 0, &dummy_versions(), None).unwrap();
+        assert!(comment.contains("clang-format (v1.2.3) reports"));
+        assert!(!comment.contains("clang-tidy (v1.2.3) reports"));
+    }
+
+    #[tokio::test]
+    async fn summary_output_file_errors() {
+        unsafe {
+            env::remove_var("GITHUB_ACTIONS");
+        }
+        let tmp_dir = tempdir().unwrap();
+        let mut rest_api_client = RestClient::new().unwrap();
+
+        // the parent "directory" is actually a file
+        let not_a_dir = tmp_dir.path().join("not-a-dir");
+        std::fs::write(&not_a_dir, "").unwrap();
+        let feedback_inputs = FeedbackInput {
+            summary_output_file: Some(not_a_dir.join("summary.md")),
+            repo_root: tmp_dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        let err = rest_api_client
+            .post_feedback(
+                &make_dummy_files("warning"),
+                feedback_inputs,
+                dummy_versions(),
+            )
+            .await
+            .unwrap_err();
+        assert!(matches!(err, ClientError::MkDirFailed { .. }));
+
+        // the output "file" is actually a directory
+        let feedback_inputs = FeedbackInput {
+            summary_output_file: Some(tmp_dir.path().to_path_buf()),
+            repo_root: tmp_dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        let err = rest_api_client
+            .post_feedback(
+                &make_dummy_files("warning"),
+                feedback_inputs,
+                dummy_versions(),
+            )
+            .await
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            ClientError::SummaryOutputFileWriteFailed { .. }
+        ));
+
+        // the output path has no parent (and is not a writable file)
+        #[cfg(unix)]
+        {
+            let feedback_inputs = FeedbackInput {
+                summary_output_file: Some(PathBuf::from("/")),
+                repo_root: tmp_dir.path().to_path_buf(),
+                ..Default::default()
+            };
+            let err = rest_api_client
+                .post_feedback(
+                    &make_dummy_files("warning"),
+                    feedback_inputs,
+                    dummy_versions(),
+                )
+                .await
+                .unwrap_err();
+            assert!(matches!(
+                err,
+                ClientError::SummaryOutputFileWriteFailed { .. }
+            ));
+        }
+    }
+
+    #[test]
+    fn comment_with_poisoned_mutex() {
+        let files = make_dummy_files("warning");
+        crate::test_common::poison_mutex(&files[0]);
+        // poisoned while making the clang-format comment
+        assert!(RestClient::make_comment(&files, 1, 1, &dummy_versions(), None).is_err());
+        // poisoned while making the clang-tidy comment
+        assert!(RestClient::make_comment(&files, 0, 1, &dummy_versions(), None).is_err());
+    }
+
+    #[test]
+    fn comment_too_long_for_tidy_note() {
+        let files = make_dummy_files("warning");
+        let unlimited = RestClient::make_comment(&files, 0, 1, &dummy_versions(), None).unwrap();
+        assert!(unlimited.contains("A test dummy rationale"));
+        // one byte short of the room needed for the clang-tidy note
+        let limited = RestClient::make_comment(
+            &files,
+            0,
+            1,
+            &dummy_versions(),
+            Some(unlimited.len() as u64 - 1),
+        )
+        .unwrap();
+        assert!(!limited.contains("A test dummy rationale"));
     }
 }

@@ -536,4 +536,36 @@ mod test {
             serde_json::from_str(&std::fs::read_to_string(&out_path).unwrap()).unwrap();
         assert_eq!(written, to_json(&log));
     }
+
+    #[test]
+    fn write_sarif_file_errors() {
+        use crate::error::ClientError;
+
+        let tmp_dir = tempfile::tempdir().unwrap();
+        let log = SarifLog::new(&make_files(), None, tmp_dir.path()).unwrap();
+
+        // the parent "directory" is actually a file
+        let not_a_dir = tmp_dir.path().join("not-a-dir");
+        std::fs::write(&not_a_dir, "").unwrap();
+        let err = log.write(&not_a_dir.join("clang-tidy.sarif")).unwrap_err();
+        assert!(matches!(err, ClientError::MkDirFailed { .. }));
+
+        // the output "file" is actually a directory
+        let err = log.write(tmp_dir.path()).unwrap_err();
+        assert!(matches!(err, ClientError::SarifFileWriteFailed { .. }));
+
+        // the output path has no parent (and is not a writable file)
+        #[cfg(unix)]
+        {
+            let err = log.write(Path::new("/")).unwrap_err();
+            assert!(matches!(err, ClientError::SarifFileWriteFailed { .. }));
+        }
+    }
+
+    #[test]
+    fn poisoned_mutex() {
+        let files = make_files();
+        crate::test_common::poison_mutex(&files[0]);
+        assert!(SarifLog::new(&files, None, Path::new(".")).is_err());
+    }
 }

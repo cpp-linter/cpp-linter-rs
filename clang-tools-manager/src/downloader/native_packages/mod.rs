@@ -127,3 +127,105 @@ pub async fn try_install_package(
     }
     Ok(None)
 }
+
+#[cfg(all(test, unix))]
+mod tests {
+    //! These tests use a fake `brew` (and fake clang tools) in an isolated `PATH`.
+    //! Thus, no real package manager is ever invoked.
+
+    use std::path::Path;
+
+    use semver::{Version, VersionReq};
+    use tempfile::TempDir;
+
+    use super::{get_available_package_managers, try_install_package};
+    use crate::{
+        ClangTool,
+        test_utils_unix::{enable_logs, fake_clang_tool, fake_exe, isolate_path},
+        version::GetToolError,
+    };
+
+    const TOOL: ClangTool = ClangTool::ClangFormat;
+
+    /// A fake `brew` where `brew list` exits with `list_status`,
+    /// and `brew install` exits with `install_status`.
+    fn fake_brew(dir: &Path, list_status: u8, install_status: u8) {
+        let script = format!(
+            "if [ \"$1\" = \"list\" ]; then exit {list_status}; fi\n\
+            exit {install_status}"
+        );
+        fake_exe(dir, "brew", &script);
+    }
+
+    async fn run() -> Result<Option<crate::ClangVersion>, GetToolError> {
+        let req = VersionReq::parse("17").unwrap();
+        try_install_package(&TOOL, &req, &Version::new(17, 0, 0)).await
+    }
+
+    fn setup() -> TempDir {
+        enable_logs();
+        let tmp = TempDir::new().unwrap();
+        isolate_path(tmp.path());
+        tmp
+    }
+
+    #[tokio::test]
+    async fn no_package_managers() {
+        let _tmp = setup();
+        assert!(get_available_package_managers().is_empty());
+        assert!(run().await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn already_installed() {
+        let tmp = setup();
+        fake_brew(tmp.path(), 0, 1);
+        assert_eq!(get_available_package_managers().len(), 1);
+        fake_clang_tool(tmp.path(), "clang-format-17", "17.0.6");
+        let result = run().await.unwrap().unwrap();
+        assert_eq!(result.version, Version::new(17, 0, 6));
+        assert_eq!(result.path, tmp.path().join("clang-format-17"));
+    }
+
+    #[tokio::test]
+    async fn install_success() {
+        let tmp = setup();
+        fake_brew(tmp.path(), 1, 0);
+        fake_clang_tool(tmp.path(), "clang-format-17", "17.0.6");
+        let result = run().await.unwrap().unwrap();
+        assert_eq!(result.version, Version::new(17, 0, 6));
+    }
+
+    #[tokio::test]
+    async fn install_version_mismatch() {
+        let tmp = setup();
+        fake_brew(tmp.path(), 0, 0);
+        // the found binary does not satisfy the version requirement
+        fake_clang_tool(tmp.path(), "clang-format", "16.0.0");
+        assert!(run().await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn install_failure() {
+        let tmp = setup();
+        fake_brew(tmp.path(), 1, 1);
+        assert!(run().await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn installed_tool_not_found() {
+        let tmp = setup();
+        fake_brew(tmp.path(), 1, 0);
+        let err = run().await.unwrap_err();
+        assert!(matches!(err, GetToolError::GetClangPathError(_)));
+    }
+
+    #[tokio::test]
+    async fn installed_tool_no_version() {
+        let tmp = setup();
+        fake_brew(tmp.path(), 1, 0);
+        fake_exe(tmp.path(), "clang-format-17", "echo \"no version info\"");
+        let err = run().await.unwrap_err();
+        assert!(matches!(err, GetToolError::GetClangVersion(_)));
+    }
+}

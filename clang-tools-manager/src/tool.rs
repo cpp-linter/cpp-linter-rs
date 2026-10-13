@@ -259,4 +259,47 @@ mod tests {
             CLANG_FORMAT.get_exe_path(&RequestedVersion::Path(PathBuf::from("non-existent-path")));
         assert!(tool_exe.is_err());
     }
+
+    #[cfg(unix)]
+    mod fake_tools {
+        use std::fs;
+
+        use tempfile::TempDir;
+
+        use super::CLANG_FORMAT;
+        use crate::{
+            test_utils_unix::{enable_logs, fake_clang_tool, fake_exe},
+            tool::GetClangVersionError,
+        };
+
+        #[test]
+        fn capture_no_version() {
+            let tmp = TempDir::new().unwrap();
+            let exe = fake_exe(tmp.path(), "clang-format", "echo \"no version info\"");
+            let err = CLANG_FORMAT.capture_version(&exe).unwrap_err();
+            println!("{err}");
+            assert!(matches!(err, GetClangVersionError::VersionParse(_)));
+        }
+
+        #[test]
+        fn symlink() {
+            enable_logs();
+            let tmp = TempDir::new().unwrap();
+            let bin_17 = fake_clang_tool(tmp.path(), "clang-format-17", "17.0.6");
+            let bin_18 = fake_clang_tool(tmp.path(), "clang-format-18", "18.1.8");
+            let link = tmp.path().join("clang-format");
+
+            // create a new symlink
+            CLANG_FORMAT.symlink_bin(&bin_17, &link, false).unwrap();
+            assert_eq!(fs::read_link(&link).unwrap(), bin_17);
+
+            // do not overwrite an existing symlink
+            CLANG_FORMAT.symlink_bin(&bin_18, &link, false).unwrap();
+            assert_eq!(fs::read_link(&link).unwrap(), bin_17);
+
+            // overwrite an existing symlink
+            CLANG_FORMAT.symlink_bin(&bin_18, &link, true).unwrap();
+            assert_eq!(fs::read_link(&link).unwrap(), bin_18);
+        }
+    }
 }
