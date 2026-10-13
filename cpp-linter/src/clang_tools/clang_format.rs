@@ -317,17 +317,13 @@ mod tests {
     use std::ops::RangeInclusive;
 
     use std::{
-        fs,
         path::{Path, PathBuf},
         sync::Mutex,
     };
 
     use super::{run_clang_format, summarize_style, three_way_diff};
     use crate::{
-        clang_tools::make_patch,
-        cli::{ClangParams, LinesChangedOnly},
-        common_fs::FileObj,
-        error::ClangCaptureError,
+        clang_tools::make_patch, cli::ClangParams, common_fs::FileObj, error::ClangCaptureError,
         test_common::setup_tmp_workspace,
     };
 
@@ -356,6 +352,7 @@ mod tests {
     mod fake_tool {
         use super::*;
         use crate::test_common::make_fake_tool;
+        use std::fs;
 
         #[test]
         fn missing_source_file() {
@@ -407,6 +404,8 @@ mod tests {
 
         #[test]
         fn tidy_patch_not_readable() {
+            use crate::cli::LinesChangedOnly;
+
             let tmp_workspace = setup_tmp_workspace();
             let tools_dir = tempfile::tempdir().unwrap();
             let fake_format = make_fake_tool(tools_dir.path(), "clang-format", "");
