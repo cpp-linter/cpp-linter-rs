@@ -108,6 +108,7 @@ words:
   - rustdoc
   - rustflags
   - rustup
+  - saphyr
   - SARIF
   - sccache
   - sdist

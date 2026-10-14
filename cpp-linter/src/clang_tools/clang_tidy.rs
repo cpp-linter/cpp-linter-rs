@@ -64,7 +64,7 @@ pub struct TidyNotification {
     /// fixes/advice. This information is purely superfluous.
     pub suggestion: Vec<String>,
 
-    /// The list of line numbers that had fixes applied via `clang-tidy --fix-error`.
+    /// The list of line numbers (in the analyzed file) that clang-tidy suggested fixes for.
     pub fixed_lines: Vec<u32>,
 }
 
@@ -272,27 +272,152 @@ pub fn tally_tidy_advice(files: &[Arc<Mutex<FileObj>>]) -> Result<u64, String> {
     Ok(total)
 }
 
-/// RAII guard that restores a file's original content on drop.
+/// The YAML document that clang-tidy writes with `--export-fixes`.
 ///
-/// This is a best-effort when an error gets propagated before
-/// we can explicitly restore a file's contents.
-struct RestoreOnDrop<'a> {
-    path: &'a Path,
-    content: String,
-    // lock:
-    armed: bool,
+/// Only the fields needed to apply fixes are deserialized.
+#[derive(Deserialize, Debug, Default)]
+#[serde(rename_all = "PascalCase")]
+struct ExportedFixes {
+    #[serde(default)]
+    diagnostics: Vec<ExportedDiagnostic>,
 }
 
-impl Drop for RestoreOnDrop<'_> {
-    fn drop(&mut self) {
-        if self.armed {
-            // We have to ignore any error here and hope for the best.
-            let _ = fs::write(self.path, &self.content);
+/// A single diagnostic in [`ExportedFixes`].
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "PascalCase")]
+struct ExportedDiagnostic {
+    diagnostic_name: String,
+    diagnostic_message: ExportedMessage,
+    #[serde(default)]
+    build_directory: String,
+}
+
+/// The location and fixes of an [`ExportedDiagnostic`].
+#[derive(Deserialize, Debug, Default)]
+#[serde(rename_all = "PascalCase")]
+struct ExportedMessage {
+    #[serde(default)]
+    file_path: String,
+    #[serde(default)]
+    file_offset: usize,
+    #[serde(default)]
+    replacements: Vec<ExportedReplacement>,
+}
+
+/// A single text replacement in an [`ExportedMessage`].
+#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = "PascalCase")]
+struct ExportedReplacement {
+    file_path: String,
+    offset: usize,
+    length: usize,
+    #[serde(default)]
+    replacement_text: String,
+}
+
+/// Is `path` (as reported by clang-tidy) the same file as `target`?
+///
+/// `target` is expected to be absolute and normalized.
+/// Relative paths are resolved from the diagnostic's `build_dir`.
+fn is_same_file(path: &str, build_dir: &str, target: &Path) -> bool {
+    if path.is_empty() {
+        return false;
+    }
+    let path = normalize_path(&Path::new(build_dir).join(path));
+    path == target
+        || fs::canonicalize(&path)
+            .ok()
+            .zip(fs::canonicalize(target).ok())
+            .is_some_and(|(a, b)| a == b)
+}
+
+/// Convert a byte `offset` in `content` into a 1-based line number.
+fn offset_to_line(content: &[u8], offset: usize) -> u32 {
+    let end = offset.min(content.len());
+    content[..end].iter().filter(|b| **b == b'\n').count() as u32 + 1
+}
+
+/// Apply the clang-tidy `fixes` that pertain to the `target` file onto its `content`.
+///
+/// Fixes for any other file (eg. a header declaring a function defined in `target`)
+/// are ignored, so nothing outside the analyzed file is ever changed.
+///
+/// Returns the patched content.
+/// Each diagnostic's `fixed_lines` (in the original `content`) are recorded in the
+/// matching `notes`.
+fn apply_fixes(
+    fixes: &ExportedFixes,
+    target: &Path,
+    content: &[u8],
+    notes: &mut [TidyNotification],
+) -> Vec<u8> {
+    let mut replacements = vec![];
+    for diag in &fixes.diagnostics {
+        let msg = &diag.diagnostic_message;
+        let mut fixed_lines = vec![];
+        for replacement in &msg.replacements {
+            if replacement
+                .offset
+                .checked_add(replacement.length)
+                .is_some_and(|end| end <= content.len())
+                && is_same_file(&replacement.file_path, &diag.build_directory, target)
+            {
+                let line = offset_to_line(content, replacement.offset);
+                if !fixed_lines.contains(&line) {
+                    fixed_lines.push(line);
+                }
+                replacements.push(replacement);
+            }
+        }
+        if fixed_lines.is_empty() {
+            continue;
+        }
+        // Find the notification (parsed from stdout) for this diagnostic.
+        let diag_path = normalize_path(&Path::new(&diag.build_directory).join(&msg.file_path));
+        let diag_line = if is_same_file(&msg.file_path, &diag.build_directory, target) {
+            Some(offset_to_line(content, msg.file_offset))
+        } else {
+            fs::read(&diag_path)
+                .ok()
+                .map(|c| offset_to_line(&c, msg.file_offset))
+        };
+        if let Some(note) = notes.iter_mut().find(|note| {
+            note.diagnostic == diag.diagnostic_name
+                && Some(note.line) == diag_line
+                && diag_path.ends_with(&note.filename)
+        }) {
+            for line in fixed_lines {
+                if !note.fixed_lines.contains(&line) {
+                    note.fixed_lines.push(line);
+                }
+            }
         }
     }
+
+    // clang-tidy already discards conflicting fixes before exporting them,
+    // but be defensive about duplicates and overlaps anyway.
+    replacements.sort_by_key(|r| (r.offset, r.length));
+    replacements.dedup();
+    let mut patched = Vec::with_capacity(content.len());
+    let mut cursor = 0;
+    for replacement in replacements {
+        let end = replacement.offset + replacement.length;
+        if replacement.offset < cursor {
+            continue;
+        }
+        patched.extend_from_slice(&content[cursor..replacement.offset]);
+        patched.extend_from_slice(replacement.replacement_text.as_bytes());
+        cursor = end;
+    }
+    patched.extend_from_slice(&content[cursor..]);
+    patched
 }
 
 /// Run clang-tidy, then parse and return it's output.
+///
+/// clang-tidy is not allowed to modify any files.
+/// Instead, its fixes are exported (`--export-fixes`), and only the fixes for the
+/// analyzed file are applied to a copy of that file in the cache.
 pub fn run_clang_tidy(
     file: &mut MutexGuard<FileObj>,
     clang_params: &ClangParams,
@@ -332,10 +457,30 @@ pub fn run_clang_tidy(
         cmd.args(["--line-filter", filter.as_str()]);
     }
     let repo_file_path = clang_params.repo_root.join(&file.name);
-    cmd.arg("--fix-errors");
-    if !clang_params.style.is_empty() {
-        cmd.args(["--format-style", clang_params.style.as_str()]);
-    }
+    let original_content =
+        fs::read(&repo_file_path).map_err(|e| ClangCaptureError::ReadFileFailed {
+            file_name: file_name.clone(),
+            source: e,
+        })?;
+    let cache_path = clang_params.get_cache_path();
+    let cache_patch_path = cache_path.join(&file.name);
+    fs::create_dir_all(
+        cache_patch_path
+            .parent()
+            .ok_or(ClangCaptureError::UnknownCacheParentPath)?,
+    )
+    .map_err(ClangCaptureError::MkDirFailed)?;
+    // clang-tidy runs from the repo root, so give it an absolute path.
+    let mut fixes_path = std::path::absolute(&cache_patch_path)
+        .map_err(ClangCaptureError::UnknownWorkingDirectory)?
+        .into_os_string();
+    fixes_path.push(".fixes.yml");
+    let fixes_path = PathBuf::from(fixes_path);
+    // clang-tidy does not write this file if there is nothing to report,
+    // so don't let a stale one from a previous run get used.
+    let _ = fs::remove_file(&fixes_path);
+    cmd.arg("--export-fixes");
+    cmd.arg(&fixes_path);
     cmd.arg(file.name.to_string_lossy().as_ref());
     logs.push((
         log::Level::Info,
@@ -348,47 +493,12 @@ pub fn run_clang_tidy(
                 .join(" ")
         ),
     ));
-    let cache_path = clang_params.get_cache_path();
-    let cache_patch_path = cache_path.join(&file.name);
-    fs::create_dir_all(
-        cache_patch_path
-            .parent()
-            .ok_or(ClangCaptureError::UnknownCacheParentPath)?,
-    )
-    .map_err(ClangCaptureError::MkDirFailed)?;
-    let mut drop_guard = RestoreOnDrop {
-        content: fs::read_to_string(&repo_file_path).map_err(|e| {
-            ClangCaptureError::ReadFileFailed {
-                file_name: file_name.clone(),
-                source: e,
-            }
-        })?,
-        armed: true,
-        path: repo_file_path.as_path(),
-    };
-    // run clang-tidy to patch the file in-place.
     let output = cmd
         .output()
         .map_err(|e| ClangCaptureError::FailedToRunCommand {
             task: format!("execute clang-tidy on file {file_name}"),
             source: e,
         })?;
-    // move the patched file content into cache
-    fs::copy(&repo_file_path, &cache_patch_path).map_err(|e| {
-        ClangCaptureError::WriteFileFailed {
-            file_name: cache_patch_path.to_string_lossy().to_string(),
-            source: e,
-        }
-    })?;
-    // restore the original file content to avoid unexpected behavior in later steps of dev workflow
-    fs::write(&repo_file_path, &drop_guard.content).map_err(|e| {
-        ClangCaptureError::WriteFileFailed {
-            file_name: file_name.clone(),
-            source: e,
-        }
-    })?;
-    // disarm the drop guard since we've already restored the original content
-    drop_guard.armed = false;
 
     logs.push((
         log::Level::Debug,
@@ -407,11 +517,35 @@ pub fn run_clang_tidy(
         ));
     }
 
-    let notes = parse_tidy_output(
+    let mut notes = parse_tidy_output(
         &output.stdout,
         &clang_params.database_json,
         &clang_params.repo_root,
     )?;
+
+    let fixes = match fs::read_to_string(&fixes_path) {
+        Ok(yml) => {
+            let _ = fs::remove_file(&fixes_path);
+            serde_saphyr::from_str::<ExportedFixes>(&yml).unwrap_or_else(|e| {
+                logs.push((
+                    log::Level::Error,
+                    format!("Failed to parse fixes exported by clang-tidy for {file_name}: {e}"),
+                ));
+                ExportedFixes::default()
+            })
+        }
+        // no file means no diagnostics
+        Err(_) => ExportedFixes::default(),
+    };
+    let target = normalize_path(
+        &std::path::absolute(&repo_file_path)
+            .map_err(ClangCaptureError::UnknownWorkingDirectory)?,
+    );
+    let patched = apply_fixes(&fixes, &target, &original_content, &mut notes);
+    fs::write(&cache_patch_path, patched).map_err(|e| ClangCaptureError::WriteFileFailed {
+        file_name: cache_patch_path.to_string_lossy().to_string(),
+        source: e,
+    })?;
 
     let tidy_advice = TidyAdvice { notes };
     file.patched_path = Some(cache_patch_path.to_path_buf());
@@ -425,7 +559,7 @@ mod test {
 
     use std::{
         env, fs,
-        path::PathBuf,
+        path::{Path, PathBuf},
         str::FromStr,
         sync::{Arc, Mutex},
     };
@@ -440,8 +574,8 @@ mod test {
     };
 
     use super::{
-        CLANG_DIAGNOSTICS_URL, ClangCaptureError, CompilationUnit, NOTE_HEADER, RestoreOnDrop,
-        TidyNotification, run_clang_tidy,
+        CLANG_DIAGNOSTICS_URL, ClangCaptureError, CompilationUnit, ExportedFixes, NOTE_HEADER,
+        TidyNotification, apply_fixes, run_clang_tidy,
     };
 
     #[test]
@@ -689,28 +823,6 @@ TrenchBroom/TrenchBroom/common/test/src/mdl/tst_ReadFreeImageTexture.cpp:44:48: 
     }
 
     #[test]
-    fn restore_on_drop_fires() {
-        let tmp = tempfile::tempdir().unwrap();
-        let file_path = tmp.path().join("test_file.txt");
-        let original = "original content";
-        fs::write(&file_path, original).unwrap();
-
-        {
-            let guard = RestoreOnDrop {
-                path: &file_path,
-                content: original.to_string(),
-                armed: true,
-            };
-            // Simulate clang-tidy mutating the file
-            fs::write(&file_path, "patched content").unwrap();
-            // Explicit drop triggers restoration
-            drop(guard);
-        }
-
-        assert_eq!(fs::read_to_string(&file_path).unwrap(), original);
-    }
-
-    #[test]
     fn parse_non_utf8_output() {
         let err = parse_tidy_output(&[0xFF, 0xFE], &None, &PathBuf::from(".")).unwrap_err();
         assert!(matches!(err, ClangCaptureError::NonUtf8Output { .. }));
@@ -801,23 +913,6 @@ TrenchBroom/TrenchBroom/common/test/src/mdl/tst_ReadFreeImageTexture.cpp:44:48: 
         assert!(matches!(err, ClangCaptureError::WriteFileFailed { .. }));
     }
 
-    #[cfg(target_os = "linux")]
-    #[test]
-    fn tidy_source_not_restorable() {
-        let tmp_workspace = crate::test_common::setup_tmp_workspace();
-        let tools_dir = tempfile::tempdir().unwrap();
-        // replace the source file with a symlink to a readable (but not writable) file
-        let fake_tidy = crate::test_common::make_fake_tool(
-            tools_dir.path(),
-            "clang-tidy",
-            "rm -f demo/demo.cpp && ln -s /proc/version demo/demo.cpp",
-        );
-        let clang_params = make_clang_params(tmp_workspace.path(), Some(fake_tidy));
-        let file = Mutex::new(FileObj::new(PathBuf::from("demo/demo.cpp")));
-        let err = run_clang_tidy(&mut file.lock().unwrap(), &clang_params).unwrap_err();
-        assert!(matches!(err, ClangCaptureError::WriteFileFailed { .. }));
-    }
-
     #[cfg(unix)]
     #[test]
     fn tidy_non_utf8_output() {
@@ -832,5 +927,158 @@ TrenchBroom/TrenchBroom/common/test/src/mdl/tst_ReadFreeImageTexture.cpp:44:48: 
         let file = Mutex::new(FileObj::new(PathBuf::from("demo/demo.cpp")));
         let err = run_clang_tidy(&mut file.lock().unwrap(), &clang_params).unwrap_err();
         assert!(matches!(err, ClangCaptureError::NonUtf8Output { .. }));
+    }
+
+    fn get_tidy_exe() -> PathBuf {
+        ClangTool::ClangTidy
+            .get_exe_path(
+                &RequestedVersion::from_str(
+                    env::var("CLANG_VERSION").unwrap_or("".to_string()).as_str(),
+                )
+                .unwrap(),
+            )
+            .unwrap()
+    }
+
+    const FIX_HEADER: &str = "#pragma once\nvoid set(int *p);\n";
+    const FIX_SOURCE: &str =
+        "#include \"fix.h\"\nvoid set(int *p) {\n  int x = *p;\n  (void)x;\n}\n";
+
+    /// A fix for a diagnostic in the analyzed source file can also change a header
+    /// (see cpp-linter/cpp-linter-rs#475).
+    /// Neither file in the worktree should be modified,
+    /// but the fix for the analyzed file should be cached.
+    #[test]
+    fn fixes_do_not_modify_worktree() {
+        let tmp_workspace = tempfile::TempDir::with_prefix("cpp-linter-unit-tests_").unwrap();
+        fs::write(tmp_workspace.path().join("fix.h"), FIX_HEADER).unwrap();
+        fs::write(tmp_workspace.path().join("fix.cpp"), FIX_SOURCE).unwrap();
+        let clang_params = ClangParams {
+            tidy_checks: "-*,readability-non-const-parameter".to_string(),
+            clang_tidy_command: Some(get_tidy_exe()),
+            repo_root: tmp_workspace.path().to_path_buf(),
+            ..Default::default()
+        };
+        let file = Mutex::new(FileObj::new(PathBuf::from("fix.cpp")));
+        let mut file = file.lock().unwrap();
+        run_clang_tidy(&mut file, &clang_params).unwrap();
+
+        // worktree is untouched
+        assert_eq!(
+            fs::read_to_string(tmp_workspace.path().join("fix.h")).unwrap(),
+            FIX_HEADER
+        );
+        assert_eq!(
+            fs::read_to_string(tmp_workspace.path().join("fix.cpp")).unwrap(),
+            FIX_SOURCE
+        );
+
+        // the fix for the analyzed file is cached
+        let patched = fs::read_to_string(file.patched_path.as_ref().unwrap()).unwrap();
+        assert_eq!(
+            patched,
+            FIX_SOURCE.replace("set(int *p)", "set(const int *p)")
+        );
+        // the exported fixes are cleaned up
+        assert!(
+            !fs::read_dir(clang_params.get_cache_path())
+                .unwrap()
+                .any(|e| e.unwrap().file_name().to_string_lossy().ends_with(".yml"))
+        );
+
+        let notes = &file.tidy_advice.as_ref().unwrap().notes;
+        let note = notes
+            .iter()
+            .find(|n| n.diagnostic == "readability-non-const-parameter")
+            .unwrap();
+        assert_eq!(note.fixed_lines, vec![2]);
+    }
+
+    fn dummy_fixes(target: &Path) -> String {
+        let target = target.to_string_lossy();
+        format!(
+            r#"---
+MainSourceFile:  '{target}'
+Diagnostics:
+  - DiagnosticName:  modernize-use-auto
+    DiagnosticMessage:
+      Message:         'a ''quoted'' rationale'
+      FilePath:        '{target}'
+      FileOffset:      7
+      Replacements:
+        - FilePath:        'fix.h'
+          Offset:          0
+          Length:          4
+          ReplacementText: 'nope'
+        - FilePath:        '{target}'
+          Offset:          7
+          Length:          3
+          ReplacementText: "auto\nx"
+        # a duplicate is ignored
+        - FilePath:        '{target}'
+          Offset:          7
+          Length:          3
+          ReplacementText: "auto\nx"
+        # an overlapping fix is ignored
+        - FilePath:        '{target}'
+          Offset:          8
+          Length:          1
+          ReplacementText: 'overlap'
+        # out-of-bounds fix is ignored
+        - FilePath:        '{target}'
+          Offset:          100
+          Length:          1
+          ReplacementText: 'oob'
+    Level:           Warning
+    BuildDirectory:  '{build_dir}'
+...
+"#,
+            build_dir = target
+                .trim_end_matches("demo.cpp")
+                .trim_end_matches(['/', '\\']),
+        )
+    }
+
+    #[test]
+    fn apply_exported_fixes() {
+        let tmp = tempfile::tempdir().unwrap();
+        let target = tmp.path().join("demo.cpp");
+        let content = b"line\n  int y;\n";
+        let fixes: ExportedFixes = serde_saphyr::from_str(&dummy_fixes(&target)).unwrap();
+        assert_eq!(fixes.diagnostics.len(), 1);
+        let mut notes = vec![dummy_note("demo.cpp", vec![])];
+        notes[0].line = 2;
+        let patched = apply_fixes(&fixes, &target, content, &mut notes);
+        assert_eq!(String::from_utf8(patched).unwrap(), "line\n  auto\nx y;\n");
+        assert_eq!(notes[0].fixed_lines, vec![2]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn tidy_bad_exported_fixes() {
+        let tmp_workspace = crate::test_common::setup_tmp_workspace();
+        let tools_dir = tempfile::tempdir().unwrap();
+        // write invalid YAML to the path given to `--export-fixes`
+        let fake_tidy = crate::test_common::make_fake_tool(
+            tools_dir.path(),
+            "clang-tidy",
+            r#"while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--export-fixes" ]; then printf 'Diagnostics: [' > "$2"; fi
+  shift
+done"#,
+        );
+        let clang_params = make_clang_params(tmp_workspace.path(), Some(fake_tidy));
+        let file = Mutex::new(FileObj::new(PathBuf::from("demo/demo.cpp")));
+        let mut file = file.lock().unwrap();
+        let logs = run_clang_tidy(&mut file, &clang_params).unwrap();
+        assert!(
+            logs.iter()
+                .any(|(lvl, msg)| *lvl == log::Level::Error && msg.contains("Failed to parse"))
+        );
+        // the cached file is the original content
+        assert_eq!(
+            fs::read_to_string(file.patched_path.as_ref().unwrap()).unwrap(),
+            fs::read_to_string("tests/demo/demo.cpp").unwrap()
+        );
     }
 }
