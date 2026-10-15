@@ -2,7 +2,7 @@
 //! output.
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     env::consts::OS,
     fs,
     path::{Path, PathBuf},
@@ -160,8 +160,6 @@ fn parse_tidy_output(
     repo_root: &Path,
 ) -> Result<Vec<TidyNotification>, ClangCaptureError> {
     let note_header = Regex::new(NOTE_HEADER)?;
-    let fixed_note = Regex::new(r"^.+:(\d+):\d+:\snote: FIX-IT applied suggested code changes$")?;
-    let mut found_fix = false;
     let mut notification = None;
     let mut result = Vec::new();
     for line in String::from_utf8(tidy_stdout.to_vec())
@@ -230,21 +228,8 @@ fn parse_tidy_output(
                     suggestion: Vec::new(),
                     fixed_lines: Vec::new(),
                 });
-                // begin capturing subsequent lines as suggestions
-                found_fix = false;
             }
-        } else if let Some(capture) = fixed_note.captures(line) {
-            let fixed_line = capture[1].parse()?;
-            if let Some(note) = &mut notification
-                && !note.fixed_lines.contains(&fixed_line)
-            {
-                note.fixed_lines.push(fixed_line);
-            }
-            // Suspend capturing subsequent lines as suggestions until
-            // a new notification is constructed. If we found a note about applied fixes,
-            // then the lines of suggestions for that notification have already been parsed.
-            found_fix = true;
-        } else if !found_fix && let Some(note) = &mut notification {
+        } else if let Some(note) = &mut notification {
             // append lines of code that are part of
             // the previous line's notification
             note.suggestion.push(line.to_string());
@@ -331,8 +316,8 @@ struct FixPaths<'a> {
     canonical_target: Option<PathBuf>,
     /// clang-tidy's working directory (absolute).
     working_dir: &'a Path,
-    /// Results of [`Self::is_target()`], keyed by the paths given to it.
-    cache: HashMap<(&'a str, &'a str), bool>,
+    /// Results of [`Self::other_file()`], keyed by the paths given to it.
+    cache: HashMap<(&'a str, &'a str), Option<PathBuf>>,
 }
 
 impl<'a> FixPaths<'a> {
@@ -355,18 +340,21 @@ impl<'a> FixPaths<'a> {
         normalize_path(&base.join(path))
     }
 
-    /// Is the `path` (reported by clang-tidy) the analyzed file?
-    fn is_target(&mut self, build_dir: &'a str, path: &'a str) -> bool {
+    /// Get the resolved `path` (reported by clang-tidy) if it is not the analyzed file.
+    ///
+    /// Returns [`None`] if the `path` is the analyzed file.
+    fn other_file(&mut self, build_dir: &'a str, path: &'a str) -> Option<PathBuf> {
         if let Some(result) = self.cache.get(&(build_dir, path)) {
-            return *result;
+            return result.clone();
         }
         let resolved = self.resolve(build_dir, path);
-        let result = resolved == self.target
+        let is_target = resolved == self.target
             || self
                 .canonical_target
                 .as_ref()
                 .is_some_and(|target| fs::canonicalize(&resolved).is_ok_and(|p| p == *target));
-        self.cache.insert((build_dir, path), result);
+        let result = (!is_target).then_some(resolved);
+        self.cache.insert((build_dir, path), result.clone());
         result
     }
 }
@@ -397,13 +385,10 @@ fn apply_fixes<'a>(
         let msg = &diag.diagnostic_message;
         let build_dir = diag.build_directory.as_str();
         let mut fixed_lines = vec![];
-        let mut other_files = vec![];
+        let mut other_files = HashSet::new();
         for replacement in &msg.replacements {
-            if !paths.is_target(build_dir, &replacement.file_path) {
-                let other = paths.resolve(build_dir, &replacement.file_path);
-                if !other_files.contains(&other) {
-                    other_files.push(other);
-                }
+            if let Some(other) = paths.other_file(build_dir, &replacement.file_path) {
+                other_files.insert(other);
             } else if replacement
                 .offset
                 .checked_add(replacement.length)
@@ -440,13 +425,17 @@ fn apply_fixes<'a>(
             continue;
         }
         // Find the notification (parsed from stdout) for this diagnostic.
-        let diag_path = paths.resolve(build_dir, &msg.file_path);
-        let diag_line = if paths.is_target(build_dir, &msg.file_path) {
-            Some(offset_to_line(content, msg.file_offset))
-        } else {
-            fs::read(&diag_path)
-                .ok()
-                .map(|c| offset_to_line(&c, msg.file_offset))
+        let (diag_path, diag_line) = match paths.other_file(build_dir, &msg.file_path) {
+            None => (
+                paths.target.to_path_buf(),
+                Some(offset_to_line(content, msg.file_offset)),
+            ),
+            Some(other) => {
+                let line = fs::read(&other)
+                    .ok()
+                    .map(|c| offset_to_line(&c, msg.file_offset));
+                (other, line)
+            }
         };
         if let Some(note) = notes.iter_mut().find(|note| {
             note.diagnostic == diag.diagnostic_name

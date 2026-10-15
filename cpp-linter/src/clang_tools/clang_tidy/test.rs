@@ -515,12 +515,15 @@ fn fix_paths_resolve() {
     let build_dir = build_dir.to_string_lossy();
     let mut paths = FixPaths::new(&target, tmp.path());
     // relative paths are resolved from the build directory
-    assert!(paths.is_target(&build_dir, "../src/demo.cpp"));
+    assert!(paths.other_file(&build_dir, "../src/demo.cpp").is_none());
     // or from the working directory if no build directory is given
-    assert!(paths.is_target("", "src/demo.cpp"));
-    assert!(!paths.is_target("", "src/demo.hpp"));
+    assert!(paths.other_file("", "src/demo.cpp").is_none());
+    assert_eq!(
+        paths.other_file("", "src/demo.hpp"),
+        Some(tmp.path().join("src/demo.hpp"))
+    );
     // cached results are reused
-    assert!(paths.is_target(&build_dir, "../src/demo.cpp"));
+    assert!(paths.other_file(&build_dir, "../src/demo.cpp").is_none());
 }
 
 /// Make a fake clang-tidy that runs `cmd` with the path given to `--export-fixes` as `$2`.
