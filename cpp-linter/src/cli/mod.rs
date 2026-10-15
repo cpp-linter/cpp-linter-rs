@@ -9,9 +9,7 @@ use std::str::FromStr;
 use clang_tools_manager::{RequestedVersion, logger::CLI_HELP_STYLE};
 #[cfg(feature = "bin")]
 use clap::{
-    ArgAction, Args, Parser, Subcommand, ValueEnum,
-    builder::{FalseyValueParser, NonEmptyStringValueParser},
-    value_parser,
+    ArgAction, Args, Parser, Subcommand, ValueEnum, builder::FalseyValueParser, value_parser,
 };
 
 mod structs;
@@ -22,8 +20,10 @@ pub use structs::{ClangParams, FeedbackInput, LinesChangedOnly, ThreadComments};
 #[derive(Debug, Clone, PartialEq, Eq, ValueEnum)]
 pub enum Verbosity {
     /// Enables the [`log::Level::Info`] log level and above.
+    #[value(alias = "20")]
     Info,
     /// Enables the [`log::Level::Debug`] log level and above.
+    #[value(alias = "10")]
     Debug,
 }
 
@@ -179,6 +179,9 @@ pub struct GeneralOptions {
 )]
 pub struct SourceOptions {
     /// A comma-separated list of file extensions to analyze.
+    ///
+    /// Surrounding whitespace and a leading `.` are ignored,
+    /// so `.cpp, .h` is the same as `cpp,h`.
     #[cfg_attr(
         feature = "bin",
         arg(
@@ -186,7 +189,7 @@ pub struct SourceOptions {
             long,
             value_delimiter = ',',
             default_value = "c,h,C,H,cpp,hpp,cc,hh,c++,h++,cxx,hxx",
-            value_parser = NonEmptyStringValueParser::new(),
+            value_parser = parse_extension,
             help_heading = "Source options"
         )
     )]
@@ -320,8 +323,9 @@ pub struct FormatOptions {
     ///   entirely.
     ///
     /// > [!NOTE]
-    /// > If this is not a blank string, then it is also passed to clang-tidy
-    /// > (if [`--tidy_checks`](#-c-tidy-checks) is not `-*`).
+    /// > If this is not a blank string, then fixes suggested by clang-tidy
+    /// > (if [`--tidy-checks`](#-c-tidy-checks) is not `-*`) are also
+    /// > formatted with this style.
     /// > This is done to ensure suggestions from both clang-tidy and
     /// > clang-format are consistent.
     #[cfg_attr(
@@ -574,6 +578,20 @@ pub struct FeedbackOptions {
     pub passive_reviews: bool,
 }
 
+/// Parses a single value of the `--extensions` option.
+///
+/// Surrounding whitespace and a leading `.` are removed.
+/// An empty value is an error.
+#[cfg(feature = "bin")]
+fn parse_extension(val: &str) -> Result<String, String> {
+    let ext = val.trim().trim_start_matches('.');
+    if ext.is_empty() {
+        Err(format!("invalid file extension: {val:?}"))
+    } else {
+        Ok(ext.to_string())
+    }
+}
+
 /// Converts the parsed value of the `--extra-arg` option into an optional vector of strings.
 ///
 /// This is for adapting to 2 scenarios where `--extra-arg` is either
@@ -603,12 +621,15 @@ pub fn convert_extra_arg_val(args: &[String]) -> Vec<String> {
         // specified once; split and return result
         v.trim_matches('\'')
             .trim_matches('"')
-            .split(' ')
+            .split_whitespace()
             .map(|i| i.to_string())
             .collect()
     } else {
-        // specified multiple times; just return a clone of the values
-        val.map(|i| i.to_string()).collect()
+        // specified multiple times; just strip any quotes and skip blank values
+        val.map(|i| i.trim_matches('\'').trim_matches('"').trim())
+            .filter(|i| !i.is_empty())
+            .map(|i| i.to_string())
+            .collect()
     }
 }
 
@@ -656,6 +677,38 @@ mod test {
         let extra_args = convert_extra_arg_val(&args.tidy_options.extra_arg);
         assert_eq!(extra_args.len(), 2);
         assert_eq!(extra_args, ["-std=c++17", "-Wall"])
+    }
+
+    #[test]
+    fn extensions_are_normalized() {
+        let args = Cli::parse_from(vec!["cpp-linter", "-e", " .cpp, .h,hpp"]);
+        assert_eq!(args.source_options.extensions, ["cpp", "h", "hpp"]);
+        assert!(Cli::try_parse_from(vec!["cpp-linter", "-e", "c,.,h"]).is_err());
+    }
+
+    #[test]
+    fn numeric_verbosity() {
+        let args = Cli::parse_from(vec!["cpp-linter", "-v", "10"]);
+        assert!(args.general_options.verbosity.is_debug());
+        let args = Cli::parse_from(vec!["cpp-linter", "-v", "20"]);
+        assert!(!args.general_options.verbosity.is_debug());
+    }
+
+    #[test]
+    fn extra_arg_extra_spaces() {
+        let args = Cli::parse_from(vec!["cpp-linter", "--extra-arg=' -std=c++17   -Wall '"]);
+        let extra_args = convert_extra_arg_val(&args.tidy_options.extra_arg);
+        assert_eq!(extra_args, ["-std=c++17", "-Wall"]);
+
+        let args = Cli::parse_from(vec![
+            "cpp-linter",
+            "--extra-arg=\"-std=c++17\"",
+            "--extra-arg=",
+            "--extra-arg= ",
+            "--extra-arg='-Wall'",
+        ]);
+        let extra_args = convert_extra_arg_val(&args.tidy_options.extra_arg);
+        assert_eq!(extra_args, ["-std=c++17", "-Wall"]);
     }
 
     #[test]

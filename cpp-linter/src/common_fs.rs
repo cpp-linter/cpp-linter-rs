@@ -250,7 +250,12 @@ impl FileObj {
             // Count of clang-tidy diagnostics that had no fixes applied
             let mut total = 0;
             for note in &advice.notes {
-                if note.fixed_lines.is_empty() && self.is_line_in_diff(&note.line) {
+                // Skip diagnostics about other files (eg. included headers);
+                // their line numbers do not refer to this file.
+                if note.filename == file_name
+                    && note.fixed_lines.is_empty()
+                    && self.is_line_in_diff(&note.line)
+                {
                     // notification had no suggestion applied in `patched`
                     total += 1;
                     if summary_only {
@@ -531,6 +536,11 @@ mod test {
                 note(1, vec![]),
                 // not in any existing suggestion; creates a new suggestion
                 note(3, vec!["line3".to_string()]),
+                // a diagnostic about an included header is not about this file's line 4
+                TidyNotification {
+                    filename: "test_file.h".to_string(),
+                    ..note(4, vec![])
+                },
             ],
         });
 
