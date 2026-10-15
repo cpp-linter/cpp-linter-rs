@@ -264,6 +264,9 @@ fn three_way_diff(ranges: &[RangeInclusive<u32>], tidy_diff: Diff) -> Vec<RangeI
             if before_end < og_start {
                 maybe_push_range(&mut joint_ranges, after_start, after_end);
                 line_shift += delta;
+                // shift the og range by the lines this tidy hunk added or removed
+                merged_start = (og_start as i32 + line_shift) as u32;
+                merged_end = (og_end as i32 + line_shift) as u32;
                 tidy_iter.next();
                 continue;
             }
@@ -534,6 +537,22 @@ mod tests {
         let joint_ranges = three_way_diff(&ranges, tidy_diff);
         println!("joint ranges: {joint_ranges:#?}");
         assert_eq!(joint_ranges, vec![4..=7, 10..=11]);
+    }
+
+    #[test]
+    fn three_way_diff_tidy_hunk_before_range() {
+        const OG_SRC: &str = "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8";
+        // TIDY_SRC replaces "line2" with 2 lines, which is entirely before ranges[5..=6].
+        // So the tidy hunk is kept as is and the og range is shifted down by 1 line.
+        const TIDY_SRC: &str = "line1\nStringA\nStringB\nline3\nline4\nline5\nline6\nline7\nline8";
+        let (tidy_diff, _input) = make_patch(TIDY_SRC, OG_SRC);
+        #[cfg(feature = "bin")]
+        print_diff(OG_SRC, TIDY_SRC, &tidy_diff, &_input);
+        let ranges = vec![RangeInclusive::new(5, 6)];
+        println!("tidy diff: {tidy_diff:#?}\ncompared to og ranges: {ranges:?}");
+        let joint_ranges = three_way_diff(&ranges, tidy_diff);
+        println!("joint ranges: {joint_ranges:#?}");
+        assert_eq!(joint_ranges, vec![2..=3, 6..=7]);
     }
 
     #[cfg(feature = "bin")]
