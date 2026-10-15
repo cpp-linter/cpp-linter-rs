@@ -67,6 +67,9 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
         },
     );
     let is_pr = rest_api_client.is_pr();
+    if !is_pr && cli.feedback_options.pr_review && rest_api_client.client_kind() == "local" {
+        log::warn!("Pull request reviews are only posted when running in a supported CI platform.");
+    }
 
     let mut file_filter = FileFilter::new(
         &cli.source_options
@@ -108,7 +111,7 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
     }
 
     rest_api_client.start_log_group("Get list of specified source files");
-    let files = if !matches!(cli.source_options.lines_changed_only, LinesChangedOnly::Off)
+    let mut files = if !matches!(cli.source_options.lines_changed_only, LinesChangedOnly::Off)
         || cli.source_options.files_changed_only
     {
         // parse_diff(github_rest_api_payload)
@@ -151,6 +154,9 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
         }
         all_files
     };
+    // The file lists from git and the directory walk are unordered.
+    // Sort them, so the order of feedback (comments, annotations, etc) is deterministic.
+    files.sort_by(|a, b| a.name.cmp(&b.name));
     let mut arc_files = vec![];
     log::info!("Giving attention to the following files:");
     for file in files {
@@ -195,7 +201,7 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
         .post_feedback(&arc_files, user_inputs, clang_versions)
         .await?;
     rest_api_client.end_log_group("Posting feedback");
-    if env::var("PRE_COMMIT").is_ok_and(|v| v == "1") && checks_failed > 1 {
+    if env::var("PRE_COMMIT").is_ok_and(|v| v == "1") && checks_failed > 0 {
         return Err(anyhow!("Some checks did not pass"));
     }
     Ok(())
@@ -229,6 +235,28 @@ pub(crate) mod test {
             "cpp-linter".to_string(),
             "-l".to_string(),
             "false".to_string(),
+            "--repo-root".to_string(),
+            tmp_workspace.path().to_str().unwrap().to_string(),
+            "demo/demo.cpp".to_string(),
+        ])
+        .await
+        .unwrap();
+        drop(tmp_gh_out);
+    }
+
+    #[tokio::test]
+    async fn pr_review_outside_ci() {
+        let tmp_gh_out = setup_tmp_gh_out_path();
+        let tmp_workspace = setup_tmp_workspace();
+        unsafe {
+            env::set_var("GITHUB_ACTIONS", "false");
+        }
+        // a PR review is requested, but only a warning is logged outside CI
+        run_main(vec![
+            "cpp-linter".to_string(),
+            "-l".to_string(),
+            "false".to_string(),
+            "--pr-review".to_string(),
             "--repo-root".to_string(),
             tmp_workspace.path().to_str().unwrap().to_string(),
             "demo/demo.cpp".to_string(),

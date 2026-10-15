@@ -206,6 +206,7 @@ impl RestClient {
             let summary_only = ["true", "on", "1"].contains(
                 &env::var("CPP_LINTER_PR_REVIEW_SUMMARY_ONLY")
                     .unwrap_or("false".to_string())
+                    .to_lowercase()
                     .as_str(),
             );
             let mut review_comments = ReviewComments::default();
@@ -236,9 +237,10 @@ impl RestClient {
             let total_review_comments = options.comments.len() as u32;
             self.client.cull_pr_reviews(&mut options).await?;
             let has_changes = review_comments.tool_total > 0;
+            let is_lgtm = options.comments.is_empty() && !has_changes;
             options.action = if feedback_inputs.passive_reviews {
                 ReviewAction::Comment
-            } else if options.comments.is_empty() && !has_changes {
+            } else if is_lgtm {
                 ReviewAction::Approve
             } else {
                 ReviewAction::RequestChanges
@@ -249,7 +251,15 @@ impl RestClient {
                 total_review_comments,
                 summary_only,
             );
-            self.client.post_pr_review(&options).await?;
+            if is_lgtm && feedback_inputs.no_lgtm {
+                log::debug!("Not posting an approved review because `no-lgtm` is true");
+            } else if options.comments.is_empty() && total_review_comments > 0 {
+                log::info!(
+                    "All review comments were already posted in previous reviews; not posting a new review."
+                );
+            } else {
+                self.client.post_pr_review(&options).await?;
+            }
         } else {
             for file in files {
                 let file = file
@@ -348,7 +358,10 @@ impl RestClient {
                 for note in &tidy_advice.notes {
                     let path = file.name.to_string_lossy().replace('\\', "/");
                     if note.filename == path {
-                        let title = format!("{}:{}:{}", note.filename, note.line, note.cols);
+                        let title = format!(
+                            "{}:{}:{} [{}]",
+                            note.filename, note.line, note.cols, note.diagnostic
+                        );
                         let annotation = FileAnnotation {
                             severity: match note.severity.as_str() {
                                 "warning" => AnnotationLevel::Warning,
@@ -356,10 +369,11 @@ impl RestClient {
                                 _ => AnnotationLevel::Notice, // default to notice for all else
                             },
                             path,
-                            start_line: None,
+                            // `line` is required to anchor the annotation to a line in the file
+                            start_line: Some(note.line as usize),
                             end_line: Some(note.line as usize),
-                            start_column: None,
-                            end_column: Some(note.cols as usize),
+                            start_column: Some(note.cols as usize),
+                            end_column: None,
                             title: Some(title),
                             message: note.rationale.clone(),
                         };
@@ -524,7 +538,7 @@ fn make_tidy_comment(
     remaining_length: &mut u64,
 ) -> Result<(), ClientError> {
     let opener = format!(
-        "\n<details><summary>clang-tidy (v{version_used}) reports: {tidy_checks_failed}<strong> concern(s)</strong></summary>\n\n"
+        "\n<details><summary>clang-tidy (v{version_used}) reports: <strong>{tidy_checks_failed} concern(s)</strong></summary>\n\n"
     );
     let mut show_fix_explanation = false;
     let mut tidy_comment = String::new();
@@ -797,6 +811,26 @@ mod test {
             annotations
                 .iter()
                 .all(|a| matches!(a.severity, AnnotationLevel::Notice))
+        );
+    }
+
+    #[test]
+    fn tidy_annotation_points_to_line() {
+        let annotations =
+            RestClient::make_annotations(&make_dummy_files("warning"), "llvm").unwrap();
+        let tidy = annotations
+            .iter()
+            .find(|a| matches!(a.severity, AnnotationLevel::Warning))
+            .unwrap();
+        assert_eq!(tidy.start_line, Some(1));
+        assert_eq!(tidy.start_column, Some(1));
+        assert_eq!(
+            tidy.title.as_deref(),
+            Some("tests/demo/demo.cpp:1:1 [clang-diagnostic-error]")
+        );
+        assert!(
+            tidy.fmt_github()
+                .starts_with("::warning file=tests/demo/demo.cpp,line=1,col=1,")
         );
     }
 

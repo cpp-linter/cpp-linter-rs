@@ -191,7 +191,9 @@ fn parse_tidy_output(
                     for unit in db_json {
                         let unit_path =
                             PathBuf::from_iter([unit.directory.as_str(), unit.file.as_str()]);
-                        if unit_path == filename {
+                        // clang-tidy may report the path as it is written in the database
+                        // (relative to the unit's directory) or joined with the directory.
+                        if unit_path == filename || Path::new(&unit.file) == filename {
                             filename =
                                 normalize_path(&PathBuf::from_iter([&unit.directory, &unit.file]));
                             found_unit = true;

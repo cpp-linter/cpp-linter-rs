@@ -6,7 +6,13 @@ use cpp_linter::{
 };
 use git_bot_feedback::LinesChangedOnly;
 use mockito::Matcher;
-use std::{env, io::Write, path::Path};
+use serde_json::json;
+use std::{
+    env,
+    io::Write,
+    path::Path,
+    sync::{Arc, Mutex},
+};
 use tempfile::{NamedTempFile, TempDir};
 
 mod common;
@@ -35,6 +41,8 @@ struct TestParams {
     pub fail_posting: bool,
     pub bad_pr_info: bool,
     pub bad_existing_reviews: bool,
+    /// A GraphQL response listing review threads from a previous run.
+    pub previous_review: Option<String>,
 }
 
 impl Default for TestParams {
@@ -53,11 +61,13 @@ impl Default for TestParams {
             fail_posting: false,
             bad_pr_info: false,
             bad_existing_reviews: false,
+            previous_review: None,
         }
     }
 }
 
-async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
+/// Returns the body of the posted PR review (if any).
+async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) -> Option<String> {
     let mut event_payload_path = NamedTempFile::new_in("./").unwrap();
     let event_payload = if test_params.bad_pr_info {
         "".to_string()
@@ -85,7 +95,8 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
         env::set_var("GITHUB_TOKEN", TOKEN);
         env::set_var("CI", "true");
         if test_params.summary_only {
-            env::set_var("CPP_LINTER_PR_REVIEW_SUMMARY_ONLY", "true");
+            // the value is case-insensitive
+            env::set_var("CPP_LINTER_PR_REVIEW_SUMMARY_ONLY", "True");
         }
         env::set_var("GITHUB_EVENT_PATH", event_payload_path.path());
     }
@@ -139,11 +150,23 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
         }
         mocks.push(mock);
     }
-    if !test_params.fail_get_existing_reviews
+    if let Some(previous_review) = &test_params.previous_review {
+        mocks.push(
+            server
+                .mock("POST", "/graphql")
+                .match_body(Matcher::Regex("reviewThreads".to_string()))
+                .match_header("Authorization", format!("token {TOKEN}").as_str())
+                .with_header(REMAINING_RATE_LIMIT_HEADER, "50")
+                .with_header(RESET_RATE_LIMIT_HEADER, reset_timestamp.as_str())
+                .with_body(previous_review)
+                .create(),
+        );
+    } else if !test_params.fail_get_existing_reviews
         && !test_params.bad_existing_reviews
         && test_params.pr_state != "closed"
         && !test_params.bad_pr_info
     {
+        // the previous review is outdated (not reused), so it gets dismissed
         mocks.push(
             server
                 .mock(
@@ -159,8 +182,17 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
         );
     }
 
+    let posted_review = Arc::new(Mutex::new(None));
     let lgtm_allowed = !test_params.force_lgtm || !test_params.no_lgtm;
-    if lgtm_allowed
+    if test_params.previous_review.is_some() {
+        // all suggestions were reused, so a new review is not posted
+        mocks.push(
+            server
+                .mock("POST", reviews_endpoint.as_str())
+                .expect(0)
+                .create(),
+        );
+    } else if lgtm_allowed
         && !test_params.pr_draft
         && test_params.pr_state == "open"
         && !test_params.bad_pr_info
@@ -197,14 +229,27 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
                 ".+"
             }
         );
+        let captured = posted_review.clone();
         mocks.push(
             server
                 .mock("POST", reviews_endpoint.as_str())
                 .match_body(Matcher::Regex(expected_review_payload))
+                .with_body_from_request(move |req| {
+                    *captured.lock().unwrap() = Some(req.utf8_lossy_body().unwrap().to_string());
+                    vec![]
+                })
                 .match_header("Authorization", format!("token {TOKEN}").as_str())
                 .with_header(REMAINING_RATE_LIMIT_HEADER, "50")
                 .with_header(RESET_RATE_LIMIT_HEADER, reset_timestamp.as_str())
                 .with_status(if test_params.fail_posting { 403 } else { 200 })
+                .create(),
+        );
+    } else if !lgtm_allowed && test_params.pr_state == "open" && !test_params.bad_pr_info {
+        // `--no-lgtm` means an approving review is not posted at all
+        mocks.push(
+            server
+                .mock("POST", reviews_endpoint.as_str())
+                .expect(0)
                 .create(),
         );
     }
@@ -255,13 +300,60 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
     for mock in mocks {
         mock.assert();
     }
+    posted_review.lock().unwrap().take()
 }
 
-async fn test_review(test_params: &TestParams) {
+async fn test_review(test_params: &TestParams) -> Option<String> {
     let tmp_dir = create_test_space(true);
     let lib_root = env::current_dir().unwrap();
-    setup(&lib_root, &tmp_dir, test_params).await;
+    let posted_review = setup(&lib_root, &tmp_dir, test_params).await;
     drop(tmp_dir);
+    posted_review
+}
+
+/// Make a GraphQL response that lists the comments of a `posted_review`
+/// as unresolved review threads of the first review in pr_reviews.json.
+fn as_previous_review(posted_review: &str) -> String {
+    let review: serde_json::Value = serde_json::from_str(posted_review).unwrap();
+    let existing_reviews: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(format!("{MOCK_ASSETS_PATH}pr_reviews.json")).unwrap(),
+    )
+    .unwrap();
+    let review_id = &existing_reviews[0]["node_id"];
+    let threads = review["comments"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .enumerate()
+        .map(|(i, comment)| {
+            json!({
+                "id": format!("thread_{i}"),
+                "isResolved": false,
+                "isCollapsed": false,
+                "comments": {
+                    "nodes": [{
+                        "id": format!("comment_{i}"),
+                        "body": comment["body"],
+                        "path": comment["path"],
+                        "line": comment["line"],
+                        "startLine": comment["start_line"],
+                        "originalLine": comment["line"],
+                        "originalStartLine": comment["start_line"],
+                        "pullRequestReview": {"id": review_id, "isMinimized": false},
+                    }],
+                    "pageInfo": {"hasNextPage": false, "endCursor": null},
+                },
+            })
+        })
+        .collect::<Vec<_>>();
+    assert!(!threads.is_empty());
+    json!({
+        "data": {"repository": {"pullRequest": {"reviewThreads": {
+            "nodes": threads,
+            "pageInfo": {"hasNextPage": false, "endCursor": null},
+        }}}}
+    })
+    .to_string()
 }
 
 #[tokio::test]
@@ -405,6 +497,22 @@ async fn bad_pr_info() {
         lines_changed_only: LinesChangedOnly::Off,
         force_lgtm: true,
         bad_pr_info: true,
+        ..Default::default()
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn all_suggestions_reused() {
+    let posted_review = test_review(&TestParams {
+        lines_changed_only: LinesChangedOnly::Off,
+        ..Default::default()
+    })
+    .await
+    .expect("Expected a PR review to be posted");
+    test_review(&TestParams {
+        lines_changed_only: LinesChangedOnly::Off,
+        previous_review: Some(as_previous_review(&posted_review)),
         ..Default::default()
     })
     .await;

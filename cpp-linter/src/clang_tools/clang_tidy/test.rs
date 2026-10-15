@@ -299,6 +299,16 @@ fn parse_with_database_units() {
     assert_eq!(notes[0].filename, "demo.cpp");
     // path of a file not in the database is also made relative to the repo root
     assert_eq!(notes[1].filename, "unknown.cpp");
+
+    // clang-tidy can also report the path exactly as written in the database (eg. meson)
+    let notes = parse_tidy_output(
+        b"../demo.cpp:1:1: warning: some rationale [modernize-use-auto]\n",
+        &database_json,
+        &env::current_dir().unwrap(),
+    )
+    .unwrap();
+    assert_eq!(notes.len(), 1);
+    assert_eq!(notes[0].filename, "demo.cpp");
 }
 
 fn make_clang_params(
