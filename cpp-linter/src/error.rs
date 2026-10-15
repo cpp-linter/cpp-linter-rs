@@ -152,6 +152,28 @@ pub enum ClangCaptureError {
         source: std::io::Error,
     },
 
+    /// Error when failing to remove a file.
+    #[error("Failed to remove file '{file_name}': {source}")]
+    RemoveFileFailed {
+        /// The name of the file that failed to be removed.
+        file_name: String,
+
+        /// The underlying error from trying to remove the file.
+        #[source]
+        source: std::io::Error,
+    },
+
+    /// Error when failing to parse the fixes exported by clang-tidy (`--export-fixes`).
+    #[error("Failed to parse clang-tidy fixes exported to '{file_name}': {source}")]
+    ParseFixesFailed {
+        /// The name of the YAML file that failed to be parsed.
+        file_name: String,
+
+        /// The underlying error from trying to parse the YAML.
+        #[source]
+        source: Box<serde_saphyr::Error>,
+    },
+
     /// Error when failing to compile a regular expression pattern.
     #[error("Failed to compile regular expression: {0}")]
     RegexError(#[from] regex::Error),
