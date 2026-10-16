@@ -202,7 +202,13 @@ pub fn run_clang_format(
         file.patched_path = Some(cache_format_fixes);
     }
 
-    if clang_params.fix && !format_advice.replacements.is_empty() {
+    if clang_params.fix && !format_advice.replacements.is_empty() && !output.status.success() {
+        // The output of a failed clang-format is not a formatted file.
+        logs.push((
+            Level::Error,
+            format!("Not applying clang-format fixes to {file_name}: clang-format failed"),
+        ));
+    } else if clang_params.fix && !format_advice.replacements.is_empty() {
         // Like `clang-format -i` with the same `--lines`, but reuse the output we already have.
         let file_path = clang_params.repo_root.join(&file.name);
         fs::write(&file_path, &output.stdout).map_err(|e| ClangCaptureError::WriteFileFailed {
@@ -440,6 +446,25 @@ mod tests {
                 fs::read_to_string("tests/demo/demo.cpp").unwrap()
             );
             assert!(!logs.iter().any(|(_, msg)| msg.starts_with("Applied")));
+        }
+
+        #[test]
+        fn fix_skipped_when_clang_format_fails() {
+            let tmp_workspace = setup_tmp_workspace();
+            let tools_dir = tempfile::tempdir().unwrap();
+            let fake_format = make_fake_tool(tools_dir.path(), "clang-format", "exit 1");
+            let clang_params = ClangParams {
+                fix: true,
+                ..make_clang_params(tmp_workspace.path(), fake_format)
+            };
+            let file = Mutex::new(FileObj::new(PathBuf::from("demo/demo.cpp")));
+            let logs = run_clang_format(&mut file.lock().unwrap(), &clang_params).unwrap();
+            assert_eq!(
+                fs::read_to_string(tmp_workspace.path().join("demo/demo.cpp")).unwrap(),
+                fs::read_to_string("tests/demo/demo.cpp").unwrap()
+            );
+            assert!(logs.iter().any(|(level, msg)| *level == log::Level::Error
+                && msg == "Not applying clang-format fixes to demo/demo.cpp: clang-format failed"));
         }
 
         #[test]

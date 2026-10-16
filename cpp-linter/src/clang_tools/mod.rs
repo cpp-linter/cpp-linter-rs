@@ -182,7 +182,8 @@ pub async fn capture_clang_tools_output(
     let spawn = |executors: &mut JoinSet<_>, file: &Arc<Mutex<FileObj>>| {
         let arc_file = file.clone();
         let arc_params = arc_params.clone();
-        executors.spawn(async move { analyze_single_file(arc_file, arc_params) });
+        // the clang tools are run synchronously, so keep them off the async worker threads
+        executors.spawn_blocking(move || analyze_single_file(arc_file, arc_params));
     };
     // iterate over the discovered files and run the clang tools,
     // starting the next file whenever one is done
