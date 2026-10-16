@@ -225,11 +225,6 @@ pub struct ClangParams {
 
     /// Apply clang-format fixes to the analyzed files?
     pub fix: bool,
-
-    /// The maximum number of files to analyze at the same time.
-    ///
-    /// `0` means the number of available CPU cores.
-    pub jobs: usize,
 }
 
 impl ClangParams {
@@ -292,7 +287,6 @@ impl From<&Cli> for ClangParams {
             format_filter,
             repo_root,
             fix: args.format_options.fix,
-            jobs: args.general_options.jobs,
         }
     }
 }

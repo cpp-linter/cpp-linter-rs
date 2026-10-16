@@ -164,38 +164,16 @@ pub async fn capture_clang_tools_output(
         }
     };
 
-    let jobs = match clang_params.jobs {
-        0 => match std::thread::available_parallelism() {
-            Ok(n) => n.get(),
-            Err(e) => {
-                log::warn!(
-                    "Analyzing one file at a time: the number of CPU cores is unknown ({e})"
-                );
-                1
-            }
-        },
-        jobs => jobs,
-    };
-    log::debug!("Analyzing up to {jobs} file(s) at the same time");
     let mut executors = JoinSet::new();
     let arc_params = Arc::new(clang_params);
-    let spawn = |executors: &mut JoinSet<_>, file: &Arc<Mutex<FileObj>>| {
+    // iterate over the discovered files and run the clang tools
+    for file in files {
         let arc_file = file.clone();
         let arc_params = arc_params.clone();
-        // the clang tools are run synchronously, so keep them off the async worker threads
-        executors.spawn_blocking(move || analyze_single_file(arc_file, arc_params));
-    };
-    // iterate over the discovered files and run the clang tools,
-    // starting the next file whenever one is done
-    let mut pending = files.iter();
-    for file in pending.by_ref().take(jobs) {
-        spawn(&mut executors, file);
+        executors.spawn(async move { analyze_single_file(arc_file, arc_params) });
     }
 
     while let Some(output) = executors.join_next().await {
-        if let Some(file) = pending.next() {
-            spawn(&mut executors, file);
-        }
         // output?? acts as a fast-fail for any error encountered.
         // This includes any `spawn()` error and any `analyze_single_file()` error.
         // Any unresolved tasks are aborted and dropped when an error is returned here.
