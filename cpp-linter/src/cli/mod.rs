@@ -137,21 +137,6 @@ pub struct GeneralOptions {
     )]
     pub verbosity: Verbosity,
 
-    /// The number of files to analyze at the same time.
-    ///
-    /// If this is less than or equal to `0`, then all available
-    /// CPU cores are used.
-    #[arg(
-        short = 'j',
-        long,
-        default_value = "0",
-        allow_negative_numbers = true,
-        value_parser = parse_jobs,
-        help_heading = "General options",
-        verbatim_doc_comment,
-    )]
-    pub jobs: usize,
-
     /// Whether to use the system's available package managers.
     ///
     /// By default, this matches the value of a CI environment variable.
@@ -614,18 +599,6 @@ pub struct FeedbackOptions {
     pub passive_reviews: bool,
 }
 
-/// Parses the value of the `--jobs` option.
-///
-/// A value less than or equal to `0` becomes `0`, which means all available CPU cores.
-#[cfg(feature = "bin")]
-fn parse_jobs(val: &str) -> Result<usize, String> {
-    let jobs = val
-        .trim()
-        .parse::<i64>()
-        .map_err(|_| format!("invalid number of jobs: {val:?}"))?;
-    usize::try_from(jobs.max(0)).map_err(|_| format!("too many jobs: {val:?}"))
-}
-
 /// Parses a single value of the `--extensions` option.
 ///
 /// Surrounding whitespace and a leading `.` are removed.
@@ -757,18 +730,6 @@ mod test {
         ]);
         let extra_args = convert_extra_arg_val(&args.tidy_options.extra_arg);
         assert_eq!(extra_args, ["-std=c++17", "-Wall"]);
-    }
-
-    #[test]
-    fn jobs() {
-        let args = Cli::parse_from(vec!["cpp-linter"]);
-        assert_eq!(args.general_options.jobs, 0);
-        let args = Cli::parse_from(vec!["cpp-linter", "-j", "4"]);
-        assert_eq!(args.general_options.jobs, 4);
-        // a negative number means all CPU cores, like 0
-        let args = Cli::parse_from(vec!["cpp-linter", "--jobs", "-1"]);
-        assert_eq!(args.general_options.jobs, 0);
-        assert!(Cli::try_parse_from(vec!["cpp-linter", "-j", "many"]).is_err());
     }
 
     #[test]
