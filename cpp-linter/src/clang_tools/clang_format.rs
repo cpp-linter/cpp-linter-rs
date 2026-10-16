@@ -115,7 +115,7 @@ pub fn run_clang_format(
         }
     })?;
     let (diff, _) = make_patch(&patched_contents, &original_contents);
-    let format_advice = FormatAdvice {
+    let mut format_advice = FormatAdvice {
         replacements: diff
             .hunks()
             .filter_map(|hunk| {
@@ -200,6 +200,21 @@ pub fn run_clang_format(
             }
         })?;
         file.patched_path = Some(cache_format_fixes);
+    }
+
+    if clang_params.fix && !format_advice.replacements.is_empty() {
+        // Like `clang-format -i` with the same `--lines`, but reuse the output we already have.
+        let file_path = clang_params.repo_root.join(&file.name);
+        fs::write(&file_path, &output.stdout).map_err(|e| ClangCaptureError::WriteFileFailed {
+            file_name: file_path.to_string_lossy().to_string(),
+            source: e,
+        })?;
+        logs.push((
+            Level::Info,
+            format!("Applied clang-format fixes to {file_name}"),
+        ));
+        // The file is now formatted, so it has no format issues to report.
+        format_advice = FormatAdvice::default();
     }
 
     file.format_advice = Some(format_advice);
@@ -378,6 +393,53 @@ mod tests {
             let file = Mutex::new(FileObj::new(PathBuf::from("demo/demo.cpp")));
             let err = run_clang_format(&mut file.lock().unwrap(), &clang_params).unwrap_err();
             assert!(matches!(err, ClangCaptureError::NonUtf8Output { .. }));
+        }
+
+        #[test]
+        fn fix_writes_formatted_file() {
+            let tmp_workspace = setup_tmp_workspace();
+            let tools_dir = tempfile::tempdir().unwrap();
+            let fake_format = make_fake_tool(tools_dir.path(), "clang-format", "echo formatted");
+            let clang_params = ClangParams {
+                fix: true,
+                ..make_clang_params(tmp_workspace.path(), fake_format)
+            };
+            let file = Mutex::new(FileObj::new(PathBuf::from("demo/demo.cpp")));
+            let mut file = file.lock().unwrap();
+            let logs = run_clang_format(&mut file, &clang_params).unwrap();
+            assert_eq!(
+                fs::read_to_string(tmp_workspace.path().join("demo/demo.cpp")).unwrap(),
+                "formatted\n"
+            );
+            // the formatted file has no format issues to report
+            assert_eq!(file.format_advice, Some(Default::default()));
+            assert!(
+                logs.iter()
+                    .any(|(_, msg)| msg == "Applied clang-format fixes to demo/demo.cpp")
+            );
+        }
+
+        #[test]
+        fn fix_leaves_formatted_file() {
+            let tmp_workspace = setup_tmp_workspace();
+            let tools_dir = tempfile::tempdir().unwrap();
+            // output the given file (the last argument) unchanged
+            let fake_format = make_fake_tool(
+                tools_dir.path(),
+                "clang-format",
+                r#"for f; do :; done; cat "$f""#,
+            );
+            let clang_params = ClangParams {
+                fix: true,
+                ..make_clang_params(tmp_workspace.path(), fake_format)
+            };
+            let file = Mutex::new(FileObj::new(PathBuf::from("demo/demo.cpp")));
+            let logs = run_clang_format(&mut file.lock().unwrap(), &clang_params).unwrap();
+            assert_eq!(
+                fs::read_to_string(tmp_workspace.path().join("demo/demo.cpp")).unwrap(),
+                fs::read_to_string("tests/demo/demo.cpp").unwrap()
+            );
+            assert!(!logs.iter().any(|(_, msg)| msg.starts_with("Applied")));
         }
 
         #[test]

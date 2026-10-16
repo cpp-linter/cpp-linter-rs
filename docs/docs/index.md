@@ -1,7 +1,7 @@
 <!-- markdownlint-disable MD041 MD053 -->
 
 [file-annotations]: cli.md#-a-file-annotations
-[thread-comments]: cli.md#-g-thread-comments
+[thread-comments]: cli.md#-t-thread-comments
 [step-summary]: cli.md#-w-step-summary
 [pr-review]: cli.md#-p-pr-review
 [other-licenses]: other-licenses.md

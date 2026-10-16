@@ -12,6 +12,8 @@ inputs:
     minimum-version: '1.4.6'
   verbosity:
     minimum-version: '1.3.0'
+  jobs:
+    minimum-version: '1.8.0'
   lines-changed-only:
     minimum-version: '1.5.0'
     required-permission: 'contents: read #file-changes'
@@ -24,6 +26,8 @@ inputs:
     minimum-version: '1.9.0'
   ignore-format:
     minimum-version: '1.9.0'
+  fix:
+    minimum-version: '1.14.0'
   thread-comments:
     minimum-version: '1.6.1'
     required-permission: 'contents: write #thread-comments'
