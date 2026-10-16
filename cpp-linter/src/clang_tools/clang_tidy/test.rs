@@ -140,6 +140,7 @@ fn use_extra_args() {
         clang_tidy_command: Some(exe_path),
         clang_format_command: None,
         repo_root: tmp_workspace.path().to_path_buf(),
+        ..Default::default()
     };
     let mut file_lock = arc_file.lock().unwrap();
     fs::create_dir_all(clang_params.get_cache_path()).unwrap();

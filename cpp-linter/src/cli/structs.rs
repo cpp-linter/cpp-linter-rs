@@ -222,6 +222,14 @@ pub struct ClangParams {
     ///
     /// A project-specific cache folder is created in this path.
     pub repo_root: PathBuf,
+
+    /// Apply clang-format fixes to the analyzed files?
+    pub fix: bool,
+
+    /// The maximum number of files to analyze at the same time.
+    ///
+    /// `0` means the number of available CPU cores.
+    pub jobs: usize,
 }
 
 impl ClangParams {
@@ -283,6 +291,8 @@ impl From<&Cli> for ClangParams {
             tidy_filter,
             format_filter,
             repo_root,
+            fix: args.format_options.fix,
+            jobs: args.general_options.jobs,
         }
     }
 }

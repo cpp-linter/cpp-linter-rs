@@ -1,7 +1,7 @@
 <!-- markdownlint-disable MD041 -->
 
 [file-annotations]: https://cpp-linter.github.io/cpp-linter-rs/cli#-a-file-annotations
-[thread-comments]: https://cpp-linter.github.io/cpp-linter-rs/cli#-g-thread-comments
+[thread-comments]: https://cpp-linter.github.io/cpp-linter-rs/cli#-t-thread-comments
 [step-summary]: https://cpp-linter.github.io/cpp-linter-rs/cli#-w-step-summary
 [pr-review]: https://cpp-linter.github.io/cpp-linter-rs/cli#-p-pr-review
 [other-licenses]: https://cpp-linter.github.io/cpp-linter-rs/other-licenses
