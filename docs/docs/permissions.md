@@ -51,7 +51,7 @@ the repository is not checked out before running cpp-linter.
 
 ## Thread Comments
 
-The [`--thread-comments`](cli.md#-g-thread-comments) feature requires the following permissions:
+The [`--thread-comments`](cli.md#-t-thread-comments) feature requires the following permissions:
 
 ### Push
 

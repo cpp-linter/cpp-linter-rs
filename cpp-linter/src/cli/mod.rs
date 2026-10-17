@@ -456,7 +456,7 @@ pub struct FeedbackOptions {
     /// > See [Authenticating with the `GITHUB_TOKEN`](
     /// > https://docs.github.com/en/actions/reference/authentication-in-a-workflow).
     #[cfg_attr(feature = "bin", arg(
-        short = 'g',
+        short = 't',
         long,
         default_value = "false",
         default_missing_value = "update",
@@ -471,10 +471,10 @@ pub struct FeedbackOptions {
     /// thread comment that basically says 'Looks Good To Me' (when all checks pass).
     ///
     /// > [!IMPORTANT]
-    /// > The [`--thread-comments`](#-g-thread-comments)
+    /// > The [`--thread-comments`](#-t-thread-comments)
     /// > option also notes further implications.
     #[cfg_attr(feature = "bin", arg(
-        short = 't',
+        short = 'g',
         long,
         default_value_t = true,
         action = ArgAction::Set,
@@ -637,7 +637,7 @@ pub fn convert_extra_arg_val(args: &[String]) -> Vec<String> {
 mod test {
     #![allow(clippy::unwrap_used)]
 
-    use super::{Cli, convert_extra_arg_val};
+    use super::{Cli, ThreadComments, convert_extra_arg_val};
     use clap::Parser;
 
     #[test]
@@ -709,6 +709,14 @@ mod test {
         ]);
         let extra_args = convert_extra_arg_val(&args.tidy_options.extra_arg);
         assert_eq!(extra_args, ["-std=c++17", "-Wall"]);
+    }
+
+    #[test]
+    fn short_feedback_flags() {
+        // same as cpp-linter v1
+        let args = Cli::parse_from(vec!["cpp-linter", "-t", "true", "-g", "false"]);
+        assert_eq!(args.feedback_options.thread_comments, ThreadComments::On);
+        assert!(!args.feedback_options.no_lgtm);
     }
 
     #[test]
