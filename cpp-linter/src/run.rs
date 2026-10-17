@@ -319,29 +319,6 @@ pub(crate) mod test {
     }
 
     #[tokio::test]
-    async fn fix_format() {
-        let tmp_gh_out = setup_tmp_gh_out_path();
-        let tmp_workspace = setup_tmp_workspace();
-        let demo = tmp_workspace.path().join("demo/demo.cpp");
-        let original = std::fs::read_to_string(&demo).unwrap();
-        run_main(vec![
-            "cpp-linter".to_string(),
-            "-l".to_string(),
-            "false".to_string(),
-            "--tidy-checks=-*".to_string(),
-            "--fix".to_string(),
-            "--repo-root".to_string(),
-            tmp_workspace.path().to_str().unwrap().to_string(),
-            "demo/demo.cpp".to_string(),
-        ])
-        .await
-        .unwrap();
-        // demo.cpp does not conform to the default (llvm) style
-        assert_ne!(std::fs::read_to_string(&demo).unwrap(), original);
-        drop(tmp_gh_out);
-    }
-
-    #[tokio::test]
     async fn no_version_input() {
         let tmp_gh_out = setup_tmp_gh_out_path();
         let tmp_workspace = setup_tmp_workspace();

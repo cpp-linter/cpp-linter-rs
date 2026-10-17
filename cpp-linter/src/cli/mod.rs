@@ -354,27 +354,6 @@ pub struct FormatOptions {
         )
     )]
     pub ignore_format: Option<Vec<String>>,
-
-    /// Apply clang-format fixes to the analyzed files.
-    ///
-    /// Only the lines selected by
-    /// [`--lines-changed-only`](#-l-lines-changed-only) are formatted.
-    /// Formatted files are not reported as having format issues.
-    ///
-    /// > [!NOTE]
-    /// > This only applies to clang-format.
-    /// > Fixes suggested by clang-tidy are not applied.
-    #[cfg_attr(
-        feature = "bin",
-        arg(
-            short = 'F',
-            long,
-            action = ArgAction::SetTrue,
-            help_heading = "Clang-format options",
-            verbatim_doc_comment,
-        )
-    )]
-    pub fix: bool,
 }
 
 /// A struct to describe the CLI's clang-tidy options.
@@ -730,18 +709,6 @@ mod test {
         ]);
         let extra_args = convert_extra_arg_val(&args.tidy_options.extra_arg);
         assert_eq!(extra_args, ["-std=c++17", "-Wall"]);
-    }
-
-    #[test]
-    fn fix_flag() {
-        let args = Cli::parse_from(vec!["cpp-linter"]);
-        assert!(!args.format_options.fix);
-        let args = Cli::parse_from(vec!["cpp-linter", "--fix"]);
-        assert!(args.format_options.fix);
-        // like cpp-linter v1, the flag takes no value, so a file can follow it
-        let args = Cli::parse_from(vec!["cpp-linter", "-F", "src/demo.cpp"]);
-        assert!(args.format_options.fix);
-        assert_eq!(args.not_ignored.unwrap(), ["src/demo.cpp"]);
     }
 
     #[test]
