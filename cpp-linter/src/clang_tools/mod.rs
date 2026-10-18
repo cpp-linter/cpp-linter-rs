@@ -3,7 +3,6 @@
 
 use std::{
     fs,
-    path::PathBuf,
     sync::{Arc, Mutex},
 };
 
@@ -25,61 +24,110 @@ use crate::{
 pub mod clang_format;
 use clang_format::run_clang_format;
 pub mod clang_tidy;
-use clang_tidy::run_clang_tidy;
+use clang_tidy::{
+    other_files::{TidyFixes, apply_other_file_fixes},
+    run_clang_tidy,
+};
 
-/// This creates a task to run clang-tidy and clang-format on a single file.
+/// A collection of cached logs: a [`Vec`] of tuples that hold
+/// - log level
+/// - messages
+type Logs = Vec<(log::Level, String)>;
+
+/// Run clang-tidy on a single file.
 ///
-/// Returns a Future that infallibly resolves to a 2-tuple that contains
-///
-/// 1. The file's path.
-/// 2. A collections of cached logs. A [`Vec`] of tuples that hold
-///    - log level
-///    - messages
-fn analyze_single_file(
+/// Returns the cached logs and the fixes that clang-tidy suggested (if it was run).
+fn analyze_tidy(
     file: Arc<Mutex<FileObj>>,
     clang_params: Arc<ClangParams>,
-) -> Result<(PathBuf, Vec<(log::Level, String)>), ClangCaptureError> {
+) -> Result<(Logs, Option<TidyFixes>), ClangCaptureError> {
     let mut file = file.lock().map_err(|_| ClangCaptureError::MutexPoisoned)?;
-    let mut logs = vec![];
-    if clang_params.clang_tidy_command.is_some() {
-        if clang_params
-            .tidy_filter
-            .as_ref()
-            .is_some_and(|f| f.is_qualified(file.name.as_path()))
-            || clang_params.tidy_filter.is_none()
-        {
-            let tidy_result = run_clang_tidy(&mut file, &clang_params)?;
-            logs.extend(tidy_result);
-        } else {
-            logs.push((
-                log::Level::Info,
-                format!(
-                    "{} not scanned by clang-tidy due to `--ignore-tidy`",
-                    file.name.as_os_str().to_string_lossy()
-                ),
-            ));
+    if clang_params.clang_tidy_command.is_none() {
+        return Ok((vec![], None));
+    }
+    if clang_params
+        .tidy_filter
+        .as_ref()
+        .is_some_and(|f| !f.is_qualified(file.name.as_path()))
+    {
+        let msg = format!(
+            "{} not scanned by clang-tidy due to `--ignore-tidy`",
+            file.name.as_os_str().to_string_lossy()
+        );
+        return Ok((vec![(log::Level::Info, msg)], None));
+    }
+    let (logs, fixes) = run_clang_tidy(&mut file, &clang_params)?;
+    Ok((logs, Some(fixes)))
+}
+
+/// Run clang-format on a single file.
+///
+/// This must happen after all clang-tidy fixes for the `file` are cached
+/// (see [`apply_other_file_fixes()`]), because clang-format also formats those fixes.
+fn analyze_format(
+    file: Arc<Mutex<FileObj>>,
+    clang_params: Arc<ClangParams>,
+) -> Result<Logs, ClangCaptureError> {
+    let mut file = file.lock().map_err(|_| ClangCaptureError::MutexPoisoned)?;
+    if clang_params.clang_format_command.is_none() {
+        return Ok(vec![]);
+    }
+    if clang_params
+        .format_filter
+        .as_ref()
+        .is_some_and(|f| !f.is_qualified(file.name.as_path()))
+    {
+        let msg = format!(
+            "{} not scanned by clang-format due to `--ignore-format`",
+            file.name.as_os_str().to_string_lossy()
+        );
+        return Ok(vec![(log::Level::Info, msg)]);
+    }
+    run_clang_format(&mut file, &clang_params)
+}
+
+/// Run clang-tidy and then clang-format on all `files`.
+///
+/// Files are analyzed in parallel. clang-format only runs after clang-tidy analyzed
+/// all files, so that clang-tidy fixes for other analyzed files (eg. a header) are
+/// cached first; see [`apply_other_file_fixes()`].
+///
+/// Returns the cached logs for each file (in the same order as `files`).
+async fn analyze_files(
+    files: &[Arc<Mutex<FileObj>>],
+    clang_params: Arc<ClangParams>,
+) -> Result<Vec<Logs>, ClangTaskError> {
+    let mut logs = vec![Logs::new(); files.len()];
+
+    let mut executors = JoinSet::new();
+    for (index, file) in files.iter().enumerate() {
+        let (file, params) = (file.clone(), clang_params.clone());
+        executors.spawn(async move { (index, analyze_tidy(file, params)) });
+    }
+    let mut tidy_fixes = vec![];
+    while let Some(output) = executors.join_next().await {
+        // output? acts as a fast-fail for any `spawn()` error,
+        // and result? does the same for any `analyze_tidy()` error.
+        // Any unresolved tasks are aborted and dropped when an error is returned here.
+        let (index, result) = output?;
+        let (file_logs, fixes) = result?;
+        logs[index].extend(file_logs);
+        if let Some(fixes) = fixes {
+            tidy_fixes.push((index, fixes));
         }
     }
-    if clang_params.clang_format_command.is_some() {
-        if clang_params
-            .format_filter
-            .as_ref()
-            .is_some_and(|f| f.is_qualified(file.name.as_path()))
-            || clang_params.format_filter.is_none()
-        {
-            let format_result = run_clang_format(&mut file, &clang_params)?;
-            logs.extend(format_result);
-        } else {
-            logs.push((
-                log::Level::Info,
-                format!(
-                    "{} not scanned by clang-format due to `--ignore-format`",
-                    file.name.as_os_str().to_string_lossy()
-                ),
-            ));
-        }
+    apply_other_file_fixes(files, &tidy_fixes, &clang_params, &mut logs)?;
+
+    let mut executors = JoinSet::new();
+    for (index, file) in files.iter().enumerate() {
+        let (file, params) = (file.clone(), clang_params.clone());
+        executors.spawn(async move { (index, analyze_format(file, params)) });
     }
-    Ok((file.name.clone(), logs))
+    while let Some(output) = executors.join_next().await {
+        let (index, result) = output?;
+        logs[index].extend(result?);
+    }
+    Ok(logs)
 }
 
 /// A struct to contain the version numbers of the clang-tools used
@@ -164,20 +212,13 @@ pub async fn capture_clang_tools_output(
         }
     };
 
-    let mut executors = JoinSet::new();
-    let arc_params = Arc::new(clang_params);
-    // iterate over the discovered files and run the clang tools
-    for file in files {
-        let arc_file = file.clone();
-        let arc_params = arc_params.clone();
-        executors.spawn(async move { analyze_single_file(arc_file, arc_params) });
-    }
-
-    while let Some(output) = executors.join_next().await {
-        // output?? acts as a fast-fail for any error encountered.
-        // This includes any `spawn()` error and any `analyze_single_file()` error.
-        // Any unresolved tasks are aborted and dropped when an error is returned here.
-        let (file_name, logs) = output??;
+    let logs = analyze_files(files, Arc::new(clang_params)).await?;
+    for (file, logs) in files.iter().zip(logs) {
+        let file_name = file
+            .lock()
+            .map_err(|_| ClangCaptureError::MutexPoisoned)?
+            .name
+            .clone();
         let log_group_name = format!("Analyzing {}", file_name.to_string_lossy());
         rest_api_client.start_log_group(&log_group_name);
         for (level, msg) in logs {
@@ -362,7 +403,10 @@ pub fn make_patch<'buffer>(
 mod tests {
     #![allow(clippy::unwrap_used)]
 
-    use std::{env, fs, path::Path};
+    use std::{
+        env, fs,
+        path::{Path, PathBuf},
+    };
 
     use clang_tools_manager::logger::try_init_logger;
     use git_bot_feedback::ReviewComment;

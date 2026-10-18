@@ -2,7 +2,7 @@
 //! output.
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     env::consts::OS,
     fs,
     path::{Path, PathBuf},
@@ -17,6 +17,9 @@ use serde::Deserialize;
 
 // project-specific modules/crates
 use crate::{cli::ClangParams, common_fs::FileObj, error::ClangCaptureError};
+
+pub mod other_files;
+use other_files::{OtherFileFix, Replacement, TidyFixes};
 
 /// Used to deserialize a json compilation database's translation unit.
 ///
@@ -370,8 +373,9 @@ fn offset_to_line(content: &[u8], offset: usize) -> u32 {
 /// Apply the clang-tidy `fixes` that pertain to the analyzed file onto its `content`.
 ///
 /// Fixes for any other file (eg. a header declaring a function defined in the analyzed
-/// file) are not applied, so nothing outside the analyzed file is ever changed.
-/// Such fixes are noted in the returned logs instead.
+/// file) are not applied here, so nothing outside the analyzed file is ever changed.
+/// They are returned in [`TidyFixes::others`] instead, to be applied (if allowed)
+/// after all files are analyzed; see [`other_files::apply_other_file_fixes()`].
 ///
 /// Each diagnostic's `fixed_lines` (in the original `content`) are recorded in the
 /// matching `notes`.
@@ -381,80 +385,110 @@ fn apply_fixes<'a>(
     content: &[u8],
     notes: &mut [TidyNotification],
     logs: &mut Vec<(log::Level, String)>,
-) -> Vec<u8> {
-    let mut replacements = vec![];
+) -> (Vec<u8>, TidyFixes) {
+    let mut tidy_fixes = TidyFixes::default();
     for diag in &fixes.diagnostics {
-        let msg = &diag.diagnostic_message;
-        let build_dir = diag.build_directory.as_str();
-        let mut fixed_lines = vec![];
-        let mut other_files = HashSet::new();
-        for replacement in &msg.replacements {
-            if let Some(other) = paths.other_file(build_dir, &replacement.file_path) {
-                other_files.insert(other);
-            } else if replacement
-                .offset
-                .checked_add(replacement.length)
-                .is_some_and(|end| end <= content.len())
-            {
-                let line = offset_to_line(content, replacement.offset);
-                if !fixed_lines.contains(&line) {
-                    fixed_lines.push(line);
-                }
-                replacements.push(replacement);
-            } else {
-                logs.push((
-                    log::Level::Warn,
-                    format!(
-                        "Skipping a fix for {} that is out of bounds of {}: {replacement:?}",
-                        diag.diagnostic_name,
-                        paths.target.to_string_lossy(),
-                    ),
-                ));
-            }
+        let fixed_lines = collect_diagnostic_fixes(diag, paths, content, &mut tidy_fixes, logs);
+        if !fixed_lines.is_empty() {
+            record_fixed_lines(diag, paths, content, notes, fixed_lines);
         }
-        for other in other_files {
+    }
+    let patched = patch_content(content, &tidy_fixes.own, paths.target, logs);
+    (patched, tidy_fixes)
+}
+
+/// Sort the replacements of one `diag` into [`TidyFixes::own`] or [`TidyFixes::others`].
+///
+/// Returns the lines (in the analyzed file's `content`) that this diagnostic fixes.
+fn collect_diagnostic_fixes<'a>(
+    diag: &'a ExportedDiagnostic,
+    paths: &mut FixPaths<'a>,
+    content: &[u8],
+    tidy_fixes: &mut TidyFixes,
+    logs: &mut Vec<(log::Level, String)>,
+) -> Vec<u32> {
+    let build_dir = diag.build_directory.as_str();
+    let mut fixed_lines = vec![];
+    for replacement in &diag.diagnostic_message.replacements {
+        if let Some(other) = paths.other_file(build_dir, &replacement.file_path) {
+            tidy_fixes.others.push(OtherFileFix {
+                path: other,
+                diagnostic: diag.diagnostic_name.clone(),
+                replacement: Replacement::from(replacement),
+            });
+        } else if replacement
+            .offset
+            .checked_add(replacement.length)
+            .is_some_and(|end| end <= content.len())
+        {
+            let line = offset_to_line(content, replacement.offset);
+            if !fixed_lines.contains(&line) {
+                fixed_lines.push(line);
+            }
+            tidy_fixes.own.push(Replacement::from(replacement));
+        } else {
             logs.push((
-                log::Level::Info,
+                log::Level::Warn,
                 format!(
-                    "Not applying the fix for {} (reported in {}) to {} because cpp-linter only applies fixes to the analyzed file",
+                    "Skipping a fix for {} that is out of bounds of {}: {replacement:?}",
                     diag.diagnostic_name,
                     paths.target.to_string_lossy(),
-                    other.to_string_lossy(),
                 ),
             ));
         }
-        if fixed_lines.is_empty() {
-            continue;
+    }
+    fixed_lines
+}
+
+/// Record the `fixed_lines` of a `diag` in the notification (parsed from stdout)
+/// that matches it.
+fn record_fixed_lines<'a>(
+    diag: &'a ExportedDiagnostic,
+    paths: &mut FixPaths<'a>,
+    content: &[u8],
+    notes: &mut [TidyNotification],
+    fixed_lines: Vec<u32>,
+) {
+    let msg = &diag.diagnostic_message;
+    let (diag_path, diag_line) = match paths.other_file(&diag.build_directory, &msg.file_path) {
+        None => (
+            paths.target.to_path_buf(),
+            Some(offset_to_line(content, msg.file_offset)),
+        ),
+        Some(other) => {
+            let line = fs::read(&other)
+                .ok()
+                .map(|c| offset_to_line(&c, msg.file_offset));
+            (other, line)
         }
-        // Find the notification (parsed from stdout) for this diagnostic.
-        let (diag_path, diag_line) = match paths.other_file(build_dir, &msg.file_path) {
-            None => (
-                paths.target.to_path_buf(),
-                Some(offset_to_line(content, msg.file_offset)),
-            ),
-            Some(other) => {
-                let line = fs::read(&other)
-                    .ok()
-                    .map(|c| offset_to_line(&c, msg.file_offset));
-                (other, line)
-            }
-        };
-        if let Some(note) = notes.iter_mut().find(|note| {
-            note.diagnostic == diag.diagnostic_name
-                && Some(note.line) == diag_line
-                && diag_path.ends_with(&note.filename)
-        }) {
-            for line in fixed_lines {
-                if !note.fixed_lines.contains(&line) {
-                    note.fixed_lines.push(line);
-                }
+    };
+    if let Some(note) = notes.iter_mut().find(|note| {
+        note.diagnostic == diag.diagnostic_name
+            && Some(note.line) == diag_line
+            && diag_path.ends_with(&note.filename)
+    }) {
+        for line in fixed_lines {
+            if !note.fixed_lines.contains(&line) {
+                note.fixed_lines.push(line);
             }
         }
     }
+}
 
+/// Apply the given `replacements` onto a file's original `content`.
+///
+/// The `file` is only used in log messages.
+pub(super) fn patch_content(
+    content: &[u8],
+    replacements: &[Replacement],
+    file: &Path,
+    logs: &mut Vec<(log::Level, String)>,
+) -> Vec<u8> {
     // clang-tidy already discards conflicting fixes before exporting them,
     // but be defensive about duplicates and overlaps anyway.
-    replacements.sort_by_key(|r| (r.offset, r.length));
+    // Duplicates are expected when several translation units fix the same header.
+    let mut replacements = replacements.iter().collect::<Vec<_>>();
+    replacements.sort();
     replacements.dedup();
     let mut patched = Vec::with_capacity(content.len());
     let mut cursor = 0;
@@ -464,17 +498,39 @@ fn apply_fixes<'a>(
                 log::Level::Warn,
                 format!(
                     "Skipping a fix that overlaps another fix in {}: {replacement:?}",
-                    paths.target.to_string_lossy(),
+                    file.to_string_lossy(),
                 ),
             ));
             continue;
         }
         patched.extend_from_slice(&content[cursor..replacement.offset]);
-        patched.extend_from_slice(replacement.replacement_text.as_bytes());
+        patched.extend_from_slice(replacement.text.as_bytes());
         cursor = replacement.offset + replacement.length;
     }
     patched.extend_from_slice(&content[cursor..]);
     patched
+}
+
+/// Write the `patched` content of a `file` to the cache.
+///
+/// Returns the path to the cached file.
+pub(super) fn write_cache(
+    clang_params: &ClangParams,
+    file: &Path,
+    patched: &[u8],
+) -> Result<PathBuf, ClangCaptureError> {
+    let cache_patch_path = clang_params.get_cache_path().join(file);
+    fs::create_dir_all(
+        cache_patch_path
+            .parent()
+            .ok_or(ClangCaptureError::UnknownCacheParentPath)?,
+    )
+    .map_err(ClangCaptureError::MkDirFailed)?;
+    fs::write(&cache_patch_path, patched).map_err(|e| ClangCaptureError::WriteFileFailed {
+        file_name: cache_patch_path.to_string_lossy().to_string(),
+        source: e,
+    })?;
+    Ok(cache_patch_path)
 }
 
 /// Build the clang-tidy command that analyzes the given `file`.
@@ -566,10 +622,11 @@ fn read_exported_fixes(fixes_path: &Path) -> Result<ExportedFixes, ClangCaptureE
 /// clang-tidy is not allowed to modify any files.
 /// Instead, its fixes are exported (`--export-fixes`), and only the fixes for the
 /// analyzed file are applied to a copy of that file in the cache.
+/// The fixes for other files are returned in [`TidyFixes::others`].
 pub fn run_clang_tidy(
     file: &mut MutexGuard<FileObj>,
     clang_params: &ClangParams,
-) -> Result<Vec<(log::Level, String)>, ClangCaptureError> {
+) -> Result<(Vec<(log::Level, String)>, TidyFixes), ClangCaptureError> {
     let file_name = file.name.to_string_lossy().to_string();
     let repo_file_path = clang_params.repo_root.join(&file.name);
     let original_content =
@@ -639,15 +696,11 @@ pub fn run_clang_tidy(
         .map_err(ClangCaptureError::UnknownWorkingDirectory)?;
     let target = normalize_path(&working_dir.join(&file.name));
     let mut paths = FixPaths::new(&target, &working_dir);
-    let patched = apply_fixes(&fixes, &mut paths, &original_content, &mut notes, &mut logs);
-    fs::write(&cache_patch_path, patched).map_err(|e| ClangCaptureError::WriteFileFailed {
-        file_name: cache_patch_path.to_string_lossy().to_string(),
-        source: e,
-    })?;
-
-    file.patched_path = Some(cache_patch_path);
+    let (patched, tidy_fixes) =
+        apply_fixes(&fixes, &mut paths, &original_content, &mut notes, &mut logs);
+    file.patched_path = Some(write_cache(clang_params, &file.name, &patched)?);
     file.tidy_advice = Some(TidyAdvice { notes });
-    Ok(logs)
+    Ok((logs, tidy_fixes))
 }
 
 #[cfg(test)]

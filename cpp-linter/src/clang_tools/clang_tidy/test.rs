@@ -18,7 +18,7 @@ use crate::{
 
 use super::{
     CLANG_DIAGNOSTICS_URL, ClangCaptureError, CompilationUnit, ExportedFixes, FixPaths,
-    NOTE_HEADER, TidyNotification, apply_fixes, run_clang_tidy,
+    NOTE_HEADER, OtherFileFix, Replacement, TidyNotification, apply_fixes, run_clang_tidy,
 };
 
 #[test]
@@ -145,6 +145,7 @@ fn use_extra_args() {
     fs::create_dir_all(clang_params.get_cache_path()).unwrap();
     let logs = run_clang_tidy(&mut file_lock, &clang_params)
         .unwrap()
+        .0
         .into_iter()
         .filter_map(|(_lvl, msg)| {
             if msg.contains("Running ") {
@@ -410,7 +411,7 @@ fn fixes_do_not_modify_worktree() {
     };
     let file = Mutex::new(FileObj::new(PathBuf::from("fix.cpp")));
     let mut file = file.lock().unwrap();
-    let logs = run_clang_tidy(&mut file, &clang_params).unwrap();
+    let (_logs, fixes) = run_clang_tidy(&mut file, &clang_params).unwrap();
 
     // worktree is untouched
     assert_eq!(
@@ -442,13 +443,12 @@ fn fixes_do_not_modify_worktree() {
         .unwrap();
     assert_eq!(note.fixed_lines, vec![2]);
 
-    // the fix that was not applied to the header is noted
-    assert!(logs.iter().any(|(lvl, msg)| {
-        *lvl == log::Level::Info
-            && msg.starts_with("Not applying the fix for readability-non-const-parameter")
-            && msg.ends_with("because cpp-linter only applies fixes to the analyzed file")
-            && msg.contains("fix.h")
-    }));
+    // the fix for the header is returned (to be applied later, if allowed)
+    assert_eq!(fixes.own.len(), 1);
+    assert_eq!(fixes.others.len(), 1);
+    let header_fix = &fixes.others[0];
+    assert_eq!(header_fix.diagnostic, "readability-non-const-parameter");
+    assert!(header_fix.path.ends_with("fix.h"));
 }
 
 fn dummy_fixes(target: &Path) -> String {
@@ -507,14 +507,26 @@ fn apply_exported_fixes() {
     notes[0].line = 2;
     let mut logs = vec![];
     let mut paths = FixPaths::new(&target, tmp.path());
-    let patched = apply_fixes(&fixes, &mut paths, content, &mut notes, &mut logs);
+    let (patched, tidy_fixes) = apply_fixes(&fixes, &mut paths, content, &mut notes, &mut logs);
     assert_eq!(String::from_utf8(patched).unwrap(), "line\n  auto\nx y;\n");
     assert_eq!(notes[0].fixed_lines, vec![2]);
     let messages = logs.into_iter().map(|(_, msg)| msg).collect::<Vec<_>>();
-    assert_eq!(messages.len(), 3, "{messages:#?}");
+    assert_eq!(messages.len(), 2, "{messages:#?}");
     assert!(messages[0].contains("out of bounds"));
-    assert!(messages[1].starts_with("Not applying") && messages[1].contains("fix.h"));
-    assert!(messages[2].contains("overlaps"));
+    assert!(messages[1].contains("overlaps"));
+    // the fix for another file is not applied, but returned
+    assert_eq!(
+        tidy_fixes.others,
+        vec![OtherFileFix {
+            path: tmp.path().join("fix.h"),
+            diagnostic: "modernize-use-auto".to_string(),
+            replacement: Replacement {
+                offset: 0,
+                length: 4,
+                text: "nope".to_string(),
+            },
+        }]
+    );
 }
 
 #[test]
