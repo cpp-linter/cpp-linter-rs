@@ -285,3 +285,31 @@ fn no_other_fixes() {
     assert!(logs[0].is_empty());
     assert!(patched(&files[0]).is_none());
 }
+
+/// An analyzed file that was removed after it was analyzed cannot be fixed.
+#[test]
+fn analyzed_file_missing() {
+    let tmp = workspace();
+    let clang_params = ClangParams {
+        repo_root: tmp.path().to_path_buf(),
+        ..Default::default()
+    };
+    let files = as_files(vec![
+        FileObj::new(PathBuf::from("fix.cpp")),
+        FileObj::new(PathBuf::from("fix.h")),
+    ]);
+    // keep the header's path known to `AnalyzedFiles`, but make it unreadable
+    let fix = header_fix(tmp.path());
+    fs::remove_file(tmp.path().join("fix.h")).unwrap();
+    fs::create_dir(tmp.path().join("fix.h")).unwrap();
+    let fixes = TidyFixes {
+        own: vec![],
+        others: vec![fix],
+    };
+    let mut logs = vec![vec![], vec![]];
+    let err = apply_other_file_fixes(&files, &[(0, fixes)], &clang_params, &mut logs).unwrap_err();
+    assert!(
+        matches!(err, crate::error::ClangCaptureError::ReadFileFailed { ref file_name, .. } if file_name == "fix.h"),
+        "{err:?}"
+    );
+}

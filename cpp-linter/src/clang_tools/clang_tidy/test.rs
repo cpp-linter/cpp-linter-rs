@@ -604,3 +604,50 @@ fn tidy_stale_fixes_not_removable() {
     let err = run_clang_tidy(&mut file.lock().unwrap(), &clang_params).unwrap_err();
     assert!(matches!(err, ClangCaptureError::RemoveFileFailed { .. }));
 }
+
+/// A diagnostic reported in another file (eg. a header) can suggest a fix
+/// for the analyzed file. The fixed lines are recorded in the header's note.
+#[test]
+fn fixed_lines_of_diagnostic_in_other_file() {
+    let tmp = tempfile::tempdir().unwrap();
+    let header = tmp.path().join("fix.h");
+    fs::write(&header, FIX_HEADER).unwrap();
+    let target = tmp.path().join("demo.cpp");
+    let (target_str, header_str) = (target.to_string_lossy(), header.to_string_lossy());
+    let yml = format!(
+        r#"---
+MainSourceFile:  '{target_str}'
+Diagnostics:
+  - DiagnosticName:  modernize-use-auto
+    DiagnosticMessage:
+      Message:         'a rationale'
+      FilePath:        '{header_str}'
+      FileOffset:      22
+      Replacements:
+        - FilePath:        '{target_str}'
+          Offset:          7
+          Length:          3
+          ReplacementText: 'auto'
+    Level:           Warning
+    BuildDirectory:  '{build_dir}'
+...
+"#,
+        build_dir = tmp.path().to_string_lossy(),
+    );
+    let fixes: ExportedFixes = serde_saphyr::from_str(&yml).unwrap();
+    let mut notes = vec![dummy_note("fix.h", vec![])];
+    notes[0].line = 2;
+    let mut logs = vec![];
+    let mut paths = FixPaths::new(&target, tmp.path());
+    let (patched, tidy_fixes) = apply_fixes(
+        &fixes,
+        &mut paths,
+        b"line\n  int y;\n",
+        &mut notes,
+        &mut logs,
+    );
+    assert_eq!(String::from_utf8(patched).unwrap(), "line\n  auto y;\n");
+    assert!(logs.is_empty(), "{logs:#?}");
+    assert!(tidy_fixes.others.is_empty());
+    assert_eq!(notes[0].fixed_lines, vec![2]);
+}
