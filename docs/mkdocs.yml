@@ -22,6 +22,7 @@ nav:
 
 theme:
   name: material
+  custom_dir: overrides
   features:
     - navigation.top
     - content.tabs.link
@@ -77,6 +78,11 @@ extra:
       link: https://www.npmjs.com/package/@cpp-linter/cpp-linter
     - icon: simple/rust
       link: https://crates.io/crates/cpp-linter
+  # The same Google Analytics property as cpp-linter.github.io and the other
+  # cpp-linter docs, which all share that origin.
+  analytics:
+    provider: google
+    property: G-JKH4SXC7HC
 
 extra_css:
   - https://cpp-linter.github.io/stylesheets/shared.css
