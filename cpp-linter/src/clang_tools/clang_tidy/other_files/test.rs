@@ -239,7 +239,11 @@ fn outside_changed_lines() {
     assert!(patched(&files[1]).is_none());
     let messages = messages(&logs[0]);
     assert_eq!(messages.len(), 1);
-    assert!(messages[0].ends_with("to fix.h because the fix is outside the file's changed lines"));
+    assert!(
+        messages[0].ends_with(
+            "to fix.h because the fix clashes with the `--lines-changed-only` constraint"
+        )
+    );
 }
 
 #[test]
@@ -265,7 +269,13 @@ fn out_of_bounds() {
     assert!(patched(&files[1]).is_none());
     let messages = messages(&logs[0]);
     assert_eq!(messages.len(), 1);
-    assert!(messages[0].ends_with("to fix.h because the fix is out of the file's bounds"));
+    assert!(messages[0].ends_with(&format!(
+        "to fix.h because the fix seems malformed and is out of the file's bounds \
+        (bytes {} to {} of a {} byte file)",
+        HEADER.len(),
+        HEADER.len() + 1,
+        HEADER.len(),
+    )));
 }
 
 /// The same fix for the header is suggested by two analyzed sources,

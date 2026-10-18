@@ -72,17 +72,30 @@ pub struct TidyFixes {
 enum Rejection {
     NotAnalyzed,
     IgnoredByTidy,
-    OutOfBounds,
+    /// The fix's byte offsets do not fit in the file.
+    OutOfBounds {
+        /// The byte offset where the fix starts.
+        start: usize,
+        /// The byte offset where the fix ends (exclusive).
+        end: usize,
+        /// The file's size (in bytes).
+        size: usize,
+    },
     OutsideChangedLines,
 }
 
 impl Rejection {
-    fn reason(&self) -> &'static str {
+    fn reason(&self) -> String {
         match self {
-            Self::NotAnalyzed => "it is not one of the analyzed files",
-            Self::IgnoredByTidy => "it is ignored by `--ignore-tidy`",
-            Self::OutOfBounds => "the fix is out of the file's bounds",
-            Self::OutsideChangedLines => "the fix is outside the file's changed lines",
+            Self::NotAnalyzed => "it is not one of the analyzed files".to_string(),
+            Self::IgnoredByTidy => "it is ignored by `--ignore-tidy`".to_string(),
+            Self::OutOfBounds { start, end, size } => format!(
+                "the fix seems malformed and is out of the file's bounds \
+                (bytes {start} to {end} of a {size} byte file)"
+            ),
+            Self::OutsideChangedLines => {
+                "the fix clashes with the `--lines-changed-only` constraint".to_string()
+            }
         }
     }
 }
@@ -164,7 +177,11 @@ impl<'a> AnalyzedFiles<'a> {
             .checked_add(replacement.length)
             .filter(|end| *end <= content_len)
         else {
-            return Ok(Err(Rejection::OutOfBounds));
+            return Ok(Err(Rejection::OutOfBounds {
+                start: replacement.offset,
+                end: replacement.offset.saturating_add(replacement.length),
+                size: content_len,
+            }));
         };
         let content = self.content(index, clang_params)?;
         // `end` is exclusive, so use the last replaced byte (if any) for the end line
@@ -223,8 +240,8 @@ pub fn apply_other_file_fixes(
     let mut analyzed = AnalyzedFiles::new(files, &working_dir)?;
     // the replacements to apply, keyed by the index of the file they apply to
     let mut pending: BTreeMap<usize, Pending> = BTreeMap::new();
-    for (source, fixes) in tidy_fixes {
-        let source_name = file_name(&files[*source])?;
+    for (source_index, fixes) in tidy_fixes {
+        let source_name = file_name(&files[*source_index])?;
         for fix in &fixes.others {
             // show the path relative to the repository root, if possible
             let other = fix
@@ -242,7 +259,7 @@ pub fn apply_other_file_fixes(
                     verdict
                 }
             };
-            logs[*source].push(match verdict.err() {
+            logs[*source_index].push(match verdict.err() {
                 None => (
                     log::Level::Info,
                     format!(
