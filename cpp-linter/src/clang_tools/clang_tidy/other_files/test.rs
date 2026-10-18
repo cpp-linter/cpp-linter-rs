@@ -10,9 +10,12 @@ use std::{
 use clang_tools_manager::RequestedVersion;
 use git_bot_feedback::FileFilter;
 
-use super::{OtherFileFix, Replacement, TidyFixes, apply_other_file_fixes};
+use super::{OtherFileFix, Pending, Replacement, TidyFixes, apply_other_file_fixes, merge_note};
 use crate::{
-    clang_tools::{ClangTool, analyze_files},
+    clang_tools::{
+        ClangTool, analyze_files,
+        clang_tidy::{TidyNotification, tally_tidy_advice},
+    },
     cli::{ClangParams, LinesChangedOnly},
     common_fs::FileObj,
 };
@@ -56,7 +59,31 @@ fn header_fix(workspace: &Path) -> OtherFileFix {
             length: 0,
             text: "const ".to_string(),
         },
+        note: Some(source_note()),
     }
+}
+
+/// The note about the diagnostic (in [`SOURCE`]) that suggests [`header_fix()`].
+fn source_note() -> TidyNotification {
+    TidyNotification {
+        filename: "fix.cpp".to_string(),
+        line: 2,
+        cols: 10,
+        severity: "warning".to_string(),
+        rationale: "pointer parameter 'p' can be pointer to const".to_string(),
+        diagnostic: "readability-non-const-parameter".to_string(),
+        suggestion: vec![],
+        fixed_lines: vec![],
+    }
+}
+
+/// The notes (about other files) in the header's tidy advice.
+fn header_notes(file: &Arc<Mutex<FileObj>>) -> Vec<TidyNotification> {
+    let file = file.lock().unwrap();
+    file.tidy_advice
+        .as_ref()
+        .map(|advice| advice.notes.clone())
+        .unwrap_or_default()
 }
 
 fn header_fixes(workspace: &Path) -> TidyFixes {
@@ -116,6 +143,25 @@ async fn fix_analyzed_header() {
         }),
         "{logs:#?}"
     );
+
+    // the header's advice explains the fix, without counting it as the header's diagnostic
+    let notes = header_notes(&files[1]);
+    let note = notes
+        .iter()
+        .find(|n| n.diagnostic == "readability-non-const-parameter")
+        .unwrap();
+    assert_eq!(note.filename, "fix.cpp");
+    assert_eq!(note.fixed_lines, vec![2]);
+    let help = files[1]
+        .lock()
+        .unwrap()
+        .tidy_advice
+        .as_ref()
+        .unwrap()
+        .get_suggestion_help(2, 2);
+    assert!(help.starts_with("### clang-tidy diagnostic(s)"), "{help}");
+    assert!(help.contains(&note.rationale), "{help}");
+    assert_eq!(tally_tidy_advice(&files).unwrap(), 1);
 }
 
 #[test]
@@ -264,6 +310,63 @@ fn merge_with_own_fixes() {
     }
     // duplicate fixes do not cause warnings
     assert!(logs[1].is_empty(), "{:#?}", logs[1]);
+    // the same note is recorded once, with the fixed line in the header
+    let notes = header_notes(&files[1]);
+    assert_eq!(notes.len(), 1, "{notes:#?}");
+    assert_eq!(notes[0].fixed_lines, vec![2]);
+}
+
+/// A fix that removes a whole changed line (including its line break)
+/// does not reach into the next line.
+#[test]
+#[allow(clippy::single_range_in_vec_init)]
+fn remove_changed_line() {
+    let tmp = workspace();
+    let clang_params = ClangParams {
+        repo_root: tmp.path().to_path_buf(),
+        lines_changed_only: LinesChangedOnly::On,
+        ..Default::default()
+    };
+    let files = as_files(vec![
+        FileObj::from(PathBuf::from("fix.cpp"), vec![2], vec![2..=2]),
+        // only the first line of the header was changed
+        FileObj::from(PathBuf::from("fix.h"), vec![1], vec![1..=1]),
+    ]);
+    let mut fix = header_fix(tmp.path());
+    fix.replacement = Replacement {
+        offset: 0,
+        length: "#pragma once\n".len(),
+        text: String::new(),
+    };
+    let fixes = TidyFixes {
+        own: vec![],
+        others: vec![fix],
+    };
+    let mut logs = vec![vec![], vec![]];
+    apply_other_file_fixes(&files, &[(0, fixes)], &clang_params, &mut logs).unwrap();
+    assert_eq!(patched(&files[1]).unwrap(), "void set(int *p);\n");
+    assert_eq!(header_notes(&files[1])[0].fixed_lines, vec![1]);
+}
+
+/// A note about the analyzed file itself is only merged into the file's own note,
+/// so it is never counted twice.
+#[test]
+fn merge_note_about_same_file() {
+    let mut note = source_note();
+    note.fixed_lines = vec![3];
+    let mut notes = vec![];
+    merge_note(&mut notes, note.clone(), "fix.cpp");
+    assert!(notes.is_empty());
+
+    let own = TidyNotification {
+        fixed_lines: vec![2],
+        ..source_note()
+    };
+    let mut notes = vec![own];
+    merge_note(&mut notes, note.clone(), "fix.cpp");
+    merge_note(&mut notes, note, "fix.cpp");
+    assert_eq!(notes.len(), 1);
+    assert_eq!(notes[0].fixed_lines, vec![2, 3]);
 }
 
 #[test]
@@ -312,4 +415,23 @@ fn analyzed_file_missing() {
         matches!(err, crate::error::ClangCaptureError::ReadFileFailed { ref file_name, .. } if file_name == "fix.h"),
         "{err:?}"
     );
+}
+
+/// A fix whose diagnostic has no matching note is applied without a note.
+#[test]
+fn pending_fix_without_note() {
+    let tmp = workspace();
+    let mut fix = header_fix(tmp.path());
+    fix.note = None;
+    let mut pending = Pending::default();
+    pending.add(&fix, 2);
+    assert_eq!(pending.replacements, vec![fix.replacement]);
+    assert!(pending.notes.is_empty());
+
+    // fixes for the same diagnostic on different lines share a note
+    let fix = header_fix(tmp.path());
+    pending.add(&fix, 2);
+    pending.add(&fix, 3);
+    assert_eq!(pending.notes.len(), 1);
+    assert_eq!(pending.notes[0].fixed_lines, vec![2, 3]);
 }

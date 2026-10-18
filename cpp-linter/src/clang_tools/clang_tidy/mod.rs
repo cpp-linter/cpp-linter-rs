@@ -41,7 +41,7 @@ pub struct CompilationUnit {
 }
 
 /// A structure that represents a single notification parsed from clang-tidy's stdout.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TidyNotification {
     /// The file's path and name (supposedly relative to the repository root folder).
     pub filename: String,
@@ -388,9 +388,26 @@ fn apply_fixes<'a>(
 ) -> (Vec<u8>, TidyFixes) {
     let mut tidy_fixes = TidyFixes::default();
     for diag in &fixes.diagnostics {
+        let first_other = tidy_fixes.others.len();
         let fixed_lines = collect_diagnostic_fixes(diag, paths, content, &mut tidy_fixes, logs);
-        if !fixed_lines.is_empty() {
-            record_fixed_lines(diag, paths, content, notes, fixed_lines);
+        let other_fixes = &mut tidy_fixes.others[first_other..];
+        if fixed_lines.is_empty() && other_fixes.is_empty() {
+            continue;
+        }
+        let Some(note) = find_note(diag, paths, content, notes) else {
+            continue;
+        };
+        for line in fixed_lines {
+            if !note.fixed_lines.contains(&line) {
+                note.fixed_lines.push(line);
+            }
+        }
+        for fix in other_fixes {
+            // the fixed lines in the other file are recorded once the fix is applied
+            fix.note = Some(TidyNotification {
+                fixed_lines: vec![],
+                ..note.clone()
+            });
         }
     }
     let patched = patch_content(content, &tidy_fixes.own, paths.target, logs);
@@ -415,6 +432,7 @@ fn collect_diagnostic_fixes<'a>(
                 path: other,
                 diagnostic: diag.diagnostic_name.clone(),
                 replacement: Replacement::from(replacement),
+                note: None,
             });
         } else if replacement
             .offset
@@ -440,15 +458,13 @@ fn collect_diagnostic_fixes<'a>(
     fixed_lines
 }
 
-/// Record the `fixed_lines` of a `diag` in the notification (parsed from stdout)
-/// that matches it.
-fn record_fixed_lines<'a>(
+/// Find the notification (parsed from stdout) that matches a `diag`.
+fn find_note<'a, 'n>(
     diag: &'a ExportedDiagnostic,
     paths: &mut FixPaths<'a>,
     content: &[u8],
-    notes: &mut [TidyNotification],
-    fixed_lines: Vec<u32>,
-) {
+    notes: &'n mut [TidyNotification],
+) -> Option<&'n mut TidyNotification> {
     let msg = &diag.diagnostic_message;
     let (diag_path, diag_line) = match paths.other_file(&diag.build_directory, &msg.file_path) {
         None => (
@@ -462,17 +478,11 @@ fn record_fixed_lines<'a>(
             (other, line)
         }
     };
-    if let Some(note) = notes.iter_mut().find(|note| {
+    notes.iter_mut().find(|note| {
         note.diagnostic == diag.diagnostic_name
             && Some(note.line) == diag_line
             && diag_path.ends_with(&note.filename)
-    }) {
-        for line in fixed_lines {
-            if !note.fixed_lines.contains(&line) {
-                note.fixed_lines.push(line);
-            }
-        }
-    }
+    })
 }
 
 /// Apply the given `replacements` onto a file's original `content`.

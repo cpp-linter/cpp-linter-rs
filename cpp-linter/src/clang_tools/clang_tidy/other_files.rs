@@ -15,7 +15,9 @@ use std::{
 
 use clang_tools_manager::utils::normalize_path;
 
-use super::{ExportedReplacement, offset_to_line, patch_content, write_cache};
+use super::{
+    ExportedReplacement, TidyAdvice, TidyNotification, offset_to_line, patch_content, write_cache,
+};
 use crate::{cli::ClangParams, common_fs::FileObj, error::ClangCaptureError};
 
 /// A text replacement in a file's original content.
@@ -48,6 +50,13 @@ pub struct OtherFileFix {
     pub diagnostic: String,
     /// The replacement in the other file's original content.
     pub replacement: Replacement,
+    /// The notification (parsed from clang-tidy's stdout) about the diagnostic,
+    /// if one was found.
+    ///
+    /// Once the fix is applied, a copy (with the fixed line in the other file) is
+    /// added to the other file's [`TidyAdvice`], so suggestions in a PR review can
+    /// explain the fix.
+    pub note: Option<TidyNotification>,
 }
 
 /// The fixes that clang-tidy suggested while analyzing a file.
@@ -140,12 +149,14 @@ impl<'a> AnalyzedFiles<'a> {
     }
 
     /// Decide whether the `fix` may be applied to the analyzed file at `index`.
+    ///
+    /// Returns the line where the fix starts if it may be applied.
     fn check(
         &mut self,
         index: usize,
         fix: &OtherFileFix,
         clang_params: &ClangParams,
-    ) -> Result<Option<Rejection>, ClangCaptureError> {
+    ) -> Result<Result<u32, Rejection>, ClangCaptureError> {
         let content_len = self.content(index, clang_params)?.len();
         let replacement = &fix.replacement;
         let Some(end) = replacement
@@ -153,12 +164,14 @@ impl<'a> AnalyzedFiles<'a> {
             .checked_add(replacement.length)
             .filter(|end| *end <= content_len)
         else {
-            return Ok(Some(Rejection::OutOfBounds));
+            return Ok(Err(Rejection::OutOfBounds));
         };
         let content = self.content(index, clang_params)?;
+        // `end` is exclusive, so use the last replaced byte (if any) for the end line
+        let last = if replacement.length > 0 { end - 1 } else { end };
         let (start_line, end_line) = (
             offset_to_line(content, replacement.offset),
-            offset_to_line(content, end),
+            offset_to_line(content, last),
         );
         let file = self.files[index]
             .lock()
@@ -168,7 +181,7 @@ impl<'a> AnalyzedFiles<'a> {
             .as_ref()
             .is_some_and(|f| !f.is_qualified(&file.name))
         {
-            return Ok(Some(Rejection::IgnoredByTidy));
+            return Ok(Err(Rejection::IgnoredByTidy));
         }
         let ranges = file.get_ranges(&clang_params.lines_changed_only);
         if !ranges.is_empty()
@@ -176,9 +189,9 @@ impl<'a> AnalyzedFiles<'a> {
                 .iter()
                 .any(|r| r.contains(&start_line) && r.contains(&end_line))
         {
-            return Ok(Some(Rejection::OutsideChangedLines));
+            return Ok(Err(Rejection::OutsideChangedLines));
         }
-        Ok(None)
+        Ok(Ok(start_line))
     }
 }
 
@@ -209,7 +222,7 @@ pub fn apply_other_file_fixes(
         .map_err(ClangCaptureError::UnknownWorkingDirectory)?;
     let mut analyzed = AnalyzedFiles::new(files, &working_dir)?;
     // the replacements to apply, keyed by the index of the file they apply to
-    let mut pending: BTreeMap<usize, Vec<Replacement>> = BTreeMap::new();
+    let mut pending: BTreeMap<usize, Pending> = BTreeMap::new();
     for (source, fixes) in tidy_fixes {
         let source_name = file_name(&files[*source])?;
         for fix in &fixes.others {
@@ -219,20 +232,17 @@ pub fn apply_other_file_fixes(
                 .strip_prefix(&working_dir)
                 .unwrap_or(&fix.path)
                 .to_string_lossy();
-            let rejection = match analyzed.find(&fix.path) {
-                None => Some(Rejection::NotAnalyzed),
+            let verdict = match analyzed.find(&fix.path) {
+                None => Err(Rejection::NotAnalyzed),
                 Some(index) => {
-                    let rejection = analyzed.check(index, fix, clang_params)?;
-                    if rejection.is_none() {
-                        pending
-                            .entry(index)
-                            .or_default()
-                            .push(fix.replacement.clone());
+                    let verdict = analyzed.check(index, fix, clang_params)?;
+                    if let Ok(line) = verdict {
+                        pending.entry(index).or_default().add(fix, line);
                     }
-                    rejection
+                    verdict
                 }
             };
-            logs[*source].push(match rejection {
+            logs[*source].push(match verdict.err() {
                 None => (
                     log::Level::Info,
                     format!(
@@ -251,7 +261,14 @@ pub fn apply_other_file_fixes(
             });
         }
     }
-    for (index, mut replacements) in pending {
+    for (
+        index,
+        Pending {
+            mut replacements,
+            notes,
+        },
+    ) in pending
+    {
         if let Some((_, fixes)) = tidy_fixes.iter().find(|(i, _)| *i == index) {
             replacements.extend(fixes.own.iter().cloned());
         }
@@ -261,8 +278,66 @@ pub fn apply_other_file_fixes(
             .map_err(|_| ClangCaptureError::MutexPoisoned)?;
         let patched = patch_content(content, &replacements, &file.name, &mut logs[index]);
         file.patched_path = Some(write_cache(clang_params, &file.name, &patched)?);
+        let name = file.name.to_string_lossy().replace('\\', "/");
+        let advice = file
+            .tidy_advice
+            .get_or_insert_with(|| TidyAdvice { notes: vec![] });
+        for note in notes {
+            merge_note(&mut advice.notes, note, &name);
+        }
     }
     Ok(())
+}
+
+/// The accepted fixes for one analyzed file.
+#[derive(Default)]
+struct Pending {
+    replacements: Vec<Replacement>,
+    /// Copies of the notes about the diagnostics that suggested the fixes,
+    /// with the fixed lines in the analyzed file.
+    notes: Vec<TidyNotification>,
+}
+
+impl Pending {
+    fn add(&mut self, fix: &OtherFileFix, line: u32) {
+        self.replacements.push(fix.replacement.clone());
+        let Some(note) = &fix.note else {
+            return;
+        };
+        let note = TidyNotification {
+            fixed_lines: vec![line],
+            ..note.clone()
+        };
+        if let Some(existing) = self.notes.iter_mut().find(|n| is_same_note(n, &note)) {
+            if !existing.fixed_lines.contains(&line) {
+                existing.fixed_lines.push(line);
+            }
+        } else {
+            self.notes.push(note);
+        }
+    }
+}
+
+fn is_same_note(a: &TidyNotification, b: &TidyNotification) -> bool {
+    a.filename == b.filename && a.line == b.line && a.diagnostic == b.diagnostic
+}
+
+/// Add the fixed lines of a `note` to the `notes` of the analyzed file named `file_name`.
+///
+/// A note about another file (eg. the source file that suggested the fix) is added,
+/// so suggestions in a PR review can explain the fix; notes about other files are not
+/// counted as this file's diagnostics. A note about this file is only merged into the
+/// same note found by analyzing this file, so it is not counted twice.
+fn merge_note(notes: &mut Vec<TidyNotification>, note: TidyNotification, file_name: &str) {
+    if let Some(existing) = notes.iter_mut().find(|n| is_same_note(n, &note)) {
+        for line in note.fixed_lines {
+            if !existing.fixed_lines.contains(&line) {
+                existing.fixed_lines.push(line);
+            }
+        }
+    } else if note.filename != file_name {
+        notes.push(note);
+    }
 }
 
 fn file_name(file: &Arc<Mutex<FileObj>>) -> Result<String, ClangCaptureError> {

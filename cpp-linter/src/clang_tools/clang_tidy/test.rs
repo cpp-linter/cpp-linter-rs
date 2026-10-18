@@ -525,6 +525,11 @@ fn apply_exported_fixes() {
                 length: 4,
                 text: "nope".to_string(),
             },
+            // the matching note, to explain the fix once it is applied
+            note: Some(TidyNotification {
+                fixed_lines: vec![],
+                ..notes[0].clone()
+            }),
         }]
     );
 }
