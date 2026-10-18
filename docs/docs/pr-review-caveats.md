@@ -42,6 +42,8 @@ Clang-tidy and clang-format suggestions are shown in 1 Pull Request review.
 
 - Each generated review is specific to the commit that triggered the Continuous Integration
   workflow.
+- Suggestions that were already posted in a previous review are not repeated.
+  If all suggestions were already posted, then no new review is posted.
 - Outdated reviews are dismissed and minimized if all suggestions/comments are resolved.
   Some clang-tidy findings do not have automatic fixes to suggest. So, some review comments
   may need user action to resolve.
@@ -63,8 +65,8 @@ GitHub REST API does not provide a way to hide comments or mark review suggestio
 
 If any suggestions did not fit within the Pull Request diff, then the review's summary comment will
 indicate how many suggestions were left out.
-The full patch of suggestions is always included as a collapsed code block in the review summary
-comment. This isn't a problem we can fix.
+A patch of the suggestions that did not fit is included as a collapsed code block in the review
+summary comment (unless the patch is too large to fit in the comment). This isn't a problem we can fix.
 GitHub won't allow review comments/suggestions to target lines that are not shown in the Pull
 Request diff (the summation of file differences in a Pull Request).
 
