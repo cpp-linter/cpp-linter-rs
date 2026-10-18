@@ -169,6 +169,7 @@ fn ignored_by_tidy() {
 }
 
 #[test]
+#[allow(clippy::single_range_in_vec_init)]
 fn outside_changed_lines() {
     let tmp = workspace();
     let clang_params = ClangParams {
