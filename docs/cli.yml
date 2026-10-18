@@ -12,6 +12,10 @@ inputs:
     minimum-version: '1.4.6'
   verbosity:
     minimum-version: '1.3.0'
+  mod-sys:
+    minimum-version: '2.0.0'
+  no-mod-sys:
+    minimum-version: '2.0.0'
   lines-changed-only:
     minimum-version: '1.5.0'
     required-permission: 'contents: read #file-changes'
@@ -39,14 +43,10 @@ inputs:
     minimum-version: '1.4.3'
   database:
     minimum-version: '1.4.0'
-  extra-args:
+  extra-arg:
     minimum-version: '1.4.7'
-  tidy-review:
-    minimum-version: '1.7.0'
-    experimental: true
-    required-permission: 'pull-requests: write #pull-request-reviews'
-  format-review:
-    minimum-version: '1.7.0'
+  pr-review:
+    minimum-version: '2.0.0'
     required-permission: 'pull-requests: write #pull-request-reviews'
   passive-reviews:
     minimum-version: '1.10.0'
