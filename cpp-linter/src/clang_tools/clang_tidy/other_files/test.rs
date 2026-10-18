@@ -433,15 +433,104 @@ fn pending_fix_without_note() {
     let tmp = workspace();
     let mut fix = header_fix(tmp.path());
     fix.note = None;
-    let mut pending = Pending::default();
-    pending.add(&fix, 2);
+    let mut pending = Pending::new(&[]);
+    assert!(pending.add(&fix, 2).is_ok());
     assert_eq!(pending.replacements, vec![fix.replacement]);
     assert!(pending.notes.is_empty());
 
     // fixes for the same diagnostic on different lines share a note
     let fix = header_fix(tmp.path());
-    pending.add(&fix, 2);
-    pending.add(&fix, 3);
+    assert!(pending.add(&fix, 2).is_ok());
+    assert!(pending.add(&fix, 3).is_ok());
     assert_eq!(pending.notes.len(), 1);
     assert_eq!(pending.notes[0].fixed_lines, vec![2, 3]);
+}
+
+/// A fix that replaces `int` in the header's declaration.
+fn replace_int(workspace: &Path, text: &str) -> OtherFileFix {
+    OtherFileFix {
+        replacement: Replacement {
+            offset: HEADER_FIX_OFFSET,
+            length: 3,
+            text: text.to_string(),
+        },
+        ..header_fix(workspace)
+    }
+}
+
+/// Of two different fixes for the same text in another file, only the first is applied.
+#[test]
+fn overlapping_fixes() {
+    let tmp = workspace();
+    fs::write(tmp.path().join("other.cpp"), SOURCE).unwrap();
+    let clang_params = ClangParams {
+        repo_root: tmp.path().to_path_buf(),
+        ..Default::default()
+    };
+    let files = as_files(vec![
+        FileObj::new(PathBuf::from("fix.cpp")),
+        FileObj::new(PathBuf::from("fix.h")),
+        FileObj::new(PathBuf::from("other.cpp")),
+    ]);
+    let fixes_of = |text: &str| TidyFixes {
+        own: vec![],
+        others: vec![replace_int(tmp.path(), text)],
+    };
+    let tidy_fixes = [(0, fixes_of("long")), (2, fixes_of("char"))];
+    let mut logs = vec![vec![], vec![], vec![]];
+    apply_other_file_fixes(&files, &tidy_fixes, &clang_params, &mut logs).unwrap();
+    assert_eq!(
+        patched(&files[1]).unwrap(),
+        "#pragma once\nvoid set(long *p);\n"
+    );
+    assert!(messages(&logs[0])[0].starts_with("Applying the fix"));
+    let messages = messages(&logs[2]);
+    assert_eq!(messages.len(), 1);
+    assert!(
+        messages[0].ends_with("to fix.h because the fix overlaps another fix for the same file")
+    );
+    // the overlapping fix does not touch the patch, so it gets no fixed line
+    let notes = header_notes(&files[1]);
+    assert_eq!(notes.len(), 1, "{notes:#?}");
+    assert_eq!(notes[0].fixed_lines, vec![2]);
+    // the patch is not changed behind the scenes either
+    assert!(logs[1].is_empty(), "{:#?}", logs[1]);
+}
+
+/// A fix from another file that overlaps the file's own fix is not applied.
+#[test]
+fn overlaps_own_fix() {
+    let tmp = workspace();
+    let clang_params = ClangParams {
+        repo_root: tmp.path().to_path_buf(),
+        ..Default::default()
+    };
+    let files = as_files(vec![
+        FileObj::new(PathBuf::from("fix.cpp")),
+        FileObj::new(PathBuf::from("fix.h")),
+    ]);
+    let own = TidyFixes {
+        own: vec![replace_int(tmp.path(), "long").replacement],
+        others: vec![],
+    };
+    let mut fix = header_fix(tmp.path());
+    // insert inside the replaced `int`
+    fix.replacement.offset += 1;
+    let others = TidyFixes {
+        own: vec![],
+        others: vec![fix],
+    };
+    let mut logs = vec![vec![], vec![]];
+    apply_other_file_fixes(&files, &[(0, others), (1, own)], &clang_params, &mut logs).unwrap();
+    // only the header's own fix is applied
+    assert_eq!(
+        patched(&files[1]).unwrap(),
+        "#pragma once\nvoid set(long *p);\n"
+    );
+    let messages = messages(&logs[0]);
+    assert_eq!(messages.len(), 1);
+    assert!(
+        messages[0].ends_with("to fix.h because the fix overlaps another fix for the same file")
+    );
+    assert!(header_notes(&files[1]).is_empty());
 }

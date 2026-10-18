@@ -82,6 +82,8 @@ enum Rejection {
         size: usize,
     },
     OutsideChangedLines,
+    /// The fix overlaps a different fix that is applied to the same file.
+    Overlaps,
 }
 
 impl Rejection {
@@ -96,6 +98,7 @@ impl Rejection {
             Self::OutsideChangedLines => {
                 "the fix clashes with the `--lines-changed-only` constraint".to_string()
             }
+            Self::Overlaps => "the fix overlaps another fix for the same file".to_string(),
         }
     }
 }
@@ -217,8 +220,9 @@ impl<'a> AnalyzedFiles<'a> {
 ///
 /// `tidy_fixes` holds the fixes found while analyzing the file at the paired index of
 /// `files`. A fix for another file is only applied if that file is also analyzed,
-/// is not ignored by `--ignore-tidy`, and the fix is within the file's changed lines
-/// (according to `--lines-changed-only`).
+/// is not ignored by `--ignore-tidy`, the fix is within the file's changed lines
+/// (according to `--lines-changed-only`), and it does not overlap the file's own fixes
+/// or a different fix accepted before.
 ///
 /// Messages about each fix are added to the `logs` of the analyzed file whose
 /// diagnostic suggested it (at the paired index of `files`).
@@ -251,13 +255,12 @@ pub fn apply_other_file_fixes(
                 .to_string_lossy();
             let verdict = match analyzed.find(&fix.path) {
                 None => Err(Rejection::NotAnalyzed),
-                Some(index) => {
-                    let verdict = analyzed.check(index, fix, clang_params)?;
-                    if let Ok(line) = verdict {
-                        pending.entry(index).or_default().add(fix, line);
-                    }
-                    verdict
-                }
+                Some(index) => analyzed.check(index, fix, clang_params)?.and_then(|line| {
+                    pending
+                        .entry(index)
+                        .or_insert_with(|| Pending::new(own_fixes(tidy_fixes, index)))
+                        .add(fix, line)
+                }),
             };
             logs[*source_index].push(match verdict.err() {
                 None => (
@@ -281,14 +284,11 @@ pub fn apply_other_file_fixes(
     for (
         index,
         Pending {
-            mut replacements,
+            replacements,
             notes,
         },
     ) in pending
     {
-        if let Some((_, fixes)) = tidy_fixes.iter().find(|(i, _)| *i == index) {
-            replacements.extend(fixes.own.iter().cloned());
-        }
         let content = analyzed.content(index, clang_params)?;
         let mut file = files[index]
             .lock()
@@ -306,9 +306,27 @@ pub fn apply_other_file_fixes(
     Ok(())
 }
 
+/// Get the fixes that clang-tidy suggested for the analyzed file at `index`
+/// while analyzing that file.
+fn own_fixes(tidy_fixes: &[(usize, TidyFixes)], index: usize) -> &[Replacement] {
+    tidy_fixes
+        .iter()
+        .find(|(i, _)| *i == index)
+        .map(|(_, fixes)| fixes.own.as_slice())
+        .unwrap_or_default()
+}
+
+/// Do two replacements overlap, so only one of them can be applied?
+///
+/// Identical replacements do not overlap, because they are applied once.
+fn overlaps(a: &Replacement, b: &Replacement) -> bool {
+    let (first, second) = if a <= b { (a, b) } else { (b, a) };
+    first != second && second.offset < first.offset + first.length
+}
+
 /// The accepted fixes for one analyzed file.
-#[derive(Default)]
 struct Pending {
+    /// The file's own fixes, followed by the accepted fixes from other files.
     replacements: Vec<Replacement>,
     /// Copies of the notes about the diagnostics that suggested the fixes,
     /// with the fixed lines in the analyzed file.
@@ -316,10 +334,26 @@ struct Pending {
 }
 
 impl Pending {
-    fn add(&mut self, fix: &OtherFileFix, line: u32) {
+    fn new(own: &[Replacement]) -> Self {
+        Self {
+            replacements: own.to_vec(),
+            notes: vec![],
+        }
+    }
+
+    /// Accept a `fix` that starts at `line`, unless it overlaps a fix accepted before
+    /// (or the file's own fixes, which take precedence).
+    fn add(&mut self, fix: &OtherFileFix, line: u32) -> Result<(), Rejection> {
+        if self
+            .replacements
+            .iter()
+            .any(|r| overlaps(r, &fix.replacement))
+        {
+            return Err(Rejection::Overlaps);
+        }
         self.replacements.push(fix.replacement.clone());
         let Some(note) = &fix.note else {
-            return;
+            return Ok(());
         };
         let note = TidyNotification {
             fixed_lines: vec![line],
@@ -332,6 +366,7 @@ impl Pending {
         } else {
             self.notes.push(note);
         }
+        Ok(())
     }
 }
 
