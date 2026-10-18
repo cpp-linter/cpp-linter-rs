@@ -62,7 +62,7 @@ jobs:
       #   if: runner.os == 'Windows'
       #   run: vcpkg install openssl
 
-      - uses: cargo-bins/cargo-binstall@7bebc2e59eb8820162b7ac8f62a92bfdb2732447 # v1.25.1
+      - uses: cargo-bins/cargo-binstall@3be4ad2b146f3302f92e5956c54fedbb6ae8cccc # v1.25.3
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - name: Install third-party binaries
@@ -76,7 +76,7 @@ jobs:
           python-version: 3.x
 
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: true
           cache-dependency-glob: "uv.lock"
