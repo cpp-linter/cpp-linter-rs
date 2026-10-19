@@ -31,6 +31,6 @@ reqwest = { version = "0.13.4", default-features = false, features = ["http2", "
 thiserror = "2.0.18"
 semver = "1.0.28"
 serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.150"
+serde_json = "1.0.154"
 tempfile = "3.27.0"
-tokio = "1.52.3"
+tokio = "1.53.3"
