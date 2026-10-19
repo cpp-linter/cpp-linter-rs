@@ -1,5 +1,6 @@
 use std::{
-    fs,
+    collections::BTreeMap,
+    env, fs,
     io::Write,
     path::PathBuf,
     time::{Duration, SystemTime},
@@ -7,19 +8,30 @@ use std::{
 
 use reqwest::blocking::ClientBuilder;
 
-const URL: &str = "https://github.com/cpp-linter/clang-tools-static-binaries/releases/latest/download/versions.json";
+/// The index of all static binaries, one release per LLVM version.
+const URL: &str = "https://cpp-linter.github.io/clang-tools-static-binaries/index.json";
+
+/// The only index format this build script understands.
+const INDEX_SCHEMA_VERSION: u8 = 1;
 
 #[derive(Debug, serde::Deserialize)]
-struct VersionInfo {
-    release_tag: String,
-    llvm_versions: std::collections::HashMap<u8, String>,
+struct StaticBinariesIndex {
+    schema_version: u8,
+    versions: BTreeMap<u8, VersionEntry>,
 }
+
+#[derive(Debug, serde::Deserialize)]
+struct VersionEntry {
+    /// The release tag that holds this LLVM version's binaries.
+    tag: String,
+}
+
 fn main() {
-    let pre_seed = PathBuf::from("versions.json");
-    let version_info_str = if pre_seed.exists()
+    let pre_seed = PathBuf::from("static-binaries-index.json");
+    let index_str = if pre_seed.exists()
         && let Ok(metadata) = fs::metadata(&pre_seed)
-        // if this is a docs.rs build, then use the versions,json present in the package.
-        && (std::env::var_os("DOCS_RS").is_some()
+        // if this is a docs.rs build, then use the index present in the package.
+        && (env::var_os("DOCS_RS").is_some()
             // otherwise, check if the file is not too old (24 hours)
             || metadata.modified().is_ok_and(|d| {
                 SystemTime::now()
@@ -28,7 +40,7 @@ fn main() {
                     .unwrap_or(Duration::from_hours(25))
                     < Duration::from_hours(24)
             })) {
-        println!("cargo:warning=Using pre-seeded version info from {pre_seed:?}");
+        println!("cargo:warning=Using pre-seeded static binaries index from {pre_seed:?}");
         fs::read_to_string(&pre_seed).unwrap()
     } else {
         let versions = ClientBuilder::new()
@@ -51,23 +63,30 @@ fn main() {
         cached_seed.set_modified(SystemTime::now()).unwrap();
         versions
     };
-    let version_info: VersionInfo = serde_json::from_str(&version_info_str).unwrap();
-    let (min_ver, max_ver) = {
-        let (mut min_v, mut max_v) = (None, None);
-        for ver in version_info.llvm_versions.keys() {
-            if min_v.is_none_or(|v| v > ver) {
-                min_v = Some(ver);
-            }
-            if max_v.is_none_or(|v| v < ver) {
-                max_v = Some(ver);
-            }
-        }
-        (min_v.unwrap(), max_v.unwrap())
-    };
-    println!(
-        "cargo:rustc-env=CLANG_TOOLS_TAG={}",
-        version_info.release_tag
+    let index: StaticBinariesIndex = serde_json::from_str(&index_str).unwrap();
+    assert_eq!(
+        index.schema_version, INDEX_SCHEMA_VERSION,
+        "Unsupported schema version of {URL}"
     );
+    let min_ver = index
+        .versions
+        .keys()
+        .next()
+        .expect("index lists no versions");
+    let max_ver = index.versions.keys().next_back().unwrap();
     println!("cargo:rustc-env=MIN_CLANG_TOOLS_VERSION={min_ver}");
     println!("cargo:rustc-env=MAX_CLANG_TOOLS_VERSION={max_ver}");
+
+    // Each LLVM version is published in its own release.
+    let release_tags = index
+        .versions
+        .iter()
+        .map(|(major, entry)| format!("    ({major}, {:?}),\n", entry.tag))
+        .collect::<String>();
+    let out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
+    fs::write(
+        out_dir.join("release_tags.rs"),
+        format!("&[\n{release_tags}]\n"),
+    )
+    .unwrap();
 }

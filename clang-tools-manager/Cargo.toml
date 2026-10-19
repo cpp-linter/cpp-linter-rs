@@ -10,9 +10,9 @@ homepage.workspace = true
 license.workspace = true
 edition.workspace = true
 repository.workspace = true
-# Include a pre-seeded versions.json file in package published to crates.io.
+# Include a pre-seeded static-binaries-index.json file in package published to crates.io.
 # This is invalidated after 24 hours, but it allows docs.rs builds to succeed.
-include = ["versions.json", "src/**", "Cargo.toml", "README.md", "build.rs", "tests/**"]
+include = ["static-binaries-index.json", "src/**", "Cargo.toml", "README.md", "build.rs", "tests/**"]
 
 [[bin]]
 path = "src/main.rs"

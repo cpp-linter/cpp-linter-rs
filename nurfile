@@ -20,14 +20,14 @@ def "nur docs rs" [
     run-cmd ...$cmd
 }
 
-const URL = "https://github.com/cpp-linter/clang-tools-static-binaries/releases/latest/download/versions.json"
+const URL = "https://cpp-linter.github.io/clang-tools-static-binaries/index.json"
 
-# Seed the versions.json file with the latest release from GitHub.
+# Seed the static-binaries-index.json file with the latest index of static binaries.
 #
 # Useful to avoid network requests in local dev builds of clang-tools-manager crate.
 # This will instigate a warning, but that is expected.
 def "nur seed versions" [] {
-    let versions = (http get $URL) | save --force clang-tools-manager/versions.json
+    let versions = (http get $URL) | save --force clang-tools-manager/static-binaries-index.json
 }
 
 # Build mkdocs output.

@@ -5,7 +5,7 @@ on:
     outputs:
       artifact-name:
         description: >-
-          The name of uploaded artifact containing the versions.json file.
+          The name of uploaded artifact containing the static-binaries-index.json file.
         value: static-binary-versions
 
 permissions: {}
@@ -14,16 +14,14 @@ jobs:
   pre-seed-versions:
     runs-on: ubuntu-latest
     steps:
-      - env:
-          GITHUB_TOKEN: ${{ github.token }}
+      - name: Download static binaries index
         run: >-
-          gh release download
-          -R cpp-linter/clang-tools-static-binaries
-          --pattern versions.json
-          --output versions.json
-      - name: Upload versions.json
+          curl --fail --silent --show-error --location --retry 3
+          --output static-binaries-index.json
+          https://cpp-linter.github.io/clang-tools-static-binaries/index.json
+      - name: Upload static-binaries-index.json
         uses: actions/upload-artifact@v7
         with:
           name: static-binary-versions
-          path: versions.json
+          path: static-binaries-index.json
           if-no-files-found: error
