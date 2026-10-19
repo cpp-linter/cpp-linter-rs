@@ -338,14 +338,7 @@ impl ReviewComments {
                 format!("\n{dupes} suggestions were duplicates of previous reviews.\n").as_str(),
             );
         }
-        if !self.skipped_fixes.is_empty() {
-            body.push_str(
-                "\nSome clang-tidy fixes also change files that cpp-linter did not change. \
-                Please apply these parts yourself:\n\n",
-            );
-            body.push_str(&self.skipped_fixes.join("\n"));
-            body.push('\n');
-        }
+        self.summarize_skipped_fixes(&mut body);
         // The `full_patch` includes all suggestions that didn't fit in the diff.
         // It can also contain suggestions that were duplicates of previous reviews.
         if !self.full_patch.is_empty() {
@@ -381,6 +374,42 @@ impl ReviewComments {
         }
         body.push_str(USER_OUTREACH);
         body
+    }
+
+    /// Append the list of [`Self::skipped_fixes`] to the review summary `body`.
+    ///
+    /// Only the list items that fit within the maximum length of a GitHub comment
+    /// (leaving room for [`USER_OUTREACH`]) are added.
+    /// The number of items left out is mentioned instead.
+    fn summarize_skipped_fixes(&self, body: &mut String) {
+        if self.skipped_fixes.is_empty() {
+            return;
+        }
+        const HEADING: &str = "\nSome clang-tidy fixes also change files that cpp-linter did not change. \
+            Please apply these parts yourself:\n\n";
+        // Room kept for the line about omitted items.
+        const OMITTED_RESERVE: usize = 100;
+        let max_len = (u16::MAX as usize).saturating_sub(USER_OUTREACH.len() + OMITTED_RESERVE);
+        if body.len() + HEADING.len() > max_len {
+            log::warn!("The list of skipped fixes is too large to include in the review summary.");
+            return;
+        }
+        body.push_str(HEADING);
+        let mut omitted = 0;
+        for item in &self.skipped_fixes {
+            if omitted == 0 && body.len() + item.len() < max_len {
+                body.push_str(item);
+                body.push('\n');
+            } else {
+                omitted += 1;
+            }
+        }
+        if omitted > 0 {
+            log::warn!("{omitted} skipped fixes did not fit in the review summary.");
+            body.push_str(&format!(
+                "\n{omitted} more were not listed because this summary is too long.\n"
+            ));
+        }
     }
 
     /// Check if a given comment's [`Suggestion`] is already contained within the existing [`Self::comments`].
@@ -501,6 +530,34 @@ mod tests {
             review_summary.contains("Please apply these parts yourself:\n\n- first\n- second\n")
         );
         assert!(!review_summary.contains("No concerns to report"));
+    }
+
+    #[test]
+    fn summarize_skipped_fixes_truncated() {
+        let clang_versions = ClangVersions {
+            format_version: None,
+            tidy_version: Some(PSEUDO_VERSION),
+        };
+        let item = format!("- {}", "a".repeat(1000));
+        let review_summary = ReviewComments {
+            skipped_fixes: vec![item; 100],
+            ..Default::default()
+        }
+        .summarize(&clang_versions, &[], 0, true);
+        assert!(review_summary.len() <= u16::MAX as usize);
+        assert!(review_summary.contains("more were not listed because this summary is too long."));
+        assert!(review_summary.ends_with(USER_OUTREACH));
+    }
+
+    #[test]
+    fn summarize_skipped_fixes_no_room() {
+        let mut body = "a".repeat(u16::MAX as usize);
+        ReviewComments {
+            skipped_fixes: vec!["- first".to_string()],
+            ..Default::default()
+        }
+        .summarize_skipped_fixes(&mut body);
+        assert_eq!(body.len(), u16::MAX as usize);
     }
 
     #[test]
