@@ -89,7 +89,6 @@ mod supported_platform {
     use std::{
         fs,
         io::{BufRead, BufReader},
-        ops::RangeInclusive,
         path::{Path, PathBuf},
     };
 
@@ -104,19 +103,24 @@ mod supported_platform {
     };
 
     const CLANG_TOOLS_REPO: &str = "https://github.com/cpp-linter/clang-tools-static-binaries";
-    const CLANG_TOOLS_TAG: &str = env!("CLANG_TOOLS_TAG");
+
+    /// Each available LLVM major version and the release tag that holds its binaries.
+    const RELEASE_TAGS: &[(u8, &str)] = include!(concat!(env!("OUT_DIR"), "/release_tags.rs"));
 
     impl StaticDistDownloader {
-        /// Finds a suitable version from `req_ver` within the range of available clang tools versions.
+        /// Finds the newest available version that satisfies `req_ver`,
+        /// along with the release tag that holds its binaries.
         ///
-        /// The available versions are determined by the `MIN_CLANG_TOOLS_VERSION` and
-        /// `MAX_CLANG_TOOLS_VERSION` environment variables (inclusive) at compile time.
-        fn find_suitable_version(req_ver: &VersionReq) -> Option<Version> {
-            let clang_tools_versions: RangeInclusive<u8> = Self::get_major_version_range();
-            clang_tools_versions
-                .map(|v| Version::new(v as u64, 0, 0))
+        /// The available versions (and their release tags) are read from the
+        /// static binaries' `index.json` at compile time.
+        pub(crate) fn find_suitable_version(
+            req_ver: &VersionReq,
+        ) -> Option<(Version, &'static str)> {
+            RELEASE_TAGS
+                .iter()
                 .rev()
-                .find(|ver| req_ver.matches(ver))
+                .map(|(major, tag)| (Version::new(*major as u64, 0, 0), *tag))
+                .find(|(ver, _)| req_ver.matches(ver))
         }
 
         /// Verifies the SHA512 checksum of the downloaded file.
@@ -146,18 +150,25 @@ mod supported_platform {
             Ok(())
         }
 
+        /// The cached `SHA512SUMS` file of the release tagged `release_tag`.
+        pub(crate) fn sha512_cache_path(release_tag: &str) -> PathBuf {
+            Self::get_cache_dir()
+                .join("static_dist")
+                .join(release_tag)
+                .join("SHA512SUMS")
+        }
+
         /// Downloads the `requested_version` of the specified `tool` from a distribution of statically linked binaries.
         ///
         /// The distribution is maintained at <https://github.com/cpp-linter/clang-tools-static-binaries>.
         /// Supported platforms includes Windows, Linux, and MacOS.
-        /// Supported architectures is limited to `x86_64` (`amd64`) and `aarch64` (`arm64`);
-        /// Windows only supports x86_64 architecture (for now).
+        /// Supported architectures is limited to `x86_64` (`amd64`) and `aarch64` (`arm64`).
         pub async fn download_tool(
             tool: &ClangTool,
             requested_version: &VersionReq,
             directory: Option<&PathBuf>,
         ) -> Result<PathBuf, StaticDistDownloadError> {
-            let ver = Self::find_suitable_version(requested_version)
+            let (ver, release_tag) = Self::find_suitable_version(requested_version)
                 .ok_or(StaticDistDownloadError::UnsupportedVersion)?;
             let ver_str = ver.major.to_string();
             // we already gated unsupported architectures above,
@@ -175,7 +186,7 @@ mod supported_platform {
                 "linux"
             };
 
-            let base_url = format!("{CLANG_TOOLS_REPO}/releases/download/{CLANG_TOOLS_TAG}/",);
+            let base_url = format!("{CLANG_TOOLS_REPO}/releases/download/{release_tag}/");
             let suffix = if cfg!(target_os = "windows") {
                 ".exe"
             } else {
@@ -201,7 +212,7 @@ mod supported_platform {
                 #[cfg(unix)]
                 super::super::chmod_file(&download_path, None)?;
             }
-            let sha512_cache_path = cache_path.join("static_dist").join("SHA512SUMS");
+            let sha512_cache_path = Self::sha512_cache_path(release_tag);
             if sha512_cache_path.exists() {
                 log::info!(
                     "Using cached SHA512 checksums for static binaries from {:?}",
@@ -226,6 +237,14 @@ mod supported_platform {
         use crate::ClangTool;
         use semver::VersionReq;
         use tempfile::TempDir;
+
+        #[test]
+        fn find_newest_with_tag() {
+            let req_ver = VersionReq::parse(">=12").unwrap();
+            let (ver, tag) = StaticDistDownloader::find_suitable_version(&req_ver).unwrap();
+            assert_eq!(ver.major.to_string(), super::super::MAX_CLANG_TOOLS_VERSION);
+            assert!(tag.starts_with(&format!("llvm-{}.", ver.major)));
+        }
 
         #[test]
         fn find_none() {
@@ -262,7 +281,11 @@ mod supported_platform {
                     ));
                 }
             }
-            let sha512_sums = cache.path().join("static_dist").join("SHA512SUMS");
+            let sha512_sums = StaticDistDownloader::sha512_cache_path(
+                StaticDistDownloader::find_suitable_version(&VersionReq::parse("17").unwrap())
+                    .unwrap()
+                    .1,
+            );
             fs::create_dir_all(sha512_sums.parent().unwrap()).unwrap();
             fs::write(&sha512_sums, sums).unwrap();
 

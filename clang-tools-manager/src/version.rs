@@ -392,7 +392,7 @@ mod tests {
         use tempfile::TempDir;
 
         use crate::{
-            ClangTool, GetToolError, RequestedVersion,
+            ClangTool, GetToolError, RequestedVersion, StaticDistDownloader,
             test_utils_unix::{
                 enable_logs, fake_clang_tool, fake_exe, isolate_path, set_cache_dir,
             },
@@ -455,9 +455,12 @@ mod tests {
                         checksums.push_str(&format!("{hash}  clang-format-17_{platform}-{arch}\n"));
                     }
                 }
-                let sums = self.cache.path().join("static_dist");
-                fs::create_dir_all(&sums).unwrap();
-                fs::write(sums.join("SHA512SUMS"), checksums).unwrap();
+                let (_, release_tag) =
+                    StaticDistDownloader::find_suitable_version(&VersionReq::parse("17").unwrap())
+                        .unwrap();
+                let sums = StaticDistDownloader::sha512_cache_path(release_tag);
+                fs::create_dir_all(sums.parent().unwrap()).unwrap();
+                fs::write(sums, checksums).unwrap();
             }
 
             async fn eval(
