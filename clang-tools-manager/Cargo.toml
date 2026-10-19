@@ -33,12 +33,12 @@ reqwest = { workspace = true }
 semver =  { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-sha2 = "0.11.0"
+sha2 = "0.11.1"
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["macros"], optional = true }
 url = "2.5.8"
-which = "8.0.2"
-zip = { version = "9.0.1", default-features = false, features = ["deflate"] }
+which = "8.0.6"
+zip = { version = "9.0.5", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]
 mockito = { workspace = true }

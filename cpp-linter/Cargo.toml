@@ -15,13 +15,13 @@ license.workspace = true
 
 [dependencies]
 anyhow = { workspace = true, optional = true }
-async-trait = "0.1.89"
-chrono = "0.4.44"
+async-trait = "0.1.92"
+chrono = "0.4.45"
 clang-tools-manager = { path = "../clang-tools-manager", features = ["bin"], version = "0.3.1" }
 clap = { workspace = true, optional = true }
 colored = { workspace = true }
-fast-glob = "1.0.1"
-futures = "0.3.32"
+fast-glob = "1.1.2"
+futures = "0.3.34"
 gix-imara-diff = { version = "0.3.1", features = ["unified_diff"] }
 log = { workspace = true }
 regex = { workspace = true }
@@ -34,7 +34,7 @@ thiserror = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 [dependencies.git-bot-feedback]
-version = "0.8.1"
+version = "0.8.5"
 features = ["file-changes"]
 # path = "../../git-bot-feedback"
 # git = "https://github.com/2bndy5/git-bot-feedback"
