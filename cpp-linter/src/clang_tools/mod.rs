@@ -273,6 +273,9 @@ pub struct ReviewComments {
     /// This includes changes from both clang-tidy and clang-format
     /// (assembled in that order).
     pub full_patch: String,
+    /// Markdown list items about the parts of clang-tidy fixes that were not applied
+    /// to other files (see [`clang_tidy::TidyNotification::skipped_fixes`]).
+    pub skipped_fixes: Vec<String>,
 }
 
 impl ReviewComments {
@@ -334,6 +337,14 @@ impl ReviewComments {
             body.push_str(
                 format!("\n{dupes} suggestions were duplicates of previous reviews.\n").as_str(),
             );
+        }
+        if !self.skipped_fixes.is_empty() {
+            body.push_str(
+                "\nSome clang-tidy fixes also change files that cpp-linter did not change. \
+                Please apply these parts yourself:\n\n",
+            );
+            body.push_str(&self.skipped_fixes.join("\n"));
+            body.push('\n');
         }
         // The `full_patch` includes all suggestions that didn't fit in the diff.
         // It can also contain suggestions that were duplicates of previous reviews.
@@ -472,6 +483,22 @@ mod tests {
             summary_only,
         );
         assert!(review_summary.contains("suggestions were duplicates of previous reviews"));
+    }
+
+    #[test]
+    fn summarize_skipped_fixes() {
+        let clang_versions = ClangVersions {
+            format_version: None,
+            tidy_version: Some(PSEUDO_VERSION),
+        };
+        let review_summary = ReviewComments {
+            skipped_fixes: vec!["- first".to_string(), "- second".to_string()],
+            ..Default::default()
+        }
+        .summarize(&clang_versions, &[], 0, true);
+        assert!(
+            review_summary.contains("Please apply these parts yourself:\n\n- first\n- second\n")
+        );
     }
 
     #[test]

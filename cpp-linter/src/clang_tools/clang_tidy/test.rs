@@ -32,6 +32,7 @@ fn clang_diagnostic_link() {
         diagnostic: String::from("clang-diagnostic-error"),
         suggestion: vec![],
         fixed_lines: vec![],
+        skipped_fixes: vec![],
     };
     assert_eq!(note.diagnostic_link(), note.diagnostic);
 }
@@ -47,6 +48,7 @@ fn clang_diagnostic_warning_link() {
         diagnostic: String::from("clang-diagnostic-unused-variable"),
         suggestion: vec![],
         fixed_lines: vec![],
+        skipped_fixes: vec![],
     };
     let expected = format!(
         "[{}]({CLANG_DIAGNOSTICS_URL}#w{})",
@@ -66,6 +68,7 @@ fn clang_analyzer_link() {
         diagnostic: String::from("clang-analyzer-core.NullDereference"),
         suggestion: vec![],
         fixed_lines: vec![],
+        skipped_fixes: vec![],
     };
     let expected = format!(
         "[{}](https://clang.llvm.org/extra/clang-tidy/checks/{}/{}.html)",
@@ -86,6 +89,7 @@ fn invalid_diagnostic_link() {
         diagnostic: expected.clone(),
         suggestion: vec![],
         fixed_lines: vec![],
+        skipped_fixes: vec![],
     };
     assert_eq!(note.diagnostic_link(), expected);
 }
@@ -228,6 +232,7 @@ fn dummy_note(filename: &str, fixed_lines: Vec<u32>) -> TidyNotification {
         diagnostic: String::from("modernize-use-auto"),
         suggestion: vec![],
         fixed_lines,
+        skipped_fixes: vec![],
     }
 }
 
@@ -262,6 +267,23 @@ fn suggestion_help_with_and_without_fixes() {
     // No fixed line within the range falls back to a plain "suggestion" header.
     let help = advice.get_suggestion_help(20, 30);
     assert!(help.contains("clang-tidy suggestion"));
+}
+
+#[test]
+fn suggestion_help_with_skipped_fixes() {
+    use super::{SkippedFix, TidyAdvice};
+
+    let mut note = dummy_note("demo.cpp", vec![5]);
+    note.skipped_fixes.push(SkippedFix {
+        file: "demo.h".to_string(),
+        reason: "it is not one of the analyzed files".to_string(),
+    });
+    let advice = TidyAdvice { notes: vec![note] };
+    let help = advice.get_suggestion_help(5, 5);
+    assert!(help.contains(
+        "\n  - :warning: Part of this fix was not applied to `demo.h` \
+        because it is not one of the analyzed files.\n"
+    ));
 }
 
 #[test]
@@ -528,6 +550,7 @@ fn apply_exported_fixes() {
             // the matching note, to explain the fix once it is applied
             note: Some(TidyNotification {
                 fixed_lines: vec![],
+                skipped_fixes: vec![],
                 ..notes[0].clone()
             }),
         }]

@@ -554,7 +554,7 @@ fn make_tidy_comment(
                     let uses_auto_fix = !tidy_note.fixed_lines.is_empty();
                     let mut tmp_note = format!("- {}\n\n", tidy_note.filename);
                     tmp_note.push_str(&format!(
-                        "   <strong>{filename}:{line}:{cols}:</strong> {severity}: [{diagnostic}]{auto_fixable}\n   > {rationale}\n{concerned_code}",
+                        "   <strong>{filename}:{line}:{cols}:</strong> {severity}: [{diagnostic}]{auto_fixable}{skipped_fixes}\n   > {rationale}\n{concerned_code}",
                         filename = tidy_note.filename,
                         line = tidy_note.line,
                         cols = tidy_note.cols,
@@ -565,6 +565,11 @@ fn make_tidy_comment(
                         } else {
                             ""
                         },
+                        skipped_fixes = tidy_note
+                            .skipped_fixes
+                            .iter()
+                            .map(|skipped| format!("\n   :warning: {}", skipped.describe()))
+                            .collect::<String>(),
                         rationale = tidy_note.rationale,
                         concerned_code = if tidy_note.suggestion.is_empty() {String::from("")} else {
                             format!("\n   ```{ext}\n   {suggestion}\n   ```\n",
@@ -625,7 +630,7 @@ mod test {
         clang_tools::{
             ClangVersions,
             clang_format::FormatAdvice,
-            clang_tidy::{TidyAdvice, TidyNotification},
+            clang_tidy::{SkippedFix, TidyAdvice, TidyNotification},
         },
         cli::{FeedbackInput, ThreadComments},
         common_fs::FileObj,
@@ -664,6 +669,7 @@ mod test {
                     diagnostic: String::from("clang-diagnostic-warning"),
                     suggestion: vec![],
                     fixed_lines: vec![],
+                    skipped_fixes: vec![],
                 }];
                 file.tidy_advice = Some(TidyAdvice { notes });
                 file.format_advice = Some(FormatAdvice {
@@ -755,6 +761,7 @@ mod test {
                 diagnostic: String::from("clang-diagnostic-error"),
                 suggestion: vec![String::from("int main() {}")],
                 fixed_lines: vec![1],
+                skipped_fixes: vec![],
             }],
         });
         file.format_advice = Some(FormatAdvice {
@@ -762,6 +769,33 @@ mod test {
             replacements: vec![1..=2],
         });
         vec![Arc::new(Mutex::new(file))]
+    }
+
+    #[test]
+    fn tidy_comment_with_skipped_fixes() {
+        let files = make_dummy_files("warning");
+        {
+            let mut file = files[0].lock().unwrap();
+            let note = &mut file.tidy_advice.as_mut().unwrap().notes[0];
+            note.skipped_fixes.push(SkippedFix {
+                file: "tests/demo/demo.hpp".to_string(),
+                reason: "it is not one of the analyzed files".to_string(),
+            });
+        }
+        let mut comment = String::new();
+        let mut remaining_length = u64::from(u16::MAX);
+        super::make_tidy_comment(
+            &files,
+            &mut comment,
+            1,
+            &"1.2.3".to_string(),
+            &mut remaining_length,
+        )
+        .unwrap();
+        assert!(comment.contains(
+            "auto-fix included in generated patch[^1]\n   :warning: Part of this fix was not \
+            applied to `tests/demo/demo.hpp` because it is not one of the analyzed files.\n   > "
+        ));
     }
 
     fn dummy_versions() -> ClangVersions {

@@ -70,6 +70,32 @@ pub struct TidyNotification {
 
     /// The list of line numbers (in the analyzed file) that clang-tidy suggested fixes for.
     pub fixed_lines: Vec<u32>,
+
+    /// The parts of the diagnostic's fix that were not applied to other files
+    /// (eg. a header that is not one of the analyzed files).
+    ///
+    /// Users have to apply these parts themselves, so they are mentioned in the
+    /// thread comment and PR review.
+    pub skipped_fixes: Vec<SkippedFix>,
+}
+
+/// A part of a clang-tidy fix that was not applied to another file.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SkippedFix {
+    /// The other file's path (relative to the repository root, if possible).
+    pub file: String,
+    /// Why the fix was not applied to the other file.
+    pub reason: String,
+}
+
+impl SkippedFix {
+    /// Describe the skipped fix in a sentence (in markdown).
+    pub fn describe(&self) -> String {
+        format!(
+            "Part of this fix was not applied to `{}` because {}.",
+            self.file, self.reason
+        )
+    }
 }
 
 /// The URL to clang-tidy's documentation.
@@ -135,6 +161,9 @@ impl TidyAdvice {
                         note.rationale,
                         note.diagnostic_link()
                     ));
+                    for skipped in &note.skipped_fixes {
+                        diagnostics.push(format!("  - :warning: {}\n", skipped.describe()));
+                    }
                 }
             }
         }
@@ -232,6 +261,7 @@ fn parse_tidy_output(
                     diagnostic: String::from(&captured[6]),
                     suggestion: Vec::new(),
                     fixed_lines: Vec::new(),
+                    skipped_fixes: vec![],
                 });
             }
         } else if let Some(note) = &mut notification {
