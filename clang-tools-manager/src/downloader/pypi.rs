@@ -8,7 +8,7 @@ use std::{
     fs,
     io::{Read, Write},
     num::NonZero,
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::Command,
     str::FromStr,
     time::Duration,
@@ -556,7 +556,10 @@ impl PyPiDownloader {
         );
         for i in 0..archive.len() {
             let mut file = archive.by_index(i)?;
-            if file.name() == expected_zip_path {
+            if file
+                .enclosed_name()
+                .is_some_and(|n| n == Path::new(&expected_zip_path))
+            {
                 if extracted_bin.exists() {
                     let meta = fs::metadata(extracted_bin)?;
                     if meta.len() == file.size() {

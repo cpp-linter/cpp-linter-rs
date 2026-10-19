@@ -38,7 +38,7 @@ thiserror = { workspace = true }
 tokio = { workspace = true, features = ["macros"], optional = true }
 url = "2.5.8"
 which = "8.0.2"
-zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
+zip = { version = "9.0.1", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]
 mockito = { workspace = true }
