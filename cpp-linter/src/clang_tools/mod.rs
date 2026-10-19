@@ -373,8 +373,9 @@ impl ReviewComments {
                 body.push_str(self.full_patch.as_str());
                 body.push_str(patch_suffix);
             }
-        } else if total_review_comments == 0 {
+        } else if total_review_comments == 0 && self.skipped_fixes.is_empty() {
             // Only congratulate if there was no reused comments
+            // and no fix parts left for the user to apply
             log::info!("No concerns to report: LGTM");
             body.push_str("\nNo concerns to report. Great job! :tada:\n");
         }
@@ -499,6 +500,7 @@ mod tests {
         assert!(
             review_summary.contains("Please apply these parts yourself:\n\n- first\n- second\n")
         );
+        assert!(!review_summary.contains("No concerns to report"));
     }
 
     #[test]
