@@ -111,7 +111,7 @@ jobs:
           use-cache: true # zizmor: ignore[cache-poisoning]
       - name: Install cargo-binstall
         if: endsWith(matrix.settings.build, ' -x') || endsWith(matrix.settings.build, '--use-cross')
-        uses: cargo-bins/cargo-binstall@7bebc2e59eb8820162b7ac8f62a92bfdb2732447 # v1.25.1
+        uses: cargo-bins/cargo-binstall@3be4ad2b146f3302f92e5956c54fedbb6ae8cccc # v1.25.3
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - name: Install ${{endsWith(matrix.settings.build, ' -x') && 'cargo-zigbuild' || 'cargo-cross'}}
