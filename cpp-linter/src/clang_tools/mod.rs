@@ -278,6 +278,10 @@ pub struct ReviewComments {
     pub skipped_fixes: Vec<String>,
 }
 
+/// The notice added to a review summary instead of a patch that does not fit.
+const PATCH_TOO_LARGE: &str =
+    "\nThe full patch of fixes is too large to include in this summary.\n";
+
 impl ReviewComments {
     /// Get a markdown-formatted string that summarizes the given [`ReviewComment`]s.
     ///
@@ -358,9 +362,7 @@ impl ReviewComments {
                 log::warn!(
                     "The full patch of fixes is too large to include in the review summary."
                 );
-                body.push_str(
-                    "\nThe full patch of fixes is too large to include in this summary.\n",
-                );
+                body.push_str(PATCH_TOO_LARGE);
             } else {
                 body.push_str(&patch_prefix);
                 body.push_str(self.full_patch.as_str());
@@ -389,7 +391,9 @@ impl ReviewComments {
             Please apply these parts yourself:\n\n";
         // Room kept for the line about omitted items.
         const OMITTED_RESERVE: usize = 100;
-        let max_len = (u16::MAX as usize).saturating_sub(USER_OUTREACH.len() + OMITTED_RESERVE);
+        // Also keep room for the notice that replaces a patch that does not fit.
+        let max_len = (u16::MAX as usize)
+            .saturating_sub(USER_OUTREACH.len() + OMITTED_RESERVE + PATCH_TOO_LARGE.len());
         if body.len() + HEADING.len() > max_len {
             log::warn!("The list of skipped fixes is too large to include in the review summary.");
             return;
@@ -541,10 +545,12 @@ mod tests {
         let item = format!("- {}", "a".repeat(1000));
         let review_summary = ReviewComments {
             skipped_fixes: vec![item; 100],
+            full_patch: "a".repeat(1000),
             ..Default::default()
         }
         .summarize(&clang_versions, &[], 0, true);
         assert!(review_summary.len() <= u16::MAX as usize);
+        assert!(review_summary.contains(PATCH_TOO_LARGE));
         assert!(review_summary.contains("more were not listed because this summary is too long."));
         assert!(review_summary.ends_with(USER_OUTREACH));
     }
