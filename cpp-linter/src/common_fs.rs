@@ -250,6 +250,16 @@ impl FileObj {
             // Count of clang-tidy diagnostics that had no fixes applied
             let mut total = 0;
             for note in &advice.notes {
+                if note.filename == file_name {
+                    for skipped in &note.skipped_fixes {
+                        review_comments.skipped_fixes.push(format!(
+                            "- **{file_name}:{}** [{}]: {}",
+                            note.line,
+                            note.diagnostic_link(),
+                            skipped.describe()
+                        ));
+                    }
+                }
                 // Skip diagnostics about other files (eg. included headers);
                 // their line numbers do not refer to this file.
                 if note.filename == file_name
@@ -274,6 +284,9 @@ impl FileObj {
                             format!("\n```{file_ext}\n{}\n```\n", note.suggestion.join("\n"))
                                 .as_str(),
                         );
+                    }
+                    for skipped in &note.skipped_fixes {
+                        suggestion.push_str(&format!("\n:warning: {}\n", skipped.describe()));
                     }
                     let mut is_merged = false;
                     for s in &mut review_comments.comments {
@@ -506,7 +519,7 @@ mod test {
 
     #[test]
     fn unfixed_tidy_diagnostics() {
-        use crate::clang_tools::clang_tidy::{TidyAdvice, TidyNotification};
+        use crate::clang_tools::clang_tidy::{SkippedFix, TidyAdvice, TidyNotification};
 
         let repo_root = TempDir::new().unwrap();
         let file_name = PathBuf::from("test_file.cpp");
@@ -527,6 +540,7 @@ mod test {
             diagnostic: "readability-identifier-length".to_string(),
             suggestion,
             fixed_lines: vec![],
+            skipped_fixes: vec![],
         };
         let mut file_obj = FileObj::from(file_name, vec![1, 3], vec![1..=1, 3..=4]);
         file_obj.patched_path = Some(patched_file.path().to_path_buf());
@@ -535,7 +549,13 @@ mod test {
                 // merged into the existing suggestion for line 1
                 note(1, vec![]),
                 // not in any existing suggestion; creates a new suggestion
-                note(3, vec!["line3".to_string()]),
+                TidyNotification {
+                    skipped_fixes: vec![SkippedFix {
+                        file: "test_file.h".to_string(),
+                        reason: "it is not one of the analyzed files".to_string(),
+                    }],
+                    ..note(3, vec!["line3".to_string()])
+                },
                 // a diagnostic about an included header is not about this file's line 4
                 TidyNotification {
                     filename: "test_file.h".to_string(),
@@ -559,6 +579,18 @@ mod test {
         assert_eq!(new_suggestion.line_end, 3);
         assert!(new_suggestion.suggestion.contains("rationale for line 3"));
         assert!(new_suggestion.suggestion.contains("```cpp\nline3\n```"));
+        let skipped = "Part of this fix was not applied to `test_file.h` \
+            because it is not one of the analyzed files.";
+        assert!(
+            new_suggestion
+                .suggestion
+                .contains(&format!("\n:warning: {skipped}\n"))
+        );
+        assert_eq!(review_comments.skipped_fixes.len(), 1);
+        assert!(
+            review_comments.skipped_fixes[0].starts_with("- **test_file.cpp:3** [[readability")
+        );
+        assert!(review_comments.skipped_fixes[0].ends_with(skipped));
 
         // Processing the same file again merges duplicate suggestions
         file_obj

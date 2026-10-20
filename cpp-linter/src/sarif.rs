@@ -356,6 +356,7 @@ mod test {
             diagnostic: diagnostic.to_string(),
             suggestion: vec![],
             fixed_lines: vec![],
+            skipped_fixes: vec![],
         }
     }
 

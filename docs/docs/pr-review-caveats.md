@@ -84,3 +84,9 @@ Request diff (the summation of file differences in a Pull Request).
 - Some fixes provided might depend on what compiler is used.
   We have made it so clang-tidy takes advantage of any fixes provided by the compiler.
   Compilation errors may still prevent clang-tidy from reporting all concerns.
+- A clang-tidy fix can also change another file (for example, the declaration in a header).
+  That part of the fix is only applied if the other file is also analyzed, is not ignored by
+  `ignore-tidy`, and the change is within the file's changed lines (per
+  [`lines-changed-only`][lines-changed-only]).
+  Otherwise, the review summary (and the thread comment) lists the parts that were not applied,
+  so they can be applied by hand.

@@ -16,7 +16,8 @@ use std::{
 use clang_tools_manager::utils::normalize_path;
 
 use super::{
-    ExportedReplacement, TidyAdvice, TidyNotification, offset_to_line, patch_content, write_cache,
+    ExportedReplacement, SkippedFix, TidyAdvice, TidyNotification, offset_to_line, patch_content,
+    write_cache,
 };
 use crate::{cli::ClangParams, common_fs::FileObj, error::ClangCaptureError};
 
@@ -262,23 +263,25 @@ pub fn apply_other_file_fixes(
                         .add(fix, line)
                 }),
             };
-            logs[*source_index].push(match verdict.err() {
-                None => (
-                    log::Level::Info,
-                    format!(
-                        "Applying the fix for {} (reported in {source_name}) to {other}",
-                        fix.diagnostic,
-                    ),
+            let message = match verdict {
+                Ok(()) => format!(
+                    "Applying the fix for {} (reported in {source_name}) to {other}",
+                    fix.diagnostic,
                 ),
-                Some(rejection) => (
-                    log::Level::Info,
-                    format!(
-                        "Not applying the fix for {} (reported in {source_name}) to {other} because {}",
-                        fix.diagnostic,
-                        rejection.reason(),
-                    ),
-                ),
-            });
+                Err(rejection) => {
+                    let skipped = SkippedFix {
+                        file: other.replace('\\', "/"),
+                        reason: rejection.reason(),
+                    };
+                    let message = format!(
+                        "Not applying the fix for {} (reported in {source_name}) to {} because {}",
+                        fix.diagnostic, skipped.file, skipped.reason,
+                    );
+                    record_skipped_fix(&files[*source_index], fix, skipped)?;
+                    message
+                }
+            };
+            logs[*source_index].push((log::Level::Info, message));
         }
     }
     for (
@@ -324,6 +327,33 @@ fn overlaps(a: &Replacement, b: &Replacement) -> bool {
     first != second && second.offset < first.offset + first.length
 }
 
+/// Record a `skipped` part of a `fix` on the note about the fix's diagnostic in the
+/// analyzed `source` file, so the thread comment and PR review can mention it.
+///
+/// Nothing is recorded if no note about the diagnostic was found.
+fn record_skipped_fix(
+    source: &Arc<Mutex<FileObj>>,
+    fix: &OtherFileFix,
+    skipped: SkippedFix,
+) -> Result<(), ClangCaptureError> {
+    let Some(fix_note) = &fix.note else {
+        return Ok(());
+    };
+    let mut source = source
+        .lock()
+        .map_err(|_| ClangCaptureError::MutexPoisoned)?;
+    let note = source
+        .tidy_advice
+        .as_mut()
+        .and_then(|advice| advice.notes.iter_mut().find(|n| is_same_note(n, fix_note)));
+    if let Some(note) = note
+        && !note.skipped_fixes.contains(&skipped)
+    {
+        note.skipped_fixes.push(skipped);
+    }
+    Ok(())
+}
+
 /// The accepted fixes for one analyzed file.
 struct Pending {
     /// The file's own fixes, followed by the accepted fixes from other files.
@@ -357,6 +387,7 @@ impl Pending {
         };
         let note = TidyNotification {
             fixed_lines: vec![line],
+            skipped_fixes: vec![],
             ..note.clone()
         };
         if let Some(existing) = self.notes.iter_mut().find(|n| is_same_note(n, &note)) {

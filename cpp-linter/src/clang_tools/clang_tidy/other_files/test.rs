@@ -14,7 +14,7 @@ use super::{OtherFileFix, Pending, Replacement, TidyFixes, apply_other_file_fixe
 use crate::{
     clang_tools::{
         ClangTool, analyze_files,
-        clang_tidy::{TidyNotification, tally_tidy_advice},
+        clang_tidy::{SkippedFix, TidyAdvice, TidyNotification, tally_tidy_advice},
     },
     cli::{ClangParams, LinesChangedOnly},
     common_fs::FileObj,
@@ -74,6 +74,7 @@ fn source_note() -> TidyNotification {
         diagnostic: "readability-non-const-parameter".to_string(),
         suggestion: vec![],
         fixed_lines: vec![],
+        skipped_fixes: vec![],
     }
 }
 
@@ -171,20 +172,39 @@ fn not_analyzed() {
         repo_root: tmp.path().to_path_buf(),
         ..Default::default()
     };
-    let files = as_files(vec![FileObj::new(PathBuf::from("fix.cpp"))]);
+    let mut source = FileObj::new(PathBuf::from("fix.cpp"));
+    source.tidy_advice = Some(TidyAdvice {
+        notes: vec![source_note()],
+    });
+    let files = as_files(vec![source]);
+    let mut without_note = header_fix(tmp.path());
+    without_note.note = None;
+    let fixes = TidyFixes {
+        own: vec![],
+        // the same fix twice, and a fix whose diagnostic has no note
+        others: vec![header_fix(tmp.path()), header_fix(tmp.path()), without_note],
+    };
     let mut logs = vec![vec![]];
-    apply_other_file_fixes(
-        &files,
-        &[(0, header_fixes(tmp.path()))],
-        &clang_params,
-        &mut logs,
-    )
-    .unwrap();
+    apply_other_file_fixes(&files, &[(0, fixes)], &clang_params, &mut logs).unwrap();
     assert!(patched(&files[0]).is_none());
     let messages = messages(&logs[0]);
-    assert_eq!(messages.len(), 1);
+    assert_eq!(messages.len(), 3);
     assert!(messages[0].starts_with("Not applying the fix for readability-non-const-parameter"));
     assert!(messages[0].ends_with("to fix.h because it is not one of the analyzed files"));
+    // the skipped fix is recorded once on the diagnostic's note
+    let file = files[0].lock().unwrap();
+    let note = &file.tidy_advice.as_ref().unwrap().notes[0];
+    assert_eq!(
+        note.skipped_fixes,
+        vec![SkippedFix {
+            file: "fix.h".to_string(),
+            reason: "it is not one of the analyzed files".to_string(),
+        }]
+    );
+    assert_eq!(
+        note.skipped_fixes[0].describe(),
+        "Part of this fix was not applied to `fix.h` because it is not one of the analyzed files."
+    );
 }
 
 #[test]
