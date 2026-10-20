@@ -449,7 +449,8 @@ mod tests {
             let tmp_workspace = setup_tmp_workspace();
             let tools_dir = tempfile::tempdir().unwrap();
             let fake_format = make_fake_tool(tools_dir.path(), "clang-format", "");
-            let clang_params = make_clang_params(tmp_workspace.path(), fake_format);
+            let mut clang_params = make_clang_params(tmp_workspace.path(), fake_format);
+            clang_params.gen_patch = true;
             // a directory where the patched file should be cached
             fs::create_dir_all(clang_params.get_cache_path().join("demo/demo.cpp")).unwrap();
             let file = Mutex::new(FileObj::new(PathBuf::from("demo/demo.cpp")));
