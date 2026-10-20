@@ -186,20 +186,22 @@ pub fn run_clang_format(
     } else {
         // clang-tidy was not run on this file,
         // so just use the clang-format fixes as the patched content.
-        let cache_format_fixes = cache_path.join(&file.name);
-        fs::create_dir_all(
-            cache_format_fixes
-                .parent()
-                .ok_or(ClangCaptureError::UnknownCacheParentPath)?,
-        )
-        .map_err(ClangCaptureError::MkDirFailed)?;
-        fs::write(&cache_format_fixes, &output.stdout).map_err(|e| {
-            ClangCaptureError::WriteFileFailed {
-                file_name: cache_format_fixes.to_string_lossy().to_string(),
-                source: e,
-            }
-        })?;
-        file.patched_path = Some(cache_format_fixes);
+        if clang_params.gen_patch {
+            let cache_format_fixes = cache_path.join(&file.name);
+            fs::create_dir_all(
+                cache_format_fixes
+                    .parent()
+                    .ok_or(ClangCaptureError::UnknownCacheParentPath)?,
+            )
+            .map_err(ClangCaptureError::MkDirFailed)?;
+            fs::write(&cache_format_fixes, &output.stdout).map_err(|e| {
+                ClangCaptureError::WriteFileFailed {
+                    file_name: cache_format_fixes.to_string_lossy().to_string(),
+                    source: e,
+                }
+            })?;
+            file.patched_path = Some(cache_format_fixes);
+        }
     }
 
     file.format_advice = Some(format_advice);
@@ -447,7 +449,8 @@ mod tests {
             let tmp_workspace = setup_tmp_workspace();
             let tools_dir = tempfile::tempdir().unwrap();
             let fake_format = make_fake_tool(tools_dir.path(), "clang-format", "");
-            let clang_params = make_clang_params(tmp_workspace.path(), fake_format);
+            let mut clang_params = make_clang_params(tmp_workspace.path(), fake_format);
+            clang_params.gen_patch = true;
             // a directory where the patched file should be cached
             fs::create_dir_all(clang_params.get_cache_path().join("demo/demo.cpp")).unwrap();
             let file = Mutex::new(FileObj::new(PathBuf::from("demo/demo.cpp")));
@@ -459,7 +462,8 @@ mod tests {
         fn no_gen_patch() {
             let tmp_workspace = setup_tmp_workspace();
             let tools_dir = tempfile::tempdir().unwrap();
-            let fake_format = make_fake_tool(tools_dir.path(), "clang-format", "echo 'void main() {}'");
+            let fake_format =
+                make_fake_tool(tools_dir.path(), "clang-format", "echo 'void main() {}'");
             let mut clang_params = make_clang_params(tmp_workspace.path(), fake_format);
             clang_params.gen_patch = false;
             let file = Mutex::new(FileObj::new(PathBuf::from("demo/demo.cpp")));
