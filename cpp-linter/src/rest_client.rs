@@ -261,7 +261,7 @@ impl RestClient {
             } else {
                 self.client.post_pr_review(&options).await?;
             }
-        } else {
+        } else if feedback_inputs.gen_patch {
             for file in files {
                 let file = file
                     .lock()
@@ -480,6 +480,10 @@ impl RestClient {
                 }
                 line_buf.clear();
             }
+            log::info!(
+                "Patch file written to {}",
+                auto_fix_patch_path.to_string_lossy().replace("\\", "/")
+            );
         }
         Ok(())
     }

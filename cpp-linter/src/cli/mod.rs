@@ -576,6 +576,21 @@ pub struct FeedbackOptions {
         help_heading = "Feedback options",
     ))]
     pub passive_reviews: bool,
+
+    /// Set to `true` to generate a patch file of applied clang fixes.
+    ///
+    /// The path to the generated patch file is printed in the logs and
+    /// set as the output variable `fix-patch-path` in CI workflows.
+    #[cfg_attr(feature = "bin", arg(
+        short = 'F',
+        long,
+        default_value_t = false,
+        aliases = ["fix"],
+        action = ArgAction::Set,
+        value_parser = FalseyValueParser::new(),
+        help_heading = "Feedback options",
+    ))]
+    pub gen_patch: bool,
 }
 
 /// Parses a single value of the `--extensions` option.

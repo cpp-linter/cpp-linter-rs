@@ -454,6 +454,21 @@ mod tests {
             let err = run_clang_format(&mut file.lock().unwrap(), &clang_params).unwrap_err();
             assert!(matches!(err, ClangCaptureError::WriteFileFailed { .. }));
         }
+
+        #[test]
+        fn no_gen_patch() {
+            let tmp_workspace = setup_tmp_workspace();
+            let tools_dir = tempfile::tempdir().unwrap();
+            let fake_format = make_fake_tool(tools_dir.path(), "clang-format", "echo 'void main() {}'");
+            let mut clang_params = make_clang_params(tmp_workspace.path(), fake_format);
+            clang_params.gen_patch = false;
+            let file = Mutex::new(FileObj::new(PathBuf::from("demo/demo.cpp")));
+            let mut file = file.lock().unwrap();
+            let _ = run_clang_format(&mut file, &clang_params).unwrap();
+            assert!(file.patched_path.is_none());
+            assert!(file.format_advice.is_some());
+            assert!(!file.format_advice.as_ref().unwrap().replacements.is_empty());
+        }
     }
 
     fn formalize_style(style: &str, expected: &str) {

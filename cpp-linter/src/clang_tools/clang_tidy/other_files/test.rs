@@ -114,6 +114,7 @@ async fn fix_analyzed_header() {
         tidy_checks: "-*,readability-non-const-parameter".to_string(),
         clang_tidy_command: Some(get_tidy_exe()),
         repo_root: tmp.path().to_path_buf(),
+        gen_patch: true,
         ..Default::default()
     });
     let files = as_files(vec![
@@ -170,6 +171,7 @@ fn not_analyzed() {
     let tmp = workspace();
     let clang_params = ClangParams {
         repo_root: tmp.path().to_path_buf(),
+        gen_patch: true,
         ..Default::default()
     };
     let mut source = FileObj::new(PathBuf::from("fix.cpp"));
@@ -241,6 +243,7 @@ fn outside_changed_lines() {
     let clang_params = ClangParams {
         repo_root: tmp.path().to_path_buf(),
         lines_changed_only: LinesChangedOnly::On,
+        gen_patch: true,
         ..Default::default()
     };
     let files = as_files(vec![
@@ -271,6 +274,7 @@ fn out_of_bounds() {
     let tmp = workspace();
     let clang_params = ClangParams {
         repo_root: tmp.path().to_path_buf(),
+        gen_patch: true,
         ..Default::default()
     };
     let files = as_files(vec![
@@ -306,6 +310,7 @@ fn merge_with_own_fixes() {
     fs::write(tmp.path().join("other.cpp"), SOURCE).unwrap();
     let clang_params = ClangParams {
         repo_root: tmp.path().to_path_buf(),
+        gen_patch: true,
         ..Default::default()
     };
     let files = as_files(vec![
@@ -355,6 +360,7 @@ fn remove_changed_line() {
     let clang_params = ClangParams {
         repo_root: tmp.path().to_path_buf(),
         lines_changed_only: LinesChangedOnly::On,
+        gen_patch: true,
         ..Default::default()
     };
     let files = as_files(vec![
@@ -425,6 +431,7 @@ fn analyzed_file_missing() {
     let tmp = workspace();
     let clang_params = ClangParams {
         repo_root: tmp.path().to_path_buf(),
+        gen_patch: true,
         ..Default::default()
     };
     let files = as_files(vec![
@@ -485,6 +492,7 @@ fn overlapping_fixes() {
     fs::write(tmp.path().join("other.cpp"), SOURCE).unwrap();
     let clang_params = ClangParams {
         repo_root: tmp.path().to_path_buf(),
+        gen_patch: true,
         ..Default::default()
     };
     let files = as_files(vec![
@@ -523,6 +531,7 @@ fn overlaps_own_fix() {
     let tmp = workspace();
     let clang_params = ClangParams {
         repo_root: tmp.path().to_path_buf(),
+        gen_patch: true,
         ..Default::default()
     };
     let files = as_files(vec![

@@ -222,6 +222,12 @@ pub struct ClangParams {
     ///
     /// A project-specific cache folder is created in this path.
     pub repo_root: PathBuf,
+
+    /// Whether to generate a patch file of applied clang fixes.
+    ///
+    /// This should be asserted if posting PR reviews or generating a patch file
+    /// without posing a PR review.
+    pub gen_patch: bool,
 }
 
 impl ClangParams {
@@ -283,6 +289,7 @@ impl From<&Cli> for ClangParams {
             tidy_filter,
             format_filter,
             repo_root,
+            gen_patch: args.feedback_options.pr_review || args.feedback_options.gen_patch,
         }
     }
 }
@@ -321,6 +328,11 @@ pub struct FeedbackInput {
 
     /// The root of the repository, used to locate relative file paths in processing.
     pub repo_root: PathBuf,
+
+    /// Whether to generate a patch file of applied clang fixes.
+    ///
+    /// Only used when `pr_review` is false.
+    pub gen_patch: bool,
 }
 
 #[cfg(feature = "bin")]
@@ -338,6 +350,7 @@ impl From<&Cli> for FeedbackInput {
             repo_root: args.source_options.repo_root.clone(),
             summary_output_file: args.feedback_options.summary_output_file.clone(),
             sarif_file: args.feedback_options.sarif_file.clone(),
+            gen_patch: args.feedback_options.gen_patch,
         }
     }
 }
@@ -356,6 +369,7 @@ impl Default for FeedbackInput {
             repo_root: PathBuf::from("."),
             summary_output_file: None,
             sarif_file: None,
+            gen_patch: false,
         }
     }
 }
