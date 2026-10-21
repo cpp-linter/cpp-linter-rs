@@ -584,8 +584,10 @@ pub struct FeedbackOptions {
     #[cfg_attr(feature = "bin", arg(
         short = 'F',
         long,
-        default_value_t = false,
         aliases = ["fix"],
+        default_value_t = false,
+        default_missing_value = "true",
+        num_args = 0..=1,
         action = ArgAction::Set,
         value_parser = FalseyValueParser::new(),
         help_heading = "Feedback options",
