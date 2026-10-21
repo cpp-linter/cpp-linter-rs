@@ -171,7 +171,6 @@ fn not_analyzed() {
     let tmp = workspace();
     let clang_params = ClangParams {
         repo_root: tmp.path().to_path_buf(),
-        gen_patch: true,
         ..Default::default()
     };
     let mut source = FileObj::new(PathBuf::from("fix.cpp"));
@@ -243,7 +242,6 @@ fn outside_changed_lines() {
     let clang_params = ClangParams {
         repo_root: tmp.path().to_path_buf(),
         lines_changed_only: LinesChangedOnly::On,
-        gen_patch: true,
         ..Default::default()
     };
     let files = as_files(vec![
@@ -274,7 +272,6 @@ fn out_of_bounds() {
     let tmp = workspace();
     let clang_params = ClangParams {
         repo_root: tmp.path().to_path_buf(),
-        gen_patch: true,
         ..Default::default()
     };
     let files = as_files(vec![
@@ -349,6 +346,27 @@ fn merge_with_own_fixes() {
     let notes = header_notes(&files[1]);
     assert_eq!(notes.len(), 1, "{notes:#?}");
     assert_eq!(notes[0].fixed_lines, vec![2]);
+}
+
+/// An accepted fix records its note, but writes no patch when `gen_patch` is false.
+#[test]
+fn accepted_fix_without_patch() {
+    let tmp = workspace();
+    let clang_params = ClangParams {
+        repo_root: tmp.path().to_path_buf(),
+        gen_patch: false,
+        ..Default::default()
+    };
+    let files = as_files(vec![
+        FileObj::new(PathBuf::from("fix.cpp")),
+        FileObj::new(PathBuf::from("fix.h")),
+    ]);
+    let tidy_fixes = [(0, header_fixes(tmp.path()))];
+    let mut logs = vec![vec![], vec![]];
+    apply_other_file_fixes(&files, &tidy_fixes, &clang_params, &mut logs).unwrap();
+    assert!(patched(&files[1]).is_none());
+    assert!(messages(&logs[0])[0].starts_with("Applying the fix"));
+    assert_eq!(header_notes(&files[1]).len(), 1);
 }
 
 /// A fix that removes a whole changed line (including its line break)
