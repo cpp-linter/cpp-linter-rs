@@ -147,6 +147,7 @@ impl RestClient {
                 tidy_checks_failed,
                 &clang_versions,
                 None,
+                feedback_inputs.gen_patch || feedback_inputs.pr_review,
             )?;
             if feedback_inputs.step_summary {
                 self.client.append_step_summary(&summary)?;
@@ -261,7 +262,7 @@ impl RestClient {
             } else {
                 self.client.post_pr_review(&options).await?;
             }
-        } else {
+        } else if feedback_inputs.gen_patch {
             for file in files {
                 let file = file
                     .lock()
@@ -280,6 +281,7 @@ impl RestClient {
                     tidy_checks_failed,
                     &clang_versions,
                     Some(u16::MAX as u64),
+                    feedback_inputs.gen_patch || feedback_inputs.pr_review,
                 )?);
             }
             let options = ThreadCommentOptions {
@@ -400,6 +402,7 @@ impl RestClient {
         tidy_checks_failed: u64,
         clang_versions: &ClangVersions,
         max_len: Option<u64>,
+        patch_exists: bool,
     ) -> Result<String, ClientError> {
         let mut comment = format!("{COMMENT_MARKER}# Cpp-Linter Report ");
         let mut remaining_length =
@@ -429,6 +432,7 @@ impl RestClient {
                     tidy_checks_failed,
                     &tidy_version.to_string(),
                     &mut remaining_length,
+                    patch_exists,
                 )?;
             }
         } else {
@@ -480,6 +484,10 @@ impl RestClient {
                 }
                 line_buf.clear();
             }
+            log::info!(
+                "Patch file written to {}",
+                auto_fix_patch_path.to_string_lossy().replace("\\", "/")
+            );
         }
         Ok(())
     }
@@ -537,6 +545,7 @@ fn make_tidy_comment(
     tidy_checks_failed: u64,
     version_used: &String,
     remaining_length: &mut u64,
+    patch_exists: bool,
 ) -> Result<(), ClientError> {
     let opener = format!(
         "\n<details><summary>clang-tidy (v{version_used}) reports: <strong>{tidy_checks_failed} concern(s)</strong></summary>\n\n"
@@ -552,7 +561,7 @@ fn make_tidy_comment(
             for tidy_note in &tidy_advice.notes {
                 let file_path = PathBuf::from(&tidy_note.filename);
                 if file_path == file.name {
-                    let uses_auto_fix = !tidy_note.fixed_lines.is_empty();
+                    let uses_auto_fix = !tidy_note.fixed_lines.is_empty() && patch_exists;
                     let mut tmp_note = format!("- {}\n\n", tidy_note.filename);
                     tmp_note.push_str(&format!(
                         "   <strong>{filename}:{line}:{cols}:</strong> {severity}: [{diagnostic}]{auto_fixable}{skipped_fixes}\n   > {rationale}\n{concerned_code}",
@@ -791,6 +800,7 @@ mod test {
             1,
             &"1.2.3".to_string(),
             &mut remaining_length,
+            true,
         )
         .unwrap();
         assert!(comment.contains(
@@ -872,7 +882,8 @@ mod test {
     #[test]
     fn comment_without_tidy_concerns() {
         let files = make_dummy_files("warning");
-        let comment = RestClient::make_comment(&files, 1, 0, &dummy_versions(), None).unwrap();
+        let comment =
+            RestClient::make_comment(&files, 1, 0, &dummy_versions(), None, false).unwrap();
         assert!(comment.contains("clang-format (v1.2.3) reports"));
         assert!(!comment.contains("clang-tidy (v1.2.3) reports"));
     }
@@ -950,15 +961,16 @@ mod test {
         let files = make_dummy_files("warning");
         crate::test_common::poison_mutex(&files[0]);
         // poisoned while making the clang-format comment
-        assert!(RestClient::make_comment(&files, 1, 1, &dummy_versions(), None).is_err());
+        assert!(RestClient::make_comment(&files, 1, 1, &dummy_versions(), None, false).is_err());
         // poisoned while making the clang-tidy comment
-        assert!(RestClient::make_comment(&files, 0, 1, &dummy_versions(), None).is_err());
+        assert!(RestClient::make_comment(&files, 0, 1, &dummy_versions(), None, false).is_err());
     }
 
     #[test]
     fn comment_too_long_for_tidy_note() {
         let files = make_dummy_files("warning");
-        let unlimited = RestClient::make_comment(&files, 0, 1, &dummy_versions(), None).unwrap();
+        let unlimited =
+            RestClient::make_comment(&files, 0, 1, &dummy_versions(), None, false).unwrap();
         assert!(unlimited.contains("A test dummy rationale"));
         // one byte short of the room needed for the clang-tidy note
         let limited = RestClient::make_comment(
@@ -967,6 +979,7 @@ mod test {
             1,
             &dummy_versions(),
             Some(unlimited.len() as u64 - 1),
+            false,
         )
         .unwrap();
         assert!(!limited.contains("A test dummy rationale"));

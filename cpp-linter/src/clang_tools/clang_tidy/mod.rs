@@ -738,7 +738,9 @@ pub fn run_clang_tidy(
     let mut paths = FixPaths::new(&target, &working_dir);
     let (patched, tidy_fixes) =
         apply_fixes(&fixes, &mut paths, &original_content, &mut notes, &mut logs);
-    file.patched_path = Some(write_cache(clang_params, &file.name, &patched)?);
+    if clang_params.gen_patch {
+        file.patched_path = Some(write_cache(clang_params, &file.name, &patched)?);
+    }
     file.tidy_advice = Some(TidyAdvice { notes });
     Ok((logs, tidy_fixes))
 }

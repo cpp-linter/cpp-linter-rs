@@ -50,6 +50,7 @@ struct TestParams {
     pub fail_posting: bool,
     pub bad_existing_comments: bool,
     pub relative_out_files: bool,
+    pub gen_patch: bool,
 }
 
 impl Default for TestParams {
@@ -65,6 +66,7 @@ impl Default for TestParams {
             fail_posting: false,
             bad_existing_comments: false,
             relative_out_files: false,
+            gen_patch: false,
         }
     }
 }
@@ -278,6 +280,7 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
             "--summary-output-file={}",
             summary_out_file_path.to_str().unwrap()
         ),
+        format!("--gen-patch={}", test_params.gen_patch),
         format!("--sarif-file={}", sarif_file_path.to_str().unwrap()),
     ];
     if test_params.force_lgtm {
@@ -310,7 +313,9 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
                 .trim()
                 .to_string()
         });
-    if let Some(patch_path_from_output) = patch_path_from_output {
+    if test_params.gen_patch
+        && let patch_path_from_output = patch_path_from_output.unwrap()
+    {
         // verify patch path exists and print its content
         println!("Patch path from GITHUB_OUTPUT: {patch_path_from_output}");
         let patch_path = Path::new(&patch_path_from_output);
@@ -390,6 +395,7 @@ async fn new_push_all_lines() {
     test_comment(&TestParams {
         lines_changed_only: LinesChangedOnly::Off,
         no_lgtm: false,
+        gen_patch: true,
         ..Default::default()
     })
     .await;
@@ -399,6 +405,7 @@ async fn new_push_all_lines() {
 async fn new_push_changed_lines() {
     test_comment(&TestParams {
         no_lgtm: false,
+        gen_patch: true,
         ..Default::default()
     })
     .await;

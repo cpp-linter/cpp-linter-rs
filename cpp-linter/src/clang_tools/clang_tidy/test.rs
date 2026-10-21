@@ -144,6 +144,7 @@ fn use_extra_args() {
         clang_tidy_command: Some(exe_path),
         clang_format_command: None,
         repo_root: tmp_workspace.path().to_path_buf(),
+        gen_patch: false,
     };
     let mut file_lock = arc_file.lock().unwrap();
     fs::create_dir_all(clang_params.get_cache_path()).unwrap();
@@ -378,7 +379,8 @@ fn tidy_cache_not_writable() {
     let tmp_workspace = crate::test_common::setup_tmp_workspace();
     let tools_dir = tempfile::tempdir().unwrap();
     let fake_tidy = crate::test_common::make_fake_tool(tools_dir.path(), "clang-tidy", "");
-    let clang_params = make_clang_params(tmp_workspace.path(), Some(fake_tidy));
+    let mut clang_params = make_clang_params(tmp_workspace.path(), Some(fake_tidy));
+    clang_params.gen_patch = true;
     // a directory where the patched file should be cached
     fs::create_dir_all(clang_params.get_cache_path().join("demo/demo.cpp")).unwrap();
     let file = Mutex::new(FileObj::new(PathBuf::from("demo/demo.cpp")));
@@ -429,6 +431,7 @@ fn fixes_do_not_modify_worktree() {
         tidy_checks: "-*,readability-non-const-parameter".to_string(),
         clang_tidy_command: Some(get_tidy_exe()),
         repo_root: tmp_workspace.path().to_path_buf(),
+        gen_patch: true,
         ..Default::default()
     };
     let file = Mutex::new(FileObj::new(PathBuf::from("fix.cpp")));
@@ -471,6 +474,36 @@ fn fixes_do_not_modify_worktree() {
     let header_fix = &fixes.others[0];
     assert_eq!(header_fix.diagnostic, "readability-non-const-parameter");
     assert!(header_fix.path.ends_with("fix.h"));
+}
+
+#[test]
+fn fixes_not_cached_when_gen_patch_false() {
+    let tmp_workspace = tempfile::TempDir::with_prefix("cpp-linter-unit-tests_").unwrap();
+    fs::write(tmp_workspace.path().join("fix.h"), FIX_HEADER).unwrap();
+    fs::write(tmp_workspace.path().join("fix.cpp"), FIX_SOURCE).unwrap();
+    let clang_params = ClangParams {
+        tidy_checks: "-*,readability-non-const-parameter".to_string(),
+        clang_tidy_command: Some(get_tidy_exe()),
+        repo_root: tmp_workspace.path().to_path_buf(),
+        gen_patch: false,
+        ..Default::default()
+    };
+    let file = Mutex::new(FileObj::new(PathBuf::from("fix.cpp")));
+    let mut file = file.lock().unwrap();
+    let (_logs, fixes) = run_clang_tidy(&mut file, &clang_params).unwrap();
+
+    // patched_path is None because gen_patch is false
+    assert!(file.patched_path.is_none());
+
+    // but notes and advice are still populated
+    let notes = &file.tidy_advice.as_ref().unwrap().notes;
+    let note = notes
+        .iter()
+        .find(|n| n.diagnostic == "readability-non-const-parameter")
+        .unwrap();
+    assert_eq!(note.fixed_lines, vec![2]);
+    assert_eq!(fixes.own.len(), 1);
+    assert_eq!(fixes.others.len(), 1);
 }
 
 fn dummy_fixes(target: &Path) -> String {

@@ -292,12 +292,14 @@ pub fn apply_other_file_fixes(
         },
     ) in pending
     {
-        let content = analyzed.content(index, clang_params)?;
         let mut file = files[index]
             .lock()
             .map_err(|_| ClangCaptureError::MutexPoisoned)?;
-        let patched = patch_content(content, &replacements, &file.name, &mut logs[index]);
-        file.patched_path = Some(write_cache(clang_params, &file.name, &patched)?);
+        if clang_params.gen_patch {
+            let content = analyzed.content(index, clang_params)?;
+            let patched = patch_content(content, &replacements, &file.name, &mut logs[index]);
+            file.patched_path = Some(write_cache(clang_params, &file.name, &patched)?);
+        }
         let name = file.name.to_string_lossy().replace('\\', "/");
         let advice = file
             .tidy_advice
