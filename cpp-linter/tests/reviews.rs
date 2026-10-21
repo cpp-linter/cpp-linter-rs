@@ -107,6 +107,7 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) -> 
     let mut server = mock_server().await;
     unsafe {
         env::set_var("GITHUB_API_URL", server.url());
+        env::set_var("GITHUB_GRAPHQL_URL", format!("{}/graphql", server.url()));
     }
     let mut mocks = vec![];
 
