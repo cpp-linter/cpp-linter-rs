@@ -224,17 +224,15 @@ mod tests {
             let err = mgr
                 .check_install("llvm", &output(1, "no such package"))
                 .unwrap_err();
-            let PackageManagerError::InstallationError {
-                manager,
-                package,
-                stderr,
-            } = err
-            else {
-                panic!("unexpected error: {err}");
-            };
-            assert_eq!(manager, mgr.as_str());
-            assert_eq!(package, "llvm");
-            assert_eq!(stderr, "no such package");
+            assert!(matches!(err, PackageManagerError::InstallationError { .. }));
+            // the message names the manager and package, and shows the stderr
+            assert_eq!(
+                err.to_string(),
+                format!(
+                    "{} failed to install llvm package: no such package",
+                    mgr.as_str()
+                )
+            );
         }
     }
 }
