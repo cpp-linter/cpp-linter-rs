@@ -233,23 +233,27 @@ struct PlatformTag {
 impl PlatformTag {
     /// Checks if the platform tag is compatible with the current system.
     pub fn is_compatible_with_system(&self) -> bool {
-        self.os.is_compatible_with_system() && {
-            let sys_arch = std::env::consts::ARCH;
-            match std::env::consts::OS {
-                "windows" => match sys_arch {
-                    "x86_64" => self.arch == "amd64",
-                    "aarch64" => self.arch == "arm64",
-                    "x86" => self.arch == "x86",
-                    _ => false,
-                },
-                "macos" => match sys_arch {
-                    "x86_64" => self.arch == "x86_64" || self.arch == "universal2",
-                    "aarch64" => self.arch == "arm64" || self.arch == "universal2",
-                    _ => false,
-                },
-                "linux" => self.arch == sys_arch,
+        self.os.is_compatible_with_system()
+            && self.is_arch_compatible(std::env::consts::OS, std::env::consts::ARCH)
+    }
+
+    /// Checks if the wheel's architecture runs on the given `sys_os` and `sys_arch`
+    /// (named as in [`std::env::consts`]).
+    fn is_arch_compatible(&self, sys_os: &str, sys_arch: &str) -> bool {
+        match sys_os {
+            "windows" => match sys_arch {
+                "x86_64" => self.arch == "amd64",
+                "aarch64" => self.arch == "arm64",
+                "x86" => self.arch == "x86",
                 _ => false,
-            }
+            },
+            "macos" => match sys_arch {
+                "x86_64" => self.arch == "x86_64" || self.arch == "universal2",
+                "aarch64" => self.arch == "arm64" || self.arch == "universal2",
+                _ => false,
+            },
+            "linux" => self.arch == sys_arch,
+            _ => false,
         }
     }
 }
@@ -678,6 +682,40 @@ mod test {
         let tag = PlatformTag::from_str("win_amd64").unwrap();
         assert!(matches!(tag.os, PlatformOs::Windows));
         assert_eq!(tag.arch.as_str(), "amd64");
+    }
+
+    #[test]
+    fn arch_compatibility() {
+        let compatible = |tag: &str, sys_os: &str, sys_arch: &str| {
+            PlatformTag::from_str(tag)
+                .unwrap()
+                .is_arch_compatible(sys_os, sys_arch)
+        };
+        for (tag, sys_os, sys_arch, expected) in [
+            ("win_amd64", "windows", "x86_64", true),
+            ("win_arm64", "windows", "aarch64", true),
+            ("win32", "windows", "x86", true),
+            ("win32", "windows", "x86_64", false),
+            ("win_amd64", "windows", "aarch64", false),
+            ("win_amd64", "windows", "riscv64", false),
+            ("macosx_10_9_x86_64", "macos", "x86_64", true),
+            ("macosx_11_0_arm64", "macos", "aarch64", true),
+            ("macosx_10_9_universal2", "macos", "x86_64", true),
+            ("macosx_10_9_universal2", "macos", "aarch64", true),
+            ("macosx_11_0_arm64", "macos", "x86_64", false),
+            ("macosx_10_9_x86_64", "macos", "aarch64", false),
+            ("macosx_10_9_universal2", "macos", "powerpc", false),
+            ("manylinux_2_17_x86_64", "linux", "x86_64", true),
+            ("manylinux_2_17_aarch64", "linux", "aarch64", true),
+            ("manylinux_2_17_x86_64", "linux", "aarch64", false),
+            ("manylinux_2_17_x86_64", "freebsd", "x86_64", false),
+        ] {
+            assert_eq!(
+                compatible(tag, sys_os, sys_arch),
+                expected,
+                "{tag} on {sys_os} {sys_arch}"
+            );
+        }
     }
 
     #[test]
