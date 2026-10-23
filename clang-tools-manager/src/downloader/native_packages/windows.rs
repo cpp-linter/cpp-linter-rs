@@ -1,5 +1,8 @@
 #![cfg(target_os = "windows")]
-use std::{fmt::Display, process::Command};
+use std::{
+    fmt::Display,
+    process::{Command, Output},
+};
 
 use semver::{Comparator, Version};
 
@@ -36,6 +39,61 @@ impl WindowsPackageManager {
             // WindowsPackageManager::Scoop => "scoop",
         }
     }
+
+    /// Is the `package_name` listed in the `stdout` of this package manager's `list` command?
+    ///
+    /// If a `version` is given, then the listed version must be compatible with it
+    /// (as in `^version`). A missing or invalid listed version is treated as not installed.
+    fn is_listed(&self, stdout: &str, package_name: &str, version: Option<&Version>) -> bool {
+        let (header_lines, name_column) = match self {
+            // `choco list` starts with a line about chocolatey's version,
+            // then packages are listed as `<name> <version>`
+            WindowsPackageManager::Chocolatey => (1, 0),
+            // `winget list` starts with a table header and divider,
+            // then packages are listed as `<name> <id> <version> <source>`
+            WindowsPackageManager::Winget => (2, 1),
+        };
+        for line in stdout.lines().skip(header_lines) {
+            let mut columns = line.split_ascii_whitespace().skip(name_column);
+            if columns.next() != Some(package_name) {
+                continue;
+            }
+            // found the package, check version
+            let Some(version) = version else {
+                // version not specified, just check if package is listed
+                return true;
+            };
+            let ver_cmp = Comparator {
+                op: semver::Op::Caret,
+                major: version.major,
+                minor: Some(version.minor),
+                patch: Some(version.patch),
+                pre: version.pre.clone(),
+            };
+            return columns
+                .next()
+                .and_then(|ver_str| Version::parse(ver_str).ok())
+                .is_some_and(|ver| ver_cmp.matches(&ver));
+        }
+        false
+    }
+
+    /// Converts the `output` of this package manager's `install` command into a [`Result`].
+    fn check_install(
+        &self,
+        package_name: &str,
+        output: &Output,
+    ) -> Result<(), PackageManagerError> {
+        if output.status.success() {
+            Ok(())
+        } else {
+            Err(PackageManagerError::InstallationError {
+                manager: self.as_str().to_string(),
+                package: package_name.to_string(),
+                stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+            })
+        }
+    }
 }
 
 impl PackageManager for WindowsPackageManager {
@@ -55,80 +113,15 @@ impl PackageManager for WindowsPackageManager {
 
     fn is_installed_package(&self, package_name: &str, version: Option<&Version>) -> bool {
         let mut cmd = Command::new(self.as_str());
-        let ver_cmp = version.map(|v| Comparator {
-            op: semver::Op::Caret,
-            major: v.major,
-            minor: Some(v.minor),
-            patch: Some(v.patch),
-            pre: v.pre.clone(),
-        });
         match self {
-            WindowsPackageManager::Chocolatey => {
-                let output = cmd.arg("list").arg(package_name).output();
-                if let Ok(out) = output
-                    && out.status.success()
-                {
-                    let stdout = String::from_utf8_lossy(&out.stdout).to_string();
-                    // skip line about chocolatey version
-                    let lines = stdout.lines().skip(1);
-                    for line in lines {
-                        // packages are listed as `<name> <version>`
-                        let mut l = line.split_ascii_whitespace();
-                        if let Some(name) = l.next()
-                            && name == package_name
-                        {
-                            // found the package, check version
-                            if let Some(ver_cmp) = ver_cmp.clone() {
-                                if let Some(ver_str) = l.next()
-                                    && let Ok(ver) = Version::parse(ver_str)
-                                {
-                                    return ver_cmp.matches(&ver);
-                                } else {
-                                    // version not found or invalid, treat as not installed
-                                    return false;
-                                }
-                            } else {
-                                // version not specified, just check if package is listed
-                                return true;
-                            }
-                        }
-                    }
-                }
-                false
+            WindowsPackageManager::Chocolatey => cmd.arg("list").arg(package_name),
+            WindowsPackageManager::Winget => cmd.arg("list").arg("--id").arg(package_name),
+        };
+        match cmd.output() {
+            Ok(out) if out.status.success() => {
+                self.is_listed(&String::from_utf8_lossy(&out.stdout), package_name, version)
             }
-            WindowsPackageManager::Winget => {
-                let output = cmd.arg("list").arg("--id").arg(package_name).output();
-                if let Ok(out) = output
-                    && out.status.success()
-                {
-                    // skip first 2 lines of table header and divider
-                    let stdout = String::from_utf8_lossy(&out.stdout).to_string();
-                    let lines = stdout.lines().skip(2);
-                    for line in lines {
-                        // packages are listed as `<name> <id> <version> <source>`
-                        let mut l = line.split_ascii_whitespace().skip(1);
-                        if let Some(name) = l.next()
-                            && name == package_name
-                        {
-                            // found the package, check version
-                            if let Some(ver_cmp) = ver_cmp.clone() {
-                                if let Some(ver_str) = l.next()
-                                    && let Ok(ver) = Version::parse(ver_str)
-                                {
-                                    return ver_cmp.matches(&ver);
-                                } else {
-                                    // version not found or invalid, treat as not installed
-                                    return false;
-                                }
-                            } else {
-                                // version not specified, just check if package is listed
-                                return true;
-                            }
-                        }
-                    }
-                }
-                false
-            }
+            _ => false,
         }
     }
 
@@ -151,36 +144,95 @@ impl PackageManager for WindowsPackageManager {
                 if let Some(version) = version {
                     cmd.arg("--version").arg(version.to_string());
                 }
-                let output = cmd.output()?;
-                if output.status.success() {
-                    Ok(())
-                } else {
-                    Err(PackageManagerError::InstallationError {
-                        manager: self.as_str().to_string(),
-                        package: package_name.to_string(),
-                        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-                    })
-                }
             }
             Self::Winget => {
-                let mut cmd = Command::new("winget");
                 cmd.arg("install").arg("--id").arg(package_name);
                 if let Some(version) = version {
                     // winget does not allow installing an older version of a package that
                     // is already installed (with a newer version). So use `--force` to reinstall the specified version.
                     cmd.arg("--version").arg(version.to_string()).arg("--force");
                 }
-                let output = cmd.output()?;
-                if output.status.success() {
-                    Ok(())
-                } else {
-                    Err(PackageManagerError::InstallationError {
-                        manager: self.as_str().to_string(),
-                        package: package_name.to_string(),
-                        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-                    })
-                }
             }
+        }
+        let output = cmd.output()?;
+        self.check_install(package_name, &output)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{os::windows::process::ExitStatusExt, process::ExitStatus};
+
+    use semver::Version;
+
+    use super::{Output, PackageManagerError, WindowsPackageManager};
+
+    const CHOCO_LIST: &str = "Chocolatey v2.4.3\n\
+        llvm 18.1.8\n\
+        llvm-nightly not-a-version\n\
+        2 packages installed.\n";
+
+    const WINGET_LIST: &str = "Name Id        Version Source\n\
+        -----------------------------\n\
+        LLVM LLVM.LLVM 18.1.8  winget\n\
+        Broken LLVM.Broken\n";
+
+    #[test]
+    fn choco_listed() {
+        let choco = WindowsPackageManager::Chocolatey;
+        assert!(choco.is_listed(CHOCO_LIST, "llvm", None));
+        assert!(choco.is_listed(CHOCO_LIST, "llvm", Some(&Version::new(18, 1, 0))));
+        assert!(!choco.is_listed(CHOCO_LIST, "llvm", Some(&Version::new(19, 1, 0))));
+        // the listed version is not valid semver
+        assert!(choco.is_listed(CHOCO_LIST, "llvm-nightly", None));
+        assert!(!choco.is_listed(CHOCO_LIST, "llvm-nightly", Some(&Version::new(18, 1, 0))));
+        // the first line is about chocolatey itself, not a package
+        assert!(!choco.is_listed(CHOCO_LIST, "Chocolatey", None));
+        assert!(!choco.is_listed(CHOCO_LIST, "cmake", None));
+    }
+
+    #[test]
+    fn winget_listed() {
+        let winget = WindowsPackageManager::Winget;
+        assert!(winget.is_listed(WINGET_LIST, "LLVM.LLVM", None));
+        assert!(winget.is_listed(WINGET_LIST, "LLVM.LLVM", Some(&Version::new(18, 1, 0))));
+        assert!(!winget.is_listed(WINGET_LIST, "LLVM.LLVM", Some(&Version::new(17, 0, 6))));
+        // no version is listed
+        assert!(winget.is_listed(WINGET_LIST, "LLVM.Broken", None));
+        assert!(!winget.is_listed(WINGET_LIST, "LLVM.Broken", Some(&Version::new(18, 1, 0))));
+        // the table header and divider are not packages
+        assert!(!winget.is_listed(WINGET_LIST, "Id", None));
+        // the name column is not the ID
+        assert!(!winget.is_listed(WINGET_LIST, "LLVM", None));
+    }
+
+    fn output(code: u32, stderr: &str) -> Output {
+        Output {
+            status: ExitStatus::from_raw(code),
+            stdout: vec![],
+            stderr: stderr.as_bytes().to_vec(),
+        }
+    }
+
+    #[test]
+    fn install_result() {
+        for mgr in [
+            WindowsPackageManager::Chocolatey,
+            WindowsPackageManager::Winget,
+        ] {
+            assert!(mgr.check_install("llvm", &output(0, "")).is_ok());
+            let err = mgr
+                .check_install("llvm", &output(1, "no such package"))
+                .unwrap_err();
+            assert!(matches!(err, PackageManagerError::InstallationError { .. }));
+            // the message names the manager and package, and shows the stderr
+            assert_eq!(
+                err.to_string(),
+                format!(
+                    "{} failed to install llvm package: no such package",
+                    mgr.as_str()
+                )
+            );
         }
     }
 }

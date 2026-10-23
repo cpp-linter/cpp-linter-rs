@@ -158,6 +158,25 @@ mod supported_platform {
                 .join("SHA512SUMS")
         }
 
+        /// The release asset name of the static binary for the given `tool`'s `major`
+        /// version on the given `os` and `arch` (named as in [`std::env::consts`]).
+        ///
+        /// For example, `clang-format-21_linux-amd64` or `clang-tidy-21_windows-arm64.exe`.
+        fn asset_name(tool: &ClangTool, major: &str, os: &str, arch: &str) -> String {
+            // we already gated unsupported architectures above,
+            // so we can assume it's either x86_64 or aarch64 here
+            let arch = match arch {
+                "aarch64" => "arm64",
+                _ => "amd64",
+            };
+            let (platform, suffix) = match os {
+                "windows" => ("windows", ".exe"),
+                "macos" => ("macos", ""),
+                _ => ("linux", ""),
+            };
+            format!("{tool}-{major}_{platform}-{arch}{suffix}")
+        }
+
         /// Downloads the `requested_version` of the specified `tool` from a distribution of statically linked binaries.
         ///
         /// The distribution is maintained at <https://github.com/cpp-linter/clang-tools-static-binaries>.
@@ -171,28 +190,10 @@ mod supported_platform {
             let (ver, release_tag) = Self::find_suitable_version(requested_version)
                 .ok_or(StaticDistDownloadError::UnsupportedVersion)?;
             let ver_str = ver.major.to_string();
-            // we already gated unsupported architectures above,
-            // so we can assume it's either x86_64 or aarch64 here
-            let arch = if cfg!(target_arch = "aarch64") {
-                "arm64"
-            } else {
-                "amd64"
-            };
-            let platform = if cfg!(target_os = "windows") {
-                "windows"
-            } else if cfg!(target_os = "macos") {
-                "macos"
-            } else {
-                "linux"
-            };
-
             let base_url = format!("{CLANG_TOOLS_REPO}/releases/download/{release_tag}/");
-            let suffix = if cfg!(target_os = "windows") {
-                ".exe"
-            } else {
-                ""
-            };
-            let tool_url_path = format!("{tool}-{ver_str}_{platform}-{arch}{suffix}");
+            let suffix = std::env::consts::EXE_SUFFIX;
+            let tool_url_path =
+                Self::asset_name(tool, &ver_str, std::env::consts::OS, std::env::consts::ARCH);
             let url = Url::parse(format!("{base_url}{tool_url_path}").as_str())?;
             let cache_path = Self::get_cache_dir();
             let bin_name = format!("{tool}-{ver_str}{suffix}");
@@ -244,6 +245,24 @@ mod supported_platform {
             let (ver, tag) = StaticDistDownloader::find_suitable_version(&req_ver).unwrap();
             assert_eq!(ver.major.to_string(), super::super::MAX_CLANG_TOOLS_VERSION);
             assert!(tag.starts_with(&format!("llvm-{}.", ver.major)));
+        }
+
+        #[test]
+        fn asset_names() {
+            let tool = ClangTool::ClangTidy;
+            for (os, arch, expected) in [
+                ("linux", "x86_64", "clang-tidy-21_linux-amd64"),
+                ("linux", "aarch64", "clang-tidy-21_linux-arm64"),
+                ("macos", "x86_64", "clang-tidy-21_macos-amd64"),
+                ("macos", "aarch64", "clang-tidy-21_macos-arm64"),
+                ("windows", "x86_64", "clang-tidy-21_windows-amd64.exe"),
+                ("windows", "aarch64", "clang-tidy-21_windows-arm64.exe"),
+            ] {
+                assert_eq!(
+                    StaticDistDownloader::asset_name(&tool, "21", os, arch),
+                    expected
+                );
+            }
         }
 
         #[test]

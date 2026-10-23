@@ -591,6 +591,26 @@ fn apply_exported_fixes() {
 }
 
 #[test]
+fn apply_fixes_without_matching_note() {
+    let tmp = tempfile::tempdir().unwrap();
+    let target = tmp.path().join("demo.cpp");
+    let content = b"line\n  int y;\n";
+    let fixes: ExportedFixes = serde_saphyr::from_str(&dummy_fixes(&target)).unwrap();
+    // the only note is about another line (eg. its diagnostic's note was filtered out)
+    let mut notes = vec![dummy_note("demo.cpp", vec![])];
+    notes[0].line = 1;
+    let mut logs = vec![];
+    let mut paths = FixPaths::new(&target, tmp.path());
+    let (patched, tidy_fixes) = apply_fixes(&fixes, &mut paths, content, &mut notes, &mut logs);
+    // the fix is still applied, but no note claims it
+    assert_eq!(String::from_utf8(patched).unwrap(), "line\n  auto\nx y;\n");
+    assert!(notes[0].fixed_lines.is_empty());
+    // the fix for another file is still returned, without a note to explain it
+    assert_eq!(tidy_fixes.others.len(), 1);
+    assert_eq!(tidy_fixes.others[0].note, None);
+}
+
+#[test]
 fn fix_paths_resolve() {
     let tmp = tempfile::tempdir().unwrap();
     let target = tmp.path().join("src/demo.cpp");
