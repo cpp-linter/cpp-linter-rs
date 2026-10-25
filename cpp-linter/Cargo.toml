@@ -41,7 +41,7 @@ features = ["file-changes"]
 # branch = "git-diff-no-staged"
 
 [dev-dependencies]
-jsonschema = { version = "0.58.6", default-features = false }
+jsonschema = { version = "0.59.0", default-features = false }
 mockito = { workspace = true }
 tempfile = { workspace = true }
 reqwest = { workspace = true, features = ["default-tls"] }
