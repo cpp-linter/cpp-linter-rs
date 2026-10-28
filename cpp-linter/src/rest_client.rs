@@ -47,6 +47,12 @@ fn repo_root_prefix(repo_root: &Path, workspace_root: Option<PathBuf>) -> PathBu
     nearest_git_root(&repo_root)
         .or_else(|| nearest_git_root(&workspace_root))
         .and_then(|git_root| repo_root.strip_prefix(git_root).ok().map(Path::to_path_buf))
+        .or_else(|| {
+            repo_root
+                .strip_prefix(&workspace_root)
+                .ok()
+                .map(Path::to_path_buf)
+        })
         .unwrap_or_default()
 }
 
