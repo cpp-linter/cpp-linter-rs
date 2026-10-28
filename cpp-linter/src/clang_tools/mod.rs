@@ -469,7 +469,7 @@ mod tests {
         unsafe {
             env::remove_var("GITHUB_ACTIONS");
         }
-        let rest_client = RestClient::new().unwrap();
+        let rest_client = RestClient::new(&PathBuf::from(".")).unwrap();
         try_init_logger();
         capture_clang_tools_output(&[], &version, clang_params, &rest_client, false).await
     }

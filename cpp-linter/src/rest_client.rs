@@ -3,7 +3,7 @@
 use std::{
     env,
     io::{BufRead, Write, stdout},
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
 
@@ -11,7 +11,7 @@ use colored::Colorize;
 use git_bot_feedback::{
     AnnotationLevel, CommentKind, CommentPolicy, FileAnnotation, FileFilter, LinesChangedOnly,
     OutputVariable, RestApiClient, ReviewAction, ReviewOptions, ThreadCommentOptions,
-    client::init_client,
+    client::{init_client, nearest_git_root},
 };
 
 use crate::{
@@ -41,12 +41,43 @@ pub const USER_OUTREACH: &str = concat!(
     "(https://github.com/cpp-linter/cpp-linter-action/issues)</sub>"
 );
 
+fn repo_root_prefix(repo_root: &Path, workspace_root: Option<PathBuf>) -> PathBuf {
+    let repo_root = std::path::absolute(repo_root).unwrap_or_else(|_| repo_root.to_path_buf());
+    let workspace_root = workspace_root.unwrap_or_else(|| repo_root.to_path_buf());
+    nearest_git_root(&repo_root)
+        .or_else(|| nearest_git_root(&workspace_root))
+        .and_then(|git_root| repo_root.strip_prefix(git_root).ok().map(Path::to_path_buf))
+        .unwrap_or_default()
+}
+
+fn prefix_feedback_path(file_path: &str, repo_root_prefix: &Path) -> String {
+    repo_root_prefix
+        .join(file_path)
+        .to_string_lossy()
+        .replace('\\', "/")
+}
+
+fn normalize_changed_file_name(
+    file_name: &str,
+    repo_root_prefix: &Path,
+    file_filter: &FileFilter,
+) -> Option<PathBuf> {
+    let file_name = PathBuf::from(file_name);
+    let file_name = if repo_root_prefix.as_os_str().is_empty() {
+        file_name
+    } else {
+        file_name.strip_prefix(repo_root_prefix).ok()?.to_path_buf()
+    };
+    file_filter.is_qualified(&file_name).then_some(file_name)
+}
+
 /// A wrapper struct around a REST API client.
 ///
 /// Underneath, the client may support various Git servers and CI platforms.
 /// Currently, the client supports GitHub and GitHub Actions.
 pub struct RestClient {
     client: Box<dyn RestApiClient + Sync + Send>,
+    repo_root_prefix: PathBuf,
 }
 
 impl RestClient {
@@ -54,10 +85,14 @@ impl RestClient {
     ///
     /// See [git_bot_feedback::client::init_client] for details on
     /// possible errors during initialization.
-    pub fn new() -> Result<Self, ClientError> {
+    pub fn new(repo_root: &Path) -> Result<Self, ClientError> {
         let mut client = init_client()?;
         client.set_user_agent(USER_AGENT)?;
-        Ok(Self { client })
+        let repo_root_prefix = repo_root_prefix(repo_root, client.workspace_root()?);
+        Ok(Self {
+            client,
+            repo_root_prefix,
+        })
     }
 
     /// Returns the kind of client being used.
@@ -75,7 +110,8 @@ impl RestClient {
     /// Gets a list of changed files.
     ///
     /// Use the [`FileFilter`] and [`LinesChangedOnly`] to filter out files
-    /// that might be negligible.
+    /// that might be negligible. Returned file paths and filter patterns are relative to
+    /// the root supplied to [`RestClient::new`].
     pub async fn get_list_of_changed_files(
         &self,
         file_filter: &FileFilter,
@@ -83,25 +119,34 @@ impl RestClient {
         base_diff: &Option<String>,
         ignore_index: bool,
     ) -> Result<Vec<FileObj>, ClientError> {
+        let mut changed_files_filter = file_filter.clone();
+        changed_files_filter.ignored.clear();
+        changed_files_filter.not_ignored.clear();
+        changed_files_filter.not_ignored.insert(String::new());
         let files = self
             .client
             .get_list_of_changed_files(
-                file_filter,
+                &changed_files_filter,
                 lines_changed_only,
                 base_diff.to_owned(),
                 ignore_index,
             )
             .await?;
         Ok(files
-            .iter()
-            .map(|(file_name, diff_lines)| {
+            .into_iter()
+            .filter_map(|(file_name, diff_lines)| {
+                let file_path =
+                    normalize_changed_file_name(&file_name, &self.repo_root_prefix, file_filter)?;
                 let diff_chunks = diff_lines
                     .diff_hunks
                     .iter()
                     .map(|hunk| hunk.start..=hunk.end)
                     .collect();
-                let file_path = PathBuf::from(file_name);
-                FileObj::from(file_path, diff_lines.added_lines.clone(), diff_chunks)
+                Some(FileObj::from(
+                    file_path,
+                    diff_lines.added_lines,
+                    diff_chunks,
+                ))
             })
             .collect())
     }
@@ -137,7 +182,10 @@ impl RestClient {
         let mut comment = None;
 
         if feedback_inputs.file_annotations {
-            let annotations = Self::make_annotations(files, &feedback_inputs.style)?;
+            let mut annotations = Self::make_annotations(files, &feedback_inputs.style)?;
+            for annotation in &mut annotations {
+                annotation.path = prefix_feedback_path(&annotation.path, &self.repo_root_prefix);
+            }
             self.client.write_file_annotations(&annotations)?;
         }
         if feedback_inputs.step_summary || feedback_inputs.summary_output_file.is_some() {
@@ -228,7 +276,9 @@ impl RestClient {
                 comments: {
                     let mut comments = vec![];
                     for suggestion in &review_comments.comments {
-                        comments.push(suggestion.as_review_comment());
+                        let mut comment = suggestion.as_review_comment();
+                        comment.path = prefix_feedback_path(&comment.path, &self.repo_root_prefix);
+                        comments.push(comment);
                     }
                     comments
                 },
@@ -633,9 +683,12 @@ mod test {
     use semver::Version;
     use tempfile::{NamedTempFile, tempdir};
 
-    use git_bot_feedback::AnnotationLevel;
+    use git_bot_feedback::{AnnotationLevel, FileFilter};
 
-    use super::{RestClient, USER_OUTREACH};
+    use super::{
+        RestClient, USER_OUTREACH, normalize_changed_file_name, prefix_feedback_path,
+        repo_root_prefix,
+    };
     use crate::{
         clang_tools::{
             ClangVersions,
@@ -650,15 +703,47 @@ mod test {
 
     // ************************* tests for step-summary and output variables
 
+    #[test]
+    fn normalize_changed_files_for_nested_repo_root() {
+        let tmp_dir = tempdir().unwrap();
+        let git_root = tmp_dir.path().join("checkout");
+        let repo_root = git_root.join("member");
+        std::fs::create_dir_all(&repo_root).unwrap();
+        std::fs::write(git_root.join(".git"), "").unwrap();
+
+        let prefix = repo_root_prefix(&repo_root, Some(tmp_dir.path().to_path_buf()));
+        assert_eq!(prefix, PathBuf::from("member"));
+        assert_eq!(
+            prefix_feedback_path("src/a.cpp", &prefix),
+            "member/src/a.cpp"
+        );
+
+        let file_filter = FileFilter::new(&["build"], &["cpp"], None);
+        assert_eq!(
+            normalize_changed_file_name("member/src/a.cpp", &prefix, &file_filter),
+            Some(PathBuf::from("src/a.cpp"))
+        );
+        assert_eq!(
+            normalize_changed_file_name("member/build/a.cpp", &prefix, &file_filter),
+            None
+        );
+        assert_eq!(
+            normalize_changed_file_name("other/src/a.cpp", &prefix, &file_filter),
+            None
+        );
+    }
+
     async fn create_comment(is_lgtm: bool) -> (String, String) {
         let tmp_dir = tempdir().unwrap();
+        let repo_root = env::current_dir().unwrap();
         unsafe {
             // ensure we are mimicking a CI platform
             env::set_var("GITHUB_ACTIONS", "true");
             env::set_var("GITHUB_REPOSITORY", "cpp-linter/cpp-linter-rs");
             env::set_var("GITHUB_SHA", "deadbeef123");
+            env::set_var("GITHUB_WORKSPACE", &repo_root);
         }
-        let mut rest_api_client = RestClient::new().unwrap();
+        let mut rest_api_client = RestClient::new(&repo_root).unwrap();
         #[cfg(feature = "bin")]
         try_init_logger();
         if env::var("ACTIONS_STEP_DEBUG").is_ok_and(|var| var == "true") {
@@ -822,7 +907,7 @@ mod test {
             env::remove_var("GITHUB_ACTIONS");
         }
         let tmp_dir = tempdir().unwrap();
-        let mut rest_api_client = RestClient::new().unwrap();
+        let mut rest_api_client = RestClient::new(tmp_dir.path()).unwrap();
         for thread_comments in [ThreadComments::On, ThreadComments::Update] {
             let feedback_inputs = FeedbackInput {
                 thread_comments,
@@ -894,7 +979,7 @@ mod test {
             env::remove_var("GITHUB_ACTIONS");
         }
         let tmp_dir = tempdir().unwrap();
-        let mut rest_api_client = RestClient::new().unwrap();
+        let mut rest_api_client = RestClient::new(tmp_dir.path()).unwrap();
 
         // the parent "directory" is actually a file
         let not_a_dir = tmp_dir.path().join("not-a-dir");

@@ -2,7 +2,7 @@
 mod common;
 use chrono::Utc;
 use common::{create_test_space, mock_server};
-use git_bot_feedback::{FileFilter, LinesChangedOnly};
+use git_bot_feedback::{FileFilter, LinesChangedOnly, client::nearest_git_root};
 use mockito::Matcher;
 use tempfile::{NamedTempFile, TempDir};
 
@@ -34,6 +34,7 @@ const REMAINING_RATE_LIMIT_HEADER: &str = "x-ratelimit-remaining";
 const MALFORMED_RESPONSE_PAYLOAD: &str = "{\"message\":\"Resource not accessible by integration\"}";
 
 async fn get_paginated_changes(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
+    let repo_root = nearest_git_root(lib_root).unwrap_or_else(|| lib_root.to_path_buf());
     let mut event_payload = NamedTempFile::new_in(tmp_dir.path())
         .expect("Failed to spawn a tmp file for test event payload");
     unsafe {
@@ -41,6 +42,7 @@ async fn get_paginated_changes(lib_root: &Path, tmp_dir: &TempDir, test_params: 
         env::set_var("GITHUB_REPOSITORY", REPO);
         env::set_var("GITHUB_SHA", SHA);
         env::set_var("GITHUB_TOKEN", TOKEN);
+        env::set_var("GITHUB_WORKSPACE", &repo_root);
         env::set_var("CI", "true");
         env::set_var(
             "GITHUB_EVENT_NAME",
@@ -86,7 +88,8 @@ async fn get_paginated_changes(lib_root: &Path, tmp_dir: &TempDir, test_params: 
     }
     try_init_logger();
     log::set_max_level(log::LevelFilter::Debug);
-    let gh_client = RestClient::new();
+    let repo_root = nearest_git_root(lib_root).unwrap_or_else(|| lib_root.to_path_buf());
+    let gh_client = RestClient::new(&repo_root);
     if test_params.fail_serde_event_payload || test_params.no_event_payload {
         assert!(gh_client.is_err());
         return;

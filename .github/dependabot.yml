@@ -31,6 +31,10 @@ updates:
       interval: "weekly"
     cooldown:
       default-days: 7
+      exclude:
+        # 2bndy5 has control over git-bot-feedback source.
+        # exclude GBF from dependabot's cooldown period.
+        - git-bot-feedback
     ignore:
       - dependency-name: cpp-linter
     groups:

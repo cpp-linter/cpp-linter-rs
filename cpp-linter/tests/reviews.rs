@@ -88,6 +88,7 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) -> 
     let tmp_out = NamedTempFile::new().unwrap();
     unsafe {
         env::set_var("GITHUB_ACTIONS", "true");
+        env::set_var("GITHUB_WORKSPACE", tmp_dir.path().to_str().unwrap());
         env::set_var("GITHUB_OUTPUT", tmp_out.path());
         env::set_var("GITHUB_EVENT_NAME", "pull_request");
         env::set_var("GITHUB_REPOSITORY", REPO);

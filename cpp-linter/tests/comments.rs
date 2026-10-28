@@ -81,6 +81,7 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
             test_params.event_t.to_string().as_str(),
         );
         env::set_var("GITHUB_OUTPUT", tmp_out_file.path());
+        env::set_var("GITHUB_WORKSPACE", tmp_dir.path().to_str().unwrap());
         env::set_var("GITHUB_REPOSITORY", REPO);
         env::set_var("GITHUB_SHA", SHA);
         env::set_var("GITHUB_TOKEN", TOKEN);
