@@ -2,9 +2,9 @@
 mod common;
 use chrono::Utc;
 use common::{create_test_space, mock_server};
-use git_bot_feedback::{FileFilter, LinesChangedOnly};
+use git_bot_feedback::{FileFilter, LinesChangedOnly, client::nearest_git_root};
 use mockito::Matcher;
-use tempfile::{NamedTempFile, TempDir};
+use tempfile::{NamedTempFile, TempDir, tempdir};
 
 use clang_tools_manager::logger::try_init_logger;
 use cpp_linter::rest_client::RestClient;
@@ -34,6 +34,7 @@ const REMAINING_RATE_LIMIT_HEADER: &str = "x-ratelimit-remaining";
 const MALFORMED_RESPONSE_PAYLOAD: &str = "{\"message\":\"Resource not accessible by integration\"}";
 
 async fn get_paginated_changes(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
+    let repo_root = nearest_git_root(lib_root).unwrap_or_else(|| lib_root.to_path_buf());
     let mut event_payload = NamedTempFile::new_in(tmp_dir.path())
         .expect("Failed to spawn a tmp file for test event payload");
     unsafe {
@@ -41,6 +42,7 @@ async fn get_paginated_changes(lib_root: &Path, tmp_dir: &TempDir, test_params: 
         env::set_var("GITHUB_REPOSITORY", REPO);
         env::set_var("GITHUB_SHA", SHA);
         env::set_var("GITHUB_TOKEN", TOKEN);
+        env::set_var("GITHUB_WORKSPACE", &repo_root);
         env::set_var("CI", "true");
         env::set_var(
             "GITHUB_EVENT_NAME",
@@ -86,7 +88,8 @@ async fn get_paginated_changes(lib_root: &Path, tmp_dir: &TempDir, test_params: 
     }
     try_init_logger();
     log::set_max_level(log::LevelFilter::Debug);
-    let gh_client = RestClient::new();
+    let repo_root = nearest_git_root(lib_root).unwrap_or_else(|| lib_root.to_path_buf());
+    let gh_client = RestClient::new(&repo_root);
     if test_params.fail_serde_event_payload || test_params.no_event_payload {
         assert!(gh_client.is_err());
         return;
@@ -172,6 +175,73 @@ async fn test_get_changes(test_params: &TestParams) {
     let lib_root = env::current_dir().unwrap();
     get_paginated_changes(&lib_root, &tmp_dir, test_params).await;
     drop(tmp_dir);
+}
+
+#[tokio::test]
+async fn nested_repo_root_normalizes_and_filters_changed_files() {
+    let tmp_dir = tempdir().unwrap();
+    let git_root = tmp_dir.path().join("checkout");
+    let repo_root = git_root.join("member");
+    std::fs::create_dir_all(git_root.join(".git")).unwrap();
+    std::fs::create_dir_all(&repo_root).unwrap();
+
+    let mut event_payload = NamedTempFile::new_in(tmp_dir.path()).unwrap();
+    event_payload
+        .write_all(br#"{"pull_request":{"draft":false,"state":"open","number":42,"locked":false}}"#)
+        .unwrap();
+    unsafe {
+        env::set_var("GITHUB_ACTIONS", "true");
+        env::set_var("GITHUB_REPOSITORY", REPO);
+        env::set_var("GITHUB_SHA", SHA);
+        env::set_var("GITHUB_TOKEN", TOKEN);
+        env::set_var("GITHUB_WORKSPACE", &git_root);
+        env::set_var("GITHUB_EVENT_NAME", "pull_request");
+        env::set_var("GITHUB_EVENT_PATH", event_payload.path());
+        env::set_var("CI", "true");
+    }
+
+    let mut server = mock_server().await;
+    unsafe {
+        env::set_var("GITHUB_API_URL", server.url());
+    }
+    let response = serde_json::json!([
+        {
+            "filename": "member/src/a.cpp",
+            "changes": 2,
+            "patch": "@@ -1 +1 @@\n-old\n+new"
+        },
+        {
+            "filename": "member/build/ignored.cpp",
+            "changes": 2,
+            "patch": "@@ -1 +1 @@\n-old\n+new"
+        },
+        {
+            "filename": "outside/src/b.cpp",
+            "changes": 2,
+            "patch": "@@ -1 +1 @@\n-old\n+new"
+        }
+    ]);
+    let reset_timestamp = (Utc::now().timestamp() + 60).to_string();
+    let mock = server
+        .mock("GET", format!("/repos/{REPO}/pulls/{PR}/files").as_str())
+        .match_header("Accept", "application/vnd.github.raw+json")
+        .match_header("Authorization", format!("token {TOKEN}").as_str())
+        .match_query(Matcher::UrlEncoded("page".to_string(), "1".to_string()))
+        .with_header(REMAINING_RATE_LIMIT_HEADER, "50")
+        .with_header(RESET_RATE_LIMIT_HEADER, reset_timestamp.as_str())
+        .with_body(response.to_string())
+        .create();
+
+    let client = RestClient::new(&repo_root).unwrap();
+    let file_filter = FileFilter::new(&["build"], &["cpp"], None);
+    let files = client
+        .get_list_of_changed_files(&file_filter, &LinesChangedOnly::Off, &None::<String>, false)
+        .await
+        .unwrap();
+
+    assert_eq!(files.len(), 1);
+    assert_eq!(files[0].name, std::path::PathBuf::from("src/a.cpp"));
+    mock.assert();
 }
 
 #[tokio::test]

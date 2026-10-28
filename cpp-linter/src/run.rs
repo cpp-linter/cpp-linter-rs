@@ -58,7 +58,13 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
 
     try_init_logger();
 
-    let mut rest_api_client = RestClient::new()?;
+    let repo_root_abs = mk_path_abs(&cli.source_options.repo_root).with_context(|| {
+        format!(
+            "Failed to canonicalize the repo root path: {}",
+            cli.source_options.repo_root.to_string_lossy()
+        )
+    })?;
+    let mut rest_api_client = RestClient::new(&repo_root_abs)?;
     set_max_level(
         if cli.general_options.verbosity.is_debug() || rest_api_client.is_debug_enabled() {
             LevelFilter::Debug
@@ -84,12 +90,6 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
             .collect::<Vec<&str>>(),
         None,
     );
-    let repo_root_abs = mk_path_abs(&cli.source_options.repo_root).with_context(|| {
-        format!(
-            "Failed to canonicalize the repo root path: {}",
-            cli.source_options.repo_root.to_string_lossy()
-        )
-    })?;
     let gitmodules = repo_root_abs.join(".gitmodules");
     cli.source_options.repo_root = repo_root_abs;
     file_filter.parse_submodules(Some(gitmodules.as_path()));
