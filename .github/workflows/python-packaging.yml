@@ -47,127 +47,8 @@ jobs:
     name: Pre-seed static binaries' versions
     uses: $/.github/workflows/pre-seed-versions.yml
 
-  linux:
-    needs: [seed-build-script]
-    runs-on: ${{ matrix.platform.runner }}
-    strategy:
-      fail-fast: false
-      matrix:
-        platform:
-          - runner: ubuntu-latest
-            target: x86_64
-          - runner: ubuntu-latest
-            target: x86
-          - runner: ubuntu-latest
-            target: aarch64
-          - runner: ubuntu-latest
-            target: armv7
-          # These targets currently fail because the docker containers used for building manylinux wheels
-          # use a known-bad C compiler version; aws-lc-sys refuses to build with the bad compiler:
-          # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=95189
-          # - runner: ubuntu-latest
-          #   target: s390x
-          # - runner: ubuntu-latest
-          #   target: ppc64le
-    steps:
-      - uses: actions/checkout@v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@v7.0.0
-        with:
-          python-version: '3.x'
-      - name: Restore build script seed
-        uses: actions/download-artifact@v8
-        with:
-          name: ${{ needs.seed-build-script.outputs.artifact-name }}
-          path: clang-tools-manager
-      - name: Build wheels
-        uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
-        with:
-          target: ${{ matrix.platform.target }}
-          # Use the zig toolchain to avoid build errors in aws-lc-sys crate, which compiles C code.
-          args: >-
-            --release --out dist --find-interpreter --zig
-          # avoid cache-poisoning potential for actually distributed builds
-          sccache: ${{ startsWith(github.ref, 'refs/tags') && 'false' || 'true' }} # zizmor: ignore[cache-poisoning]
-          manylinux: 'auto'
-      - name: Upload wheels
-        uses: actions/upload-artifact@v7
-        with:
-          name: wheels-linux-${{ matrix.platform.target }}
-          path: dist/*
-
-  windows:
-    needs: [seed-build-script]
-    runs-on: ${{ matrix.platform.runner }}
-    strategy:
-      matrix:
-        platform:
-          - runner: windows-latest
-            target: x64
-          - runner: windows-latest
-            target: x86
-    steps:
-      - uses: actions/checkout@v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@v7.0.0
-        with:
-          python-version: '3.x'
-          architecture: ${{ matrix.platform.target }}
-      - name: Restore build script seed
-        uses: actions/download-artifact@v8
-        with:
-          name: ${{ needs.seed-build-script.outputs.artifact-name }}
-          path: clang-tools-manager
-      - name: Build wheels
-        uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
-        with:
-          target: ${{ matrix.platform.target }}
-          args: --release --out dist --find-interpreter
-          sccache: ${{ !startsWith(github.ref, 'refs/tags/') }} # zizmor: ignore[cache-poisoning]
-      - name: Upload wheels
-        uses: actions/upload-artifact@v7
-        with:
-          name: wheels-windows-${{ matrix.platform.target }}
-          path: dist/*
-
-  macos:
-    needs: [seed-build-script]
-    runs-on: ${{ matrix.platform.runner }}
-    strategy:
-      fail-fast: false
-      matrix:
-        platform:
-          - runner: macos-15-intel
-            target: x86_64
-          - runner: macos-15
-            target: aarch64
-    steps:
-      - uses: actions/checkout@v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@v7.0.0
-        with:
-          python-version: '3.x'
-      - name: Restore build script seed
-        uses: actions/download-artifact@v8
-        with:
-          name: ${{ needs.seed-build-script.outputs.artifact-name }}
-          path: clang-tools-manager
-      - name: Build wheels
-        uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
-        with:
-          target: ${{ matrix.platform.target }}
-          args: --release --out dist --find-interpreter
-          sccache: ${{ !startsWith(github.ref, 'refs/tags/') }} # zizmor: ignore[cache-poisoning]
-      - name: Upload wheels
-        uses: actions/upload-artifact@v7
-        with:
-          name: wheels-macos-${{ matrix.platform.target }}
-          path: dist/*
-
   sdist:
+    needs: [seed-build-script]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7.0.1
@@ -187,10 +68,103 @@ jobs:
           name: wheels-sdist
           path: dist/*
 
+  wheels:
+    needs: [seed-build-script]
+    runs-on: ${{ matrix.platform.runner }}
+    name: >-
+      wheels (${{ matrix.python.feature }},
+      ${{ matrix.platform.runner }},
+      ${{ matrix.platform.manylinux || 'manylinux'}}
+      ${{ matrix.platform.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        python:
+          - version: '3.10'
+            feature: pyo3/abi3-py310
+          - version: '3.15t'
+            feature: pyo3/abi3t-py315
+        platform:
+          - runner: windows-latest
+            target: x64
+            py-arch: x64
+          - runner: windows-latest
+            target: x86
+            py-arch: x86
+          - runner: macos-15-intel
+            target: x86_64
+          - runner: macos-15
+            target: aarch64
+          - runner: ubuntu-latest
+            target: x86_64
+          - runner: ubuntu-latest
+            target: x86
+          - runner: ubuntu-latest
+            target: aarch64
+          - runner: ubuntu-latest
+            target: x86_64
+            manylinux: musllinux_1_2
+          - runner: ubuntu-latest
+            target: x86
+            manylinux: musllinux_1_2
+          - runner: ubuntu-latest
+            target: aarch64
+            manylinux: musllinux_1_2
+          - runner: ubuntu-latest
+            target: armv7
+            manylinux: musllinux_1_2
+          - runner: ubuntu-latest
+            target: s390x
+          - runner: ubuntu-latest
+            target: ppc64le
+        include:
+          # insert these manually until python 3.11 is the minimum supported python version
+          - python:
+              version: '3.11'
+              feature: pyo3/abi3-py311
+            platform:
+              runner: windows-11-arm
+              target: aarch64
+              py-arch: arm64
+          - python:
+              version: '3.15t'
+              feature: pyo3/abi3t-py315
+            platform:
+              runner: windows-11-arm
+              target: aarch64
+              py-arch: arm64
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7.0.0
+        id: setup-python
+        with:
+          python-version: ${{ matrix.python.version }}
+          architecture: ${{ matrix.platform.py-arch || null }}
+      - name: Build wheels
+        uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
+        with:
+          target: ${{ matrix.platform.target }}
+          args: >-
+            --release
+            --out dist
+            --interpreter ${{ matrix.python.version }}
+            --features ${{ matrix.python.feature }}
+            ${{ runner.os == 'Linux' && matrix.platform.target != 'ppc64le' && '--zig' || '' }}
+          # zizmor: ignore[cache-poisoning]
+          sccache: ${{ startsWith(github.ref, 'refs/tags') && 'false' || 'true' }}
+          manylinux: ${{ matrix.platform.manylinux || 'auto' }}
+      - name: Upload wheels
+        uses: actions/upload-artifact@v7
+        with:
+          name: wheels-${{ runner.os }}-${{ matrix.platform.target }}-${{ matrix.platform.manylinux || '_' }}-${{ matrix.python.version }}
+          path: dist/*
+
   release:
     name: Release
     runs-on: ubuntu-latest
-    needs: [linux, windows, macos, sdist]
+    needs: [wheels, sdist]
     permissions:
       id-token: write
     steps:
