@@ -271,6 +271,7 @@ impl FileObj {
                     if summary_only {
                         continue;
                     }
+                    review_comments.in_diff += 1;
                     let mut suggestion = format!(
                         "### clang-tidy diagnostic\n**{file_name}:{}:{}** {}: [{}]\n\n> {}\n",
                         note.line,
@@ -338,6 +339,7 @@ impl FileObj {
             let hunk_range = self.is_hunk_in_diff(&hunk);
             match hunk_range {
                 Some((start_line, end_line)) if !summary_only => {
+                    review_comments.in_diff += 1;
                     let mut suggestion = String::new();
                     let suggestion_help = self
                         .tidy_advice
@@ -569,6 +571,9 @@ mod test {
             .make_suggestions_from_patch(&mut review_comments, false, repo_root.path())
             .unwrap();
         assert_eq!(review_comments.comments.len(), 2);
+        // 1 fix and 2 unfixed diagnostics, all within the diff (in 2 comments)
+        assert_eq!(review_comments.tool_total, 3);
+        assert_eq!(review_comments.in_diff, 3);
         assert!(
             review_comments.comments[0]
                 .suggestion
@@ -612,5 +617,6 @@ mod test {
             .unwrap();
         assert!(summary_comments.comments.is_empty());
         assert_eq!(summary_comments.tool_total, 3);
+        assert_eq!(summary_comments.in_diff, 0);
     }
 }
