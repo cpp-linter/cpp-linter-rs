@@ -101,9 +101,8 @@ pub fn extract_from_wheel(
             continue;
         };
         let dest = dest_path(&lib_clang, &relative)?;
-        if let Some(parent) = dest.parent() {
-            fs::create_dir_all(parent)?;
-        }
+        // `dest` is always inside `lib_clang`, so it always has a parent.
+        fs::create_dir_all(dest.parent().unwrap_or(&lib_clang))?;
         io::copy(&mut file, &mut fs::File::create(&dest)?)?;
         found = true;
     }
@@ -136,9 +135,8 @@ pub fn extract_from_tar_gz(archive: &Path, bin: &Path) -> Result<(), ResourceHea
             continue;
         };
         let dest = dest_path(&lib_clang, relative)?;
-        if let Some(parent) = dest.parent() {
-            fs::create_dir_all(parent)?;
-        }
+        // `dest` is always inside `lib_clang`, so it always has a parent.
+        fs::create_dir_all(dest.parent().unwrap_or(&lib_clang))?;
         entry.unpack(&dest)?;
         found = true;
     }

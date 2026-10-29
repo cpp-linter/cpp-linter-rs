@@ -263,20 +263,15 @@ mod supported_platform {
                 .join(release_tag)
                 .join(&name);
             if archive.exists() {
-                log::info!(
-                    "Using cached clang resource headers from {:?}",
-                    archive.to_string_lossy()
-                );
+                log::info!("Using cached clang resource headers from {archive:?}");
             } else {
                 let url = Url::parse(format!("{base_url}{name}").as_str())?;
                 log::info!("Downloading clang resource headers from {url}");
                 download(&url, &archive, 60).await?;
             }
             Self::verify_sha512(&archive, &name, sha512_path)?;
-            log::info!(
-                "Extracting clang resource headers to {:?}",
-                resource_headers::lib_clang_dir(bin)?.to_string_lossy()
-            );
+            let lib_clang = resource_headers::lib_clang_dir(bin)?;
+            log::info!("Extracting clang resource headers to {lib_clang:?}");
             resource_headers::extract_from_tar_gz(&archive, bin)?;
             Ok(())
         }
