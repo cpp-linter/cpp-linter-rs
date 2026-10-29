@@ -14,6 +14,7 @@ pub mod caching;
 pub mod hashing;
 pub mod native_packages;
 pub mod pypi;
+pub mod resource_headers;
 pub mod static_dist;
 
 /// An enumeration of possible errors during download operations.

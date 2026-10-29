@@ -41,6 +41,9 @@ pub struct CliOptions {
     pub tool: Vec<ClangTool>,
 
     /// The directory where the clang tools should be installed.
+    ///
+    /// clang-tidy's resource headers (like `stddef.h`) are
+    /// installed in `<DIRECTORY>/../lib/clang`.
     #[arg(short, long)]
     pub directory: Option<PathBuf>,
 

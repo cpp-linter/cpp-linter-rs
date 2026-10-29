@@ -75,6 +75,14 @@ impl ClangTool {
         }
     }
 
+    /// Does this tool need clang's resource headers (like `stddef.h`) to work?
+    ///
+    /// clang-tidy parses C/C++ sources, so it needs them.
+    /// clang-format does not.
+    pub const fn needs_resource_headers(&self) -> bool {
+        matches!(self, ClangTool::ClangTidy)
+    }
+
     /// Fetch the path to an executable clang tool for the specified `version`.
     ///
     /// If the executable is not found using the specified `version`, then the tool is

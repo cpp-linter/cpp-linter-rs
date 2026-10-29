@@ -2,7 +2,9 @@ use std::{path::PathBuf, str::FromStr};
 
 use crate::{
     Cacher, ClangTool, PyPiDownloadError, PyPiDownloader,
-    downloader::{native_packages::try_install_package, static_dist::StaticDistDownloader},
+    downloader::{
+        native_packages::try_install_package, resource_headers, static_dist::StaticDistDownloader,
+    },
     tool::{GetClangPathError, GetClangVersionError},
     utils::normalize_path,
 };
@@ -118,10 +120,16 @@ impl RequestedVersion {
                 // check if cache has a suitable version
                 let bin_ext = if cfg!(windows) { ".exe" } else { "" };
                 let min_ver = get_min_ver(version_req).ok_or(GetToolError::UnsupportedVersion)?;
+                // Downloaded binaries are named with only the major version.
                 let cached_bin = StaticDistDownloader::get_cache_dir()
                     .join("bin")
-                    .join(format!("{tool}-{min_ver}{bin_ext}"));
-                if cached_bin.exists() {
+                    .join(format!("{tool}-{}{bin_ext}", min_ver.major));
+                // A cached clang-tidy without resource headers is downloaded again,
+                // so the headers get installed.
+                if cached_bin.exists()
+                    && (!tool.needs_resource_headers()
+                        || resource_headers::has_resource_headers(&cached_bin, min_ver.major))
+                {
                     let version = tool.capture_version(&cached_bin)?;
                     if version_req.matches(&version) {
                         log::info!(
@@ -530,8 +538,39 @@ mod tests {
             fake_clang_tool(env.bin.path(), "clang-format", "16.0.0");
             let cached_bin_dir = env.cache.path().join("bin");
             fs::create_dir_all(&cached_bin_dir).unwrap();
-            let cached = fake_clang_tool(&cached_bin_dir, "clang-format-17.0.0", "17.0.6");
+            let cached = fake_clang_tool(&cached_bin_dir, "clang-format-17", "17.0.6");
             let result = env.eval(req("17"), false).await.unwrap().unwrap();
+            assert_version(&cached, result, "17.0.6");
+        }
+
+        #[tokio::test]
+        async fn eval_cached_tidy_needs_resource_headers() {
+            let env = TestEnv::new();
+            let cached_bin_dir = env.cache.path().join("bin");
+            fs::create_dir_all(&cached_bin_dir).unwrap();
+            let cached = fake_clang_tool(&cached_bin_dir, "clang-tidy-17", "17.0.6");
+            let requested = req("17");
+            let eval = || requested.eval_tool(&ClangTool::ClangTidy, false, None, false);
+            // A cached clang-tidy without resource headers is not used.
+            // Instead, it is downloaded again, which fails here because
+            // PyPI has no releases and the static binary's checksum does not match.
+            let pypi = env.cache.path().join("pypi");
+            fs::create_dir_all(&pypi).unwrap();
+            let no_releases = serde_json::json!({"releases": {}}).to_string();
+            fs::write(pypi.join("clang-tidy_pypi.json"), no_releases).unwrap();
+            let (_, release_tag) =
+                StaticDistDownloader::find_suitable_version(&VersionReq::parse("17").unwrap())
+                    .unwrap();
+            let sums = StaticDistDownloader::sha512_cache_path(release_tag);
+            fs::create_dir_all(sums.parent().unwrap()).unwrap();
+            fs::write(sums, "deadbeef  clang-tidy-17_linux-amd64\n").unwrap();
+            let err = eval().await.unwrap_err();
+            assert!(matches!(err, GetToolError::NotFound));
+
+            let include = env.cache.path().join("lib/clang/17/include");
+            fs::create_dir_all(&include).unwrap();
+            fs::write(include.join("stddef.h"), "").unwrap();
+            let result = eval().await.unwrap().unwrap();
             assert_version(&cached, result, "17.0.6");
         }
 
@@ -541,7 +580,7 @@ mod tests {
             // cached version does not satisfy the requirement
             let cached_bin_dir = env.cache.path().join("bin");
             fs::create_dir_all(&cached_bin_dir).unwrap();
-            fake_clang_tool(&cached_bin_dir, "clang-format-17.0.0", "16.0.0");
+            fake_clang_tool(&cached_bin_dir, "clang-format-17", "16.0.0");
             env.seed_empty_pypi();
             env.seed_static_dist(true);
             // no package managers are available.

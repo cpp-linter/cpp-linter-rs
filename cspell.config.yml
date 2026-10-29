@@ -11,6 +11,7 @@ words:
   - cdylib
   - choco
   - chrono
+  - cksum
   - clippy
   - codecov
   - codspeed
@@ -119,6 +120,7 @@ words:
   - splitn
   - SRCROOT
   - startswith
+  - stddef
   - superfences
   - tada
   - taiki

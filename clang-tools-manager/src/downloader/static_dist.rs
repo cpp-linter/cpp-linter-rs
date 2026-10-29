@@ -5,7 +5,7 @@ use std::{
     ops::RangeInclusive,
 };
 
-use crate::{Cacher, DownloadError};
+use crate::{Cacher, DownloadError, ResourceHeadersError};
 
 /// An error that can occur while downloading a static binary.
 #[derive(Debug, thiserror::Error)]
@@ -34,6 +34,10 @@ pub enum StaticDistDownloadError {
     /// Failed to parse the SHA512 sum file.
     #[error("Failed to parse the SHA512 sum file")]
     Sha512Corruption,
+
+    /// Failed to install clang's resource headers.
+    #[error("Failed to install clang resource headers: {0}")]
+    ResourceHeaders(#[from] ResourceHeadersError),
 }
 
 const MIN_CLANG_TOOLS_VERSION: &str = env!("MIN_CLANG_TOOLS_VERSION");
@@ -98,7 +102,7 @@ mod supported_platform {
     use super::{StaticDistDownloadError, StaticDistDownloader};
     use crate::{
         Cacher, ClangTool,
-        downloader::{download, hashing::HashAlgorithm},
+        downloader::{download, hashing::HashAlgorithm, resource_headers},
         utils::lock_path,
     };
 
@@ -225,8 +229,56 @@ mod supported_platform {
                 download(&sha512_url, &sha512_cache_path, 10).await?;
             }
             Self::verify_sha512(&download_path, &tool_url_path, &sha512_cache_path)?;
+            if tool.needs_resource_headers()
+                && !resource_headers::has_resource_headers(&download_path, ver.major)
+            {
+                Self::install_resource_headers(
+                    &ver_str,
+                    release_tag,
+                    &base_url,
+                    &sha512_cache_path,
+                    &download_path,
+                )
+                .await?;
+            }
             file_lock.unlock()?;
             Ok(download_path)
+        }
+
+        /// Installs clang's resource headers for the binary at `bin`
+        /// (see [`resource_headers::lib_clang_dir()`]).
+        ///
+        /// The headers' archive is downloaded from the release tagged `release_tag`
+        /// (at `base_url`) and verified with the release's `SHA512SUMS` file (at `sha512_path`).
+        async fn install_resource_headers(
+            major: &str,
+            release_tag: &str,
+            base_url: &str,
+            sha512_path: &Path,
+            bin: &Path,
+        ) -> Result<(), StaticDistDownloadError> {
+            let name = format!("clang-resource-headers-{major}.tar.gz");
+            let archive = Self::get_cache_dir()
+                .join("static_dist")
+                .join(release_tag)
+                .join(&name);
+            if archive.exists() {
+                log::info!(
+                    "Using cached clang resource headers from {:?}",
+                    archive.to_string_lossy()
+                );
+            } else {
+                let url = Url::parse(format!("{base_url}{name}").as_str())?;
+                log::info!("Downloading clang resource headers from {url}");
+                download(&url, &archive, 60).await?;
+            }
+            Self::verify_sha512(&archive, &name, sha512_path)?;
+            log::info!(
+                "Extracting clang resource headers to {:?}",
+                resource_headers::lib_clang_dir(bin)?.to_string_lossy()
+            );
+            resource_headers::extract_from_tar_gz(&archive, bin)?;
+            Ok(())
         }
     }
 
@@ -322,6 +374,75 @@ mod supported_platform {
                 .await
                 .unwrap_err();
             assert!(matches!(err, StaticDistDownloadError::Sha512Corruption));
+        }
+
+        /// Uses a pre-seeded cache (binary, resource headers and SHA512SUMS),
+        /// so no network access is needed.
+        #[tokio::test]
+        async fn cached_tidy_with_resource_headers() {
+            use flate2::{Compression, write::GzEncoder};
+            use sha2::{Digest, Sha512};
+
+            let sha512 = |content: &[u8]| {
+                Sha512::digest(content)
+                    .iter()
+                    .map(|b| format!("{b:02x}"))
+                    .collect::<String>()
+            };
+            let cache = TempDir::new().unwrap();
+            unsafe {
+                std::env::set_var("CPP_LINTER_CACHE", cache.path());
+            }
+            let req = VersionReq::parse("17").unwrap();
+            let release_tag = StaticDistDownloader::find_suitable_version(&req).unwrap().1;
+            let release_cache = cache.path().join("static_dist").join(release_tag);
+            fs::create_dir_all(&release_cache).unwrap();
+
+            // the resource headers' archive
+            let mut tar = tar::Builder::new(GzEncoder::new(Vec::new(), Compression::fast()));
+            let mut header = tar::Header::new_gnu();
+            header.set_size(1);
+            tar.append_data(&mut header, "lib/clang/17/include/stddef.h", &b"h"[..])
+                .unwrap();
+            let archive = tar.into_inner().unwrap().finish().unwrap();
+            let archive_name = "clang-resource-headers-17.tar.gz";
+            fs::write(release_cache.join(archive_name), &archive).unwrap();
+
+            // the binary
+            let out_dir = TempDir::new().unwrap();
+            let bin_dir = out_dir.path().join("bin");
+            fs::create_dir_all(&bin_dir).unwrap();
+            let suffix = std::env::consts::EXE_SUFFIX;
+            let bin = bin_dir.join(format!("clang-tidy-17{suffix}"));
+            let content = b"not really clang-tidy";
+            fs::write(&bin, content).unwrap();
+
+            let mut sums = format!("{}  {archive_name}\n", sha512(&archive));
+            for platform in ["linux", "macos", "windows"] {
+                for arch in ["amd64", "arm64"] {
+                    sums.push_str(&format!(
+                        "{}  clang-tidy-17_{platform}-{arch}{suffix}\n",
+                        sha512(content)
+                    ));
+                }
+            }
+            fs::write(StaticDistDownloader::sha512_cache_path(release_tag), sums).unwrap();
+
+            let tool = ClangTool::ClangTidy;
+            let result = StaticDistDownloader::download_tool(&tool, &req, Some(&bin_dir))
+                .await
+                .unwrap();
+            assert_eq!(result, bin);
+            let stddef = out_dir.path().join("lib/clang/17/include/stddef.h");
+            assert_eq!(fs::read(stddef).unwrap(), b"h");
+
+            // a corrupt archive is rejected
+            fs::remove_dir_all(out_dir.path().join("lib")).unwrap();
+            fs::write(release_cache.join(archive_name), b"corrupt").unwrap();
+            let err = StaticDistDownloader::download_tool(&tool, &req, Some(&bin_dir))
+                .await
+                .unwrap_err();
+            assert!(matches!(err, StaticDistDownloadError::DownloadError(_)));
         }
     }
 }

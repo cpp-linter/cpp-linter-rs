@@ -1,4 +1,10 @@
-use super::{DownloadError, caching::Cacher, download, hashing::HashAlgorithm};
+use super::{
+    DownloadError,
+    caching::Cacher,
+    download,
+    hashing::HashAlgorithm,
+    resource_headers::{self, ResourceHeadersError},
+};
 use crate::{ClangTool, progress_bar::ProgressBar, utils::lock_path};
 
 use semver::{Version, VersionReq};
@@ -54,6 +60,10 @@ pub enum PyPiDownloadError {
     /// Error that indicates the expected executable was not found in the downloaded wheel.
     #[error("Expected executable not found in the downloaded wheel")]
     ExecutableNotFound,
+
+    /// Errors that occur when extracting clang's resource headers from the downloaded wheel.
+    #[error("Failed to extract clang resource headers: {0}")]
+    ResourceHeaders(#[from] ResourceHeadersError),
 }
 
 /// Represents the information of a package on PyPI
@@ -540,6 +550,19 @@ impl PyPiDownloader {
             Some(dir) => dir.join(&bin_name),
         };
         Self::extract_bin(clang_tool, &cached_wheel, &extracted_bin)?;
+        if clang_tool.needs_resource_headers()
+            && !resource_headers::has_resource_headers(&extracted_bin, ver.major)
+        {
+            log::info!("Extracting clang resource headers from the {clang_tool} wheel");
+            let package = clang_tool.as_str().replace('-', "_");
+            match resource_headers::extract_from_wheel(&cached_wheel, &package, &extracted_bin) {
+                Err(ResourceHeadersError::NotFound(_)) => log::warn!(
+                    "The {clang_tool} v{ver_str} wheel has no clang resource headers (like stddef.h). \
+                    {clang_tool} may fail to parse sources that include standard headers."
+                ),
+                result => result?,
+            }
+        }
         file_lock.unlock()?;
         Ok(extracted_bin)
     }
@@ -876,7 +899,7 @@ mod test {
         use super::{BIN_PATH_IN_WHEEL, make_wheel};
         use crate::{
             Cacher, ClangTool, PyPiDownloader,
-            downloader::pypi::LinuxLibC,
+            downloader::{pypi::LinuxLibC, resource_headers},
             test_utils_unix::{enable_logs, fake_exe, isolate_path, set_cache_dir},
         };
 
@@ -924,18 +947,14 @@ mod test {
             assert_eq!(LinuxLibC::get_glibc_version(), None);
         }
 
-        /// Uses a pre-seeded cache (PyPI info and wheel), so no network access is needed.
-        #[tokio::test]
-        async fn download_cached_wheel_without_digest() {
-            let tmp = setup(Some("ldd (Ubuntu GLIBC 2.39-0ubuntu8.7) 2.39"));
-            let cache = TempDir::new().unwrap();
-            set_cache_dir(cache.path());
+        /// Seeds the cache with PyPI info about `tool` v17.0.6 (without digest)
+        /// and its wheel (with the given `entries`), so no network access is needed.
+        fn seed_cached_wheel(tool: &ClangTool, entries: &[(&str, &[u8])]) {
             let pypi_cache = PyPiDownloader::get_cache_dir().join("pypi");
             fs::create_dir_all(&pypi_cache).unwrap();
-            let filename = format!(
-                "clang_format-17.0.6-py2.py3-none-manylinux_2_17_{}.whl",
-                std::env::consts::ARCH
-            );
+            let package = tool.as_str().replace('-', "_");
+            let arch = std::env::consts::ARCH;
+            let filename = format!("{package}-17.0.6-py2.py3-none-manylinux_2_17_{arch}.whl");
             let json = serde_json::json!({
                 "releases": {
                     "17.0.6": [{
@@ -946,14 +965,22 @@ mod test {
                         "yanked": false
                     }]
                 }
-            })
-            .to_string();
-            fs::write(pypi_cache.join("clang-format_pypi.json"), json).unwrap();
+            });
+            fs::write(
+                pypi_cache.join(format!("{tool}_pypi.json")),
+                json.to_string(),
+            )
+            .unwrap();
+            make_wheel(&pypi_cache.join(format!("{tool}_17.0.6.whl")), entries);
+        }
+
+        #[tokio::test]
+        async fn download_cached_wheel_without_digest() {
+            let tmp = setup(Some("ldd (Ubuntu GLIBC 2.39-0ubuntu8.7) 2.39"));
+            let cache = TempDir::new().unwrap();
+            set_cache_dir(cache.path());
             let content = b"#!/bin/sh\necho \"clang-format version 17.0.6\"\n";
-            make_wheel(
-                &pypi_cache.join("clang-format_17.0.6.whl"),
-                &[(BIN_PATH_IN_WHEEL, content)],
-            );
+            seed_cached_wheel(&ClangTool::ClangFormat, &[(BIN_PATH_IN_WHEEL, content)]);
             let out_dir = tmp.path().join("out");
             let req = VersionReq::parse("17").unwrap();
             for _ in 0..2 {
@@ -964,6 +991,46 @@ mod test {
                 assert_eq!(bin, out_dir.join("clang-format-17"));
                 assert_eq!(fs::read(&bin).unwrap(), content);
             }
+            // clang-format does not need the resource headers
+            assert!(!tmp.path().join("lib").exists());
+        }
+
+        #[tokio::test]
+        async fn download_tidy_with_resource_headers() {
+            let tmp = setup(Some("ldd (Ubuntu GLIBC 2.39-0ubuntu8.7) 2.39"));
+            let cache = TempDir::new().unwrap();
+            set_cache_dir(cache.path());
+            let header = "clang_tidy/data/lib/clang/17/include/stddef.h";
+            seed_cached_wheel(
+                &ClangTool::ClangTidy,
+                &[("clang_tidy/data/bin/clang-tidy", b"bin"), (header, b"h")],
+            );
+            let bin_dir = tmp.path().join("bin");
+            let req = VersionReq::parse("17").unwrap();
+            let bin = PyPiDownloader::download_tool(&ClangTool::ClangTidy, &req, Some(&bin_dir))
+                .await
+                .unwrap();
+            assert!(resource_headers::has_resource_headers(&bin, 17));
+            assert!(tmp.path().join("lib/clang/17/include/stddef.h").is_file());
+        }
+
+        #[tokio::test]
+        async fn download_tidy_without_resource_headers() {
+            let tmp = setup(Some("ldd (Ubuntu GLIBC 2.39-0ubuntu8.7) 2.39"));
+            let cache = TempDir::new().unwrap();
+            set_cache_dir(cache.path());
+            seed_cached_wheel(
+                &ClangTool::ClangTidy,
+                &[("clang_tidy/data/bin/clang-tidy", b"bin")],
+            );
+            let bin_dir = tmp.path().join("bin");
+            let req = VersionReq::parse("17").unwrap();
+            // only a warning is logged about the missing headers
+            let bin = PyPiDownloader::download_tool(&ClangTool::ClangTidy, &req, Some(&bin_dir))
+                .await
+                .unwrap();
+            assert_eq!(fs::read(&bin).unwrap(), b"bin");
+            assert!(!resource_headers::has_resource_headers(&bin, 17));
         }
     }
 }
