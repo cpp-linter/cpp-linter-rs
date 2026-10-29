@@ -14,7 +14,7 @@ use flate2::read::GzDecoder;
 use semver::Version;
 use zip::{ZipArchive, result::ZipError};
 
-use crate::utils::normalize_path;
+use crate::utils::{lock_path, normalize_path};
 
 /// Errors that occur while installing clang's resource headers.
 #[derive(Debug, thiserror::Error)]
@@ -94,6 +94,9 @@ fn install_staged(
     archive: &Path,
     extract: impl FnOnce(&Path) -> Result<bool, ResourceHeadersError>,
 ) -> Result<(), ResourceHeadersError> {
+    // Binaries of different versions in one folder share `lib_clang` and the staging folder.
+    // The lock is released when dropped (at return).
+    let _lock = lock_path(lib_clang)?;
     let staging = lib_clang.with_file_name("clang.partial");
     if staging.exists() {
         // left over from an extraction that was interrupted
