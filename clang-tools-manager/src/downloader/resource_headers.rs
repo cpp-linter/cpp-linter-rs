@@ -61,18 +61,54 @@ pub fn has_resource_headers(bin: &Path, major: u64) -> bool {
     })
 }
 
-/// Joins the `relative` path of an archive entry to the `lib_clang` folder.
+/// Joins the `relative` path of an archive entry to the `dir` folder.
 ///
-/// Fails if the `relative` path could point outside of the `lib_clang` folder.
-fn dest_path(lib_clang: &Path, relative: &Path) -> Result<PathBuf, ResourceHeadersError> {
+/// Fails if the `relative` path could point outside of the `dir` folder.
+fn dest_path(dir: &Path, relative: &Path) -> Result<PathBuf, ResourceHeadersError> {
     if relative
         .components()
         .all(|c| matches!(c, Component::Normal(_)))
     {
-        Ok(lib_clang.join(relative))
+        Ok(dir.join(relative))
     } else {
         Err(ResourceHeadersError::UnsafePath(relative.to_path_buf()))
     }
+}
+
+/// Installs resource headers into the `lib_clang` folder, all or nothing.
+///
+/// `extract` writes the headers' version folders (like `21/include/stddef.h`) into
+/// the given staging folder, and returns `false` if the `archive` has no headers.
+/// Each extracted version folder then replaces the one in `lib_clang`.
+/// So a failed extraction never leaves a partial folder that [`has_resource_headers()`]
+/// would accept.
+fn install_staged(
+    lib_clang: &Path,
+    archive: &Path,
+    extract: impl FnOnce(&Path) -> Result<bool, ResourceHeadersError>,
+) -> Result<(), ResourceHeadersError> {
+    let staging = lib_clang.with_file_name("clang.partial");
+    if staging.exists() {
+        // left over from an extraction that was interrupted
+        fs::remove_dir_all(&staging)?;
+    }
+    let found = extract(&staging).inspect_err(|_| {
+        let _ = fs::remove_dir_all(&staging);
+    })?;
+    if !found {
+        return Err(ResourceHeadersError::NotFound(archive.to_path_buf()));
+    }
+    fs::create_dir_all(lib_clang)?;
+    for entry in fs::read_dir(&staging)? {
+        let entry = entry?;
+        let dest = lib_clang.join(entry.file_name());
+        if dest.is_dir() {
+            fs::remove_dir_all(&dest)?;
+        }
+        fs::rename(entry.path(), dest)?;
+    }
+    fs::remove_dir(&staging)?;
+    Ok(())
 }
 
 /// Extracts the resource headers from a clang-tidy `wheel` (`<package>/data/lib/clang/**`)
@@ -86,31 +122,28 @@ pub fn extract_from_wheel(
     bin: &Path,
 ) -> Result<(), ResourceHeadersError> {
     let prefix = Path::new(package).join("data").join("lib").join("clang");
-    let lib_clang = lib_clang_dir(bin)?;
-    let mut archive = ZipArchive::new(fs::File::open(wheel)?)?;
-    let mut found = false;
-    for i in 0..archive.len() {
-        let mut file = archive.by_index(i)?;
-        if !file.is_file() {
-            continue;
+    install_staged(&lib_clang_dir(bin)?, wheel, |staging| {
+        let mut archive = ZipArchive::new(fs::File::open(wheel)?)?;
+        let mut found = false;
+        for i in 0..archive.len() {
+            let mut file = archive.by_index(i)?;
+            if !file.is_file() {
+                continue;
+            }
+            let Some(relative) = file
+                .enclosed_name()
+                .and_then(|name| name.strip_prefix(&prefix).ok().map(Path::to_path_buf))
+            else {
+                continue;
+            };
+            let dest = dest_path(staging, &relative)?;
+            // `dest` is always inside `staging`, so it always has a parent.
+            fs::create_dir_all(dest.parent().unwrap_or(staging))?;
+            io::copy(&mut file, &mut fs::File::create(&dest)?)?;
+            found = true;
         }
-        let Some(relative) = file
-            .enclosed_name()
-            .and_then(|name| name.strip_prefix(&prefix).ok().map(Path::to_path_buf))
-        else {
-            continue;
-        };
-        let dest = dest_path(&lib_clang, &relative)?;
-        // `dest` is always inside `lib_clang`, so it always has a parent.
-        fs::create_dir_all(dest.parent().unwrap_or(&lib_clang))?;
-        io::copy(&mut file, &mut fs::File::create(&dest)?)?;
-        found = true;
-    }
-    if found {
-        Ok(())
-    } else {
-        Err(ResourceHeadersError::NotFound(wheel.to_path_buf()))
-    }
+        Ok(found)
+    })
 }
 
 /// Extracts a `clang-resource-headers-<major>.tar.gz` `archive` (holding `lib/clang/**`)
@@ -118,33 +151,30 @@ pub fn extract_from_wheel(
 ///
 /// These archives are published with the static binaries since LLVM v12.
 pub fn extract_from_tar_gz(archive: &Path, bin: &Path) -> Result<(), ResourceHeadersError> {
-    let lib_clang = lib_clang_dir(bin)?;
-    let mut tar = tar::Archive::new(GzDecoder::new(fs::File::open(archive)?));
-    let mut found = false;
-    for entry in tar.entries()? {
-        let mut entry = entry?;
-        if !entry.header().entry_type().is_file() {
-            continue;
+    install_staged(&lib_clang_dir(bin)?, archive, |staging| {
+        let mut tar = tar::Archive::new(GzDecoder::new(fs::File::open(archive)?));
+        let mut found = false;
+        for entry in tar.entries()? {
+            let mut entry = entry?;
+            if !entry.header().entry_type().is_file() {
+                continue;
+            }
+            let path = entry
+                .path()?
+                .components()
+                .filter(|c| !matches!(c, Component::CurDir))
+                .collect::<PathBuf>();
+            let Ok(relative) = path.strip_prefix(Path::new("lib").join("clang")) else {
+                continue;
+            };
+            let dest = dest_path(staging, relative)?;
+            // `dest` is always inside `staging`, so it always has a parent.
+            fs::create_dir_all(dest.parent().unwrap_or(staging))?;
+            entry.unpack(&dest)?;
+            found = true;
         }
-        let path = entry
-            .path()?
-            .components()
-            .filter(|c| !matches!(c, Component::CurDir))
-            .collect::<PathBuf>();
-        let Ok(relative) = path.strip_prefix(Path::new("lib").join("clang")) else {
-            continue;
-        };
-        let dest = dest_path(&lib_clang, relative)?;
-        // `dest` is always inside `lib_clang`, so it always has a parent.
-        fs::create_dir_all(dest.parent().unwrap_or(&lib_clang))?;
-        entry.unpack(&dest)?;
-        found = true;
-    }
-    if found {
-        Ok(())
-    } else {
-        Err(ResourceHeadersError::NotFound(archive.to_path_buf()))
-    }
+        Ok(found)
+    })
 }
 
 #[cfg(test)]
@@ -293,5 +323,42 @@ mod tests {
         let err = extract_from_tar_gz(&archive, &bin).unwrap_err();
         assert!(matches!(err, ResourceHeadersError::UnsafePath(_)));
         assert!(!tmp.path().join("evil.h").exists());
+    }
+
+    #[test]
+    fn failed_extraction_leaves_no_partial_headers() {
+        let tmp = TempDir::new().unwrap();
+        let archive = tmp.path().join("bad.tar.gz");
+        make_tar_gz(
+            &archive,
+            &[
+                ("lib/clang/21/include/stddef.h", STDDEF),
+                ("lib/clang/../../evil.h", b"evil"),
+            ],
+        );
+        let bin = tmp.path().join("bin").join("clang-tidy-21");
+        let err = extract_from_tar_gz(&archive, &bin).unwrap_err();
+        assert!(matches!(err, ResourceHeadersError::UnsafePath(_)));
+        assert!(!has_resource_headers(&bin, 21));
+        assert!(!tmp.path().join("lib/clang.partial").exists());
+    }
+
+    #[test]
+    fn extraction_replaces_old_headers() {
+        let tmp = TempDir::new().unwrap();
+        let lib = tmp.path().join("lib");
+        // a partial install from an older version of this crate
+        fs::create_dir_all(lib.join("clang/21/include")).unwrap();
+        fs::write(lib.join("clang/21/include/stale.h"), b"stale").unwrap();
+        // a staging folder left over from an interrupted extraction
+        fs::create_dir_all(lib.join("clang.partial/21")).unwrap();
+
+        let archive = tmp.path().join("clang-resource-headers-21.tar.gz");
+        make_tar_gz(&archive, &[("lib/clang/21/include/stddef.h", STDDEF)]);
+        let bin = tmp.path().join("bin").join("clang-tidy-21");
+        extract_from_tar_gz(&archive, &bin).unwrap();
+        assert!(has_resource_headers(&bin, 21));
+        assert!(!lib.join("clang/21/include/stale.h").exists());
+        assert!(!lib.join("clang.partial").exists());
     }
 }
