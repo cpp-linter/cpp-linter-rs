@@ -551,7 +551,7 @@ impl PyPiDownloader {
         };
         Self::extract_bin(clang_tool, &cached_wheel, &extracted_bin)?;
         if clang_tool.needs_resource_headers()
-            && !resource_headers::has_resource_headers(&extracted_bin, ver.major)
+            && !resource_headers::has_resource_headers(&extracted_bin, &ver)
         {
             log::info!("Extracting clang resource headers from the {clang_tool} wheel");
             let package = clang_tool.as_str().replace('-', "_");
@@ -1010,7 +1010,10 @@ mod test {
             let bin = PyPiDownloader::download_tool(&ClangTool::ClangTidy, &req, Some(&bin_dir))
                 .await
                 .unwrap();
-            assert!(resource_headers::has_resource_headers(&bin, 17));
+            assert!(resource_headers::has_resource_headers(
+                &bin,
+                &semver::Version::new(17, 0, 0)
+            ));
             assert!(tmp.path().join("lib/clang/17/include/stddef.h").is_file());
         }
 
@@ -1030,7 +1033,10 @@ mod test {
                 .await
                 .unwrap();
             assert_eq!(fs::read(&bin).unwrap(), b"bin");
-            assert!(!resource_headers::has_resource_headers(&bin, 17));
+            assert!(!resource_headers::has_resource_headers(
+                &bin,
+                &semver::Version::new(17, 0, 0)
+            ));
         }
     }
 }

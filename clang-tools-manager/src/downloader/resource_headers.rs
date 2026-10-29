@@ -11,6 +11,7 @@ use std::{
 };
 
 use flate2::read::GzDecoder;
+use semver::Version;
 use zip::{ZipArchive, result::ZipError};
 
 use crate::utils::normalize_path;
@@ -44,20 +45,26 @@ pub fn lib_clang_dir(bin: &Path) -> io::Result<PathBuf> {
     ))
 }
 
-/// Are the resource headers for LLVM's `major` version installed for the executable at `bin`?
+/// The name of the folder (in [`lib_clang_dir()`]) with the resource headers of LLVM `version`.
 ///
-/// LLVM 15 and older name the headers' folder with the full version (`lib/clang/15.0.7`).
-/// Newer versions use only the major version (`lib/clang/16`).
-pub fn has_resource_headers(bin: &Path, major: u64) -> bool {
-    let Ok(entries) = lib_clang_dir(bin).and_then(fs::read_dir) else {
-        return false;
-    };
-    let major = major.to_string();
-    let prefix = format!("{major}.");
-    entries.flatten().any(|entry| {
-        let name = entry.file_name().to_string_lossy().to_string();
-        (name == major || name.starts_with(&prefix))
-            && entry.path().join("include").join("stddef.h").is_file()
+/// LLVM 15 and older name it with the full version (`15.0.7`).
+/// Newer versions use only the major version (`16`).
+fn resource_dir_name(version: &Version) -> String {
+    if version.major > 15 {
+        version.major.to_string()
+    } else {
+        format!("{}.{}.{}", version.major, version.minor, version.patch)
+    }
+}
+
+/// Are the resource headers for LLVM `version` installed for the executable at `bin`?
+pub fn has_resource_headers(bin: &Path, version: &Version) -> bool {
+    lib_clang_dir(bin).is_ok_and(|lib_clang| {
+        lib_clang
+            .join(resource_dir_name(version))
+            .join("include")
+            .join("stddef.h")
+            .is_file()
     })
 }
 
@@ -182,6 +189,7 @@ mod tests {
     use std::{fs, io::Write, path::Path};
 
     use flate2::{Compression, write::GzEncoder};
+    use semver::Version;
     use tempfile::TempDir;
 
     use super::{
@@ -235,23 +243,25 @@ mod tests {
     fn headers_by_version() {
         let tmp = TempDir::new().unwrap();
         let bin = tmp.path().join("bin").join("clang-tidy-21");
-        assert!(!has_resource_headers(&bin, 21));
+        let v21 = Version::new(21, 1, 8);
+        assert!(!has_resource_headers(&bin, &v21));
         let lib_clang = tmp.path().join("lib").join("clang");
 
         // a folder without `stddef.h` does not count
         fs::create_dir_all(lib_clang.join("21").join("include")).unwrap();
-        assert!(!has_resource_headers(&bin, 21));
+        assert!(!has_resource_headers(&bin, &v21));
 
         // LLVM 16+ use only the major version
         fs::write(lib_clang.join("21/include/stddef.h"), STDDEF).unwrap();
-        assert!(has_resource_headers(&bin, 21));
-        assert!(!has_resource_headers(&bin, 2));
+        assert!(has_resource_headers(&bin, &v21));
+        assert!(has_resource_headers(&bin, &Version::new(21, 1, 0)));
+        assert!(!has_resource_headers(&bin, &Version::new(2, 0, 0)));
 
         // LLVM 15 and older use the full version
         fs::create_dir_all(lib_clang.join("15.0.7").join("include")).unwrap();
         fs::write(lib_clang.join("15.0.7/include/stddef.h"), STDDEF).unwrap();
-        assert!(has_resource_headers(&bin, 15));
-        assert!(!has_resource_headers(&bin, 1));
+        assert!(has_resource_headers(&bin, &Version::new(15, 0, 7)));
+        assert!(!has_resource_headers(&bin, &Version::new(15, 0, 6)));
     }
 
     #[test]
@@ -268,7 +278,7 @@ mod tests {
         );
         let bin = tmp.path().join("bin").join("clang-tidy-21");
         extract_from_wheel(&wheel, "clang_tidy", &bin).unwrap();
-        assert!(has_resource_headers(&bin, 21));
+        assert!(has_resource_headers(&bin, &Version::new(21, 0, 0)));
         assert_eq!(
             fs::read(tmp.path().join("lib/clang/21/include/stddef.h")).unwrap(),
             STDDEF
@@ -284,7 +294,7 @@ mod tests {
         let bin = tmp.path().join("bin").join("clang-tidy-14");
         let err = extract_from_wheel(&wheel, "clang_tidy", &bin).unwrap_err();
         assert!(matches!(err, ResourceHeadersError::NotFound(_)));
-        assert!(!has_resource_headers(&bin, 14));
+        assert!(!has_resource_headers(&bin, &Version::new(14, 0, 0)));
     }
 
     #[test]
@@ -300,7 +310,7 @@ mod tests {
         );
         let bin = tmp.path().join("bin").join("clang-tidy-15");
         extract_from_tar_gz(&archive, &bin).unwrap();
-        assert!(has_resource_headers(&bin, 15));
+        assert!(has_resource_headers(&bin, &Version::new(15, 0, 7)));
         assert!(!tmp.path().join("lib/clang/LICENSE.TXT").exists());
     }
 
@@ -339,7 +349,7 @@ mod tests {
         let bin = tmp.path().join("bin").join("clang-tidy-21");
         let err = extract_from_tar_gz(&archive, &bin).unwrap_err();
         assert!(matches!(err, ResourceHeadersError::UnsafePath(_)));
-        assert!(!has_resource_headers(&bin, 21));
+        assert!(!has_resource_headers(&bin, &Version::new(21, 0, 0)));
         assert!(!tmp.path().join("lib/clang.partial").exists());
     }
 
@@ -357,7 +367,7 @@ mod tests {
         make_tar_gz(&archive, &[("lib/clang/21/include/stddef.h", STDDEF)]);
         let bin = tmp.path().join("bin").join("clang-tidy-21");
         extract_from_tar_gz(&archive, &bin).unwrap();
-        assert!(has_resource_headers(&bin, 21));
+        assert!(has_resource_headers(&bin, &Version::new(21, 0, 0)));
         assert!(!lib.join("clang/21/include/stale.h").exists());
         assert!(!lib.join("clang.partial").exists());
     }

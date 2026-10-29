@@ -230,7 +230,7 @@ mod supported_platform {
             }
             Self::verify_sha512(&download_path, &tool_url_path, &sha512_cache_path)?;
             if tool.needs_resource_headers()
-                && !resource_headers::has_resource_headers(&download_path, ver.major)
+                && !resource_headers::has_resource_headers(&download_path, &ver)
             {
                 Self::install_resource_headers(
                     &ver_str,
@@ -269,7 +269,10 @@ mod supported_platform {
                 log::info!("Downloading clang resource headers from {url}");
                 download(&url, &archive, 60).await?;
             }
-            Self::verify_sha512(&archive, &name, sha512_path)?;
+            Self::verify_sha512(&archive, &name, sha512_path).inspect_err(|_| {
+                // so the next run downloads it again
+                let _ = fs::remove_file(&archive);
+            })?;
             let lib_clang = resource_headers::lib_clang_dir(bin)?;
             log::info!("Extracting clang resource headers to {lib_clang:?}");
             resource_headers::extract_from_tar_gz(&archive, bin)?;
@@ -438,6 +441,7 @@ mod supported_platform {
                 .await
                 .unwrap_err();
             assert!(matches!(err, StaticDistDownloadError::DownloadError(_)));
+            assert!(!release_cache.join(archive_name).exists());
         }
     }
 }

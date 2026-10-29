@@ -124,14 +124,14 @@ impl RequestedVersion {
                 let cached_bin = StaticDistDownloader::get_cache_dir()
                     .join("bin")
                     .join(format!("{tool}-{}{bin_ext}", min_ver.major));
-                // A cached clang-tidy without resource headers is downloaded again,
-                // so the headers get installed.
-                if cached_bin.exists()
-                    && (!tool.needs_resource_headers()
-                        || resource_headers::has_resource_headers(&cached_bin, min_ver.major))
-                {
+                if cached_bin.exists() {
                     let version = tool.capture_version(&cached_bin)?;
-                    if version_req.matches(&version) {
+                    // A cached clang-tidy without resource headers is downloaded again,
+                    // so the headers get installed.
+                    if version_req.matches(&version)
+                        && (!tool.needs_resource_headers()
+                            || resource_headers::has_resource_headers(&cached_bin, &version))
+                    {
                         log::info!(
                             "Found {tool} version {version} in cache at path: {:?}",
                             cached_bin.to_string_lossy()
