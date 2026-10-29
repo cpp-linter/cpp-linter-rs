@@ -173,7 +173,7 @@ mod tests {
             header.set_mode(0o644);
             // `append_data()` would reject unsafe paths, so the name is set directly.
             header.as_gnu_mut().unwrap().name[..name.len()].copy_from_slice(name.as_bytes());
-            header.set_cksum();
+            header.set_cksum(); // spell-checker: disable-line
             tar.append(&header, *content).unwrap();
         }
         tar.into_inner().unwrap().finish().unwrap();
