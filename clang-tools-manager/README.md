@@ -64,7 +64,10 @@ Options:
           Without it, log level is set to INFO by default.
 
   -d, --directory <DIRECTORY>
-          The directory where the clang tools should be installed
+          The directory where the clang tools should be installed.
+
+          clang-tidy's resource headers (like `stddef.h`) are
+          installed in `<DIRECTORY>/../lib/clang`.
 
   -f, --force
           Force overwriting symlink to the installed binary.

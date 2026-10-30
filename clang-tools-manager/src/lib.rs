@@ -10,6 +10,7 @@ pub use downloader::{
     DownloadError,
     caching::Cacher,
     pypi::{PyPiDownloadError, PyPiDownloader},
+    resource_headers::ResourceHeadersError,
     static_dist::{StaticDistDownloadError, StaticDistDownloader},
 };
 

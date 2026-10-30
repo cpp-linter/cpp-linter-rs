@@ -38,6 +38,7 @@ words:
   - eprecated
   - esac
   - Falsey
+  - flate
   - fontawesome
   - gitea
   - gitmodules
@@ -119,6 +120,7 @@ words:
   - splitn
   - SRCROOT
   - startswith
+  - stddef
   - superfences
   - tada
   - taiki
