@@ -264,6 +264,11 @@ pub struct ReviewComments {
     /// This differs from `comments.len()` because some suggestions may
     /// not fit within the file's diff.
     pub tool_total: u32,
+    /// The count of suggestions (included in `tool_total`) that fit within the file's diff.
+    ///
+    /// This differs from `comments.len()` because suggestions on the same lines
+    /// are merged into one comment.
+    pub in_diff: u32,
     /// A list of comment suggestions to be posted.
     ///
     /// These suggestions are guaranteed to fit in the file's diff.
@@ -319,15 +324,16 @@ impl ReviewComments {
                 .as_str(),
             );
         }
-        if !summary_only && total_review_comments != self.tool_total {
+        if !summary_only && self.in_diff != self.tool_total {
             log::info!(
-                "Only {total_review_comments} out of {} concerns fit within this pull request's diff.",
+                "Only {} out of {} concerns fit within this pull request's diff.",
+                self.in_diff,
                 self.tool_total
             );
             body.push_str(
                 format!(
-                    "\nOnly {total_review_comments} out of {} concerns fit within this pull request's diff.\n",
-                    self.tool_total,
+                    "\nOnly {} out of {} concerns fit within this pull request's diff.\n",
+                    self.in_diff, self.tool_total,
                 )
                 .as_str(),
             );
@@ -517,6 +523,25 @@ mod tests {
             summary_only,
         );
         assert!(review_summary.contains("suggestions were duplicates of previous reviews"));
+    }
+
+    #[test]
+    fn summarize_concerns_in_diff() {
+        let clang_versions = ClangVersions {
+            format_version: None,
+            tidy_version: Some(PSEUDO_VERSION),
+        };
+        let summarize = |in_diff| {
+            ReviewComments {
+                tool_total: 6,
+                in_diff,
+                ..Default::default()
+            }
+            .summarize(&clang_versions, &[], 2, false)
+        };
+        // concerns merged into fewer comments still fit within the diff
+        assert!(!summarize(6).contains("concerns fit within"));
+        assert!(summarize(2).contains("\nOnly 2 out of 6 concerns fit within"));
     }
 
     #[test]
