@@ -47,7 +47,7 @@ tempfile = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 [features]
-bin = ["dep:clap", "dep:tokio", "dep:anyhow", "dep:colored"]
+bin = ["dep:clap", "dep:tokio", "tokio/rt-multi-thread", "reqwest/default-tls", "dep:anyhow", "dep:colored"]
 
 [build-dependencies]
 serde = { workspace = true }
@@ -55,4 +55,5 @@ serde_json = { workspace = true }
 reqwest = { workspace = true, features = ["default-tls", "blocking"] }
 
 [package.metadata.binstall]
-pkg-url = "{ repo }/releases/download/clang-tools-manager/v{ version }/{ name }-{ target }{ archive-suffix }"
+pkg-url = "{ repo }/releases/download/clang-tools-manager/v{ version }/clang-tools-{ target }{ archive-suffix }"
+bin-dir = "{ bin }{ binary-ext }"
