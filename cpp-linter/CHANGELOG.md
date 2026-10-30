@@ -6,6 +6,55 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
+## [cpp-linter/v2.0.0-rc.24] - 2026-10-30
+
+### <!-- 1 --> 🚀 Added
+
+- Print patch to stdout if it exists by @2bndy5 in [#459](https://github.com/cpp-linter/cpp-linter-rs/pull/459)
+- Redesign the comment footer with website, star and sponsor links by @shenxianpeng in [#473](https://github.com/cpp-linter/cpp-linter-rs/pull/473)
+- Write clang-tidy diagnostics to a SARIF 2.1.0 file by @shenxianpeng in [#479](https://github.com/cpp-linter/cpp-linter-rs/pull/479)
+- Apply clang-tidy fixes to other analyzed files by @2bndy5 in [`cc29a7e`](https://github.com/cpp-linter/cpp-linter-rs/commit/cc29a7e585c575ee12907fce3fc6529d824304dc)
+- Report clang-tidy fixes that could not be applied to other files by @shenxianpeng in [#508](https://github.com/cpp-linter/cpp-linter-rs/pull/508)
+- Add `--fix` as alias to new `--gen-patch/-F` arg by @2bndy5 in [#511](https://github.com/cpp-linter/cpp-linter-rs/pull/511)
+
+### <!-- 4 --> 🛠️ Fixed
+
+- Increase test coverage; fix `--mod-sys`/`--no-mod-sys` flags by @shenxianpeng in [#486](https://github.com/cpp-linter/cpp-linter-rs/pull/486)
+- Never let clang-tidy modify the worktree by @shenxianpeng in [#488](https://github.com/cpp-linter/cpp-linter-rs/pull/488)
+- Shift changed lines past clang-tidy fixes above them by @shenxianpeng in [#491](https://github.com/cpp-linter/cpp-linter-rs/pull/491)
+- Close behavior gaps with cpp-linter v1 by @shenxianpeng in [#492](https://github.com/cpp-linter/cpp-linter-rs/pull/492)
+- Restore v1's `-t`/`-g` short flags by @2bndy5 in [`d8c28eb`](https://github.com/cpp-linter/cpp-linter-rs/commit/d8c28eb698d6275618ca58f5b21e70afd8aeb0ff)
+- Bump git-bot-feedback and resolve file paths correctly by @2bndy5 in [#525](https://github.com/cpp-linter/cpp-linter-rs/pull/525)
+- Count review suggestions merged into one comment as within the diff by @shenxianpeng in [#531](https://github.com/cpp-linter/cpp-linter-rs/pull/531)
+
+### <!-- 6 --> 📦 Dependency updates
+
+- Bump the cargo group across 1 directory with 10 updates by @dependabot[bot] in [#443](https://github.com/cpp-linter/cpp-linter-rs/pull/443)
+- Bump the cargo group with 6 updates by @dependabot[bot] in [#466](https://github.com/cpp-linter/cpp-linter-rs/pull/466)
+- Bump the cargo group with 5 updates by @dependabot[bot] in [#504](https://github.com/cpp-linter/cpp-linter-rs/pull/504)
+- Bump transitive dependencies by @2bndy5 in [`4cb2e2c`](https://github.com/cpp-linter/cpp-linter-rs/commit/4cb2e2c859fe460f0d5a241f5db7f681d5957d7b)
+- Bump git-bot-feedback from v0.8.6 to v0.8.8 by @2bndy5 in [#515](https://github.com/cpp-linter/cpp-linter-rs/pull/515)
+- Bump jsonschema from 0.58.6 to 0.59.0 in the cargo group by @dependabot[bot] in [#521](https://github.com/cpp-linter/cpp-linter-rs/pull/521)
+- Bump version to clang-tools-manager/v0.3.2 by @2bndy5 in [`bd385e5`](https://github.com/cpp-linter/cpp-linter-rs/commit/bd385e5b4d918631fb7d740c600b7884aadc0144)
+
+### <!-- 7 -->🚦 Tests
+
+- Cover wheel-tag parsing and clang advice tallying by @shenxianpeng in [#465](https://github.com/cpp-linter/cpp-linter-rs/pull/465)
+- Cover platform-specific branches and Windows package managers by @shenxianpeng in [#519](https://github.com/cpp-linter/cpp-linter-rs/pull/519)
+
+### <!-- 8 --> 📝 Documentation
+
+- Rework the READMEs to the org layout and fix the install commands by @shenxianpeng in [#464](https://github.com/cpp-linter/cpp-linter-rs/pull/464)
+
+### <!-- 9 --> 🗨️ Changed
+
+- Reword 'fix available' by @2bndy5 in [#458](https://github.com/cpp-linter/cpp-linter-rs/pull/458)
+- Move module imports for unix only tests by @2bndy5 in [#487](https://github.com/cpp-linter/cpp-linter-rs/pull/487)
+
+[cpp-linter/v2.0.0-rc.24]: https://github.com/cpp-linter/cpp-linter-rs/compare/cpp-linter/v2.0.0-rc.23...cpp-linter/v2.0.0-rc.24
+
+Full commit diff: [`cpp-linter/v2.0.0-rc.23...cpp-linter/v2.0.0-rc.24`][cpp-linter/v2.0.0-rc.24]
+
 ## [cpp-linter/v2.0.0-rc.23] - 2026-07-14
 
 ### <!-- 4 --> 🛠️ Fixed
@@ -15,6 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### <!-- 6 --> 📦 Dependency updates
 
 - Bump the cargo group across 1 directory with 7 updates by @dependabot[bot] in [#399](https://github.com/cpp-linter/cpp-linter-rs/pull/399)
+- Bump version to cpp-linter/v2.0.0-rc.23 by @2bndy5 in [`fbdcfa4`](https://github.com/cpp-linter/cpp-linter-rs/commit/fbdcfa468b2705d090b43e9198c4c928d8fcbe2d)
 
 [cpp-linter/v2.0.0-rc.23]: https://github.com/cpp-linter/cpp-linter-rs/compare/cpp-linter/v2.0.0-rc.22...cpp-linter/v2.0.0-rc.23
 
@@ -178,7 +228,9 @@ Full commit diff: [`cpp-linter/v2.0.0-rc.1...cpp-linter/v2.0.0-rc.16`][cpp-linte
 
 ### <!-- 4 --> 🛠️ Fixed
 
+- Fix metadata and switch to pypa-publish action by @2bndy5 in [`092e0c2`](https://github.com/cpp-linter/cpp-linter-rs/commit/092e0c20cf66747b59bab4bdf60be29f7f02dcc6)
 - Propagate errors by @2bndy5 in [#47](https://github.com/cpp-linter/cpp-linter-rs/pull/47)
+- Fix python binding's entry point by @2bndy5 in [`bba2e68`](https://github.com/cpp-linter/cpp-linter-rs/commit/bba2e68f43fa2ee652cc67a18ea2cd1cfbfe537a)
 - Clang tools' version output string in PR review summary by @2bndy5 in [`3333796`](https://github.com/cpp-linter/cpp-linter-rs/commit/33337965a240ff791d39d4e4cd6339855ea42fd8)
 - Clang-tidy diagnostic comments in PR review by @2bndy5 in [#77](https://github.com/cpp-linter/cpp-linter-rs/pull/77)
 - Parse clang-tidy output when `WarningsAsErrors` is asserted by @2bndy5 in [#190](https://github.com/cpp-linter/cpp-linter-rs/pull/190)
@@ -216,11 +268,18 @@ Full commit diff: [`cpp-linter/v2.0.0-rc.1...cpp-linter/v2.0.0-rc.16`][cpp-linte
 
 ### <!-- 8 --> 📝 Documentation
 
+- Switch to mkdocs by @2bndy5 in [`da09e54`](https://github.com/cpp-linter/cpp-linter-rs/commit/da09e542488ace2c11b60d83963912ef57b4d754)
 - [rust API] update logo, favicon, and some links by @2bndy5 in [`31b7add`](https://github.com/cpp-linter/cpp-linter-rs/commit/31b7add5ea8b1938ea4f816f27a732f3ec8d5227)
 - Fix typo in doc string comment by @2bndy5 in [`9463247`](https://github.com/cpp-linter/cpp-linter-rs/commit/9463247d5fc127a765243893f54c3745f940094d)
 
 ### <!-- 9 --> 🗨️ Changed
 
+- Refactor files by @2bndy5 in [#38](https://github.com/cpp-linter/cpp-linter-rs/pull/38)
+- Metadata changes by @2bndy5 in [`f4237ae`](https://github.com/cpp-linter/cpp-linter-rs/commit/f4237ae593e468eca0e63169c9360e97bd6e1f26)
+- Update READMEs by @2bndy5 in [`3e9c128`](https://github.com/cpp-linter/cpp-linter-rs/commit/3e9c12846c0eb96f8cdd68fc7435bd8965e7ce6a)
+- Some cleanup from release trials by @2bndy5 in [`25c3951`](https://github.com/cpp-linter/cpp-linter-rs/commit/25c3951b0ecef9e078ea71932c9401ad8abc2a28)
+- Rename repository by @2bndy5 in [`5e3d93f`](https://github.com/cpp-linter/cpp-linter-rs/commit/5e3d93f53e98bbfed56057d2f3984f65c7835550)
+- Reorganize repo folders by @2bndy5 in [`d30125b`](https://github.com/cpp-linter/cpp-linter-rs/commit/d30125bbe9015d7ea070a3b8c20fcc9acc56dbc0)
 - Better Benchmark by @2bndy5 in [#92](https://github.com/cpp-linter/cpp-linter-rs/pull/92)
 - Use `Client` instance by reference by @2bndy5 in [#141](https://github.com/cpp-linter/cpp-linter-rs/pull/141)
 - Review CI by @2bndy5 in [#195](https://github.com/cpp-linter/cpp-linter-rs/pull/195)
