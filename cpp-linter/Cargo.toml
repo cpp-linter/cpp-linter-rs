@@ -17,7 +17,7 @@ license.workspace = true
 anyhow = { workspace = true, optional = true }
 async-trait = "0.1.92"
 chrono = "0.4.45"
-clang-tools-manager = { path = "../clang-tools-manager", features = ["bin"], version = "0.3.1" }
+clang-tools-manager = { path = "../clang-tools-manager", features = ["bin"], version = "0.3.2" }
 clap = { workspace = true, optional = true }
 colored = { workspace = true }
 fast-glob = "1.1.2"
