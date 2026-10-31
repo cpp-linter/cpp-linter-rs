@@ -18,7 +18,7 @@ Install Rust, `uv`, Nushell and `nur`, and Yarn. For the Python tooling environm
 uv sync
 ```
 
-Install the Rust test tools `cargo-nextest` and `cargo-llvm-cov` if they are not already available. Register pre-commit hooks with `uv run pre-commit install` when desired.
+Install the Rust test tools `cargo-nextest` (v0.9.150 or newer) and `cargo-llvm-cov` if they are not already available. Register pre-commit hooks with `uv run pre-commit install` when desired.
 
 ## Testing
 
