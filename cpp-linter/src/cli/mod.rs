@@ -609,13 +609,16 @@ pub struct FeedbackOptions {
     /// cpp-linter
     /// git apply "$GEN_PATCH_PATH"
     /// ```
-    #[cfg_attr(feature = "bin", arg(
-        long,
-        value_name = "PATH",
-        env = "GEN_PATCH_PATH",
-        help_heading = "Feedback options",
-        verbatim_doc_comment,
-    ))]
+    #[cfg_attr(
+        feature = "bin",
+        arg(
+            long,
+            value_name = "PATH",
+            env = "GEN_PATCH_PATH",
+            help_heading = "Feedback options",
+            verbatim_doc_comment,
+        )
+    )]
     pub gen_patch_path: Option<PathBuf>,
 }
 
