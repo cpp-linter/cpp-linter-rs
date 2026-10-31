@@ -143,17 +143,22 @@ impl RequestedVersion {
                     }
                 }
 
-                // try to download a suitable version
+                // try a system package manager first (if allowed)
+                if allow_system_package_manager {
+                    match try_install_package(tool, version_req, &min_ver).await {
+                        Ok(Some(result)) => return Ok(Some(result)),
+                        Ok(None) => {}
+                        Err(e) => log::error!(
+                            "Failed to install {tool} {version_req} using a system package manager: {e}"
+                        ),
+                    }
+                }
+
+                // then try to download a suitable version from PyPI or the static binaries
                 let bin = match PyPiDownloader::download_tool(tool, version_req, directory).await {
                     Ok(bin) => bin,
                     Err(e) => {
                         log::error!("Failed to download {tool} {version_req} from PyPi: {e}");
-                        if allow_system_package_manager
-                            && let Some(result) =
-                                try_install_package(tool, version_req, &min_ver).await?
-                        {
-                            return Ok(Some(result));
-                        }
                         log::info!("Falling back to downloading {tool} static binaries.");
                         match StaticDistDownloader::download_tool(tool, version_req, directory)
                             .await
@@ -603,9 +608,25 @@ mod tests {
         }
 
         #[tokio::test]
-        async fn eval_package_manager() {
+        async fn eval_package_manager_error_falls_back() {
             let env = TestEnv::new();
             env.seed_empty_pypi();
+            env.seed_static_dist(true);
+            // A fake `brew` that "installs" clang-format, but no clang-format executable appears.
+            fake_exe(
+                env.bin.path(),
+                "brew",
+                "if [ \"$1\" = \"list\" ]; then exit 1; fi",
+            );
+            let result = env.eval(req("17"), true).await.unwrap().unwrap();
+            assert_version(&env.out.path().join("clang-format-17"), result, "17.0.6");
+        }
+
+        #[tokio::test]
+        async fn eval_package_manager() {
+            let env = TestEnv::new();
+            // PyPI is not seeded: the package manager is tried first,
+            // so nothing is downloaded from PyPI.
             let marker = env.bin.path().join("installed");
             let marker = marker.to_string_lossy();
             // A fake `brew` that "installs" clang-format v17 (by creating a marker file).
