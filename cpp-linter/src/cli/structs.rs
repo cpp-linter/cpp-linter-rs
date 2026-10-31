@@ -272,19 +272,13 @@ impl From<&Cli> for ClangParams {
                 let ignore_format: Vec<&str> = ignore_format.iter().map(|s| s.as_str()).collect();
                 FileFilter::new(&ignore_format, &extensions, Some("clang-format"))
             });
-        let repo_root = args.source_options.repo_root.clone();
+        // A relative database path is relative to the working directory (like v1),
+        // not to the repo root.
         let database = args
             .tidy_options
             .database
             .as_ref()
-            .map(PathBuf::from)
-            .map(|db| {
-                if db.is_relative() {
-                    repo_root.join(db)
-                } else {
-                    db
-                }
-            });
+            .map(|db| std::path::absolute(db).unwrap_or_else(|_| db.to_path_buf()));
         ClangParams {
             tidy_checks: args.tidy_options.tidy_checks.clone(),
             lines_changed_only: args.source_options.lines_changed_only.clone(),
@@ -296,7 +290,7 @@ impl From<&Cli> for ClangParams {
             clang_format_command: None,
             tidy_filter,
             format_filter,
-            repo_root,
+            repo_root: args.source_options.repo_root.clone(),
             gen_patch: args.feedback_options.pr_review
                 || args.feedback_options.gen_patch
                 || args.feedback_options.gen_patch_path.is_some(),
@@ -509,5 +503,15 @@ mod test {
         let cli = Cli::parse_from(["cpp-linter", "--database", tmp_dir.path().to_str().unwrap()]);
         let clang_params = ClangParams::from(&cli);
         assert_eq!(clang_params.database, Some(tmp_dir.path().to_path_buf()));
+    }
+
+    #[test]
+    fn relative_db_path() {
+        let cli = Cli::parse_from(["cpp-linter", "--repo-root", "sub", "--database", "build"]);
+        let clang_params = ClangParams::from(&cli);
+        assert_eq!(
+            clang_params.database,
+            Some(std::env::current_dir().unwrap().join("build"))
+        );
     }
 }

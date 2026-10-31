@@ -274,7 +274,8 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
         "--ignore-format=src/some source.c".to_string(),
         format!("--thread-comments={}", test_params.thread_comments),
         format!("--no-lgtm={}", test_params.no_lgtm),
-        "-p=build".to_string(),
+        // a relative database path is resolved against the working directory
+        format!("-p={}", tmp_dir.path().join("build").to_str().unwrap()),
         "-i=build/**".to_string(),
         format!("--repo-root={}", tmp_dir.path().to_str().unwrap()),
         format!(
