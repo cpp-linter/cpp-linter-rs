@@ -173,9 +173,16 @@ pub struct GeneralOptions {
     ///
     /// cpp-linter v1 used this to set the number of parallel jobs.
     /// v2 always analyzes files in parallel, so a given value only
-    /// causes a deprecation warning.
-    #[arg(short = 'j', long, value_name = "JOBS", hide = true)]
-    pub jobs: Option<String>,
+    /// causes a deprecation warning. Like v1, the value must be an integer
+    /// (v1 treated zero or a negative value as "use all CPUs").
+    #[arg(
+        short = 'j',
+        long,
+        value_name = "JOBS",
+        hide = true,
+        allow_negative_numbers = true
+    )]
+    pub jobs: Option<i32>,
 }
 
 /// A struct to describe the CLI's source options.
@@ -687,6 +694,15 @@ mod test {
         assert!(args.general_options.no_mod_sys);
 
         assert!(Cli::try_parse_from(vec!["cpp-linter", "--mod-sys", "--no-mod-sys"]).is_err());
+    }
+
+    #[test]
+    fn deprecated_jobs_takes_an_integer() {
+        let args = Cli::parse_from(vec!["cpp-linter", "-j", "4"]);
+        assert_eq!(args.general_options.jobs, Some(4));
+        let args = Cli::parse_from(vec!["cpp-linter", "--jobs", "-1"]);
+        assert_eq!(args.general_options.jobs, Some(-1));
+        assert!(Cli::try_parse_from(vec!["cpp-linter", "-j", "nope"]).is_err());
     }
 
     #[test]
