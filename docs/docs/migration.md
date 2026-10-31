@@ -11,6 +11,8 @@
 [pr-review]: cli.md#-p-pr-review
 [gen-patch]: cli.md#-f-gen-patch
 [sarif-file]: cli.md#-sarif-file
+[gen-patch-path]: cli.md#-gen-patch-path
+[summary-output-file]: cli.md#-o-summary-output-file
 
 # Migrating from v1
 
@@ -18,11 +20,11 @@ This page lists what changes when moving from cpp-linter v1 (the Python package)
 project). Most options keep their names, short flags and meaning, so many command lines work
 unchanged. The sections below cover the differences.
 
-## Removed options
+## Deprecated options
 
 | v1 option | v2 behavior | What to do |
 |---|---|---|
-| `-j`, `--jobs` | Files are always analyzed in parallel. | Remove the option. v2 exits with an "unexpected argument" error if it is given. |
+| `-j`, `--jobs` | Files are always analyzed in parallel. The value is still parsed as an integer, then ignored with a deprecation warning. | Remove the option. |
 
 ## Renamed or merged options
 
@@ -53,11 +55,15 @@ In v1, `--fix` applied clang-format fixes in place, editing the files in the wor
 
 In v2, cpp-linter never modifies the working tree. [`--gen-patch`][gen-patch] (alias `--fix`)
 writes one patch file that combines the clang-format and clang-tidy fixes. Its path is printed in
-the log and, in CI, set as the `fix-patch-path` output. To apply the fixes locally:
+the log and, in CI, set as the `fix-patch-path` output. By default the patch is written to
+`.cpp-linter-cache/auto-fix.patch` in the [`--repo-root`][repo-root] folder.
+[`--gen-patch-path`][gen-patch-path] (or the `GEN_PATCH_PATH` environment variable) chooses another
+path and implies `--gen-patch`. To apply the fixes locally:
 
 ```shell
-cpp-linter --gen-patch
-git apply path/to/the/printed/patch
+export GEN_PATCH_PATH=fixes.patch
+cpp-linter
+git apply "$GEN_PATCH_PATH"
 ```
 
 ## Clang tools are installed for you
@@ -67,25 +73,32 @@ v1 expects clang-format and clang-tidy to be installed already, for example with
 installed version to use.
 
 In v2, [`-V`, `--version`][version] also accepts a version requirement (for example `16`, `=12.0.1`
-or `>=10, <13`). If no matching tools are found on the system, v2 downloads them. It tries
-PyPI wheels first, then the system package manager (on by default in CI, see
-[`--mod-sys`][mod-sys] and [`--no-mod-sys`][no-mod-sys]), then static binaries built by
-cpp-linter. A path to an install location and a blank string (the default installed version) work
+or `>=10, <13`). If no matching tools are found on the `PATH` or in the cache, v2 installs them.
+It tries the system package manager first when allowed (on by default in CI, see
+[`--mod-sys`][mod-sys] and [`--no-mod-sys`][no-mod-sys]), then PyPI wheels, then static binaries
+built by cpp-linter. A path to an install location and a blank string (the default installed version) work
 as in v1.
 
 Running `-V` without a value prints the cpp-linter version, like the `version` subcommand.
 
-## Paths relative to the repository root
+## Relative paths
 
-A relative [`--database`][database] path is resolved against [`--repo-root`][repo-root] in v2. In
-v1 (1.15 and later) it is resolved against the current working directory. Both give the same result
-with the default `--repo-root` of `.`. If you set `--repo-root` to a sub-folder, pass the database
-path relative to that folder, or use an absolute path.
+In v2, a relative path given to [`--database`][database], [`--gen-patch-path`][gen-patch-path],
+[`--summary-output-file`][summary-output-file] or [`--sarif-file`][sarif-file] is resolved against
+the current working directory, not against [`--repo-root`][repo-root].
+
+- `--database` behaves as in v1 1.15 and later.
+- `--summary-output-file` was resolved against `--repo-root` in v1. If you set `--repo-root` to a
+  sub-folder and pass a relative summary path, prefix it with that sub-folder or use an absolute
+  path.
+
+With the default `--repo-root` of `.`, nothing changes.
 
 ## New in v2
 
 - [`--sarif-file`][sarif-file] writes clang-tidy diagnostics as a SARIF 2.1.0 file, for example to
   upload to GitHub code scanning.
-- [`--gen-patch`][gen-patch] produces a patch of all fixes, described above.
+- [`--gen-patch`][gen-patch] and [`--gen-patch-path`][gen-patch-path] produce a patch of all
+  fixes, described above.
 - [`--mod-sys`][mod-sys] and [`--no-mod-sys`][no-mod-sys] control whether system package managers
   may be used to install the clang tools.
