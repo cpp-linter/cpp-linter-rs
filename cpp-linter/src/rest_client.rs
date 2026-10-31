@@ -206,12 +206,7 @@ impl RestClient {
             if feedback_inputs.step_summary {
                 self.client.append_step_summary(&summary)?;
             }
-            if let Some(summary_output_file) = &feedback_inputs.summary_output_file {
-                let output_file = if summary_output_file.is_absolute() {
-                    summary_output_file
-                } else {
-                    &feedback_inputs.repo_root.join(summary_output_file)
-                };
+            if let Some(output_file) = &feedback_inputs.summary_output_file {
                 if let Some(parent) = output_file.parent() {
                     std::fs::create_dir_all(parent).map_err(|e| ClientError::MkDirFailed {
                         file_path: output_file.clone(),
@@ -227,12 +222,7 @@ impl RestClient {
             }
             comment = Some(summary);
         }
-        if let Some(sarif_file) = &feedback_inputs.sarif_file {
-            let output_file = if sarif_file.is_absolute() {
-                sarif_file
-            } else {
-                &feedback_inputs.repo_root.join(sarif_file)
-            };
+        if let Some(output_file) = &feedback_inputs.sarif_file {
             SarifLog::new(
                 files,
                 clang_versions.tidy_version.as_ref(),

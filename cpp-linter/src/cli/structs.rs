@@ -12,6 +12,14 @@ use crate::clang_tools::clang_tidy::CompilationUnit;
 
 use git_bot_feedback::FileFilter;
 
+/// Resolve a path given on the command line against the current working directory.
+///
+/// The path is kept as given if the working directory cannot be read.
+#[cfg(feature = "bin")]
+fn absolute_or_given(path: &Path) -> PathBuf {
+    std::path::absolute(path).unwrap_or_else(|_| path.to_path_buf())
+}
+
 /// An enum to describe `--lines-changed-only` CLI option's behavior.
 #[derive(PartialEq, Clone, Debug, Default)]
 pub enum LinesChangedOnly {
@@ -361,12 +369,20 @@ impl From<&Cli> for FeedbackInput {
             pr_review: args.feedback_options.pr_review,
             passive_reviews: args.feedback_options.passive_reviews,
             repo_root: args.source_options.repo_root.clone(),
-            summary_output_file: args.feedback_options.summary_output_file.clone(),
-            sarif_file: args.feedback_options.sarif_file.clone(),
+            summary_output_file: args
+                .feedback_options
+                .summary_output_file
+                .as_deref()
+                .map(absolute_or_given),
+            sarif_file: args
+                .feedback_options
+                .sarif_file
+                .as_deref()
+                .map(absolute_or_given),
             gen_patch: args.feedback_options.gen_patch
                 || args.feedback_options.gen_patch_path.is_some(),
             patch_path: match &args.feedback_options.gen_patch_path {
-                Some(path) => std::path::absolute(path).unwrap_or_else(|_| path.to_path_buf()),
+                Some(path) => absolute_or_given(path),
                 None => ClangParams::default_patch_path(&args.source_options.repo_root),
             },
         }
@@ -486,6 +502,30 @@ mod test {
             std::env::current_dir().unwrap().join("fixes.patch")
         );
         assert!(ClangParams::from(&cli).gen_patch);
+    }
+
+    #[test]
+    fn relative_output_files() {
+        let cli = Cli::parse_from([
+            "cpp-linter",
+            "--repo-root",
+            "sub",
+            "--summary-output-file",
+            "summary.md",
+            "--sarif-file",
+            "out/results.sarif",
+        ]);
+        let feedback_input = FeedbackInput::from(&cli);
+        // a relative path is relative to the working directory, not the repo root
+        let cwd = std::env::current_dir().unwrap();
+        assert_eq!(
+            feedback_input.summary_output_file,
+            Some(cwd.join("summary.md"))
+        );
+        assert_eq!(
+            feedback_input.sarif_file,
+            Some(cwd.join("out/results.sarif"))
+        );
     }
 
     #[test]

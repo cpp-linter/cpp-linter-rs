@@ -252,18 +252,20 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
         );
     }
 
-    let summary_out_file_path = if test_params.relative_out_files {
-        std::path::PathBuf::from(SUMMARY_OUT_FILE_NAME)
+    // A relative output path is resolved against the working directory (not the repo root).
+    // `_out_dir` keeps the directory alive until the test ends.
+    let (_out_dir, out_dir_path) = if test_params.relative_out_files {
+        let out_dir = tempfile::tempdir_in("./").unwrap();
+        let cwd = env::current_dir().unwrap();
+        let relative = out_dir.path().strip_prefix(&cwd).unwrap().to_path_buf();
+        (out_dir, relative)
     } else {
-        tmp_dir.path().join(SUMMARY_OUT_FILE_NAME)
+        let out_dir = tempfile::tempdir().unwrap();
+        let path = out_dir.path().to_path_buf();
+        (out_dir, path)
     };
-
-    // a relative path is resolved against the repo root
-    let sarif_file_path = if test_params.relative_out_files {
-        std::path::PathBuf::from(SARIF_FILE_NAME)
-    } else {
-        tmp_dir.path().join(SARIF_FILE_NAME)
-    };
+    let summary_out_file_path = out_dir_path.join(SUMMARY_OUT_FILE_NAME);
+    let sarif_file_path = out_dir_path.join(SARIF_FILE_NAME);
 
     let mut args = vec![
         "cpp-linter".to_string(),
@@ -334,12 +336,7 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
         assert!(apply_patch_status.success());
     }
 
-    let summary_out_file_abs_path = if test_params.relative_out_files {
-        tmp_dir.path().join(SUMMARY_OUT_FILE_NAME)
-    } else {
-        summary_out_file_path.clone()
-    };
-    let summary_content = std::fs::read_to_string(&summary_out_file_abs_path).unwrap();
+    let summary_content = std::fs::read_to_string(&summary_out_file_path).unwrap();
     assert!(summary_content.contains(COMMENT_MARKER));
     assert!(summary_content.contains(USER_OUTREACH));
 
@@ -352,8 +349,7 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
         .parse::<usize>()
         .unwrap();
     let sarif: serde_json::Value =
-        serde_json::from_str(&fs::read_to_string(tmp_dir.path().join(SARIF_FILE_NAME)).unwrap())
-            .unwrap();
+        serde_json::from_str(&fs::read_to_string(&sarif_file_path).unwrap()).unwrap();
     assert_eq!(sarif["version"], SARIF_VERSION);
     let schema: serde_json::Value =
         serde_json::from_str(include_str!("sarif-schema-2.1.0.json")).unwrap();

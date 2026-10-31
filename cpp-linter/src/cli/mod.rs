@@ -500,8 +500,7 @@ pub struct FeedbackOptions {
 
     /// Provide this option with a path to which a summary comment is written.
     ///
-    /// If the given path is relative, then it shall be relative to the given
-    /// [`--repo-root`](#-r-repo-root) path.
+    /// A relative path is relative to the current working directory.
     #[cfg_attr(
         feature = "bin",
         arg(
@@ -517,8 +516,7 @@ pub struct FeedbackOptions {
     /// written in the [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html)
     /// format.
     ///
-    /// If the given path is relative, then it shall be relative to the given
-    /// [`--repo-root`](#-r-repo-root) path.
+    /// A relative path is relative to the current working directory.
     ///
     /// The SARIF file only includes clang-tidy diagnostics that are also
     /// reported in other forms of feedback. So, source filters like
