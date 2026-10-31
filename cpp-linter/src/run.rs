@@ -72,6 +72,11 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
             LevelFilter::Info
         },
     );
+    if cli.general_options.jobs.is_some() {
+        log::warn!(
+            "The `--jobs` option is deprecated and ignored. Files are always analyzed in parallel."
+        );
+    }
     let is_pr = rest_api_client.is_pr();
     if !is_pr && cli.feedback_options.pr_review && rest_api_client.client_kind() == "local" {
         log::warn!("Pull request reviews are only posted when running in a supported CI platform.");
@@ -170,10 +175,10 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
     let cache_dir = clang_params.repo_root.join(ClangParams::CACHE_DIR);
     std::fs::create_dir_all(&cache_dir)
         .with_context(|| "Failed to create a local cache directory.")?;
+    let user_inputs = FeedbackInput::from(&cli);
     // delete old patch file
-    let patch_file = cache_dir.join(ClangParams::AUTO_FIX_PATCH);
-    if patch_file.exists() {
-        std::fs::remove_file(&patch_file)
+    if user_inputs.patch_path.exists() {
+        std::fs::remove_file(&user_inputs.patch_path)
             .with_context(|| "Failed to remove old patch file from previous runs.")?;
     }
     // add gitignore file in project cache dir
@@ -182,7 +187,6 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
         "# Automatically created by cpp-linter\n*\n",
     )
     .with_context(|| "Failed to write .cpp-linter-cache/.gitignore file")?;
-    let user_inputs = FeedbackInput::from(&cli);
     let clang_versions = capture_clang_tools_output(
         &arc_files,
         &cli.general_options.version,
@@ -241,6 +245,34 @@ pub(crate) mod test {
         ])
         .await
         .unwrap();
+        drop(tmp_gh_out);
+    }
+
+    // The patch is written to `--gen-patch-path`, and a stale patch there is replaced.
+    #[tokio::test]
+    async fn custom_patch_path() {
+        let tmp_gh_out = setup_tmp_gh_out_path();
+        let tmp_workspace = setup_tmp_workspace();
+        let patch_path = tmp_workspace.path().join("out").join("fixes.patch");
+        std::fs::create_dir_all(patch_path.parent().unwrap()).unwrap();
+        std::fs::write(&patch_path, "stale").unwrap();
+        run_main(vec![
+            "cpp-linter".to_string(),
+            "-l".to_string(),
+            "false".to_string(),
+            "--tidy-checks=-*".to_string(),
+            "--gen-patch-path".to_string(),
+            patch_path.to_str().unwrap().to_string(),
+            "--repo-root".to_string(),
+            tmp_workspace.path().to_str().unwrap().to_string(),
+            "demo/demo.cpp".to_string(),
+        ])
+        .await
+        .unwrap();
+        let patch = std::fs::read_to_string(&patch_path).unwrap();
+        assert!(patch.starts_with("--- a/demo/demo.cpp\n"), "{patch}");
+        let default_patch = ClangParams::default_patch_path(tmp_workspace.path());
+        assert!(!default_patch.exists());
         drop(tmp_gh_out);
     }
 
@@ -367,6 +399,25 @@ pub(crate) mod test {
             "--style".to_string(),
             String::new(),
             "--tidy-checks=-*".to_string(),
+        ])
+        .await
+        .unwrap();
+        drop(tmp_gh_out);
+    }
+
+    // v1's `--jobs` is accepted and ignored (with a warning) instead of failing to parse.
+    #[tokio::test]
+    async fn deprecated_jobs() {
+        let tmp_gh_out = setup_tmp_gh_out_path();
+        run_main(vec![
+            "cpp-linter".to_string(),
+            "-l".to_string(),
+            "false".to_string(),
+            "--style".to_string(),
+            String::new(),
+            "--tidy-checks=-*".to_string(),
+            "-j".to_string(),
+            "2".to_string(),
         ])
         .await
         .unwrap();

@@ -8,9 +8,7 @@ use std::str::FromStr;
 #[cfg(feature = "bin")]
 use clang_tools_manager::{RequestedVersion, logger::CLI_HELP_STYLE};
 #[cfg(feature = "bin")]
-use clap::{
-    ArgAction, Args, Parser, Subcommand, ValueEnum, builder::FalseyValueParser, value_parser,
-};
+use clap::{ArgAction, Args, Parser, Subcommand, ValueEnum, builder::FalseyValueParser};
 
 mod structs;
 pub use structs::{ClangParams, FeedbackInput, LinesChangedOnly, ThreadComments};
@@ -168,6 +166,22 @@ pub struct GeneralOptions {
         conflicts_with = "mod_sys",
     )]
     pub no_mod_sys: bool,
+
+    /// Deprecated and ignored.
+    ///
+    /// cpp-linter v1 used this to set the number of parallel jobs.
+    /// v2 always analyzes files in parallel, so a given value only
+    /// causes a deprecation warning. Like v1, the value must be an integer
+    /// (v1 treated zero or a negative value as "use all CPUs").
+    #[arg(
+        short = 'j',
+        long,
+        value_name = "JOBS",
+        hide = true,
+        allow_negative_numbers = true,
+        overrides_with = "jobs"
+    )]
+    pub jobs: Option<i32>,
 }
 
 /// A struct to describe the CLI's source options.
@@ -410,13 +424,15 @@ pub struct TidyOptions {
     /// attempted through all parent paths of the first input file. See [LLVM docs about
     /// setup tooling](https://clang.llvm.org/docs/HowToSetupToolingForLLVM.html)
     /// for an example of setting up Clang Tooling on a source tree.
-    #[cfg_attr(feature = "bin", arg(
-        short = 'p',
-        long,
-        value_name = "PATH",
-        value_parser = value_parser!(PathBuf),
-        help_heading = "Clang-tidy options",
-    ))]
+    #[cfg_attr(
+        feature = "bin",
+        arg(
+            short = 'p',
+            long,
+            value_name = "PATH",
+            help_heading = "Clang-tidy options",
+        )
+    )]
     pub database: Option<PathBuf>,
 
     /// A string of extra arguments passed to clang-tidy for use as compiler arguments.
@@ -502,13 +518,15 @@ pub struct FeedbackOptions {
     ///
     /// If the given path is relative, then it shall be relative to the given
     /// [`--repo-root`](#-r-repo-root) path.
-    #[cfg_attr(feature = "bin", arg(
-        short = 'o',
-        long,
-        value_name = "PATH",
-        value_parser = value_parser!(PathBuf),
-        help_heading = "Feedback options",
-    ))]
+    #[cfg_attr(
+        feature = "bin",
+        arg(
+            short = 'o',
+            long,
+            value_name = "PATH",
+            help_heading = "Feedback options",
+        )
+    )]
     pub summary_output_file: Option<PathBuf>,
 
     /// Provide this option with a path to which clang-tidy diagnostics are
@@ -528,12 +546,10 @@ pub struct FeedbackOptions {
     /// > In GitHub Actions, the SARIF file can be uploaded to
     /// > [GitHub code scanning](https://docs.github.com/en/code-security/code-scanning/integrating-with-code-scanning/uploading-a-sarif-file-to-github)
     /// > with the `github/codeql-action/upload-sarif` action.
-    #[cfg_attr(feature = "bin", arg(
-        long,
-        value_name = "PATH",
-        value_parser = value_parser!(PathBuf),
-        help_heading = "Feedback options",
-    ))]
+    #[cfg_attr(
+        feature = "bin",
+        arg(long, value_name = "PATH", help_heading = "Feedback options",)
+    )]
     pub sarif_file: Option<PathBuf>,
 
     /// Set this option to false to disable the use of
@@ -593,6 +609,33 @@ pub struct FeedbackOptions {
         help_heading = "Feedback options",
     ))]
     pub gen_patch: bool,
+
+    /// Write the patch file of applied clang fixes to this path.
+    ///
+    /// Setting this implies [`--gen-patch`](#-f-gen-patch).
+    /// A relative path is relative to the current working directory.
+    /// If not set, the patch is written to `.cpp-linter-cache/auto-fix.patch`
+    /// in the [`--repo-root`](#-r-repo-root) folder.
+    ///
+    /// This can also be set with the `GEN_PATCH_PATH` environment variable,
+    /// so the same variable can be used to apply the patch afterward:
+    ///
+    /// ```shell
+    /// export GEN_PATCH_PATH=fixes.patch
+    /// cpp-linter
+    /// git apply "$GEN_PATCH_PATH"
+    /// ```
+    #[cfg_attr(
+        feature = "bin",
+        arg(
+            long,
+            value_name = "PATH",
+            env = "GEN_PATCH_PATH",
+            help_heading = "Feedback options",
+            verbatim_doc_comment,
+        )
+    )]
+    pub gen_patch_path: Option<PathBuf>,
 }
 
 /// Parses a single value of the `--extensions` option.
@@ -679,6 +722,17 @@ mod test {
         assert!(args.general_options.no_mod_sys);
 
         assert!(Cli::try_parse_from(vec!["cpp-linter", "--mod-sys", "--no-mod-sys"]).is_err());
+    }
+
+    #[test]
+    fn deprecated_jobs_takes_an_integer() {
+        let args = Cli::parse_from(vec!["cpp-linter", "-j", "4"]);
+        assert_eq!(args.general_options.jobs, Some(4));
+        let args = Cli::parse_from(vec!["cpp-linter", "--jobs", "-1"]);
+        assert_eq!(args.general_options.jobs, Some(-1));
+        assert!(Cli::try_parse_from(vec!["cpp-linter", "-j", "nope"]).is_err());
+        let args = Cli::parse_from(vec!["cpp-linter", "-j", "1", "--jobs", "4"]);
+        assert_eq!(args.general_options.jobs, Some(4));
     }
 
     #[test]

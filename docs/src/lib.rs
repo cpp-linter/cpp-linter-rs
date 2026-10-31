@@ -80,6 +80,9 @@ fn generate_cli_doc(metadata: HashMap<String, HashMap<String, Py<PyAny>>>) -> Py
                     arg_id.as_str(),
                     group.get_id().as_str()
                 )))?;
+            if arg.is_hide_set() {
+                continue;
+            }
             let long_name = arg.get_long().ok_or(PyValueError::new_err(format!(
                 "Failed to get long name of argument with id {}",
                 arg_id.as_str()
