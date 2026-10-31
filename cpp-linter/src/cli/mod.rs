@@ -593,6 +593,31 @@ pub struct FeedbackOptions {
         help_heading = "Feedback options",
     ))]
     pub gen_patch: bool,
+
+    /// Write the patch file of applied clang fixes to this path.
+    ///
+    /// Setting this implies [`--gen-patch`](#-f-gen-patch).
+    /// A relative path is relative to the current working directory.
+    /// If not set, the patch is written to `.cpp-linter-cache/auto-fix.patch`
+    /// in the [`--repo-root`](#-r-repo-root) folder.
+    ///
+    /// This can also be set with the `GEN_PATCH_PATH` environment variable,
+    /// so the same variable can be used to apply the patch afterward:
+    ///
+    /// ```shell
+    /// export GEN_PATCH_PATH=fixes.patch
+    /// cpp-linter
+    /// git apply "$GEN_PATCH_PATH"
+    /// ```
+    #[cfg_attr(feature = "bin", arg(
+        long,
+        value_name = "PATH",
+        env = "GEN_PATCH_PATH",
+        value_parser = value_parser!(PathBuf),
+        help_heading = "Feedback options",
+        verbatim_doc_comment,
+    ))]
+    pub gen_patch_path: Option<PathBuf>,
 }
 
 /// Parses a single value of the `--extensions` option.

@@ -20,7 +20,7 @@ use crate::{
         clang_format::{summarize_style, tally_format_advice},
         clang_tidy::tally_tidy_advice,
     },
-    cli::{ClangParams, FeedbackInput, ThreadComments},
+    cli::{FeedbackInput, ThreadComments},
     common_fs::FileObj,
     error::ClientError,
     sarif::SarifLog,
@@ -273,6 +273,7 @@ impl RestClient {
                     &mut review_comments,
                     summary_only,
                     &feedback_inputs.repo_root,
+                    &feedback_inputs.patch_path,
                 )?;
             }
             self.show_patch(&feedback_inputs)?;
@@ -323,7 +324,7 @@ impl RestClient {
                 let file = file
                     .lock()
                     .map_err(|e| ClientError::MutexPoisoned(e.to_string()))?;
-                file.maybe_append_patch(&feedback_inputs.repo_root)?;
+                file.maybe_append_patch(&feedback_inputs.repo_root, &feedback_inputs.patch_path)?;
             }
             self.show_patch(&feedback_inputs)?;
         }
@@ -502,11 +503,8 @@ impl RestClient {
     ///
     /// And also write the patch path to the output variable `fix-patch-path` for CI platforms.
     fn show_patch(&self, feedback_inputs: &FeedbackInput) -> Result<(), ClientError> {
-        let auto_fix_patch_path = feedback_inputs
-            .repo_root
-            .join(ClangParams::CACHE_DIR)
-            .join(ClangParams::AUTO_FIX_PATCH);
-        if let Ok(patch_file) = std::fs::File::open(&auto_fix_patch_path) {
+        let auto_fix_patch_path = &feedback_inputs.patch_path;
+        if let Ok(patch_file) = std::fs::File::open(auto_fix_patch_path) {
             self.client.write_output_variables(&[OutputVariable {
                 name: "fix-patch-path".to_string(),
                 value: auto_fix_patch_path.to_string_lossy().replace("\\", "/"),
