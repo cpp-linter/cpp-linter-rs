@@ -613,7 +613,6 @@ pub struct FeedbackOptions {
         long,
         value_name = "PATH",
         env = "GEN_PATCH_PATH",
-        value_parser = value_parser!(PathBuf),
         help_heading = "Feedback options",
         verbatim_doc_comment,
     ))]
