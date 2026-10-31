@@ -180,7 +180,8 @@ pub struct GeneralOptions {
         long,
         value_name = "JOBS",
         hide = true,
-        allow_negative_numbers = true
+        allow_negative_numbers = true,
+        overrides_with = "jobs"
     )]
     pub jobs: Option<i32>,
 }
@@ -703,6 +704,8 @@ mod test {
         let args = Cli::parse_from(vec!["cpp-linter", "--jobs", "-1"]);
         assert_eq!(args.general_options.jobs, Some(-1));
         assert!(Cli::try_parse_from(vec!["cpp-linter", "-j", "nope"]).is_err());
+        let args = Cli::parse_from(vec!["cpp-linter", "-j", "1", "--jobs", "4"]);
+        assert_eq!(args.general_options.jobs, Some(4));
     }
 
     #[test]
