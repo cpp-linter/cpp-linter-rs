@@ -199,9 +199,8 @@ impl FileObj {
         let diff_config = UnifiedDiffConfig::default();
         let unified_diff = diff.unified_diff(&printer, diff_config, input).to_string();
         if !unified_diff.is_empty() {
-            if let Some(patch_path_parent) = patch_path.parent() {
-                fs::create_dir_all(patch_path_parent).map_err(FileObjError::MkDirFailed)?;
-            }
+            let patch_path_parent = patch_path.parent().unwrap_or(Path::new(""));
+            fs::create_dir_all(patch_path_parent).map_err(FileObjError::MkDirFailed)?;
             let mut patch_file = fs::OpenOptions::new()
                 .append(true)
                 .create(true)
