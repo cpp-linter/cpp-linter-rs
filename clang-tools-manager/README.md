@@ -79,12 +79,12 @@ Options:
 
           By default, this matches the value of a CI environment variable.
           For non-CI contexts, this allows users to opt-in to using
-          system package managers as a fallback in case PyPI offerings are
-          unsatisfactory.
+          system package managers.
 
-          If system package managers are not allowed or fail, then
-          static binaries built by cpp-linter are sought
-          (for compatible platforms).
+          When allowed, system package managers are tried first.
+          If they are not allowed or fail, then the clang tools are
+          downloaded from PyPI, and then from the static binaries
+          built by cpp-linter (for compatible platforms).
 
       --no-mod-sys
           Strictly disallow using system package managers.
