@@ -168,6 +168,14 @@ pub struct GeneralOptions {
         conflicts_with = "mod_sys",
     )]
     pub no_mod_sys: bool,
+
+    /// Deprecated and ignored.
+    ///
+    /// cpp-linter v1 used this to set the number of parallel jobs.
+    /// v2 always analyzes files in parallel, so a given value only
+    /// causes a deprecation warning.
+    #[arg(short = 'j', long, value_name = "JOBS", hide = true)]
+    pub jobs: Option<String>,
 }
 
 /// A struct to describe the CLI's source options.
