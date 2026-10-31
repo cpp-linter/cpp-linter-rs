@@ -17,7 +17,7 @@ use crate::{
     clang_tools::{
         ReviewComments, Suggestion, clang_format::FormatAdvice, clang_tidy::TidyAdvice, make_patch,
     },
-    cli::{ClangParams, LinesChangedOnly},
+    cli::LinesChangedOnly,
     error::FileObjError,
 };
 
@@ -169,7 +169,11 @@ impl FileObj {
     /// a PR review is not being posted. Both function have to create a patch by
     /// reading the original file and patched file (in cache), but
     /// [`FileObj::make_suggestions_from_patch()`] does more with the diff than this function.
-    pub fn maybe_append_patch(&self, repo_root: &Path) -> Result<(), FileObjError> {
+    pub fn maybe_append_patch(
+        &self,
+        repo_root: &Path,
+        patch_path: &Path,
+    ) -> Result<(), FileObjError> {
         let patched = match &self.patched_path {
             Some(patched_path) if patched_path.exists() => {
                 fs::read_to_string(patched_path).map_err(FileObjError::ReadFile)?
@@ -180,29 +184,28 @@ impl FileObj {
             fs::read_to_string(repo_root.join(&self.name)).map_err(FileObjError::ReadFile)?;
         let (diff, input) = make_patch(patched.as_str(), &original_content);
         let file_name = self.name.to_string_lossy().replace("\\", "/");
-        Self::append_patch(&file_name, &input, &diff, repo_root)?;
+        Self::append_patch(&file_name, &input, &diff, patch_path)?;
         Ok(())
     }
 
-    /// write fixes to a unified patch file in the cache directory.
+    /// write fixes to the unified patch file at `patch_path`.
     fn append_patch(
         file_name: &str,
         input: &InternedInput<&str>,
         diff: &Diff,
-        repo_root: &Path,
+        patch_path: &Path,
     ) -> Result<(), FileObjError> {
         let printer = BasicLineDiffPrinter(&input.interner);
         let diff_config = UnifiedDiffConfig::default();
         let unified_diff = diff.unified_diff(&printer, diff_config, input).to_string();
         if !unified_diff.is_empty() {
-            let patch_path_parent = repo_root.join(ClangParams::CACHE_DIR);
-            fs::create_dir_all(&patch_path_parent).map_err(FileObjError::MkDirFailed)?;
-            let patch_file_path = patch_path_parent.join(ClangParams::AUTO_FIX_PATCH);
+            let patch_path_parent = patch_path.parent().unwrap_or(Path::new(""));
+            fs::create_dir_all(patch_path_parent).map_err(FileObjError::MkDirFailed)?;
             let mut patch_file = fs::OpenOptions::new()
                 .append(true)
                 .create(true)
                 .truncate(false)
-                .open(&patch_file_path)
+                .open(patch_path)
                 .map_err(FileObjError::OpenPatchFileFailed)?;
             patch_file
                 .write_all(
@@ -224,6 +227,7 @@ impl FileObj {
         review_comments: &mut ReviewComments,
         summary_only: bool,
         repo_root: &Path,
+        patch_path: &Path,
     ) -> Result<(), FileObjError> {
         let patched = match &self.patched_path {
             Some(patched_path) if patched_path.exists() => {
@@ -235,7 +239,7 @@ impl FileObj {
             fs::read_to_string(repo_root.join(&self.name)).map_err(FileObjError::ReadFile)?;
         let (diff, input) = make_patch(patched.as_str(), &original_content);
         let file_name = self.name.to_string_lossy().replace("\\", "/");
-        Self::append_patch(&file_name, &input, &diff, repo_root)?;
+        Self::append_patch(&file_name, &input, &diff, patch_path)?;
 
         self.get_suggestions(review_comments, &diff, &input, summary_only)
             .map_err(FileObjError::DisplayStringFailed)?;
@@ -425,7 +429,10 @@ mod test {
     use tempfile::{NamedTempFile, TempDir};
 
     use super::FileObj;
-    use crate::{clang_tools::ReviewComments, cli::LinesChangedOnly};
+    use crate::{
+        clang_tools::ReviewComments,
+        cli::{ClangParams, LinesChangedOnly},
+    };
 
     // *********************** tests for FileObj::get_ranges()
 
@@ -508,7 +515,12 @@ mod test {
 
         let mut review_comments = ReviewComments::default();
         file_obj
-            .make_suggestions_from_patch(&mut review_comments, false, repo_root.path())
+            .make_suggestions_from_patch(
+                &mut review_comments,
+                false,
+                repo_root.path(),
+                &ClangParams::default_patch_path(repo_root.path()),
+            )
             .unwrap();
 
         assert_eq!(review_comments.comments.len(), 1);
@@ -568,7 +580,12 @@ mod test {
 
         let mut review_comments = ReviewComments::default();
         file_obj
-            .make_suggestions_from_patch(&mut review_comments, false, repo_root.path())
+            .make_suggestions_from_patch(
+                &mut review_comments,
+                false,
+                repo_root.path(),
+                &ClangParams::default_patch_path(repo_root.path()),
+            )
             .unwrap();
         assert_eq!(review_comments.comments.len(), 2);
         // 1 fix and 2 unfixed diagnostics, all within the diff (in 2 comments)
@@ -599,7 +616,12 @@ mod test {
 
         // Processing the same file again merges duplicate suggestions
         file_obj
-            .make_suggestions_from_patch(&mut review_comments, false, repo_root.path())
+            .make_suggestions_from_patch(
+                &mut review_comments,
+                false,
+                repo_root.path(),
+                &ClangParams::default_patch_path(repo_root.path()),
+            )
             .unwrap();
         assert_eq!(review_comments.comments.len(), 2);
         assert_eq!(
@@ -613,7 +635,12 @@ mod test {
         // Only counts the unfixed diagnostics in summary-only mode
         let mut summary_comments = ReviewComments::default();
         file_obj
-            .make_suggestions_from_patch(&mut summary_comments, true, repo_root.path())
+            .make_suggestions_from_patch(
+                &mut summary_comments,
+                true,
+                repo_root.path(),
+                &ClangParams::default_patch_path(repo_root.path()),
+            )
             .unwrap();
         assert!(summary_comments.comments.is_empty());
         assert_eq!(summary_comments.tool_total, 3);

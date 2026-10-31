@@ -154,4 +154,5 @@ ignorePaths:
   - .yarn/releases/*
   - "*.lock"
   - bindings/node/index.js
+  - bindings/node/index.d.ts
   - "**/*/CHANGELOG*.md"
