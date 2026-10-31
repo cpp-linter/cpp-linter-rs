@@ -8,9 +8,7 @@ use std::str::FromStr;
 #[cfg(feature = "bin")]
 use clang_tools_manager::{RequestedVersion, logger::CLI_HELP_STYLE};
 #[cfg(feature = "bin")]
-use clap::{
-    ArgAction, Args, Parser, Subcommand, ValueEnum, builder::FalseyValueParser, value_parser,
-};
+use clap::{ArgAction, Args, Parser, Subcommand, ValueEnum, builder::FalseyValueParser};
 
 mod structs;
 pub use structs::{ClangParams, FeedbackInput, LinesChangedOnly, ThreadComments};
@@ -410,13 +408,15 @@ pub struct TidyOptions {
     /// attempted through all parent paths of the first input file. See [LLVM docs about
     /// setup tooling](https://clang.llvm.org/docs/HowToSetupToolingForLLVM.html)
     /// for an example of setting up Clang Tooling on a source tree.
-    #[cfg_attr(feature = "bin", arg(
-        short = 'p',
-        long,
-        value_name = "PATH",
-        value_parser = value_parser!(PathBuf),
-        help_heading = "Clang-tidy options",
-    ))]
+    #[cfg_attr(
+        feature = "bin",
+        arg(
+            short = 'p',
+            long,
+            value_name = "PATH",
+            help_heading = "Clang-tidy options",
+        )
+    )]
     pub database: Option<PathBuf>,
 
     /// A string of extra arguments passed to clang-tidy for use as compiler arguments.
@@ -502,13 +502,15 @@ pub struct FeedbackOptions {
     ///
     /// If the given path is relative, then it shall be relative to the given
     /// [`--repo-root`](#-r-repo-root) path.
-    #[cfg_attr(feature = "bin", arg(
-        short = 'o',
-        long,
-        value_name = "PATH",
-        value_parser = value_parser!(PathBuf),
-        help_heading = "Feedback options",
-    ))]
+    #[cfg_attr(
+        feature = "bin",
+        arg(
+            short = 'o',
+            long,
+            value_name = "PATH",
+            help_heading = "Feedback options",
+        )
+    )]
     pub summary_output_file: Option<PathBuf>,
 
     /// Provide this option with a path to which clang-tidy diagnostics are
@@ -528,12 +530,10 @@ pub struct FeedbackOptions {
     /// > In GitHub Actions, the SARIF file can be uploaded to
     /// > [GitHub code scanning](https://docs.github.com/en/code-security/code-scanning/integrating-with-code-scanning/uploading-a-sarif-file-to-github)
     /// > with the `github/codeql-action/upload-sarif` action.
-    #[cfg_attr(feature = "bin", arg(
-        long,
-        value_name = "PATH",
-        value_parser = value_parser!(PathBuf),
-        help_heading = "Feedback options",
-    ))]
+    #[cfg_attr(
+        feature = "bin",
+        arg(long, value_name = "PATH", help_heading = "Feedback options",)
+    )]
     pub sarif_file: Option<PathBuf>,
 
     /// Set this option to false to disable the use of
