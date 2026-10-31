@@ -1,4 +1,7 @@
-use std::{fmt::Display, path::PathBuf};
+use std::{
+    fmt::Display,
+    path::{Path, PathBuf},
+};
 
 #[cfg(feature = "bin")]
 use clap::{ValueEnum, builder::PossibleValue};
@@ -237,6 +240,11 @@ impl ClangParams {
     /// The file name for aggregating auto-fixes into a unified patch.
     pub(crate) const AUTO_FIX_PATCH: &str = "auto-fix.patch";
 
+    /// The default path of the generated patch file, in the cache directory of `repo_root`.
+    pub(crate) fn default_patch_path(repo_root: &Path) -> PathBuf {
+        repo_root.join(Self::CACHE_DIR).join(Self::AUTO_FIX_PATCH)
+    }
+
     pub(crate) fn get_cache_path(&self) -> PathBuf {
         self.repo_root.join(Self::CACHE_DIR).join("patched")
     }
@@ -289,7 +297,9 @@ impl From<&Cli> for ClangParams {
             tidy_filter,
             format_filter,
             repo_root,
-            gen_patch: args.feedback_options.pr_review || args.feedback_options.gen_patch,
+            gen_patch: args.feedback_options.pr_review
+                || args.feedback_options.gen_patch
+                || args.feedback_options.gen_patch_path.is_some(),
         }
     }
 }
@@ -333,6 +343,9 @@ pub struct FeedbackInput {
     ///
     /// Only used when `pr_review` is false.
     pub gen_patch: bool,
+
+    /// The path of the generated patch file.
+    pub patch_path: PathBuf,
 }
 
 #[cfg(feature = "bin")]
@@ -350,7 +363,12 @@ impl From<&Cli> for FeedbackInput {
             repo_root: args.source_options.repo_root.clone(),
             summary_output_file: args.feedback_options.summary_output_file.clone(),
             sarif_file: args.feedback_options.sarif_file.clone(),
-            gen_patch: args.feedback_options.gen_patch,
+            gen_patch: args.feedback_options.gen_patch
+                || args.feedback_options.gen_patch_path.is_some(),
+            patch_path: match &args.feedback_options.gen_patch_path {
+                Some(path) => std::path::absolute(path).unwrap_or_else(|_| path.to_path_buf()),
+                None => ClangParams::default_patch_path(&args.source_options.repo_root),
+            },
         }
     }
 }
@@ -370,6 +388,7 @@ impl Default for FeedbackInput {
             summary_output_file: None,
             sarif_file: None,
             gen_patch: false,
+            patch_path: ClangParams::default_patch_path(Path::new(".")),
         }
     }
 }
@@ -380,7 +399,9 @@ mod test {
 
     use clap::{Parser, ValueEnum};
 
-    use super::{ClangParams, Cli, LinesChangedOnly, ThreadComments};
+    use std::path::PathBuf;
+
+    use super::{ClangParams, Cli, FeedbackInput, LinesChangedOnly, ThreadComments};
 
     #[test]
     fn parse_positional() {
@@ -441,6 +462,45 @@ mod test {
                 added_lines
             );
         }
+    }
+
+    #[test]
+    fn default_patch_path() {
+        let cli = Cli::parse_from(["cpp-linter", "--repo-root", "sub"]);
+        let feedback_input = FeedbackInput::from(&cli);
+        assert!(!feedback_input.gen_patch);
+        assert_eq!(
+            feedback_input.patch_path,
+            PathBuf::from("sub/.cpp-linter-cache/auto-fix.patch")
+        );
+    }
+
+    #[test]
+    fn gen_patch_path_implies_gen_patch() {
+        let cli = Cli::parse_from(["cpp-linter", "--gen-patch-path", "fixes.patch"]);
+        let feedback_input = FeedbackInput::from(&cli);
+        assert!(feedback_input.gen_patch);
+        // a relative path is relative to the working directory
+        assert_eq!(
+            feedback_input.patch_path,
+            std::env::current_dir().unwrap().join("fixes.patch")
+        );
+        assert!(ClangParams::from(&cli).gen_patch);
+    }
+
+    #[test]
+    fn gen_patch_path_from_env() {
+        unsafe {
+            std::env::set_var("GEN_PATCH_PATH", "from-env.patch");
+        }
+        let cli = Cli::parse_from(["cpp-linter"]);
+        unsafe {
+            std::env::remove_var("GEN_PATCH_PATH");
+        }
+        assert_eq!(
+            cli.feedback_options.gen_patch_path,
+            Some(PathBuf::from("from-env.patch"))
+        );
     }
 
     #[test]
