@@ -32,6 +32,10 @@ unchanged. The sections below cover the differences.
 |---|---|---|
 | `-d`, `--tidy-review` | [`-P`, `--pr-review`][pr-review] | v2 posts one review with suggestions from both clang-tidy and clang-format. The old names still work as aliases of `--pr-review`, so `-d true` now also enables clang-format suggestions. |
 | `-m`, `--format-review` | [`-P`, `--pr-review`][pr-review] | Same as above. `-m true` now also enables clang-tidy suggestions. |
+
+Because the old names are aliases of one option, a v1 command line that passes both, such as
+`--tidy-review=true --format-review=false`, is rejected in v2. Replace both with a single
+`--pr-review` value.
 | `-F`, `--fix` | [`-F`, `--gen-patch`][gen-patch] | See [Fixes are written to a patch](#fixes-are-written-to-a-patch). `--fix` is kept as an alias. |
 
 ## Changed defaults
@@ -43,10 +47,11 @@ unchanged. The sections below cover the differences.
 
 Because `--lines-changed-only` is `true` by default and implies
 [`--files-changed-only`][files-changed-only], v2 analyzes only the added lines of changed files
-unless told otherwise. To keep the v1 behavior of analyzing every line of every source file, pass:
+unless told otherwise. To keep the v1 behavior of analyzing every line of every source file,
+including files under `target`, pass:
 
 ```shell
-cpp-linter --lines-changed-only=false --files-changed-only=false
+cpp-linter --lines-changed-only=false --files-changed-only=false --ignore=.github
 ```
 
 ## Fixes are written to a patch
@@ -63,8 +68,12 @@ path and implies `--gen-patch`. To apply the fixes locally:
 ```shell
 export GEN_PATCH_PATH=fixes.patch
 cpp-linter
-git apply "$GEN_PATCH_PATH"
+# The patch is only written when there are fixes.
+if [ -f "$GEN_PATCH_PATH" ]; then git apply "$GEN_PATCH_PATH"; fi
 ```
+
+A clang-tidy fix can also change a file that was not analyzed. Those parts are left out of the
+patch and listed as skipped in the log and in the comments, so apply them by hand.
 
 ## Clang tools are installed for you
 
@@ -72,12 +81,13 @@ v1 expects clang-format and clang-tidy to be installed already, for example with
 [clang-tools-pip](https://github.com/cpp-linter/clang-tools-pip). `--version` only selects which
 installed version to use.
 
-In v2, [`-V`, `--version`][version] also accepts a version requirement (for example `16`, `=12.0.1`
-or `>=10, <13`). If no matching tools are found on the `PATH` or in the cache, v2 installs them.
+In v2, [`-V`, `--version`][version] also accepts a version requirement (for example `16` or
+`>=10, <13`). If no matching tools are found on the `PATH` or in the cache, v2 installs them.
 It tries the system package manager first when allowed (on by default in CI, see
 [`--mod-sys`][mod-sys] and [`--no-mod-sys`][no-mod-sys]), then PyPI wheels, then static binaries
-built by cpp-linter. A path to an install location and a blank string (the default installed version) work
-as in v1.
+built by cpp-linter. A path to an install location works as in v1. With a blank string (the
+default), v2 uses the installed tools and does not install anything, so the run fails if they are
+missing.
 
 Running `-V` without a value prints the cpp-linter version, like the `version` subcommand.
 
@@ -98,7 +108,7 @@ With the default `--repo-root` of `.`, nothing changes.
 
 - [`--sarif-file`][sarif-file] writes clang-tidy diagnostics as a SARIF 2.1.0 file, for example to
   upload to GitHub code scanning.
-- [`--gen-patch`][gen-patch] and [`--gen-patch-path`][gen-patch-path] produce a patch of all
-  fixes, described above.
+- [`--gen-patch`][gen-patch] and [`--gen-patch-path`][gen-patch-path] produce one patch of the
+  clang-format and clang-tidy fixes, described above.
 - [`--mod-sys`][mod-sys] and [`--no-mod-sys`][no-mod-sys] control whether system package managers
   may be used to install the clang tools.
