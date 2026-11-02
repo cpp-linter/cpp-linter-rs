@@ -10,7 +10,7 @@ use regex::Regex;
 use semver::Version;
 use which::{which, which_in};
 
-use crate::RequestedVersion;
+use crate::{RequestedVersion, version::lowest_match_in_major};
 
 /// Error that occur when trying to get the path to a clang tool executable.
 #[derive(Debug, thiserror::Error)]
@@ -122,7 +122,7 @@ impl ClangTool {
                 let mut majors = vec![];
                 while highest_major > 0 {
                     // check if the current major version satisfies the requirement.
-                    if req.matches(&Version::new(highest_major, 0, 0)) {
+                    if lowest_match_in_major(req, highest_major).is_some() {
                         majors.push(highest_major);
                     }
                     highest_major -= 1;

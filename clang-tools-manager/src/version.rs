@@ -194,16 +194,33 @@ impl RequestedVersion {
     }
 }
 
+/// Returns the lowest supported version that satisfies `version_req`.
 pub fn get_min_ver(version_req: &VersionReq) -> Option<Version> {
-    let mut result = None;
-    let supported_version_range = StaticDistDownloader::get_major_version_range();
-    for major in supported_version_range.rev() {
-        let ver = Version::new(major as u64, 0, 0);
-        if version_req.matches(&ver) {
-            result = Some(ver);
-        }
+    StaticDistDownloader::get_major_version_range()
+        .find_map(|major| lowest_match_in_major(version_req, major as u64))
+}
+
+/// Returns the lowest version with the given `major` number that satisfies `version_req`.
+///
+/// Checking only `major.0.0` is not enough: a requirement like `=12.0.1`
+/// or `17.0.6` (which means `^17.0.6`) does not match `12.0.0` or `17.0.0`.
+///
+/// The lowest match is either `major.0.0` or the lower bound of one of
+/// the requirement's comparators, so only those versions are checked.
+pub(crate) fn lowest_match_in_major(version_req: &VersionReq, major: u64) -> Option<Version> {
+    let mut candidates = vec![Version::new(major, 0, 0)];
+    for comparator in version_req.comparators.iter().filter(|c| c.major == major) {
+        let minor = comparator.minor.unwrap_or_default();
+        let patch = comparator.patch.unwrap_or_default();
+        candidates.push(Version::new(major, minor, patch));
+        // lower bounds of `>major.minor.patch` and `>major.minor`
+        candidates.push(Version::new(major, minor, patch + 1));
+        candidates.push(Version::new(major, minor + 1, 0));
     }
-    result
+    candidates
+        .into_iter()
+        .filter(|ver| version_req.matches(ver))
+        .min()
 }
 
 /// Represents an error that occurred while parsing a requested version.
@@ -269,6 +286,37 @@ mod tests {
     use crate::{ClangTool, utils::normalize_path};
 
     // See also crate::tool::tests module for other `RequestedVersion::from_str()` tests.
+
+    #[test]
+    fn lowest_match_in_major() {
+        for (req, major, expected) in [
+            ("17", 17, Some("17.0.0")),
+            ("=12.0.1", 12, Some("12.0.1")),
+            ("17.0.6", 17, Some("17.0.6")),
+            ("~17.0.6", 17, Some("17.0.6")),
+            (">17.0.6", 17, Some("17.0.7")),
+            (">17.0", 17, Some("17.1.0")),
+            (">=16.0.2, <18", 17, Some("17.0.0")),
+            (">=16.0.2, <18", 16, Some("16.0.2")),
+            ("=12.0.1", 13, None),
+            (">17", 17, None),
+        ] {
+            let req = VersionReq::parse(req).unwrap();
+            assert_eq!(
+                super::lowest_match_in_major(&req, major),
+                expected.map(|v| semver::Version::parse(v).unwrap()),
+                "{req} in major {major}"
+            );
+        }
+    }
+
+    #[test]
+    fn min_ver_of_exact_version() {
+        let min_ver = |req: &str| super::get_min_ver(&VersionReq::parse(req).unwrap());
+        assert_eq!(min_ver("=17.0.6"), Some(semver::Version::new(17, 0, 6)));
+        assert_eq!(min_ver("17.0.6"), Some(semver::Version::new(17, 0, 6)));
+        assert_eq!(min_ver("=8.0.1"), None);
+    }
 
     #[test]
     fn validate_version_path() {
@@ -530,6 +578,14 @@ mod tests {
         }
 
         #[tokio::test]
+        async fn eval_installed_exact_requirement() {
+            let env = TestEnv::new();
+            let exe = fake_clang_tool(env.bin.path(), "clang-format-17", "17.0.6");
+            let result = env.eval(req("=17.0.6"), false).await.unwrap().unwrap();
+            assert_version(&exe, result, "17.0.6");
+        }
+
+        #[tokio::test]
         async fn eval_unsupported_requirement() {
             let env = TestEnv::new();
             let err = env.eval(req("=8"), false).await.unwrap_err();
@@ -596,6 +652,23 @@ mod tests {
                 fs::read_link(symlink).unwrap(),
                 env.out.path().join("clang-format-17")
             );
+        }
+
+        #[tokio::test]
+        async fn eval_static_dist_exact_requirement() {
+            let env = TestEnv::new();
+            env.seed_empty_pypi();
+            env.seed_static_dist(true);
+            // the exact version of the LLVM 17 static binaries
+            let (ver, _) =
+                StaticDistDownloader::find_suitable_version(&VersionReq::parse("17").unwrap())
+                    .unwrap();
+            let result = env
+                .eval(req(&format!("={ver}")), false)
+                .await
+                .unwrap()
+                .unwrap();
+            assert_version(&env.out.path().join("clang-format-17"), result, "17.0.6");
         }
 
         #[tokio::test]

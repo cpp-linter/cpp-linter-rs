@@ -108,8 +108,9 @@ mod supported_platform {
 
     const CLANG_TOOLS_REPO: &str = "https://github.com/cpp-linter/clang-tools-static-binaries";
 
-    /// Each available LLVM major version and the release tag that holds its binaries.
-    const RELEASE_TAGS: &[(u8, &str)] = include!(concat!(env!("OUT_DIR"), "/release_tags.rs"));
+    /// Each available LLVM version (one per major version)
+    /// and the release tag that holds its binaries.
+    const RELEASE_TAGS: &[(&str, &str)] = include!(concat!(env!("OUT_DIR"), "/release_tags.rs"));
 
     impl StaticDistDownloader {
         /// Finds the newest available version that satisfies `req_ver`,
@@ -123,7 +124,7 @@ mod supported_platform {
             RELEASE_TAGS
                 .iter()
                 .rev()
-                .map(|(major, tag)| (Version::new(*major as u64, 0, 0), *tag))
+                .filter_map(|(ver, tag)| Some((Version::parse(ver).ok()?, *tag)))
                 .find(|(ver, _)| req_ver.matches(ver))
         }
 
@@ -313,6 +314,22 @@ mod supported_platform {
                     expected
                 );
             }
+        }
+
+        #[test]
+        fn find_exact_version() {
+            let (newest, tag) =
+                StaticDistDownloader::find_suitable_version(&VersionReq::parse("*").unwrap())
+                    .unwrap();
+            // the full version, not just `major.0.0`
+            let req_ver = VersionReq::parse(&format!("={newest}")).unwrap();
+            assert_eq!(
+                StaticDistDownloader::find_suitable_version(&req_ver),
+                Some((newest.clone(), tag))
+            );
+            // a newer version of the same major that is not published
+            let req_ver = VersionReq::parse(&format!(">{newest}, <{}", newest.major + 1)).unwrap();
+            assert_eq!(StaticDistDownloader::find_suitable_version(&req_ver), None);
         }
 
         #[test]
