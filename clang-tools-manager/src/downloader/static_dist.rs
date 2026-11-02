@@ -101,7 +101,7 @@ mod supported_platform {
 
     use super::{StaticDistDownloadError, StaticDistDownloader};
     use crate::{
-        Cacher, ClangTool,
+        Cacher, ClangTool, DownloadError,
         downloader::{download, hashing::HashAlgorithm, resource_headers},
         utils::lock_path,
     };
@@ -207,16 +207,21 @@ mod supported_platform {
                 Some(dir) => dir.join(&bin_name),
             };
             let file_lock = lock_path(&download_path)?;
-            if download_path.exists() {
+            let download_bin = || async {
+                log::info!("Downloading static binary for {tool} version {ver} from {url}");
+                download(&url, &download_path, 60 * 2).await?;
+                #[cfg(unix)]
+                super::super::chmod_file(&download_path, None)?;
+                Ok::<(), StaticDistDownloadError>(())
+            };
+            let cached = download_path.exists();
+            if cached {
                 log::info!(
                     "Using cached static binary for {tool} version {ver_str} from {:?}",
                     download_path.to_string_lossy()
                 );
             } else {
-                log::info!("Downloading static binary for {tool} version {ver_str} from {url}");
-                download(&url, &download_path, 60 * 2).await?;
-                #[cfg(unix)]
-                super::super::chmod_file(&download_path, None)?;
+                download_bin().await?;
             }
             let sha512_cache_path = Self::sha512_cache_path(release_tag);
             if sha512_cache_path.exists() {
@@ -229,7 +234,20 @@ mod supported_platform {
                 log::info!("Downloading SHA512 checksum for static binaries from {sha512_url}");
                 download(&sha512_url, &sha512_cache_path, 10).await?;
             }
-            Self::verify_sha512(&download_path, &tool_url_path, &sha512_cache_path)?;
+            match Self::verify_sha512(&download_path, &tool_url_path, &sha512_cache_path) {
+                // The binaries are named by major version only, so the cached binary
+                // may be from an older release of the same major version.
+                Err(StaticDistDownloadError::DownloadError(DownloadError::HashMismatch {
+                    ..
+                })) if cached => {
+                    log::warn!(
+                        "The cached {tool} binary is not from the {release_tag} release; downloading it again."
+                    );
+                    download_bin().await?;
+                    Self::verify_sha512(&download_path, &tool_url_path, &sha512_cache_path)?;
+                }
+                result => result?,
+            }
             if tool.needs_resource_headers()
                 && !resource_headers::has_resource_headers(&download_path, &ver)
             {
@@ -314,6 +332,35 @@ mod supported_platform {
                     expected
                 );
             }
+        }
+
+        /// A cached binary of the same major version from another release
+        /// (so its checksum does not match) is downloaded again.
+        #[tokio::test]
+        async fn cached_from_other_release() {
+            let cache = TempDir::new().unwrap();
+            unsafe {
+                std::env::set_var("CPP_LINTER_CACHE", cache.path());
+            }
+            let out_dir = TempDir::new().unwrap();
+            let suffix = std::env::consts::EXE_SUFFIX;
+            let bin = out_dir.path().join(format!("clang-format-17{suffix}"));
+            fs::write(&bin, b"clang-format from another release").unwrap();
+
+            let req = VersionReq::parse("17").unwrap();
+            let out_dir_path = out_dir.path().to_path_buf();
+            let result = StaticDistDownloader::download_tool(
+                &ClangTool::ClangFormat,
+                &req,
+                Some(&out_dir_path),
+            )
+            .await
+            .unwrap();
+            assert_eq!(result, bin);
+            assert_ne!(
+                fs::read(&bin).unwrap(),
+                b"clang-format from another release"
+            );
         }
 
         #[test]
