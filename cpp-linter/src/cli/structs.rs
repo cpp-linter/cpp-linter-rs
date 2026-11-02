@@ -299,7 +299,7 @@ impl From<&Cli> for ClangParams {
             tidy_filter,
             format_filter,
             repo_root: args.source_options.repo_root.clone(),
-            gen_patch: args.feedback_options.pr_review
+            gen_patch: args.feedback_options.is_pr_review()
                 || args.feedback_options.gen_patch
                 || args.feedback_options.gen_patch_path.is_some(),
         }
@@ -360,7 +360,7 @@ impl From<&Cli> for FeedbackInput {
             step_summary: args.feedback_options.step_summary,
             thread_comments: args.feedback_options.thread_comments.clone(),
             file_annotations: args.feedback_options.file_annotations,
-            pr_review: args.feedback_options.pr_review,
+            pr_review: args.feedback_options.is_pr_review(),
             passive_reviews: args.feedback_options.passive_reviews,
             repo_root: args.source_options.repo_root.clone(),
             summary_output_file: args

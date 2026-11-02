@@ -563,19 +563,21 @@ pub struct FeedbackOptions {
     pub file_annotations: bool,
 
     /// Set to `true` to enable Pull Request reviews.
+    ///
+    /// v1's `--tidy-review` and `--format-review` are aliases of this option.
+    /// It can be given more than once; reviews are enabled if any value is `true`.
     #[cfg_attr(feature = "bin", arg(
         short = 'P',
         long,
-        default_value_t = false,
         default_missing_value = "true",
         num_args = 0..=1,
-        action = ArgAction::Set,
+        action = ArgAction::Append,
         value_parser = FalseyValueParser::new(),
         help_heading = "Feedback options",
         aliases = ["format-review", "tidy-review"],
         short_aliases = ['d', 'm'],
     ))]
-    pub pr_review: bool,
+    pub pr_review: Vec<bool>,
 
     /// Set to `true` to prevent Pull Request reviews from
     /// approving or requesting changes.
@@ -634,6 +636,13 @@ pub struct FeedbackOptions {
         )
     )]
     pub gen_patch_path: Option<PathBuf>,
+}
+
+impl FeedbackOptions {
+    /// Are Pull Request reviews enabled by any given `--pr-review` value (or its aliases)?
+    pub fn is_pr_review(&self) -> bool {
+        self.pr_review.iter().any(|enabled| *enabled)
+    }
 }
 
 /// Parses a single value of the `--extensions` option.
@@ -720,6 +729,25 @@ mod test {
         assert!(args.general_options.no_mod_sys);
 
         assert!(Cli::try_parse_from(vec!["cpp-linter", "--mod-sys", "--no-mod-sys"]).is_err());
+    }
+
+    #[test]
+    fn pr_review_aliases_can_be_combined() {
+        for (args, expected) in [
+            (vec![], false),
+            (vec!["-P"], true),
+            (vec!["--pr-review=false"], false),
+            (vec!["--tidy-review=true", "--format-review=false"], true),
+            (
+                vec!["--tidy-review", "false", "--format-review", "false"],
+                false,
+            ),
+            (vec!["-d", "-m"], true),
+            (vec!["--format-review=false", "--pr-review"], true),
+        ] {
+            let cli = Cli::parse_from([vec!["cpp-linter"], args.clone()].concat());
+            assert_eq!(cli.feedback_options.is_pr_review(), expected, "{args:?}");
+        }
     }
 
     #[test]
