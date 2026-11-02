@@ -78,7 +78,7 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
         );
     }
     let is_pr = rest_api_client.is_pr();
-    if !is_pr && cli.feedback_options.pr_review && rest_api_client.client_kind() == "local" {
+    if !is_pr && cli.feedback_options.is_pr_review() && rest_api_client.client_kind() == "local" {
         log::warn!("Pull request reviews are only posted when running in a supported CI platform.");
     }
 
@@ -138,7 +138,7 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
                 FileObj::new(file_path)
             })
             .collect();
-        if is_pr && cli.feedback_options.pr_review {
+        if is_pr && cli.feedback_options.is_pr_review() {
             let changed_files = rest_api_client
                 .get_list_of_changed_files(
                     &file_filter,
