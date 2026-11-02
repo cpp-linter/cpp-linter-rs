@@ -10,7 +10,7 @@ use regex::Regex;
 use semver::Version;
 use which::{which, which_in};
 
-use crate::RequestedVersion;
+use crate::{RequestedVersion, version::lowest_match_in_major};
 
 /// Error that occur when trying to get the path to a clang tool executable.
 #[derive(Debug, thiserror::Error)]
@@ -122,18 +122,24 @@ impl ClangTool {
                 let mut majors = vec![];
                 while highest_major > 0 {
                     // check if the current major version satisfies the requirement.
-                    if req.matches(&Version::new(highest_major, 0, 0)) {
+                    if lowest_match_in_major(req, highest_major).is_some() {
                         majors.push(highest_major);
                     }
                     highest_major -= 1;
                 }
 
                 // now we're ready to search for the binary exe with the major version suffixed.
+                // A suffixed binary whose version does not satisfy the requirement is skipped,
+                // so the plain `clang-format` (or `clang-tidy`) below is still considered.
                 for major in majors {
                     if let Ok(cmd) = which(format!("{self}-{major}")) {
-                        return Ok(cmd);
+                        match self.capture_version(&cmd) {
+                            Ok(version) if !req.matches(&version) => continue,
+                            _ => return Ok(cmd),
+                        }
                     }
                 }
+
                 // failed to find a binary where the major version number is suffixed to the tool name.
 
                 // This line essentially ignores the version specified as a fail-safe.

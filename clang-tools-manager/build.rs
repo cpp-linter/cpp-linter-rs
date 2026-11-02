@@ -22,6 +22,8 @@ struct StaticBinariesIndex {
 
 #[derive(Debug, serde::Deserialize)]
 struct VersionEntry {
+    /// The full LLVM version (for example, `12.0.1`).
+    version: String,
     /// The release tag that holds this LLVM version's binaries.
     tag: String,
 }
@@ -80,8 +82,8 @@ fn main() {
     // Each LLVM version is published in its own release.
     let release_tags = index
         .versions
-        .iter()
-        .map(|(major, entry)| format!("    ({major}, {:?}),\n", entry.tag))
+        .values()
+        .map(|entry| format!("    ({:?}, {:?}),\n", entry.version, entry.tag))
         .collect::<String>();
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
     fs::write(
