@@ -129,11 +129,17 @@ impl ClangTool {
                 }
 
                 // now we're ready to search for the binary exe with the major version suffixed.
+                // A suffixed binary whose version does not satisfy the requirement is skipped,
+                // so the unsuffixed binary below is still considered.
                 for major in majors {
                     if let Ok(cmd) = which(format!("{self}-{major}")) {
-                        return Ok(cmd);
+                        match self.capture_version(&cmd) {
+                            Ok(version) if !req.matches(&version) => continue,
+                            _ => return Ok(cmd),
+                        }
                     }
                 }
+
                 // failed to find a binary where the major version number is suffixed to the tool name.
 
                 // This line essentially ignores the version specified as a fail-safe.

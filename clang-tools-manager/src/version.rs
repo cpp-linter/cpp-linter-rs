@@ -120,11 +120,18 @@ impl RequestedVersion {
                 // check if cache has a suitable version
                 let bin_ext = if cfg!(windows) { ".exe" } else { "" };
                 let min_ver = get_min_ver(version_req).ok_or(GetToolError::UnsupportedVersion)?;
-                // Downloaded binaries are named with only the major version.
-                let cached_bin = StaticDistDownloader::get_cache_dir()
-                    .join("bin")
-                    .join(format!("{tool}-{}{bin_ext}", min_ver.major));
-                if cached_bin.exists() {
+                // Downloaded binaries are named with only the major version,
+                // so check each major version that can satisfy the requirement (newest first).
+                for major in StaticDistDownloader::get_major_version_range()
+                    .rev()
+                    .filter(|major| lowest_match_in_major(version_req, *major as u64).is_some())
+                {
+                    let cached_bin = StaticDistDownloader::get_cache_dir()
+                        .join("bin")
+                        .join(format!("{tool}-{major}{bin_ext}"));
+                    if !cached_bin.exists() {
+                        continue;
+                    }
                     let version = tool.capture_version(&cached_bin)?;
                     // A cached clang-tidy without resource headers is downloaded again,
                     // so the headers get installed.
@@ -586,6 +593,15 @@ mod tests {
         }
 
         #[tokio::test]
+        async fn eval_skips_suffixed_mismatch() {
+            let env = TestEnv::new();
+            fake_clang_tool(env.bin.path(), "clang-format-17", "17.0.5");
+            let exe = fake_clang_tool(env.bin.path(), "clang-format", "17.0.6");
+            let result = env.eval(req("=17.0.6"), false).await.unwrap().unwrap();
+            assert_version(&exe, result, "17.0.6");
+        }
+
+        #[tokio::test]
         async fn eval_unsupported_requirement() {
             let env = TestEnv::new();
             let err = env.eval(req("=8"), false).await.unwrap_err();
@@ -601,6 +617,17 @@ mod tests {
             fs::create_dir_all(&cached_bin_dir).unwrap();
             let cached = fake_clang_tool(&cached_bin_dir, "clang-format-17", "17.0.6");
             let result = env.eval(req("17"), false).await.unwrap().unwrap();
+            assert_version(&cached, result, "17.0.6");
+        }
+
+        #[tokio::test]
+        async fn eval_cached_bin_newer_major() {
+            let env = TestEnv::new();
+            let cached_bin_dir = env.cache.path().join("bin");
+            fs::create_dir_all(&cached_bin_dir).unwrap();
+            // the lowest match is 16.0.1, but the static binaries for 17 also match
+            let cached = fake_clang_tool(&cached_bin_dir, "clang-format-17", "17.0.6");
+            let result = env.eval(req(">16.0.0, <18"), false).await.unwrap().unwrap();
             assert_version(&cached, result, "17.0.6");
         }
 
