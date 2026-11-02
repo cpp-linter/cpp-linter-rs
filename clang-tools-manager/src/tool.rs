@@ -130,7 +130,7 @@ impl ClangTool {
 
                 // now we're ready to search for the binary exe with the major version suffixed.
                 // A suffixed binary whose version does not satisfy the requirement is skipped,
-                // so the unsuffixed binary below is still considered.
+                // so the plain `clang-format` (or `clang-tidy`) below is still considered.
                 for major in majors {
                     if let Ok(cmd) = which(format!("{self}-{major}")) {
                         match self.capture_version(&cmd) {
