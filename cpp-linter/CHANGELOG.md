@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
+## [cpp-linter/v2.0.0-rc.25] - 2026-11-02
+
+### <!-- 1 --> 🚀 Added
+
+- Add `--gen-patch-path` to choose where the patch is written by @shenxianpeng in [#538](https://github.com/cpp-linter/cpp-linter-rs/pull/538)
+- Accept and ignore v1's `--jobs` with a deprecation warning by @shenxianpeng in [#536](https://github.com/cpp-linter/cpp-linter-rs/pull/536)
+- Try system package managers before PyPI when allowed by @shenxianpeng in [#539](https://github.com/cpp-linter/cpp-linter-rs/pull/539)
+
+### <!-- 4 --> 🛠️ Fixed
+
+- Resolve a relative `--database` against the working directory by @shenxianpeng in [#537](https://github.com/cpp-linter/cpp-linter-rs/pull/537)
+- Resolve relative `--summary-output-file` and `--sarif-file` against the working directory by @shenxianpeng in [#541](https://github.com/cpp-linter/cpp-linter-rs/pull/541)
+- Allow combining `--pr-review` and its v1 aliases by @shenxianpeng in [#547](https://github.com/cpp-linter/cpp-linter-rs/pull/547)
+
+### <!-- 6 --> 📦 Dependency updates
+
+- Bump the cargo group with 6 updates by @dependabot[bot] in [#543](https://github.com/cpp-linter/cpp-linter-rs/pull/543)
+- Bump version to clang-tools-manager/v0.3.3 by @2bndy5 in [`7a545d4`](https://github.com/cpp-linter/cpp-linter-rs/commit/7a545d412640d71dc50767e45f0adb8f9227fd96)
+
+[cpp-linter/v2.0.0-rc.25]: https://github.com/cpp-linter/cpp-linter-rs/compare/cpp-linter/v2.0.0-rc.24...cpp-linter/v2.0.0-rc.25
+
+Full commit diff: [`cpp-linter/v2.0.0-rc.24...cpp-linter/v2.0.0-rc.25`][cpp-linter/v2.0.0-rc.25]
+
 ## [cpp-linter/v2.0.0-rc.24] - 2026-10-30
 
 ### <!-- 1 --> 🚀 Added
@@ -36,6 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump git-bot-feedback from v0.8.6 to v0.8.8 by @2bndy5 in [#515](https://github.com/cpp-linter/cpp-linter-rs/pull/515)
 - Bump jsonschema from 0.58.6 to 0.59.0 in the cargo group by @dependabot[bot] in [#521](https://github.com/cpp-linter/cpp-linter-rs/pull/521)
 - Bump version to clang-tools-manager/v0.3.2 by @2bndy5 in [`bd385e5`](https://github.com/cpp-linter/cpp-linter-rs/commit/bd385e5b4d918631fb7d740c600b7884aadc0144)
+- Bump version to cpp-linter/v2.0.0-rc.24 by @2bndy5 in [`3ac3fac`](https://github.com/cpp-linter/cpp-linter-rs/commit/3ac3fac75fbe9d0761d0360dc6bb52e566199507)
 
 ### <!-- 7 -->🚦 Tests
 
