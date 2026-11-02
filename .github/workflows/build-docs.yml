@@ -61,9 +61,9 @@ jobs:
           path: ~/.cargo
           key: ${{ runner.os }}-docs-cargo-${{ hashFiles('Cargo.lock') }}
       - name: Install uv
-        uses: astral-sh/setup-uv@18d369b23da25a81e9458561248e1aafff6a70fa # v10.3.1
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
       - name: Install cargo-binstall
-        uses: cargo-bins/cargo-binstall@8a2045612414e945291083f820cd50b4d8fc2218 # v1.26.0
+        uses: cargo-bins/cargo-binstall@81df5c23b0dc775b009efdfc9895c5965b7a4e40 # v1.26.1
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - name: Install nur
@@ -97,9 +97,9 @@ jobs:
           path: ~/.cargo
           key: ${{ runner.os }}-docs-cargo-${{ hashFiles('Cargo.lock') }}
       - name: Install uv
-        uses: astral-sh/setup-uv@18d369b23da25a81e9458561248e1aafff6a70fa # v10.3.1
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
       - name: Install cargo-binstall
-        uses: cargo-bins/cargo-binstall@8a2045612414e945291083f820cd50b4d8fc2218 # v1.26.0
+        uses: cargo-bins/cargo-binstall@81df5c23b0dc775b009efdfc9895c5965b7a4e40 # v1.26.1
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - name: Install nur
