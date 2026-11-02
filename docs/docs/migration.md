@@ -32,11 +32,11 @@ unchanged. The sections below cover the differences.
 |---|---|---|
 | `-d`, `--tidy-review` | [`-P`, `--pr-review`][pr-review] | v2 posts one review with suggestions from both clang-tidy and clang-format. The old names still work as aliases of `--pr-review`, so `-d true` now also enables clang-format suggestions. |
 | `-m`, `--format-review` | [`-P`, `--pr-review`][pr-review] | Same as above. `-m true` now also enables clang-tidy suggestions. |
+| `-F`, `--fix` | [`-F`, `--gen-patch`][gen-patch] | See [Fixes are written to a patch](#fixes-are-written-to-a-patch). `--fix` is kept as an alias. |
 
 The old names can still be given together, as in v1 (for example
 `--tidy-review=true --format-review=false`). Reviews are enabled if any of the given values is
 `true`.
-| `-F`, `--fix` | [`-F`, `--gen-patch`][gen-patch] | See [Fixes are written to a patch](#fixes-are-written-to-a-patch). `--fix` is kept as an alias. |
 
 ## Changed defaults
 
