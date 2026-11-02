@@ -241,7 +241,7 @@ mod supported_platform {
                     ..
                 })) if cached => {
                     log::warn!(
-                        "The cached {tool} binary is not from the {release_tag} release; downloading it again."
+                        "The cached {tool} static binary is not from the {release_tag} release; downloading it again."
                     );
                     download_bin().await?;
                     Self::verify_sha512(&download_path, &tool_url_path, &sha512_cache_path)?;
