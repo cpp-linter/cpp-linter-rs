@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
+## [clang-tools-manager/v0.3.3] - 2026-11-02
+
+### <!-- 1 --> 🚀 Added
+
+- Try system package managers before PyPI when allowed by @shenxianpeng in [#539](https://github.com/cpp-linter/cpp-linter-rs/pull/539)
+
+### <!-- 4 --> 🛠️ Fixed
+
+- Find clang tools for a full version like `=12.0.1` by @shenxianpeng in [#548](https://github.com/cpp-linter/cpp-linter-rs/pull/548)
+
+[clang-tools-manager/v0.3.3]: https://github.com/cpp-linter/cpp-linter-rs/compare/clang-tools-manager/v0.3.2...clang-tools-manager/v0.3.3
+
+Full commit diff: [`clang-tools-manager/v0.3.2...clang-tools-manager/v0.3.3`][clang-tools-manager/v0.3.3]
+
 ## [clang-tools-manager/v0.3.2] - 2026-10-30
 
 ### <!-- 1 --> 🚀 Added
@@ -25,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump the cargo group across 1 directory with 10 updates by @dependabot[bot] in [#443](https://github.com/cpp-linter/cpp-linter-rs/pull/443)
 - Bump the cargo group with 5 updates by @dependabot[bot] in [#504](https://github.com/cpp-linter/cpp-linter-rs/pull/504)
 - Bump transitive dependencies by @2bndy5 in [`4cb2e2c`](https://github.com/cpp-linter/cpp-linter-rs/commit/4cb2e2c859fe460f0d5a241f5db7f681d5957d7b)
+- Bump version to clang-tools-manager/v0.3.2 by @2bndy5 in [`bd385e5`](https://github.com/cpp-linter/cpp-linter-rs/commit/bd385e5b4d918631fb7d740c600b7884aadc0144)
 
 ### <!-- 7 -->🚦 Tests
 
