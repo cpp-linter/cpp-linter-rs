@@ -6,6 +6,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
+## [cpp-linter-js/v2.0.0-rc.23] - 2026-11-03
+
+### <!-- 1 --> 🚀 Added
+
+- Add `--gen-patch-path` to choose where the patch is written by @shenxianpeng in [#538](https://github.com/cpp-linter/cpp-linter-rs/pull/538)
+- Accept and ignore v1's `--jobs` with a deprecation warning by @shenxianpeng in [#536](https://github.com/cpp-linter/cpp-linter-rs/pull/536)
+- Try system package managers before PyPI when allowed by @shenxianpeng in [#539](https://github.com/cpp-linter/cpp-linter-rs/pull/539)
+
+### <!-- 4 --> 🛠️ Fixed
+
+- Resolve a relative `--database` against the working directory by @shenxianpeng in [#537](https://github.com/cpp-linter/cpp-linter-rs/pull/537)
+- Resolve relative `--summary-output-file` and `--sarif-file` against the working directory by @shenxianpeng in [#541](https://github.com/cpp-linter/cpp-linter-rs/pull/541)
+- Allow combining `--pr-review` and its v1 aliases by @shenxianpeng in [#547](https://github.com/cpp-linter/cpp-linter-rs/pull/547)
+- Find clang tools for a full version like `=12.0.1` by @shenxianpeng in [#548](https://github.com/cpp-linter/cpp-linter-rs/pull/548)
+
+### <!-- 6 --> 📦 Dependency updates
+
+- Bump the npm group with 2 updates by @dependabot[bot] in [#544](https://github.com/cpp-linter/cpp-linter-rs/pull/544)
+- Bump the cargo group with 6 updates by @dependabot[bot] in [#543](https://github.com/cpp-linter/cpp-linter-rs/pull/543)
+- Bump version to clang-tools-manager/v0.3.3 by @2bndy5 in [`7a545d4`](https://github.com/cpp-linter/cpp-linter-rs/commit/7a545d412640d71dc50767e45f0adb8f9227fd96)
+- Bump version to cpp-linter/v2.0.0-rc.25 by @2bndy5 in [`1918797`](https://github.com/cpp-linter/cpp-linter-rs/commit/1918797c3e7f4e82f8dbf1db9f8203419672f490)
+- Bump version to cpp-linter-py/v2.0.0-rc.24 by @2bndy5 in [`e26cce7`](https://github.com/cpp-linter/cpp-linter-rs/commit/e26cce73b06c565b030a2158229bf0f1af989cbc)
+
+### <!-- 8 --> 📝 Documentation
+
+- Add AGENTS.md by @2bndy5 in [#542](https://github.com/cpp-linter/cpp-linter-rs/pull/542)
+
+[cpp-linter-js/v2.0.0-rc.23]: https://github.com/cpp-linter/cpp-linter-rs/compare/cpp-linter-js/v2.0.0-rc.22...cpp-linter-js/v2.0.0-rc.23
+
+Full commit diff: [`cpp-linter-js/v2.0.0-rc.22...cpp-linter-js/v2.0.0-rc.23`][cpp-linter-js/v2.0.0-rc.23]
+
 ## [cpp-linter-js/v2.0.0-rc.22] - 2026-10-30
 
 ### <!-- 1 --> 🚀 Added
@@ -88,6 +119,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump version to clang-tools-manager/v0.3.2 by @2bndy5 in [`bd385e5`](https://github.com/cpp-linter/cpp-linter-rs/commit/bd385e5b4d918631fb7d740c600b7884aadc0144)
 - Bump version to cpp-linter/v2.0.0-rc.24 by @2bndy5 in [`3ac3fac`](https://github.com/cpp-linter/cpp-linter-rs/commit/3ac3fac75fbe9d0761d0360dc6bb52e566199507)
 - Bump version to cpp-linter-py/v2.0.0-rc.23 by @2bndy5 in [`2504be7`](https://github.com/cpp-linter/cpp-linter-rs/commit/2504be7d43b9fcee32521ca881461193a90606ec)
+- Bump version to cpp-linter-js/v2.0.0-rc.22 by @2bndy5 in [`aecd3fd`](https://github.com/cpp-linter/cpp-linter-rs/commit/aecd3fd66b72ab42ee033091cdd812db24563a5c)
 
 ### <!-- 7 -->🚦 Tests
 
