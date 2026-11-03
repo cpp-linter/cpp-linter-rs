@@ -46,6 +46,8 @@ respective package managers).
 
 ### Rust
 
+[![Crates.io Version][crates-io-badge]][crates-io-pkg]
+
 Until 2.0 is released, crates.io only has release candidates,
 so `--version` is required.
 
@@ -155,6 +157,8 @@ As for dependencies (that are redistributed by us in binary form) and their
 licenses, refer to [THIRD-PARTY LICENSES][other-licenses].
 
 [MIT]: https://github.com/cpp-linter/cpp-linter-rs/blob/main/LICENSE
+[crates-io-badge]: https://img.shields.io/crates/v/cpp-linter?labelColor=454a63&color=975a16
+[crates-io-pkg]: https://crates.io/crates/cpp-linter
 [test-pypi-badge]: https://img.shields.io/pypi/v/cpp-linter?pypiBaseUrl=https%3A%2F%2Ftest.pypi.org&label=test-pypi&labelColor=454a63&color=975a16
 [test-pypi-pkg]: https://test.pypi.org/project/cpp-linter/
 [npm-badge]: https://img.shields.io/npm/v/%40cpp-linter%2Fcpp-linter/next?labelColor=454a63&color=975a16
