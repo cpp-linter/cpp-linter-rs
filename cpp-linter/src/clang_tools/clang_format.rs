@@ -90,7 +90,24 @@ pub fn run_clang_format(
             source: e,
         })?;
 
-    if !output.stderr.is_empty() || !output.status.success() {
+    // When clang-format exits non-zero (eg. an invalid `--style` value or a
+    // `.clang-format` config that the installed clang-format version rejects), its
+    // stdout is empty. Diffing that empty output against the file's contents would
+    // wrongly report the entire file as needing reformatting (and, with
+    // `--fix`/`--gen-patch-path`, emit a patch that deletes the whole file). So skip
+    // this file with no format advice, like when clang-format reports no fixes.
+    if !output.status.success() {
+        logs.push((
+            log::Level::Warn,
+            format!(
+                "clang-format failed to run on {file_name}; skipping its format suggestions:\n{}",
+                String::from_utf8_lossy(&output.stderr)
+            ),
+        ));
+        file.format_advice = Some(FormatAdvice::default());
+        return Ok(logs);
+    }
+    if !output.stderr.is_empty() {
         logs.push((
             log::Level::Debug,
             format!(
@@ -382,14 +399,49 @@ mod tests {
             assert!(matches!(err, ClangCaptureError::NonUtf8Output { .. }));
         }
 
+        // A clang-format that exits non-zero (eg. a bad `--style` or an unsupported
+        // `.clang-format` key) must not be treated as "the whole file should become
+        // empty". Instead the file is skipped with no format advice and a warning.
+        #[test]
+        fn nonzero_exit_skips_file_with_warning() {
+            let tmp_workspace = setup_tmp_workspace();
+            let tools_dir = tempfile::tempdir().unwrap();
+            // mimic clang-format rejecting the style: an error on stderr, empty stdout,
+            // and a non-zero exit code.
+            let fake_format = make_fake_tool(
+                tools_dir.path(),
+                "clang-format",
+                "echo 'Invalid value for -style' >&2; exit 1",
+            );
+            let clang_params = make_clang_params(tmp_workspace.path(), fake_format);
+            let file = Mutex::new(FileObj::new(PathBuf::from("demo/demo.cpp")));
+            let logs = {
+                let mut locked = file.lock().unwrap();
+                run_clang_format(&mut locked, &clang_params).unwrap()
+            };
+            // the failure is surfaced at warning level, carrying clang-format's stderr
+            let warnings = logs
+                .iter()
+                .filter(|(lvl, msg)| {
+                    *lvl == log::Level::Warn && msg.contains("Invalid value for -style")
+                })
+                .count();
+            assert_eq!(warnings, 1);
+            // the file is reported as having no formatting concerns (NOT every line),
+            // so no patch that deletes the file is ever produced.
+            let advice = file.lock().unwrap().format_advice.clone().unwrap();
+            assert!(advice.replacements.is_empty());
+        }
+
         #[test]
         fn errors_reported_in_stderr() {
             let tmp_workspace = setup_tmp_workspace();
             let tools_dir = tempfile::tempdir().unwrap();
+            // a successful run that still writes to stderr (eg. a warning)
             let fake_format = make_fake_tool(
                 tools_dir.path(),
                 "clang-format",
-                "echo 'some error' >&2; exit 1",
+                "echo 'some error' >&2; for a in \"$@\"; do f=$a; done; cat \"$f\"",
             );
             let clang_params = make_clang_params(tmp_workspace.path(), fake_format);
             // simulate a file already patched by clang-tidy
