@@ -13,12 +13,45 @@
 [sarif-file]: cli.md#-sarif-file
 [gen-patch-path]: cli.md#-gen-patch-path
 [summary-output-file]: cli.md#-o-summary-output-file
+[quick-start]: index.md#quick-start
 
 # Migrating from v1
 
 This page lists what changes when moving from cpp-linter v1 (the Python package) to v2 (this Rust
 project). Most options keep their names, short flags and meaning, so many command lines work
 unchanged. The sections below cover the differences.
+
+## Installing v2
+
+v2 keeps the package name and the command of v1. On PyPI it is still `cpp-linter`, and it still
+installs a `cpp-linter` command. Once 2.0 is released, `pip install --upgrade cpp-linter` moves to
+v2. To stay on v1, pin the version:
+
+```shell
+pip install "cpp-linter<2"
+```
+
+v2 can also be installed with cargo, as a pre-built binary, or from npm. See
+[Quick start][quick-start] for these commands and for how to install the current release candidate.
+
+cpp-linter-action v2 keeps using cpp-linter v1, so workflows that use the action do not change
+until they move to a new major version of the action.
+
+### Python API
+
+v1 is a Python package, so some scripts import its modules, such as `cpp_linter.rest_api`. The v2
+Python package only provides `cpp_linter.main()`. Scripts that import other v1 modules need to run
+cpp-linter as a command or call `main()` instead. `main()` takes an optional list of strings that
+starts with the program name, like `sys.argv`:
+
+```python
+import cpp_linter
+
+cpp_linter.main(["cpp-linter", "--style=file", "src/main.cpp"])
+```
+
+If cpp-linter fails, `main()` raises an `OSError`. Invalid arguments and `--help` exit the Python
+process, as they exit the command.
 
 ## Deprecated options
 
