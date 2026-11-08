@@ -50,7 +50,8 @@ import cpp_linter
 cpp_linter.main(["cpp-linter", "--style=file", "src/main.cpp"])
 ```
 
-If cpp-linter fails, `main()` raises an `OSError`.
+If cpp-linter fails, `main()` raises an `OSError`. Invalid arguments and `--help` exit the Python
+process, as they exit the command.
 
 ## Deprecated options
 
