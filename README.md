@@ -14,7 +14,8 @@
 [thread-comment-dark]: docs/docs/images/thread-comment-dark.png#gh-dark-mode-only
 [pr-review-light]: docs/docs/images/pr-review-light.png#gh-light-mode-only
 [pr-review-dark]: docs/docs/images/pr-review-dark.png#gh-dark-mode-only
-[step-summary-preview]: docs/docs/images/step-summary.png
+[step-summary-light]: docs/docs/images/step-summary-light.png#gh-light-mode-only
+[step-summary-dark]: docs/docs/images/step-summary-dark.png#gh-dark-mode-only
 
 [cli-doc]: https://cpp-linter.github.io/cpp-linter-rs/cli
 
@@ -126,7 +127,8 @@ Using [`--thread-comments`][thread-comments]:
 
 Using [`--step-summary`][step-summary]:
 
-![step summary][step-summary-preview]
+![step summary][step-summary-light]
+![step summary][step-summary-dark]
 
 ### Pull Request Review
 

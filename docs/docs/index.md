@@ -14,7 +14,8 @@
 [thread-comment-dark]: images/thread-comment-dark.png#gh-dark-mode-only
 [pr-review-light]: images/pr-review-light.png#gh-light-mode-only
 [pr-review-dark]: images/pr-review-dark.png#gh-dark-mode-only
-[step-summary-preview]: images/step-summary.png
+[step-summary-light]: images/step-summary-light.png#gh-light-mode-only
+[step-summary-dark]: images/step-summary-dark.png#gh-dark-mode-only
 
 [cli-doc]: cli.md
 
