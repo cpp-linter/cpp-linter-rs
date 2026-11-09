@@ -275,7 +275,8 @@ impl RestClient {
                         let mut comments = vec![];
                         for suggestion in &review_comments.comments {
                             let mut comment = suggestion.as_review_comment();
-                            comment.path = prefix_feedback_path(&comment.path, &self.repo_root_prefix);
+                            comment.path =
+                                prefix_feedback_path(&comment.path, &self.repo_root_prefix);
                             comments.push(comment);
                         }
                         comments

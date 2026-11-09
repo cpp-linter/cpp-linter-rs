@@ -45,6 +45,7 @@ struct TestParams {
     pub thread_comments: ThreadComments,
     pub no_lgtm: bool,
     pub force_lgtm: bool,
+    pub is_fork: bool,
     pub fail_get_existing_comments: bool,
     pub fail_dismissal: bool,
     pub fail_posting: bool,
@@ -61,6 +62,7 @@ impl Default for TestParams {
             thread_comments: ThreadComments::On,
             no_lgtm: true,
             force_lgtm: false,
+            is_fork: false,
             fail_get_existing_comments: false,
             fail_dismissal: false,
             fail_posting: false,
@@ -93,6 +95,18 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
                     "state": "open",
                     "number": PR,
                     "locked": false,
+                    "head": {
+                        "repo": {
+                            "id": if test_params.is_fork { 200 } else { 100 },
+                            "full_name": if test_params.is_fork { "fork/repo" } else { REPO },
+                        }
+                    },
+                    "base": {
+                        "repo": {
+                            "id": 100,
+                            "full_name": REPO,
+                        }
+                    }
                 }
             })
             .to_string();
@@ -154,7 +168,7 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
         }
         mock = mock.create();
         mocks.push(mock);
-    } else {
+    } else if !test_params.is_fork {
         let pr_endpoint = format!("/repos/{REPO}/issues/{PR}/comments");
         for pg in ["1", "2"] {
             let link = if pg == "1" {
@@ -187,7 +201,10 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
         }
     );
 
-    if !test_params.fail_get_existing_comments && !test_params.bad_existing_comments {
+    if !test_params.fail_get_existing_comments
+        && !test_params.bad_existing_comments
+        && !test_params.is_fork
+    {
         mocks.push(
             server
                 .mock("DELETE", comment_url.as_str())
@@ -212,7 +229,8 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
 
     let lgtm_allowed = !test_params.force_lgtm || !test_params.no_lgtm;
 
-    if test_params.thread_comments == ThreadComments::Update && lgtm_allowed {
+    if test_params.thread_comments == ThreadComments::Update && lgtm_allowed && !test_params.is_fork
+    {
         mocks.push(
             server
                 .mock("PATCH", comment_url.as_str())
@@ -228,6 +246,7 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
     if test_params.thread_comments == ThreadComments::On
         && lgtm_allowed
         && !test_params.bad_existing_comments
+        && !test_params.is_fork
     {
         mocks.push(
             server
@@ -248,6 +267,18 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
                 .with_header(REMAINING_RATE_LIMIT_HEADER, "50")
                 .with_header(RESET_RATE_LIMIT_HEADER, reset_timestamp.as_str())
                 .with_status(if test_params.fail_posting { 403 } else { 200 })
+                .create(),
+        );
+    }
+
+    if test_params.is_fork {
+        mocks.push(
+            server
+                .mock(
+                    "POST",
+                    format!("/repos/{REPO}/issues/{PR}/comments").as_str(),
+                )
+                .expect(0)
                 .create(),
         );
     }
@@ -562,6 +593,27 @@ async fn bad_existing_comments() {
 async fn relative_out_files() {
     test_comment(&TestParams {
         relative_out_files: true,
+        ..Default::default()
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn new_pr_fork() {
+    test_comment(&TestParams {
+        event_t: EventType::PullRequest,
+        is_fork: true,
+        ..Default::default()
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn update_pr_fork() {
+    test_comment(&TestParams {
+        event_t: EventType::PullRequest,
+        thread_comments: ThreadComments::Update,
+        is_fork: true,
         ..Default::default()
     })
     .await;
