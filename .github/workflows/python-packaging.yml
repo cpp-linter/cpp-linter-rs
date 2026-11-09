@@ -74,7 +74,7 @@ jobs:
     name: >-
       wheels (${{ matrix.python.feature }},
       ${{ matrix.platform.runner }},
-      ${{ matrix.platform.manylinux || 'manylinux'}}
+      ${{ matrix.platform.manylinux || '-' }}
       ${{ matrix.platform.target }})
     strategy:
       fail-fast: false
