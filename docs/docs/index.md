@@ -6,13 +6,16 @@
 [pr-review]: cli.md#-p-pr-review
 [other-licenses]: other-licenses.md
 
-[format-annotations-preview]: images/annotations-clang-format.png
-[tidy-annotations-preview]: images/annotations-clang-tidy.png
-[step-summary-preview]: images/step-summary.png
-[thread-comment-preview]: images/comment.png
-[tidy-review-preview]: images/tidy-review.png
-[format-review-preview]: images/format-review.png
-[format-suggestion-preview]: images/format-suggestion.png
+[annotations-diff-light]: images/annotations-diff-light.png#gh-light-mode-only
+[annotations-diff-dark]: images/annotations-diff-dark.png#gh-dark-mode-only
+[annotations-summary-light]: images/annotations-summary-light.png#gh-light-mode-only
+[annotations-summary-dark]: images/annotations-summary-dark.png#gh-dark-mode-only
+[thread-comment-light]: images/thread-comment-light.png#gh-light-mode-only
+[thread-comment-dark]: images/thread-comment-dark.png#gh-dark-mode-only
+[pr-review-light]: images/pr-review-light.png#gh-light-mode-only
+[pr-review-dark]: images/pr-review-dark.png#gh-dark-mode-only
+[step-summary-light]: images/step-summary-light.png#gh-light-mode-only
+[step-summary-dark]: images/step-summary-dark.png#gh-dark-mode-only
 
 [cli-doc]: cli.md
 
