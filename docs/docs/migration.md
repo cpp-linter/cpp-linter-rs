@@ -6,6 +6,7 @@
 [mod-sys]: cli.md#-mod-sys
 [no-mod-sys]: cli.md#-no-mod-sys
 [ignore]: cli.md#-i-ignore
+[tidy-checks]: cli.md#-c-tidy-checks
 [database]: cli.md#-p-database
 [repo-root]: cli.md#-r-repo-root
 [pr-review]: cli.md#-p-pr-review
@@ -77,6 +78,7 @@ The old names can still be given together, as in v1 (for example
 |---|---|---|
 | [`-l`, `--lines-changed-only`][lines-changed-only] | `false` | `true` |
 | [`-i`, `--ignore`][ignore] | `.github` | `.github` and `target` |
+| [`-c`, `--tidy-checks`][tidy-checks] | includes `clang-analyzer-*` | no `clang-analyzer-*` |
 
 Because `--lines-changed-only` is `true` by default and implies
 [`--files-changed-only`][files-changed-only], v2 analyzes only the added lines of changed files
@@ -85,6 +87,17 @@ including files under `target`, pass:
 
 ```shell
 cpp-linter --lines-changed-only=false --files-changed-only=false --ignore=.github
+```
+
+The default [`--tidy-checks`][tidy-checks] no longer adds the Clang Static Analyzer checks
+(`clang-analyzer-*`), because they can make clang-tidy many times slower. clang-tidy 22 and newer
+also leave them out of their own defaults, so with those versions they only run if a `.clang-tidy`
+file or `--tidy-checks` enables them. clang-tidy 21 and older still enable them by default; add
+`-clang-analyzer-*` to `--tidy-checks` to turn them off there. To keep them with any version, add
+them back:
+
+```shell
+cpp-linter --tidy-checks="boost-*,bugprone-*,performance-*,readability-*,portability-*,modernize-*,clang-analyzer-*,cppcoreguidelines-*"
 ```
 
 ## Fixes are written to a patch
