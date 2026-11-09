@@ -36,6 +36,7 @@ struct TestParams {
     pub summary_only: bool,
     pub pr_state: String,
     pub pr_draft: bool,
+    pub is_fork: bool,
     pub fail_dismissal: bool,
     pub fail_get_existing_reviews: bool,
     pub fail_posting: bool,
@@ -56,6 +57,7 @@ impl Default for TestParams {
             summary_only: false,
             pr_state: "open".to_string(),
             pr_draft: false,
+            is_fork: false,
             fail_dismissal: false,
             fail_get_existing_reviews: false,
             fail_posting: false,
@@ -78,6 +80,18 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) -> 
                 "state": test_params.pr_state,
                 "number": PR,
                 "locked": false,
+                "head": {
+                    "repo": {
+                        "id": if test_params.is_fork { 200 } else { 100 },
+                        "full_name": if test_params.is_fork { "fork/repo" } else { REPO },
+                    }
+                },
+                "base": {
+                    "repo": {
+                        "id": 100,
+                        "full_name": REPO,
+                    }
+                }
             }
         })
         .to_string()
@@ -129,7 +143,7 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) -> 
 
     let reviews_endpoint = format!("/repos/{REPO}/pulls/{PR}/reviews");
 
-    if test_params.pr_state != "closed" && !test_params.bad_pr_info {
+    if test_params.pr_state != "closed" && !test_params.bad_pr_info && !test_params.is_fork {
         let mut mock = server
             .mock("GET", reviews_endpoint.as_str())
             .match_header("Accept", "application/vnd.github.raw+json")
@@ -167,6 +181,7 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) -> 
         && !test_params.bad_existing_reviews
         && test_params.pr_state != "closed"
         && !test_params.bad_pr_info
+        && !test_params.is_fork
     {
         // the previous review is outdated (not reused), so it gets dismissed
         mocks.push(
@@ -186,8 +201,8 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) -> 
 
     let posted_review = Arc::new(Mutex::new(None));
     let lgtm_allowed = !test_params.force_lgtm || !test_params.no_lgtm;
-    if test_params.previous_review.is_some() {
-        // all suggestions were reused, so a new review is not posted
+    if test_params.previous_review.is_some() || test_params.is_fork {
+        // all suggestions were reused (or is_fork), so a new review is not posted
         mocks.push(
             server
                 .mock("POST", reviews_endpoint.as_str())
@@ -519,4 +534,16 @@ async fn all_suggestions_reused() {
         ..Default::default()
     })
     .await;
+}
+
+#[tokio::test]
+async fn is_fork() {
+    assert!(
+        test_review(&TestParams {
+            is_fork: true,
+            ..Default::default()
+        })
+        .await
+        .is_none()
+    );
 }

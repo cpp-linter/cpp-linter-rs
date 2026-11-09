@@ -268,46 +268,51 @@ impl RestClient {
             }
             self.show_patch(&feedback_inputs)?;
 
-            let mut options = ReviewOptions {
-                marker: COMMENT_MARKER.to_string(),
-                comments: {
-                    let mut comments = vec![];
-                    for suggestion in &review_comments.comments {
-                        let mut comment = suggestion.as_review_comment();
-                        comment.path = prefix_feedback_path(&comment.path, &self.repo_root_prefix);
-                        comments.push(comment);
-                    }
-                    comments
-                },
-                ..Default::default()
-            };
+            if self.client.is_pr_same_remote() {
+                let mut options = ReviewOptions {
+                    marker: COMMENT_MARKER.to_string(),
+                    comments: {
+                        let mut comments = vec![];
+                        for suggestion in &review_comments.comments {
+                            let mut comment = suggestion.as_review_comment();
+                            comment.path =
+                                prefix_feedback_path(&comment.path, &self.repo_root_prefix);
+                            comments.push(comment);
+                        }
+                        comments
+                    },
+                    ..Default::default()
+                };
 
-            let total_review_comments = options.comments.len() as u32;
-            self.client.cull_pr_reviews(&mut options).await?;
-            let has_changes =
-                review_comments.tool_total > 0 || !review_comments.skipped_fixes.is_empty();
-            let is_lgtm = options.comments.is_empty() && !has_changes;
-            options.action = if feedback_inputs.passive_reviews {
-                ReviewAction::Comment
-            } else if is_lgtm {
-                ReviewAction::Approve
-            } else {
-                ReviewAction::RequestChanges
-            };
-            options.summary = review_comments.summarize(
-                &clang_versions,
-                &options.comments,
-                total_review_comments,
-                summary_only,
-            );
-            if is_lgtm && feedback_inputs.no_lgtm {
-                log::debug!("Not posting an approved review because `no-lgtm` is true");
-            } else if options.comments.is_empty() && total_review_comments > 0 {
-                log::info!(
-                    "All review comments were already posted in previous reviews; not posting a new review."
+                let total_review_comments = options.comments.len() as u32;
+                self.client.cull_pr_reviews(&mut options).await?;
+                let has_changes =
+                    review_comments.tool_total > 0 || !review_comments.skipped_fixes.is_empty();
+                let is_lgtm = options.comments.is_empty() && !has_changes;
+                options.action = if feedback_inputs.passive_reviews {
+                    ReviewAction::Comment
+                } else if is_lgtm {
+                    ReviewAction::Approve
+                } else {
+                    ReviewAction::RequestChanges
+                };
+                options.summary = review_comments.summarize(
+                    &clang_versions,
+                    &options.comments,
+                    total_review_comments,
+                    summary_only,
                 );
+                if is_lgtm && feedback_inputs.no_lgtm {
+                    log::debug!("Not posting an approved review because `no-lgtm` is true");
+                } else if options.comments.is_empty() && total_review_comments > 0 {
+                    log::info!(
+                        "All review comments were already posted in previous reviews; not posting a new review."
+                    );
+                } else {
+                    self.client.post_pr_review(&options).await?;
+                }
             } else {
-                self.client.post_pr_review(&options).await?;
+                log::warn!("PR is from a different remote, skipping review.");
             }
         } else if feedback_inputs.gen_patch {
             for file in files {
@@ -320,6 +325,11 @@ impl RestClient {
         }
 
         if feedback_inputs.thread_comments != ThreadComments::Off {
+            // do not post thread-comments for on PRs from forks
+            if self.client.is_pr_event() && !self.client.is_pr_same_remote() {
+                log::warn!("PR is from a different remote, skipping thread comments.");
+                return Ok(format_checks_failed + tidy_checks_failed);
+            }
             // post thread comment for PR or push event
             if comment.as_ref().is_none_or(|c| c.len() > u16::MAX as usize) {
                 comment = Some(Self::make_comment(
