@@ -6,13 +6,15 @@
 [pr-review]: https://cpp-linter.github.io/cpp-linter-rs/cli#-p-pr-review
 [other-licenses]: https://cpp-linter.github.io/cpp-linter-rs/other-licenses
 
-[format-annotations-preview]: docs/docs/images/annotations-clang-format.png
-[tidy-annotations-preview]: docs/docs/images/annotations-clang-tidy.png
+[annotations-diff-light]: docs/docs/images/annotations-diff-light.png#gh-light-mode-only
+[annotations-diff-dark]: docs/docs/images/annotations-diff-dark.png#gh-dark-mode-only
+[annotations-summary-light]: docs/docs/images/annotations-summary-light.png#gh-light-mode-only
+[annotations-summary-dark]: docs/docs/images/annotations-summary-dark.png#gh-dark-mode-only
+[thread-comment-light]: docs/docs/images/thread-comment-light.png#gh-light-mode-only
+[thread-comment-dark]: docs/docs/images/thread-comment-dark.png#gh-dark-mode-only
+[pr-review-light]: docs/docs/images/pr-review-light.png#gh-light-mode-only
+[pr-review-dark]: docs/docs/images/pr-review-dark.png#gh-dark-mode-only
 [step-summary-preview]: docs/docs/images/step-summary.png
-[thread-comment-preview]: docs/docs/images/comment.png
-[tidy-review-preview]: docs/docs/images/tidy-review.png
-[format-review-preview]: docs/docs/images/format-review.png
-[format-suggestion-preview]: docs/docs/images/format-suggestion.png
 
 [cli-doc]: https://cpp-linter.github.io/cpp-linter-rs/cli
 
@@ -103,19 +105,22 @@ For the description of supported Command Line Interface options, see
 
 Using [`--file-annotations`][file-annotations]:
 
-#### clang-format annotations
+#### In the pull request's changed files
 
-![clang-format annotations][format-annotations-preview]
+![clang-tidy annotation][annotations-diff-light]
+![clang-tidy annotation][annotations-diff-dark]
 
-#### clang-tidy annotations
+#### In the workflow run summary
 
-![clang-tidy annotations][tidy-annotations-preview]
+![annotations in the workflow run summary][annotations-summary-light]
+![annotations in the workflow run summary][annotations-summary-dark]
 
 ### Thread Comment
 
 Using [`--thread-comments`][thread-comments]:
 
-![sample thread-comment][thread-comment-preview]
+![sample thread-comment][thread-comment-light]
+![sample thread-comment][thread-comment-dark]
 
 ### Step Summary
 
@@ -127,15 +132,8 @@ Using [`--step-summary`][step-summary]:
 
 Using [`--pr-review`][pr-review]:
 
-#### Only clang-tidy
-
-![sample tidy-review][tidy-review-preview]
-
-#### Only clang-format
-
-![sample format-review][format-review-preview]
-
-![sample format-suggestion][format-suggestion-preview]
+![sample pr-review][pr-review-light]
+![sample pr-review][pr-review-dark]
 
 ## Sponsors
 
