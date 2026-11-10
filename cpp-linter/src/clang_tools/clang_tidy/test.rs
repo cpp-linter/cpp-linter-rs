@@ -223,6 +223,42 @@ TrenchBroom/TrenchBroom/common/test/src/mdl/tst_ReadFreeImageTexture.cpp:44:48: 
     }
 }
 
+#[test]
+fn parse_colored_tidy_output() {
+    // clang-tidy 18 output when `.clang-tidy` sets `UseColor: true`
+    // cspell:ignore mwarning mvariable mnote deadcode
+    let tidy_out = concat!(
+        "\x1b[1ma.cpp:1:17: \x1b[0m\x1b[0;1;35mwarning: \x1b[0m\x1b[1mvariable name 'x' is too short, expected at least 3 characters [readability-identifier-length]\x1b[0m\n",
+        "    1 | int main(){ int x = 0; x = 1; return 0; }\x1b[0m\n",
+        "      | \x1b[0;1;32m                ^\n",
+        "\x1b[0m\x1b[1ma.cpp:1:24: \x1b[0m\x1b[0;1;35mwarning: \x1b[0m\x1b[1mValue stored to 'x' is never read [clang-analyzer-deadcode.DeadStores]\x1b[0m\n",
+        "    1 | int main(){ int x = 0; x = 1; return 0; }\x1b[0m\n",
+        "      | \x1b[0;1;32m                       ^   ~\n",
+        "\x1b[0m\x1b[1ma.cpp:1:24: \x1b[0m\x1b[0;1;36mnote: \x1b[0mValue stored to 'x' is never read\x1b[0m\n",
+        "    1 | int main(){ int x = 0; x = 1; return 0; }\x1b[0m\n",
+        "      | \x1b[0;1;32m                       ^   ~\n",
+        "\x1b[0m\n",
+    );
+    let notes = parse_tidy_output(tidy_out.as_bytes(), &None, &PathBuf::from(".")).unwrap();
+    let diagnostics = notes
+        .iter()
+        .map(|n| n.diagnostic.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        diagnostics,
+        [
+            "readability-identifier-length",
+            "clang-analyzer-deadcode.DeadStores"
+        ]
+    );
+    assert_eq!(notes[0].filename, "a.cpp");
+    assert_eq!((notes[1].line, notes[1].cols), (1, 24));
+    for note in &notes {
+        assert!(!note.rationale.contains('\x1b'));
+        assert!(note.suggestion.iter().all(|l| !l.contains('\x1b')));
+    }
+}
+
 fn dummy_note(filename: &str, fixed_lines: Vec<u32>) -> TidyNotification {
     TidyNotification {
         filename: filename.to_string(),

@@ -182,6 +182,11 @@ impl TidyAdvice {
 /// A regex pattern to capture the clang-tidy note header.
 const NOTE_HEADER: &str = r"^(.+):(\d+):(\d+):\s(\w+):(.*)\[([a-zA-Z\d\-\.]+),?[^\]]*\]$";
 
+/// A regex pattern to match ANSI color codes.
+///
+/// clang-tidy emits them even when piped if `.clang-tidy` sets `UseColor: true`.
+const ANSI_ESCAPE: &str = r"\x1b\[[0-9;]*m";
+
 /// Parses clang-tidy stdout.
 ///
 /// Here it helps to have the JSON database deserialized for normalizing paths present
@@ -192,6 +197,7 @@ fn parse_tidy_output(
     repo_root: &Path,
 ) -> Result<Vec<TidyNotification>, ClangCaptureError> {
     let note_header = Regex::new(NOTE_HEADER)?;
+    let ansi_escape = Regex::new(ANSI_ESCAPE)?;
     let mut notification = None;
     let mut result = Vec::new();
     for line in String::from_utf8(tidy_stdout.to_vec())
@@ -201,7 +207,8 @@ fn parse_tidy_output(
         })?
         .lines()
     {
-        if let Some(captured) = note_header.captures(line) {
+        let line = ansi_escape.replace_all(line, "");
+        if let Some(captured) = note_header.captures(&line) {
             // First check that the diagnostic name is a actual diagnostic name.
             // Sometimes clang-tidy uses square brackets to enclose additional context
             // about the diagnostic rationale. For example: '[with auto = typename ...]'
@@ -267,7 +274,7 @@ fn parse_tidy_output(
         } else if let Some(note) = &mut notification {
             // append lines of code that are part of
             // the previous line's notification
-            note.suggestion.push(line.to_string());
+            note.suggestion.push(line.into_owned());
         }
     }
     if let Some(note) = notification {
