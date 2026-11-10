@@ -10,6 +10,7 @@ nav:
   - migration.md
   - pr-review-caveats.md
   - permissions.md
+  - git-servers.md
   - python.md
   - node.md
   - Changes:
