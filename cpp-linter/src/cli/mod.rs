@@ -403,12 +403,17 @@ pub struct TidyOptions {
     ///   `'-*'`.
     /// - It is also possible to rely solely on a .clang-tidy config file by
     ///   specifying this option as a blank string (`''`).
+    /// - The default does not add the Clang Static Analyzer checks
+    ///   (`clang-analyzer-*`) because they can make clang-tidy many times slower.
+    ///   clang-tidy 22 and newer also leave them out of their own defaults.
+    ///   clang-tidy 21 and older still enable them unless `-clang-analyzer-*` is added.
+    ///   Add `clang-analyzer-*` to this option or to a .clang-tidy file to enable them.
     ///
     /// See also clang-tidy docs for more info.
     #[cfg_attr(feature = "bin", arg(
         short = 'c',
         long,
-        default_value = "boost-*,bugprone-*,performance-*,readability-*,portability-*,modernize-*,clang-analyzer-*,cppcoreguidelines-*",
+        default_value = "boost-*,bugprone-*,performance-*,readability-*,portability-*,modernize-*,cppcoreguidelines-*",
         default_missing_value = "",
         num_args = 0..=1,
         help_heading = "Clang-tidy options",
