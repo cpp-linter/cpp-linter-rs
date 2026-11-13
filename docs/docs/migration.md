@@ -7,6 +7,7 @@
 [no-mod-sys]: cli.md#-no-mod-sys
 [ignore]: cli.md#-i-ignore
 [tidy-checks]: cli.md#-c-tidy-checks
+[style]: cli.md#-s-style
 [database]: cli.md#-p-database
 [repo-root]: cli.md#-r-repo-root
 [pr-review]: cli.md#-p-pr-review
@@ -136,6 +137,16 @@ default), v2 uses the installed tools and does not install anything, so the run 
 missing.
 
 Running `-V` without a value prints the cpp-linter version, like the `version` subcommand.
+
+## When clang-format fails
+
+In v1, when clang-format exited with an error for a file (for example because of a bad
+[`--style`][style] value, or a `.clang-format` key that the installed version does not know), the
+error was only logged at debug level and the file passed as formatted.
+
+In v2, such a file is logged as a warning and counted in the `clang-format-checks-failed` output.
+If clang-format fails on every file it runs on, the configuration is most likely wrong, so
+cpp-linter exits with an error.
 
 ## Relative paths
 

@@ -385,9 +385,23 @@ impl RestClient {
                         }
                     }
                 }
+                let name = file.name.to_string_lossy().replace('\\', "/");
+                if format_advice.failed {
+                    annotations.push(FileAnnotation {
+                        severity: AnnotationLevel::Warning,
+                        path: name.clone(),
+                        start_line: None,
+                        end_line: None,
+                        start_column: None,
+                        end_column: None,
+                        title: Some(format!("clang-format failed on {name}")),
+                        message: format!(
+                            "clang-format exited with an error for {name}, so its formatting was not checked. See the logs for details."
+                        ),
+                    });
+                }
                 // post annotation if any applicable lines were formatted
                 if !lines.is_empty() {
-                    let name = file.name.to_string_lossy().replace('\\', "/");
                     let title = format!("Run clang-format on {name}");
                     let message = format!(
                         "File {name} does not conform to {style_guide} style guidelines. (lines {line_set})",
@@ -513,13 +527,16 @@ impl RestClient {
             log::info!("Generated patch content:");
             let stdout_handle = stdout();
             let mut reader = std::io::BufReader::new(patch_file);
-            let mut line_buf = String::new();
+            let mut raw_line = Vec::new();
             let mut stdout_lock = stdout_handle.lock();
             while let bytes_read = reader
-                .read_line(&mut line_buf)
+                .read_until(b'\n', &mut raw_line)
                 .map_err(ClientError::PatchReadFailed)?
                 && bytes_read > 0
             {
+                // The patch may hold lines of files that are not UTF-8 (eg. GBK);
+                // that is fine for showing it in the console.
+                let line_buf = String::from_utf8_lossy(&raw_line);
                 if line_buf.starts_with('+') {
                     // Green for additions
                     stdout_lock
@@ -536,7 +553,7 @@ impl RestClient {
                         .write_all(line_buf.as_bytes())
                         .map_err(ClientError::StdoutWriteFailed)?;
                 }
-                line_buf.clear();
+                raw_line.clear();
             }
             log::info!(
                 "Patch file written to {}",
@@ -567,18 +584,22 @@ fn make_format_comment(
             .lock()
             .map_err(|e| ClientError::MutexPoisoned(e.to_string()))?;
         if let Some(format_advice) = &file.format_advice
-            && !format_advice.replacements.is_empty()
+            && format_advice.is_concern()
             && *remaining_length > 0
         {
-            let line_count = format_advice
-                .replacements
-                .iter()
-                .fold(0, |acc, r| acc + r.clone().count());
-            let note = format!(
-                "- {} ({line_count} line{})\n",
-                file.name.to_string_lossy().replace('\\', "/"),
-                if line_count > 1 { "s" } else { "" }
-            );
+            let name = file.name.to_string_lossy().replace('\\', "/");
+            let note = if format_advice.failed {
+                format!("- {name} (clang-format failed to run; see the logs)\n")
+            } else {
+                let line_count = format_advice
+                    .replacements
+                    .iter()
+                    .fold(0, |acc, r| acc + r.clone().count());
+                format!(
+                    "- {name} ({line_count} line{})\n",
+                    if line_count > 1 { "s" } else { "" }
+                )
+            };
             if (note.len() as u64) < *remaining_length {
                 format_comment.push_str(&note.to_string());
                 *remaining_length -= note.len() as u64;
@@ -774,6 +795,7 @@ mod test {
                 file.format_advice = Some(FormatAdvice {
                     #[allow(clippy::single_range_in_vec_init)]
                     replacements: vec![1..=2],
+                    ..Default::default()
                 });
                 files.push(Arc::new(Mutex::new(file)));
             }
@@ -866,6 +888,7 @@ mod test {
         file.format_advice = Some(FormatAdvice {
             #[allow(clippy::single_range_in_vec_init)]
             replacements: vec![1..=2],
+            ..Default::default()
         });
         vec![Arc::new(Mutex::new(file))]
     }
@@ -965,6 +988,29 @@ mod test {
         assert!(
             tidy.fmt_github()
                 .starts_with("::warning file=tests/demo/demo.cpp,line=1,col=1,")
+        );
+    }
+
+    #[test]
+    fn format_failure_feedback() {
+        let file = FileObj::new(PathBuf::from("tests/demo/demo.cpp"));
+        let file = Arc::new(Mutex::new(file));
+        file.lock().unwrap().format_advice = Some(FormatAdvice {
+            failed: true,
+            ..Default::default()
+        });
+        let files = vec![file];
+        let annotations = RestClient::make_annotations(&files, "llvm").unwrap();
+        assert_eq!(annotations.len(), 1);
+        assert!(matches!(annotations[0].severity, AnnotationLevel::Warning));
+        assert_eq!(
+            annotations[0].title.as_deref(),
+            Some("clang-format failed on tests/demo/demo.cpp")
+        );
+        let comment =
+            RestClient::make_comment(&files, 1, 0, &dummy_versions(), None, false).unwrap();
+        assert!(
+            comment.contains("- tests/demo/demo.cpp (clang-format failed to run; see the logs)")
         );
     }
 

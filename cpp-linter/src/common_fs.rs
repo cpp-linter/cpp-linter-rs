@@ -15,7 +15,8 @@ use gix_imara_diff::{
 
 use crate::{
     clang_tools::{
-        ReviewComments, Suggestion, clang_format::FormatAdvice, clang_tidy::TidyAdvice, make_patch,
+        DiffContents, ReviewComments, Suggestion, clang_format::FormatAdvice,
+        clang_tidy::TidyAdvice,
     },
     cli::LinesChangedOnly,
     error::FileObjError,
@@ -174,23 +175,34 @@ impl FileObj {
         repo_root: &Path,
         patch_path: &Path,
     ) -> Result<(), FileObjError> {
+        let Some(contents) = self.read_contents(repo_root)? else {
+            return Ok(());
+        };
+        let (diff, input) = contents.make_patch();
+        let file_name = self.name.to_string_lossy().replace("\\", "/");
+        Self::append_patch(&file_name, &contents, &input, &diff, patch_path)?;
+        Ok(())
+    }
+
+    /// Read the original and cached patched contents of this file (if any) as bytes.
+    ///
+    /// Files are read as bytes because they may not be UTF-8 (eg. GBK or Latin-1).
+    fn read_contents(&self, repo_root: &Path) -> Result<Option<DiffContents>, FileObjError> {
         let patched = match &self.patched_path {
             Some(patched_path) if patched_path.exists() => {
-                fs::read_to_string(patched_path).map_err(FileObjError::ReadFile)?
+                fs::read(patched_path).map_err(FileObjError::ReadFile)?
             }
-            _ => return Ok(()),
+            _ => return Ok(None),
         };
         let original_content =
-            fs::read_to_string(repo_root.join(&self.name)).map_err(FileObjError::ReadFile)?;
-        let (diff, input) = make_patch(patched.as_str(), &original_content);
-        let file_name = self.name.to_string_lossy().replace("\\", "/");
-        Self::append_patch(&file_name, &input, &diff, patch_path)?;
-        Ok(())
+            fs::read(repo_root.join(&self.name)).map_err(FileObjError::ReadFile)?;
+        Ok(Some(DiffContents::new(&original_content, &patched)))
     }
 
     /// write fixes to the unified patch file at `patch_path`.
     fn append_patch(
         file_name: &str,
+        contents: &DiffContents,
         input: &InternedInput<&str>,
         diff: &Diff,
         patch_path: &Path,
@@ -208,9 +220,8 @@ impl FileObj {
                 .open(patch_path)
                 .map_err(FileObjError::OpenPatchFileFailed)?;
             patch_file
-                .write_all(
-                    format!("--- a/{file_name}\n+++ b/{file_name}\n{unified_diff}").as_bytes(),
-                )
+                .write_all(format!("--- a/{file_name}\n+++ b/{file_name}\n").as_bytes())
+                .and_then(|_| patch_file.write_all(&contents.encode(&unified_diff)))
                 .map_err(FileObjError::WritePatchFailed)?;
         }
         Ok(())
@@ -229,20 +240,24 @@ impl FileObj {
         repo_root: &Path,
         patch_path: &Path,
     ) -> Result<(), FileObjError> {
-        let patched = match &self.patched_path {
-            Some(patched_path) if patched_path.exists() => {
-                fs::read_to_string(patched_path).map_err(FileObjError::ReadFile)?
-            }
-            _ => return Ok(()),
+        let Some(contents) = self.read_contents(repo_root)? else {
+            return Ok(());
         };
-        let original_content =
-            fs::read_to_string(repo_root.join(&self.name)).map_err(FileObjError::ReadFile)?;
-        let (diff, input) = make_patch(patched.as_str(), &original_content);
+        let (diff, input) = contents.make_patch();
         let file_name = self.name.to_string_lossy().replace("\\", "/");
-        Self::append_patch(&file_name, &input, &diff, patch_path)?;
+        Self::append_patch(&file_name, &contents, &input, &diff, patch_path)?;
 
-        self.get_suggestions(review_comments, &diff, &input, summary_only)
-            .map_err(FileObjError::DisplayStringFailed)?;
+        if contents.is_utf8 {
+            self.get_suggestions(review_comments, &diff, &input, summary_only)
+                .map_err(FileObjError::DisplayStringFailed)?;
+        } else {
+            // A review comment is text, so it can't reproduce lines that are not UTF-8.
+            // Such fixes are only counted (they are still in the patch file).
+            log::warn!(
+                "{file_name} is not UTF-8 encoded, so its fixes are only in the patch file, not in the PR review"
+            );
+            review_comments.tool_total += diff.hunks().count() as u32;
+        }
         if let Some(advice) = &self.tidy_advice {
             // now check for clang-tidy warnings with no fixes applied
             let file_ext = self
@@ -645,5 +660,47 @@ mod test {
         assert!(summary_comments.comments.is_empty());
         assert_eq!(summary_comments.tool_total, 3);
         assert_eq!(summary_comments.in_diff, 0);
+    }
+
+    /// A source file that is not UTF-8 (here: GBK) must not abort the run.
+    /// Its fixes go into the patch file byte for byte, but not into review suggestions.
+    #[test]
+    #[allow(clippy::single_range_in_vec_init)]
+    fn non_utf8_file_patch() {
+        let repo_root = TempDir::new().unwrap();
+        let file_name = PathBuf::from("gbk.cpp");
+        // "// 中文" (GBK encoded) followed by a line that needs fixing
+        let original: &[u8] = b"// \xd6\xd0\xce\xc4\nint  a;\n";
+        let patched: &[u8] = b"// \xd6\xd0\xce\xc4\nint a;\n";
+        fs::write(repo_root.path().join(&file_name), original).unwrap();
+        let patched_file = NamedTempFile::new().unwrap();
+        fs::write(patched_file.path(), patched).unwrap();
+
+        let mut file_obj = FileObj::from(file_name, vec![2], vec![1..=2]);
+        file_obj.patched_path = Some(patched_file.path().to_path_buf());
+
+        let patch_path = repo_root.path().join("fixes.patch");
+        let mut review_comments = ReviewComments::default();
+        file_obj
+            .make_suggestions_from_patch(&mut review_comments, false, repo_root.path(), &patch_path)
+            .unwrap();
+        // the fix is counted, but not posted as a suggestion
+        assert!(review_comments.comments.is_empty());
+        assert!(review_comments.full_patch.is_empty());
+        assert_eq!(review_comments.tool_total, 1);
+        assert_eq!(review_comments.in_diff, 0);
+
+        // the patch keeps the original bytes
+        let patch = fs::read(&patch_path).unwrap();
+        let expected: &[u8] = b"--- a/gbk.cpp\n+++ b/gbk.cpp\n@@ -1,2 +1,2 @@\n \
+            // \xd6\xd0\xce\xc4\n-int  a;\n+int a;\n";
+        assert_eq!(patch, expected);
+
+        // same patch without a PR review
+        fs::remove_file(&patch_path).unwrap();
+        file_obj
+            .maybe_append_patch(repo_root.path(), &patch_path)
+            .unwrap();
+        assert_eq!(fs::read(&patch_path).unwrap(), expected);
     }
 }

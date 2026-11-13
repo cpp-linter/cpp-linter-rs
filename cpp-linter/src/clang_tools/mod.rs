@@ -226,7 +226,32 @@ pub async fn capture_clang_tools_output(
         }
         rest_api_client.end_log_group(&log_group_name);
     }
+    check_format_failures(files)?;
     Ok(clang_versions)
+}
+
+/// Fail if clang-format failed on every file it was run on.
+///
+/// When clang-format fails for only some files (eg. an unusual file), those files
+/// are counted as failed checks (see [`FormatAdvice::failed`](clang_format::FormatAdvice::failed)).
+/// But when it fails for all of them, the cause is most likely the configuration
+/// (eg. a bad `--style` value or a `.clang-format` key that the installed version
+/// does not know), so there are no results worth reporting.
+fn check_format_failures(files: &[Arc<Mutex<FileObj>>]) -> Result<(), ClangTaskError> {
+    let (mut attempted, mut failed) = (0, 0);
+    for file in files {
+        let file = file.lock().map_err(|_| ClangCaptureError::MutexPoisoned)?;
+        if let Some(advice) = &file.format_advice {
+            attempted += 1;
+            if advice.failed {
+                failed += 1;
+            }
+        }
+    }
+    if attempted > 0 && failed == attempted {
+        return Err(ClangTaskError::FormatFailedOnAllFiles(failed));
+    }
+    Ok(())
 }
 
 /// A struct to describe a single suggestion in a pull_request review.
@@ -438,6 +463,61 @@ impl ReviewComments {
     }
 }
 
+/// A file's original and patched contents as text that can be diffed with [`make_patch()`].
+///
+/// Source files are not always UTF-8 (eg. a file saved as GBK or Latin-1). When either
+/// buffer is not valid UTF-8, both buffers are decoded byte for byte as Latin-1 (each
+/// byte becomes the `char` of the same value). That keeps line numbers and line contents
+/// exact, so a patch written from the diff applies to the original bytes after
+/// [`DiffContents::encode()`] turns it back into bytes.
+pub struct DiffContents {
+    /// The original contents of the file.
+    pub original: String,
+
+    /// The patched contents of the file.
+    pub patched: String,
+
+    /// Is `false` if either buffer was not valid UTF-8 and both were decoded as Latin-1.
+    pub is_utf8: bool,
+}
+
+impl DiffContents {
+    /// Prepare the `original` and `patched` bytes of a file for diffing.
+    pub fn new(original: &[u8], patched: &[u8]) -> Self {
+        match (str::from_utf8(original), str::from_utf8(patched)) {
+            (Ok(original), Ok(patched)) => Self {
+                original: original.to_string(),
+                patched: patched.to_string(),
+                is_utf8: true,
+            },
+            _ => Self {
+                original: original.iter().copied().map(char::from).collect(),
+                patched: patched.iter().copied().map(char::from).collect(),
+                is_utf8: false,
+            },
+        }
+    }
+
+    /// Create a [`Diff`] (and its [`InternedInput`]) of the patched contents.
+    pub fn make_patch(&self) -> (Diff, InternedInput<&str>) {
+        make_patch(&self.patched, &self.original)
+    }
+
+    /// Convert `text` that was derived from these contents (eg. a unified diff)
+    /// back to the bytes it represents.
+    pub fn encode(&self, text: &str) -> Vec<u8> {
+        if self.is_utf8 {
+            text.as_bytes().to_vec()
+        } else {
+            // Every char here came from a single byte (or is ASCII, like the
+            // markers in a unified diff), so it always fits in a `u8`.
+            text.chars()
+                .map(|c| u8::try_from(c).unwrap_or(b'?'))
+                .collect()
+        }
+    }
+}
+
 /// A helper function to create a [`Diff`] and its associated [`InternedInput`] from
 /// a `patched` buffer and the `original_content`` of the file.
 pub fn make_patch<'buffer>(
@@ -620,5 +700,60 @@ mod tests {
             review_summary
                 .contains("The full patch of fixes is too large to include in this summary.")
         );
+    }
+
+    #[test]
+    fn diff_contents_utf8() {
+        let contents = DiffContents::new("// 中文\n".as_bytes(), "// 中文\n\n".as_bytes());
+        assert!(contents.is_utf8);
+        assert_eq!(contents.original, "// 中文\n");
+        assert_eq!(contents.encode("// 中文"), "// 中文".as_bytes());
+    }
+
+    #[test]
+    fn diff_contents_not_utf8() {
+        // "// 中文" in GBK
+        let gbk: &[u8] = b"// \xd6\xd0\xce\xc4\n";
+        // one buffer that is not UTF-8 is enough to treat both as bytes
+        let contents = DiffContents::new(gbk, "// 中文\n".as_bytes());
+        assert!(!contents.is_utf8);
+        assert_eq!(contents.original.chars().count(), gbk.len());
+        assert_eq!(contents.encode(&contents.original), gbk);
+        assert_eq!(contents.encode(&contents.patched), "// 中文\n".as_bytes());
+        let (diff, _) = contents.make_patch();
+        assert_eq!(diff.hunks().count(), 1);
+    }
+
+    fn files_with_format_results(results: &[Option<bool>]) -> Vec<Arc<Mutex<FileObj>>> {
+        results
+            .iter()
+            .enumerate()
+            .map(|(i, failed)| {
+                let mut file = FileObj::new(PathBuf::from(format!("file{i}.cpp")));
+                file.format_advice = failed.map(|failed| clang_format::FormatAdvice {
+                    failed,
+                    ..Default::default()
+                });
+                Arc::new(Mutex::new(file))
+            })
+            .collect()
+    }
+
+    #[test]
+    fn format_failed_on_all_files() {
+        // `None` = clang-format was not run on the file (eg. `--ignore-format`)
+        let files = files_with_format_results(&[Some(true), None, Some(true)]);
+        let err = check_format_failures(&files).unwrap_err();
+        assert!(matches!(err, ClangTaskError::FormatFailedOnAllFiles(2)));
+    }
+
+    #[test]
+    fn format_failed_on_some_files() {
+        let files = files_with_format_results(&[Some(true), Some(false)]);
+        check_format_failures(&files).unwrap();
+        // clang-format was not run at all
+        let files = files_with_format_results(&[None, None]);
+        check_format_failures(&files).unwrap();
+        check_format_failures(&[]).unwrap();
     }
 }

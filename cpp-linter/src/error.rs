@@ -219,4 +219,12 @@ pub enum ClangTaskError {
     /// Error to propagate failures from capturing clang tools' output.
     #[error(transparent)]
     ClangCaptureError(#[from] ClangCaptureError),
+
+    /// Error when clang-format failed on every file it was run on.
+    ///
+    /// This usually means a bad `--style` value or `.clang-format` file.
+    #[error(
+        "clang-format failed on all {0} file(s) it ran on; check the `--style` value and the `.clang-format` file"
+    )]
+    FormatFailedOnAllFiles(usize),
 }
