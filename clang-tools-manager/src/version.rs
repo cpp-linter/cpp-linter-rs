@@ -213,14 +213,15 @@ impl RequestedVersion {
 
 /// Returns true if `version_req` only allows specific minor or patch releases (eg. `=18.1.8` or `=18.1`).
 ///
+/// All comparators must match, so one exact comparator (with a minor version) is enough.
+///
 /// System package managers can only install a tool by its major version,
 /// so they could install (and leave behind) a version that does not satisfy such a requirement.
 fn requires_exact_version(version_req: &VersionReq) -> bool {
-    !version_req.comparators.is_empty()
-        && version_req
-            .comparators
-            .iter()
-            .all(|c| c.op == semver::Op::Exact && c.minor.is_some())
+    version_req
+        .comparators
+        .iter()
+        .any(|c| c.op == semver::Op::Exact && c.minor.is_some())
 }
 
 /// Returns the lowest supported version that satisfies `version_req`.
@@ -322,6 +323,7 @@ mod tests {
             ("=18.1.8", true),
             ("=18.1", true),
             ("=18", false),
+            ("=17.0.6, >=17", true),
             ("18.1.8", false),
             (">=18.1, <18.2", false),
             ("*", false),
