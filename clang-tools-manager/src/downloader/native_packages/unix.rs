@@ -156,7 +156,7 @@ impl PackageManager for UnixPackageManager {
                 && let Some(version) = version
             {
                 log::info!(
-                    "{package_id} is not available from the configured apt sources; trying the official LLVM apt repository."
+                    "`apt install {package_id}` failed; trying the official LLVM apt repository."
                 );
                 log::debug!(
                     "`apt install {package_id}` failed: {}",
