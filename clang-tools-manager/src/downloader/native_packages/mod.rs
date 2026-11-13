@@ -77,51 +77,37 @@ pub async fn try_install_package(
 ) -> Result<Option<ClangVersion>, GetToolError> {
     let os_pkg_managers = get_available_package_managers();
     if os_pkg_managers.is_empty() {
-        log::error!("No supported package managers found on the system.");
+        log::warn!("No supported package managers found on the system.");
         return Ok(None);
-    } else {
-        for mgr in os_pkg_managers {
-            log::info!("Trying to install {tool} v{min_version} using {mgr} package manager.");
-            let pkg_name = mgr.get_package_name(tool);
-            if mgr.is_installed_package(&pkg_name, Some(min_version))
-                && let Ok(path) =
-                    tool.get_exe_path(&RequestedVersion::Requirement(version_req.clone()))
-                && let Ok(version) = tool.capture_version(&path)
-                && version_req.matches(&version)
-            {
-                log::info!(
-                    "Found {tool} version matching {version_req} installed via {mgr} package manager."
-                );
-                return Ok(Some(ClangVersion { version, path }));
-            } else {
-                log::info!(
-                    "{mgr} package manager does not have a version of {tool} matching {version_req} installed."
-                );
-                match mgr.install_package(&pkg_name, Some(min_version)).await {
-                    Ok(()) => {
-                        log::info!(
-                            "Successfully installed {tool} v{min_version} using {mgr} package manager."
-                        );
-                        let path =
-                            tool.get_exe_path(&RequestedVersion::Requirement(version_req.clone()))?;
-                        let version = tool.capture_version(&path)?;
-                        if version_req.matches(&version) {
-                            log::info!(
-                                "Installed {tool} version {version} matches the requirement {version_req}."
-                            );
-                            return Ok(Some(ClangVersion { version, path }));
-                        } else {
-                            log::error!(
-                                "Installed {tool} version {version} does not match the requirement {version_req}."
-                            );
-                        }
-                    }
-                    Err(e) => {
-                        log::error!(
-                            "Failed to install {tool} v{min_version} using {mgr} package manager: {e}"
-                        );
-                    }
+    }
+    for mgr in os_pkg_managers {
+        let pkg_name = mgr.get_package_name(tool);
+        if mgr.is_installed_package(&pkg_name, Some(min_version))
+            && let Ok(path) = tool.get_exe_path(&RequestedVersion::Requirement(version_req.clone()))
+            && let Ok(version) = tool.capture_version(&path)
+            && version_req.matches(&version)
+        {
+            log::info!("Found {tool} version {version} installed via {mgr} package manager.");
+            return Ok(Some(ClangVersion { version, path }));
+        }
+        log::info!("Installing {tool} {version_req} using {mgr} package manager.");
+        match mgr.install_package(&pkg_name, Some(min_version)).await {
+            Ok(()) => {
+                let path =
+                    tool.get_exe_path(&RequestedVersion::Requirement(version_req.clone()))?;
+                let version = tool.capture_version(&path)?;
+                if version_req.matches(&version) {
+                    log::info!("Installed {tool} version {version} using {mgr} package manager.");
+                    return Ok(Some(ClangVersion { version, path }));
                 }
+                log::warn!(
+                    "{mgr} package manager provides {tool} version {version}, which does not match the requirement {version_req}."
+                );
+            }
+            Err(e) => {
+                log::warn!(
+                    "Failed to install {tool} {version_req} using {mgr} package manager: {e}"
+                );
             }
         }
     }

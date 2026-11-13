@@ -155,12 +155,12 @@ impl PackageManager for UnixPackageManager {
             if matches!(self, UnixPackageManager::Apt)
                 && let Some(version) = version
             {
-                log::error!(
-                    "Failed to install {package_id} via apt: {}",
-                    String::from_utf8_lossy(&output.stderr)
-                );
                 log::info!(
-                    "trying to install from official LLVM PPA repository (for Debian-based `apt` package manager)"
+                    "`apt install {package_id}` failed; trying the official LLVM apt repository."
+                );
+                log::debug!(
+                    "`apt install {package_id}` failed: {}",
+                    String::from_utf8_lossy(&output.stderr)
                 );
                 return llvm_apt_install::install_llvm_via_apt(
                     version.major.to_string(),
@@ -182,10 +182,13 @@ impl PackageManager for UnixPackageManager {
         match self {
             #[cfg(target_os = "linux")]
             UnixPackageManager::Apt => {
-                let output = cmd
-                    .args(["list", "--installed", package_id.as_str()])
+                // `apt list --installed <pkg>` exits with 0 even if the package is not installed.
+                let output = Command::new("dpkg-query")
+                    .args(["--show", "--showformat=${db:Status-Status}"])
+                    .arg(package_id.as_str())
                     .output();
-                output.is_ok_and(|out| out.status.success())
+                output
+                    .is_ok_and(|out| out.status.success() && out.stdout.as_slice() == b"installed")
             }
             #[cfg(target_os = "linux")]
             UnixPackageManager::Dnf => {
@@ -387,6 +390,11 @@ mod tests {
         let tmp = setup();
         let ver = Version::new(17, 0, 0);
         for mgr in all_managers() {
+            #[cfg(target_os = "linux")]
+            if matches!(mgr, UnixPackageManager::Apt) {
+                // apt is checked with `dpkg-query`, which is tested separately.
+                continue;
+            }
             // package manager not found
             assert!(!mgr.is_installed_package("clang", Some(&ver)));
             fake_exe(tmp.path(), mgr.as_str(), SUCCESS);
@@ -394,6 +402,25 @@ mod tests {
             fake_exe(tmp.path(), mgr.as_str(), FAILURE);
             assert!(!mgr.is_installed_package("clang", None));
         }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn is_installed_apt_package() {
+        let tmp = setup();
+        let mgr = UnixPackageManager::Apt;
+        let ver = Version::new(17, 0, 0);
+        // `dpkg-query` not found
+        assert!(!mgr.is_installed_package("clang-format", Some(&ver)));
+        // package is installed
+        fake_exe(tmp.path(), "dpkg-query", "printf installed");
+        assert!(mgr.is_installed_package("clang-format", Some(&ver)));
+        // package is known but not installed (`dpkg-query` still exits with 0)
+        fake_exe(tmp.path(), "dpkg-query", "printf not-installed");
+        assert!(!mgr.is_installed_package("clang-format", Some(&ver)));
+        // package is unknown
+        fake_exe(tmp.path(), "dpkg-query", FAILURE);
+        assert!(!mgr.is_installed_package("clang-format", None));
     }
 
     #[tokio::test]
