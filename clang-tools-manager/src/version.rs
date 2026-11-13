@@ -156,12 +156,18 @@ impl RequestedVersion {
 
                 // try a system package manager first (if allowed)
                 if allow_system_package_manager {
-                    match try_install_package(tool, version_req, &min_ver).await {
-                        Ok(Some(result)) => return Ok(Some(result)),
-                        Ok(None) => {}
-                        Err(e) => log::warn!(
-                            "Failed to install {tool} {version_req} using a system package manager: {e}"
-                        ),
+                    if requires_exact_version(version_req) {
+                        log::info!(
+                            "Skipping system package managers: they only install {tool} by major version, but {version_req} requires an exact version."
+                        );
+                    } else {
+                        match try_install_package(tool, version_req, &min_ver).await {
+                            Ok(Some(result)) => return Ok(Some(result)),
+                            Ok(None) => {}
+                            Err(e) => log::warn!(
+                                "Failed to install {tool} {version_req} using a system package manager: {e}"
+                            ),
+                        }
                     }
                 }
 
@@ -203,6 +209,18 @@ impl RequestedVersion {
             }
         }
     }
+}
+
+/// Returns true if `version_req` only allows specific minor or patch releases (eg. `=18.1.8` or `=18.1`).
+///
+/// System package managers can only install a tool by its major version,
+/// so they could install (and leave behind) a version that does not satisfy such a requirement.
+fn requires_exact_version(version_req: &VersionReq) -> bool {
+    !version_req.comparators.is_empty()
+        && version_req
+            .comparators
+            .iter()
+            .all(|c| c.op == semver::Op::Exact && c.minor.is_some())
 }
 
 /// Returns the lowest supported version that satisfies `version_req`.
@@ -293,10 +311,28 @@ mod tests {
     use semver::VersionReq;
     use tempfile::TempDir;
 
-    use super::{RequestedVersion, RequestedVersionParsingError};
+    use super::{RequestedVersion, RequestedVersionParsingError, requires_exact_version};
     use crate::{ClangTool, utils::normalize_path};
 
     // See also crate::tool::tests module for other `RequestedVersion::from_str()` tests.
+
+    #[test]
+    fn exact_version_requirements() {
+        for (req, exact) in [
+            ("=18.1.8", true),
+            ("=18.1", true),
+            ("=18", false),
+            ("18.1.8", false),
+            (">=18.1, <18.2", false),
+            ("*", false),
+        ] {
+            assert_eq!(
+                requires_exact_version(&VersionReq::parse(req).unwrap()),
+                exact,
+                "{req}"
+            );
+        }
+    }
 
     #[test]
     fn lowest_match_in_major() {
@@ -709,6 +745,26 @@ mod tests {
             env.seed_static_dist(false);
             let err = env.eval(req("17"), false).await.unwrap_err();
             assert!(matches!(err, GetToolError::NotFound));
+        }
+
+        #[tokio::test]
+        async fn eval_exact_requirement_skips_package_manager() {
+            let env = TestEnv::new();
+            env.seed_empty_pypi();
+            env.seed_static_dist(true);
+            let marker = env.bin.path().join("installed");
+            // A fake `brew` that would "install" clang-format (by creating a marker file).
+            fake_exe(
+                env.bin.path(),
+                "brew",
+                &format!(
+                    "if [ \"$1\" = \"list\" ]; then exit 1; fi\n: > \"{}\"",
+                    marker.to_string_lossy()
+                ),
+            );
+            let result = env.eval(req("=17.0.6"), true).await.unwrap().unwrap();
+            assert_version(&env.out.path().join("clang-format-17"), result, "17.0.6");
+            assert!(!marker.exists());
         }
 
         #[tokio::test]
