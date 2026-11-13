@@ -23,6 +23,7 @@ words:
   - declval
   - devel
   - Doherty
+  - dpkg
   - dtolnay
   - eabi
   - ecure
@@ -118,6 +119,7 @@ words:
   - serde
   - Shen
   - shenxianpeng
+  - showformat
   - splitn
   - SRCROOT
   - startswith
