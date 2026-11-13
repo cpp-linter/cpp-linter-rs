@@ -96,6 +96,9 @@ pub struct GeneralOptions {
     /// Accepted options are:
     ///
     /// - A semantic version specifier, eg. `>=10, <13`, `=12.0.1`, or simply `16`.
+    ///   A version without an operator is a minimum within that major version:
+    ///   `18.1.8` accepts 18.1.8 or a newer 18.x release, and `16` accepts any 16.x release.
+    ///   Use `=18.1.8` to require exactly that version.
     /// - A blank string (`''`) to use the platform's default
     ///   installed version.
     /// - A path to where the clang tools are

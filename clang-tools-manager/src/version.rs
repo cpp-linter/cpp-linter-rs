@@ -115,6 +115,10 @@ impl RequestedVersion {
                         );
                         return Ok(Some(ClangVersion { version, path }));
                     }
+                    log::info!(
+                        "Found {tool} version {version} at path: {:?}, which does not match the requirement {version_req}.",
+                        path.to_string_lossy()
+                    );
                 }
 
                 // check if cache has a suitable version
@@ -155,7 +159,7 @@ impl RequestedVersion {
                     match try_install_package(tool, version_req, &min_ver).await {
                         Ok(Some(result)) => return Ok(Some(result)),
                         Ok(None) => {}
-                        Err(e) => log::error!(
+                        Err(e) => log::warn!(
                             "Failed to install {tool} {version_req} using a system package manager: {e}"
                         ),
                     }
@@ -165,7 +169,7 @@ impl RequestedVersion {
                 let bin = match PyPiDownloader::download_tool(tool, version_req, directory).await {
                     Ok(bin) => bin,
                     Err(e) => {
-                        log::error!("Failed to download {tool} {version_req} from PyPi: {e}");
+                        log::warn!("Failed to download {tool} {version_req} from PyPi: {e}");
                         log::info!("Falling back to downloading {tool} static binaries.");
                         match StaticDistDownloader::download_tool(tool, version_req, directory)
                             .await
