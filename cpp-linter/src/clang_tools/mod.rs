@@ -306,6 +306,10 @@ pub struct ReviewComments {
     /// Markdown list items about the parts of clang-tidy fixes that were not applied
     /// to other files (see [`clang_tidy::TidyNotification::skipped_fixes`]).
     pub skipped_fixes: Vec<String>,
+    /// Markdown list items about concerns that cannot be posted as suggestions:
+    /// a file that clang-format failed to run on, or fixes for a file that is
+    /// not UTF-8 encoded.
+    pub not_posted: Vec<String>,
 }
 
 /// The notice added to a review summary instead of a patch that does not fit.
@@ -374,6 +378,7 @@ impl ReviewComments {
             );
         }
         self.summarize_skipped_fixes(&mut body);
+        self.summarize_not_posted(&mut body);
         // The `full_patch` includes all suggestions that didn't fit in the diff.
         // It can also contain suggestions that were duplicates of previous reviews.
         if !self.full_patch.is_empty() {
@@ -399,9 +404,12 @@ impl ReviewComments {
                 body.push_str(self.full_patch.as_str());
                 body.push_str(patch_suffix);
             }
-        } else if total_review_comments == 0 && self.skipped_fixes.is_empty() {
-            // Only congratulate if there was no reused comments
-            // and no fix parts left for the user to apply
+        } else if total_review_comments == 0
+            && self.skipped_fixes.is_empty()
+            && self.not_posted.is_empty()
+        {
+            // Only congratulate if there was no reused comments,
+            // no fix parts left for the user to apply, and no concerns that could not be posted
             log::info!("No concerns to report: LGTM");
             body.push_str("\nNo concerns to report. Great job! :tada:\n");
         }
@@ -415,23 +423,43 @@ impl ReviewComments {
     /// (leaving room for [`USER_OUTREACH`]) are added.
     /// The number of items left out is mentioned instead.
     fn summarize_skipped_fixes(&self, body: &mut String) {
-        if self.skipped_fixes.is_empty() {
-            return;
-        }
         const HEADING: &str = "\nSome clang-tidy fixes also change files that cpp-linter did not change. \
             Please apply these parts yourself:\n\n";
+        Self::summarize_list(body, HEADING, &self.skipped_fixes, "skipped fixes");
+    }
+
+    /// Append the list of [`Self::not_posted`] concerns to the review summary `body`.
+    ///
+    /// The same length limit applies as in [`Self::summarize_skipped_fixes()`].
+    fn summarize_not_posted(&self, body: &mut String) {
+        const HEADING: &str = "\nSome concerns could not be posted as suggestions:\n\n";
+        Self::summarize_list(
+            body,
+            HEADING,
+            &self.not_posted,
+            "concerns that could not be posted",
+        );
+    }
+
+    /// Append a `heading` and the Markdown list `items` to the review summary `body`.
+    ///
+    /// `description` names the items in the logs when they do not fit.
+    fn summarize_list(body: &mut String, heading: &str, items: &[String], description: &str) {
+        if items.is_empty() {
+            return;
+        }
         // Room kept for the line about omitted items.
         const OMITTED_RESERVE: usize = 100;
         // Also keep room for the notice that replaces a patch that does not fit.
         let max_len = (u16::MAX as usize)
             .saturating_sub(USER_OUTREACH.len() + OMITTED_RESERVE + PATCH_TOO_LARGE.len());
-        if body.len() + HEADING.len() > max_len {
-            log::warn!("The list of skipped fixes is too large to include in the review summary.");
+        if body.len() + heading.len() > max_len {
+            log::warn!("The list of {description} is too large to include in the review summary.");
             return;
         }
-        body.push_str(HEADING);
+        body.push_str(heading);
         let mut omitted = 0;
-        for item in &self.skipped_fixes {
+        for item in items {
             if omitted == 0 && body.len() + item.len() < max_len {
                 body.push_str(item);
                 body.push('\n');
@@ -440,7 +468,7 @@ impl ReviewComments {
             }
         }
         if omitted > 0 {
-            log::warn!("{omitted} skipped fixes did not fit in the review summary.");
+            log::warn!("{omitted} {description} did not fit in the review summary.");
             body.push_str(&format!(
                 "\n{omitted} more were not listed because this summary is too long.\n"
             ));
@@ -638,6 +666,23 @@ mod tests {
         assert!(
             review_summary.contains("Please apply these parts yourself:\n\n- first\n- second\n")
         );
+        assert!(!review_summary.contains("No concerns to report"));
+    }
+
+    #[test]
+    fn summarize_not_posted_concerns() {
+        let clang_versions = ClangVersions {
+            format_version: Some(PSEUDO_VERSION),
+            tidy_version: None,
+        };
+        let review_summary = ReviewComments {
+            not_posted: vec!["- **demo.cpp**: clang-format failed".to_string()],
+            ..Default::default()
+        }
+        .summarize(&clang_versions, &[], 0, false);
+        assert!(review_summary.contains(
+            "Some concerns could not be posted as suggestions:\n\n- **demo.cpp**: clang-format failed\n"
+        ));
         assert!(!review_summary.contains("No concerns to report"));
     }
 

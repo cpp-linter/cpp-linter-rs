@@ -240,11 +240,17 @@ impl FileObj {
         repo_root: &Path,
         patch_path: &Path,
     ) -> Result<(), FileObjError> {
+        let file_name = self.name.to_string_lossy().replace("\\", "/");
+        if self.format_advice.as_ref().is_some_and(|a| a.failed) {
+            // There is nothing to suggest, but the review must not approve this file.
+            review_comments.not_posted.push(format!(
+                "- **{file_name}**: clang-format failed to run, so the formatting was not checked (see the logs)"
+            ));
+        }
         let Some(contents) = self.read_contents(repo_root)? else {
             return Ok(());
         };
         let (diff, input) = contents.make_patch();
-        let file_name = self.name.to_string_lossy().replace("\\", "/");
         Self::append_patch(&file_name, &contents, &input, &diff, patch_path)?;
 
         if contents.is_utf8 {
@@ -252,11 +258,16 @@ impl FileObj {
                 .map_err(FileObjError::DisplayStringFailed)?;
         } else {
             // A review comment is text, so it can't reproduce lines that are not UTF-8.
-            // Such fixes are only counted (they are still in the patch file).
-            log::warn!(
-                "{file_name} is not UTF-8 encoded, so its fixes are only in the patch file, not in the PR review"
-            );
-            review_comments.tool_total += diff.hunks().count() as u32;
+            // Such fixes are only mentioned in the summary (they are still in the patch file).
+            let fixes = diff.hunks().count();
+            if fixes > 0 {
+                log::warn!(
+                    "{file_name} is not UTF-8 encoded, so its fixes are only in the patch file, not in the PR review"
+                );
+                review_comments.not_posted.push(format!(
+                    "- **{file_name}**: {fixes} fix(es) are only in the patch file because the file is not UTF-8 encoded"
+                ));
+            }
         }
         if let Some(advice) = &self.tidy_advice {
             // now check for clang-tidy warnings with no fixes applied
@@ -443,7 +454,7 @@ mod test {
 
     use tempfile::{NamedTempFile, TempDir};
 
-    use super::FileObj;
+    use super::{FileObj, FormatAdvice};
     use crate::{
         clang_tools::ReviewComments,
         cli::{ClangParams, LinesChangedOnly},
@@ -662,6 +673,30 @@ mod test {
         assert_eq!(summary_comments.in_diff, 0);
     }
 
+    /// A file that clang-format failed on has no patch, but a PR review must mention it
+    /// (which also keeps the review from approving).
+    #[test]
+    fn format_failure_is_not_posted_concern() {
+        let repo_root = TempDir::new().unwrap();
+        let mut file_obj = FileObj::new(PathBuf::from("failed.cpp"));
+        file_obj.format_advice = Some(FormatAdvice {
+            failed: true,
+            ..Default::default()
+        });
+        let mut review_comments = ReviewComments::default();
+        file_obj
+            .make_suggestions_from_patch(
+                &mut review_comments,
+                false,
+                repo_root.path(),
+                &ClangParams::default_patch_path(repo_root.path()),
+            )
+            .unwrap();
+        assert!(review_comments.comments.is_empty());
+        assert_eq!(review_comments.not_posted.len(), 1);
+        assert!(review_comments.not_posted[0].starts_with("- **failed.cpp**: clang-format failed"));
+    }
+
     /// A source file that is not UTF-8 (here: GBK) must not abort the run.
     /// Its fixes go into the patch file byte for byte, but not into review suggestions.
     #[test]
@@ -684,11 +719,16 @@ mod test {
         file_obj
             .make_suggestions_from_patch(&mut review_comments, false, repo_root.path(), &patch_path)
             .unwrap();
-        // the fix is counted, but not posted as a suggestion
+        // the fix is mentioned in the summary, but not posted as a suggestion
         assert!(review_comments.comments.is_empty());
         assert!(review_comments.full_patch.is_empty());
-        assert_eq!(review_comments.tool_total, 1);
-        assert_eq!(review_comments.in_diff, 0);
+        assert_eq!(review_comments.tool_total, 0);
+        assert_eq!(
+            review_comments.not_posted,
+            vec![
+                "- **gbk.cpp**: 1 fix(es) are only in the patch file because the file is not UTF-8 encoded"
+            ]
+        );
 
         // the patch keeps the original bytes
         let patch = fs::read(&patch_path).unwrap();
