@@ -452,6 +452,7 @@ mod test {
     #![allow(clippy::unwrap_used)]
     use std::{fs, path::PathBuf};
 
+    use clang_tools_manager::logger::try_init_logger;
     use tempfile::{NamedTempFile, TempDir};
 
     use super::{FileObj, FormatAdvice};
@@ -702,6 +703,9 @@ mod test {
     #[test]
     #[allow(clippy::single_range_in_vec_init)]
     fn non_utf8_file_patch() {
+        // a warning is logged about the suggestions that are not posted
+        try_init_logger();
+        log::set_max_level(log::LevelFilter::Info);
         let repo_root = TempDir::new().unwrap();
         let file_name = PathBuf::from("gbk.cpp");
         // "// 中文" (GBK encoded) followed by a line that needs fixing
@@ -742,5 +746,13 @@ mod test {
             .maybe_append_patch(repo_root.path(), &patch_path)
             .unwrap();
         assert_eq!(fs::read(&patch_path).unwrap(), expected);
+
+        // nothing is mentioned when the file needs no fixes
+        fs::write(patched_file.path(), original).unwrap();
+        let mut review_comments = ReviewComments::default();
+        file_obj
+            .make_suggestions_from_patch(&mut review_comments, false, repo_root.path(), &patch_path)
+            .unwrap();
+        assert!(review_comments.not_posted.is_empty());
     }
 }
