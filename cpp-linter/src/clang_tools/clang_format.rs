@@ -13,7 +13,7 @@ use log::Level;
 
 // project-specific crates/modules
 use crate::{
-    clang_tools::make_patch, cli::ClangParams, common_fs::FileObj, error::ClangCaptureError,
+    clang_tools::DiffContents, cli::ClangParams, common_fs::FileObj, error::ClangCaptureError,
 };
 
 /// A struct to hold clang-format advice for a single file.
@@ -21,6 +21,20 @@ use crate::{
 pub struct FormatAdvice {
     /// A list of line ranges that clang-format wants to replace.
     pub replacements: Vec<RangeInclusive<u32>>,
+
+    /// Is `true` if clang-format failed to run on the file (it exited with an error).
+    ///
+    /// Such a file has no [`FormatAdvice::replacements`], but it still counts as a
+    /// failed clang-format check, so a broken `--style` or `.clang-format` does not
+    /// pass silently.
+    pub failed: bool,
+}
+
+impl FormatAdvice {
+    /// Does this advice count as a failed clang-format check?
+    pub fn is_concern(&self) -> bool {
+        self.failed || !self.replacements.is_empty()
+    }
 }
 
 /// Get a string that summarizes the given `--style`
@@ -43,8 +57,10 @@ pub fn tally_format_advice(files: &[Arc<Mutex<FileObj>>]) -> Result<u64, String>
     let mut total = 0;
     for file in files {
         let file = file.lock().map_err(|e| e.to_string())?;
-        if let Some(advice) = &file.format_advice
-            && !advice.replacements.is_empty()
+        if file
+            .format_advice
+            .as_ref()
+            .is_some_and(FormatAdvice::is_concern)
         {
             total += 1;
         }
@@ -94,17 +110,20 @@ pub fn run_clang_format(
     // `.clang-format` config that the installed clang-format version rejects), its
     // stdout is empty. Diffing that empty output against the file's contents would
     // wrongly report the entire file as needing reformatting (and, with
-    // `--fix`/`--gen-patch-path`, emit a patch that deletes the whole file). So skip
-    // this file with no format advice, like when clang-format reports no fixes.
+    // `--fix`/`--gen-patch-path`, emit a patch that deletes the whole file). So make
+    // no format suggestions for this file, but count it as a failed check.
     if !output.status.success() {
         logs.push((
             log::Level::Warn,
             format!(
-                "clang-format failed to run on {file_name}; skipping its format suggestions:\n{}",
+                "clang-format failed to run on {file_name}; counting it as not formatted:\n{}",
                 String::from_utf8_lossy(&output.stderr)
             ),
         ));
-        file.format_advice = Some(FormatAdvice::default());
+        file.format_advice = Some(FormatAdvice {
+            failed: true,
+            ..Default::default()
+        });
         return Ok(logs);
     }
     if !output.stderr.is_empty() {
@@ -117,22 +136,18 @@ pub fn run_clang_format(
         ));
     }
 
-    // use a diff between patched and original contents to get format results
-    let original_contents =
-        fs::read_to_string(clang_params.repo_root.join(&file.name)).map_err(|e| {
-            ClangCaptureError::ReadFileFailed {
-                file_name: file_name.clone(),
-                source: e,
-            }
-        })?;
-    let patched_contents = String::from_utf8(output.stdout.to_vec()).map_err(|e| {
-        ClangCaptureError::NonUtf8Output {
-            task: "clang-format".to_string(),
+    // use a diff between patched and original contents to get format results.
+    // The file is read as bytes because it may not be UTF-8 (eg. GBK or Latin-1).
+    let original_contents = fs::read(clang_params.repo_root.join(&file.name)).map_err(|e| {
+        ClangCaptureError::ReadFileFailed {
+            file_name: file_name.clone(),
             source: e,
         }
     })?;
-    let (diff, _) = make_patch(&patched_contents, &original_contents);
+    let format_contents = DiffContents::new(&original_contents, &output.stdout);
+    let (diff, _) = format_contents.make_patch();
     let format_advice = FormatAdvice {
+        failed: false,
         replacements: diff
             .hunks()
             .filter_map(|hunk| {
@@ -172,13 +187,13 @@ pub fn run_clang_format(
         cmd.args(["--style", &clang_params.style, "-i"]);
         // if ranges is empty, then we're just formatting the entire file.
         if !ranges.is_empty() {
-            let tidy_patch_contents = fs::read_to_string(patched_path).map_err(|e| {
-                ClangCaptureError::ReadFileFailed {
+            let tidy_patch_contents =
+                fs::read(patched_path).map_err(|e| ClangCaptureError::ReadFileFailed {
                     file_name: patched_path.to_string_lossy().to_string(),
                     source: e,
-                }
-            })?;
-            let (tidy_diff, _) = make_patch(&tidy_patch_contents, &original_contents);
+                })?;
+            let tidy_contents = DiffContents::new(&original_contents, &tidy_patch_contents);
+            let (tidy_diff, _) = tidy_contents.make_patch();
             let joint_ranges = three_way_diff(&ranges, tidy_diff);
             for range in &joint_ranges {
                 cmd.arg(format!("--lines={}:{}", range.start(), range.end()).as_str());
@@ -395,8 +410,38 @@ mod tests {
                 make_fake_tool(tools_dir.path(), "clang-format", r"printf '\377\376'");
             let clang_params = make_clang_params(tmp_workspace.path(), fake_format);
             let file = Mutex::new(FileObj::new(PathBuf::from("demo/demo.cpp")));
-            let err = run_clang_format(&mut file.lock().unwrap(), &clang_params).unwrap_err();
-            assert!(matches!(err, ClangCaptureError::NonUtf8Output { .. }));
+            let mut file = file.lock().unwrap();
+            run_clang_format(&mut file, &clang_params).unwrap();
+            // the output replaced every line of the file
+            let advice = file.format_advice.as_ref().unwrap();
+            assert!(!advice.failed);
+            assert!(!advice.replacements.is_empty());
+        }
+
+        /// A source file that is not UTF-8 (eg. GBK) gets format advice like any other.
+        #[test]
+        fn non_utf8_source_file() {
+            let tmp_workspace = setup_tmp_workspace();
+            fs::write(
+                tmp_workspace.path().join("demo/gbk.cpp"),
+                b"// \xd6\xd0\xce\xc4\nint  a;\nint b;\n",
+            )
+            .unwrap();
+            let tools_dir = tempfile::tempdir().unwrap();
+            let fake_format = make_fake_tool(
+                tools_dir.path(),
+                "clang-format",
+                r"printf '// \326\320\316\304\nint a;\nint b;\n'",
+            );
+            let mut clang_params = make_clang_params(tmp_workspace.path(), fake_format);
+            clang_params.gen_patch = true;
+            let file = Mutex::new(FileObj::new(PathBuf::from("demo/gbk.cpp")));
+            let mut file = file.lock().unwrap();
+            run_clang_format(&mut file, &clang_params).unwrap();
+            let advice = file.format_advice.as_ref().unwrap();
+            assert!(!advice.failed);
+            assert_eq!(advice.replacements, vec![RangeInclusive::new(2, 2)]);
+            assert!(file.patched_path.as_ref().unwrap().is_file());
         }
 
         // A clang-format that exits non-zero (eg. a bad `--style` or an unsupported
@@ -427,10 +472,12 @@ mod tests {
                 })
                 .count();
             assert_eq!(warnings, 1);
-            // the file is reported as having no formatting concerns (NOT every line),
-            // so no patch that deletes the file is ever produced.
+            // the file has no format suggestions (NOT every line), so no patch that
+            // deletes the file is ever produced. But it counts as a failed check.
             let advice = file.lock().unwrap().format_advice.clone().unwrap();
             assert!(advice.replacements.is_empty());
+            assert!(advice.failed);
+            assert!(advice.is_concern());
         }
 
         #[test]
@@ -547,7 +594,7 @@ mod tests {
     }
 
     #[test]
-    fn tally_counts_only_nonempty_advice() {
+    fn tally_counts_concerns() {
         use std::sync::{Arc, Mutex};
 
         use super::{FormatAdvice, tally_format_advice};
@@ -558,20 +605,26 @@ mod tests {
         {
             with_advice.format_advice = Some(FormatAdvice {
                 replacements: vec![1..=2],
+                ..Default::default()
             });
         }
         let mut empty_advice = FileObj::new(std::path::PathBuf::from("empty.cpp"));
-        empty_advice.format_advice = Some(FormatAdvice {
-            replacements: vec![],
-        });
+        empty_advice.format_advice = Some(FormatAdvice::default());
         // a third file with no advice at all is also ignored
         let no_advice = FileObj::new(std::path::PathBuf::from("none.cpp"));
+        // a file that clang-format failed to run on is counted
+        let mut failed = FileObj::new(std::path::PathBuf::from("failed.cpp"));
+        failed.format_advice = Some(FormatAdvice {
+            failed: true,
+            ..Default::default()
+        });
         let files = vec![
             Arc::new(Mutex::new(with_advice)),
             Arc::new(Mutex::new(empty_advice)),
             Arc::new(Mutex::new(no_advice)),
+            Arc::new(Mutex::new(failed)),
         ];
-        assert_eq!(tally_format_advice(&files).unwrap(), 1);
+        assert_eq!(tally_format_advice(&files).unwrap(), 2);
     }
 
     #[test]

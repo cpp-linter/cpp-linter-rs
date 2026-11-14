@@ -15,7 +15,8 @@ use gix_imara_diff::{
 
 use crate::{
     clang_tools::{
-        ReviewComments, Suggestion, clang_format::FormatAdvice, clang_tidy::TidyAdvice, make_patch,
+        DiffContents, ReviewComments, Suggestion, clang_format::FormatAdvice,
+        clang_tidy::TidyAdvice,
     },
     cli::LinesChangedOnly,
     error::FileObjError,
@@ -174,23 +175,34 @@ impl FileObj {
         repo_root: &Path,
         patch_path: &Path,
     ) -> Result<(), FileObjError> {
+        let Some(contents) = self.read_contents(repo_root)? else {
+            return Ok(());
+        };
+        let (diff, input) = contents.make_patch();
+        let file_name = self.name.to_string_lossy().replace("\\", "/");
+        Self::append_patch(&file_name, &contents, &input, &diff, patch_path)?;
+        Ok(())
+    }
+
+    /// Read the original and cached patched contents of this file (if any) as bytes.
+    ///
+    /// Files are read as bytes because they may not be UTF-8 (eg. GBK or Latin-1).
+    fn read_contents(&self, repo_root: &Path) -> Result<Option<DiffContents>, FileObjError> {
         let patched = match &self.patched_path {
             Some(patched_path) if patched_path.exists() => {
-                fs::read_to_string(patched_path).map_err(FileObjError::ReadFile)?
+                fs::read(patched_path).map_err(FileObjError::ReadFile)?
             }
-            _ => return Ok(()),
+            _ => return Ok(None),
         };
         let original_content =
-            fs::read_to_string(repo_root.join(&self.name)).map_err(FileObjError::ReadFile)?;
-        let (diff, input) = make_patch(patched.as_str(), &original_content);
-        let file_name = self.name.to_string_lossy().replace("\\", "/");
-        Self::append_patch(&file_name, &input, &diff, patch_path)?;
-        Ok(())
+            fs::read(repo_root.join(&self.name)).map_err(FileObjError::ReadFile)?;
+        Ok(Some(DiffContents::new(&original_content, &patched)))
     }
 
     /// write fixes to the unified patch file at `patch_path`.
     fn append_patch(
         file_name: &str,
+        contents: &DiffContents,
         input: &InternedInput<&str>,
         diff: &Diff,
         patch_path: &Path,
@@ -208,9 +220,8 @@ impl FileObj {
                 .open(patch_path)
                 .map_err(FileObjError::OpenPatchFileFailed)?;
             patch_file
-                .write_all(
-                    format!("--- a/{file_name}\n+++ b/{file_name}\n{unified_diff}").as_bytes(),
-                )
+                .write_all(format!("--- a/{file_name}\n+++ b/{file_name}\n").as_bytes())
+                .and_then(|_| patch_file.write_all(&contents.encode(&unified_diff)))
                 .map_err(FileObjError::WritePatchFailed)?;
         }
         Ok(())
@@ -229,20 +240,35 @@ impl FileObj {
         repo_root: &Path,
         patch_path: &Path,
     ) -> Result<(), FileObjError> {
-        let patched = match &self.patched_path {
-            Some(patched_path) if patched_path.exists() => {
-                fs::read_to_string(patched_path).map_err(FileObjError::ReadFile)?
-            }
-            _ => return Ok(()),
-        };
-        let original_content =
-            fs::read_to_string(repo_root.join(&self.name)).map_err(FileObjError::ReadFile)?;
-        let (diff, input) = make_patch(patched.as_str(), &original_content);
         let file_name = self.name.to_string_lossy().replace("\\", "/");
-        Self::append_patch(&file_name, &input, &diff, patch_path)?;
+        if self.format_advice.as_ref().is_some_and(|a| a.failed) {
+            // There is nothing to suggest, but the review must not approve this file.
+            review_comments.not_posted.push(format!(
+                "- **{file_name}**: clang-format failed to run, so the formatting was not checked (see the logs)"
+            ));
+        }
+        let Some(contents) = self.read_contents(repo_root)? else {
+            return Ok(());
+        };
+        let (diff, input) = contents.make_patch();
+        Self::append_patch(&file_name, &contents, &input, &diff, patch_path)?;
 
-        self.get_suggestions(review_comments, &diff, &input, summary_only)
-            .map_err(FileObjError::DisplayStringFailed)?;
+        if contents.is_utf8 {
+            self.get_suggestions(review_comments, &diff, &input, summary_only)
+                .map_err(FileObjError::DisplayStringFailed)?;
+        } else {
+            // A review comment is text, so it can't reproduce lines that are not UTF-8.
+            // Such fixes are only mentioned in the summary (they are still in the patch file).
+            let fixes = diff.hunks().count();
+            if fixes > 0 {
+                log::warn!(
+                    "{file_name} is not UTF-8 encoded, so its fixes are only in the patch file, not in the PR review"
+                );
+                review_comments.not_posted.push(format!(
+                    "- **{file_name}**: {fixes} fix(es) are only in the patch file because the file is not UTF-8 encoded"
+                ));
+            }
+        }
         if let Some(advice) = &self.tidy_advice {
             // now check for clang-tidy warnings with no fixes applied
             let file_ext = self
@@ -426,9 +452,10 @@ mod test {
     #![allow(clippy::unwrap_used)]
     use std::{fs, path::PathBuf};
 
+    use clang_tools_manager::logger::try_init_logger;
     use tempfile::{NamedTempFile, TempDir};
 
-    use super::FileObj;
+    use super::{FileObj, FormatAdvice};
     use crate::{
         clang_tools::ReviewComments,
         cli::{ClangParams, LinesChangedOnly},
@@ -645,5 +672,87 @@ mod test {
         assert!(summary_comments.comments.is_empty());
         assert_eq!(summary_comments.tool_total, 3);
         assert_eq!(summary_comments.in_diff, 0);
+    }
+
+    /// A file that clang-format failed on has no patch, but a PR review must mention it
+    /// (which also keeps the review from approving).
+    #[test]
+    fn format_failure_is_not_posted_concern() {
+        let repo_root = TempDir::new().unwrap();
+        let mut file_obj = FileObj::new(PathBuf::from("failed.cpp"));
+        file_obj.format_advice = Some(FormatAdvice {
+            failed: true,
+            ..Default::default()
+        });
+        let mut review_comments = ReviewComments::default();
+        file_obj
+            .make_suggestions_from_patch(
+                &mut review_comments,
+                false,
+                repo_root.path(),
+                &ClangParams::default_patch_path(repo_root.path()),
+            )
+            .unwrap();
+        assert!(review_comments.comments.is_empty());
+        assert_eq!(review_comments.not_posted.len(), 1);
+        assert!(review_comments.not_posted[0].starts_with("- **failed.cpp**: clang-format failed"));
+    }
+
+    /// A source file that is not UTF-8 (here: GBK) must not abort the run.
+    /// Its fixes go into the patch file byte for byte, but not into review suggestions.
+    #[test]
+    #[allow(clippy::single_range_in_vec_init)]
+    fn non_utf8_file_patch() {
+        // a warning is logged about the suggestions that are not posted
+        try_init_logger();
+        log::set_max_level(log::LevelFilter::Info);
+        let repo_root = TempDir::new().unwrap();
+        let file_name = PathBuf::from("gbk.cpp");
+        // "// 中文" (GBK encoded) followed by a line that needs fixing
+        let original: &[u8] = b"// \xd6\xd0\xce\xc4\nint  a;\n";
+        let patched: &[u8] = b"// \xd6\xd0\xce\xc4\nint a;\n";
+        fs::write(repo_root.path().join(&file_name), original).unwrap();
+        let patched_file = NamedTempFile::new().unwrap();
+        fs::write(patched_file.path(), patched).unwrap();
+
+        let mut file_obj = FileObj::from(file_name, vec![2], vec![1..=2]);
+        file_obj.patched_path = Some(patched_file.path().to_path_buf());
+
+        let patch_path = repo_root.path().join("fixes.patch");
+        let mut review_comments = ReviewComments::default();
+        file_obj
+            .make_suggestions_from_patch(&mut review_comments, false, repo_root.path(), &patch_path)
+            .unwrap();
+        // the fix is mentioned in the summary, but not posted as a suggestion
+        assert!(review_comments.comments.is_empty());
+        assert!(review_comments.full_patch.is_empty());
+        assert_eq!(review_comments.tool_total, 0);
+        assert_eq!(
+            review_comments.not_posted,
+            vec![
+                "- **gbk.cpp**: 1 fix(es) are only in the patch file because the file is not UTF-8 encoded"
+            ]
+        );
+
+        // the patch keeps the original bytes
+        let patch = fs::read(&patch_path).unwrap();
+        let expected: &[u8] = b"--- a/gbk.cpp\n+++ b/gbk.cpp\n@@ -1,2 +1,2 @@\n \
+            // \xd6\xd0\xce\xc4\n-int  a;\n+int a;\n";
+        assert_eq!(patch, expected);
+
+        // same patch without a PR review
+        fs::remove_file(&patch_path).unwrap();
+        file_obj
+            .maybe_append_patch(repo_root.path(), &patch_path)
+            .unwrap();
+        assert_eq!(fs::read(&patch_path).unwrap(), expected);
+
+        // nothing is mentioned when the file needs no fixes
+        fs::write(patched_file.path(), original).unwrap();
+        let mut review_comments = ReviewComments::default();
+        file_obj
+            .make_suggestions_from_patch(&mut review_comments, false, repo_root.path(), &patch_path)
+            .unwrap();
+        assert!(review_comments.not_posted.is_empty());
     }
 }

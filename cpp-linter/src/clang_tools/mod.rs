@@ -226,7 +226,32 @@ pub async fn capture_clang_tools_output(
         }
         rest_api_client.end_log_group(&log_group_name);
     }
+    check_format_failures(files)?;
     Ok(clang_versions)
+}
+
+/// Fail if clang-format failed on every file it was run on.
+///
+/// When clang-format fails for only some files (eg. an unusual file), those files
+/// are counted as failed checks (see [`FormatAdvice::failed`](clang_format::FormatAdvice::failed)).
+/// But when it fails for all of them, the cause is most likely the configuration
+/// (eg. a bad `--style` value or a `.clang-format` key that the installed version
+/// does not know), so there are no results worth reporting.
+fn check_format_failures(files: &[Arc<Mutex<FileObj>>]) -> Result<(), ClangTaskError> {
+    let (mut attempted, mut failed) = (0, 0);
+    for file in files {
+        let file = file.lock().map_err(|_| ClangCaptureError::MutexPoisoned)?;
+        if let Some(advice) = &file.format_advice {
+            attempted += 1;
+            if advice.failed {
+                failed += 1;
+            }
+        }
+    }
+    if attempted > 0 && failed == attempted {
+        return Err(ClangTaskError::FormatFailedOnAllFiles(failed));
+    }
+    Ok(())
 }
 
 /// A struct to describe a single suggestion in a pull_request review.
@@ -281,6 +306,10 @@ pub struct ReviewComments {
     /// Markdown list items about the parts of clang-tidy fixes that were not applied
     /// to other files (see [`clang_tidy::TidyNotification::skipped_fixes`]).
     pub skipped_fixes: Vec<String>,
+    /// Markdown list items about concerns that cannot be posted as suggestions:
+    /// a file that clang-format failed to run on, or fixes for a file that is
+    /// not UTF-8 encoded.
+    pub not_posted: Vec<String>,
 }
 
 /// The notice added to a review summary instead of a patch that does not fit.
@@ -349,6 +378,7 @@ impl ReviewComments {
             );
         }
         self.summarize_skipped_fixes(&mut body);
+        self.summarize_not_posted(&mut body);
         // The `full_patch` includes all suggestions that didn't fit in the diff.
         // It can also contain suggestions that were duplicates of previous reviews.
         if !self.full_patch.is_empty() {
@@ -374,9 +404,12 @@ impl ReviewComments {
                 body.push_str(self.full_patch.as_str());
                 body.push_str(patch_suffix);
             }
-        } else if total_review_comments == 0 && self.skipped_fixes.is_empty() {
-            // Only congratulate if there was no reused comments
-            // and no fix parts left for the user to apply
+        } else if total_review_comments == 0
+            && self.skipped_fixes.is_empty()
+            && self.not_posted.is_empty()
+        {
+            // Only congratulate if there was no reused comments,
+            // no fix parts left for the user to apply, and no concerns that could not be posted
             log::info!("No concerns to report: LGTM");
             body.push_str("\nNo concerns to report. Great job! :tada:\n");
         }
@@ -390,23 +423,43 @@ impl ReviewComments {
     /// (leaving room for [`USER_OUTREACH`]) are added.
     /// The number of items left out is mentioned instead.
     fn summarize_skipped_fixes(&self, body: &mut String) {
-        if self.skipped_fixes.is_empty() {
-            return;
-        }
         const HEADING: &str = "\nSome clang-tidy fixes also change files that cpp-linter did not change. \
             Please apply these parts yourself:\n\n";
+        Self::summarize_list(body, HEADING, &self.skipped_fixes, "skipped fixes");
+    }
+
+    /// Append the list of [`Self::not_posted`] concerns to the review summary `body`.
+    ///
+    /// The same length limit applies as in [`Self::summarize_skipped_fixes()`].
+    fn summarize_not_posted(&self, body: &mut String) {
+        const HEADING: &str = "\nSome concerns could not be posted as suggestions:\n\n";
+        Self::summarize_list(
+            body,
+            HEADING,
+            &self.not_posted,
+            "concerns that could not be posted",
+        );
+    }
+
+    /// Append a `heading` and the Markdown list `items` to the review summary `body`.
+    ///
+    /// `description` names the items in the logs when they do not fit.
+    fn summarize_list(body: &mut String, heading: &str, items: &[String], description: &str) {
+        if items.is_empty() {
+            return;
+        }
         // Room kept for the line about omitted items.
         const OMITTED_RESERVE: usize = 100;
         // Also keep room for the notice that replaces a patch that does not fit.
         let max_len = (u16::MAX as usize)
             .saturating_sub(USER_OUTREACH.len() + OMITTED_RESERVE + PATCH_TOO_LARGE.len());
-        if body.len() + HEADING.len() > max_len {
-            log::warn!("The list of skipped fixes is too large to include in the review summary.");
+        if body.len() + heading.len() > max_len {
+            log::warn!("The list of {description} is too large to include in the review summary.");
             return;
         }
-        body.push_str(HEADING);
+        body.push_str(heading);
         let mut omitted = 0;
-        for item in &self.skipped_fixes {
+        for item in items {
             if omitted == 0 && body.len() + item.len() < max_len {
                 body.push_str(item);
                 body.push('\n');
@@ -415,7 +468,7 @@ impl ReviewComments {
             }
         }
         if omitted > 0 {
-            log::warn!("{omitted} skipped fixes did not fit in the review summary.");
+            log::warn!("{omitted} {description} did not fit in the review summary.");
             body.push_str(&format!(
                 "\n{omitted} more were not listed because this summary is too long.\n"
             ));
@@ -435,6 +488,61 @@ impl ReviewComments {
             }
         }
         false
+    }
+}
+
+/// A file's original and patched contents as text that can be diffed with [`make_patch()`].
+///
+/// Source files are not always UTF-8 (eg. a file saved as GBK or Latin-1). When either
+/// buffer is not valid UTF-8, both buffers are decoded byte for byte as Latin-1 (each
+/// byte becomes the `char` of the same value). That keeps line numbers and line contents
+/// exact, so a patch written from the diff applies to the original bytes after
+/// [`DiffContents::encode()`] turns it back into bytes.
+pub struct DiffContents {
+    /// The original contents of the file.
+    pub original: String,
+
+    /// The patched contents of the file.
+    pub patched: String,
+
+    /// Is `false` if either buffer was not valid UTF-8 and both were decoded as Latin-1.
+    pub is_utf8: bool,
+}
+
+impl DiffContents {
+    /// Prepare the `original` and `patched` bytes of a file for diffing.
+    pub fn new(original: &[u8], patched: &[u8]) -> Self {
+        match (str::from_utf8(original), str::from_utf8(patched)) {
+            (Ok(original), Ok(patched)) => Self {
+                original: original.to_string(),
+                patched: patched.to_string(),
+                is_utf8: true,
+            },
+            _ => Self {
+                original: original.iter().copied().map(char::from).collect(),
+                patched: patched.iter().copied().map(char::from).collect(),
+                is_utf8: false,
+            },
+        }
+    }
+
+    /// Create a [`Diff`] (and its [`InternedInput`]) of the patched contents.
+    pub fn make_patch(&self) -> (Diff, InternedInput<&str>) {
+        make_patch(&self.patched, &self.original)
+    }
+
+    /// Convert `text` that was derived from these contents (eg. a unified diff)
+    /// back to the bytes it represents.
+    pub fn encode(&self, text: &str) -> Vec<u8> {
+        if self.is_utf8 {
+            text.as_bytes().to_vec()
+        } else {
+            // Every char here came from a single byte (or is ASCII, like the
+            // markers in a unified diff), so it always fits in a `u8`.
+            text.chars()
+                .map(|c| u8::try_from(c).unwrap_or(b'?'))
+                .collect()
+        }
     }
 }
 
@@ -562,6 +670,23 @@ mod tests {
     }
 
     #[test]
+    fn summarize_not_posted_concerns() {
+        let clang_versions = ClangVersions {
+            format_version: Some(PSEUDO_VERSION),
+            tidy_version: None,
+        };
+        let review_summary = ReviewComments {
+            not_posted: vec!["- **demo.cpp**: clang-format failed".to_string()],
+            ..Default::default()
+        }
+        .summarize(&clang_versions, &[], 0, false);
+        assert!(review_summary.contains(
+            "Some concerns could not be posted as suggestions:\n\n- **demo.cpp**: clang-format failed\n"
+        ));
+        assert!(!review_summary.contains("No concerns to report"));
+    }
+
+    #[test]
     fn summarize_skipped_fixes_truncated() {
         let clang_versions = ClangVersions {
             format_version: None,
@@ -620,5 +745,60 @@ mod tests {
             review_summary
                 .contains("The full patch of fixes is too large to include in this summary.")
         );
+    }
+
+    #[test]
+    fn diff_contents_utf8() {
+        let contents = DiffContents::new("// 中文\n".as_bytes(), "// 中文\n\n".as_bytes());
+        assert!(contents.is_utf8);
+        assert_eq!(contents.original, "// 中文\n");
+        assert_eq!(contents.encode("// 中文"), "// 中文".as_bytes());
+    }
+
+    #[test]
+    fn diff_contents_not_utf8() {
+        // "// 中文" in GBK
+        let gbk: &[u8] = b"// \xd6\xd0\xce\xc4\n";
+        // one buffer that is not UTF-8 is enough to treat both as bytes
+        let contents = DiffContents::new(gbk, "// 中文\n".as_bytes());
+        assert!(!contents.is_utf8);
+        assert_eq!(contents.original.chars().count(), gbk.len());
+        assert_eq!(contents.encode(&contents.original), gbk);
+        assert_eq!(contents.encode(&contents.patched), "// 中文\n".as_bytes());
+        let (diff, _) = contents.make_patch();
+        assert_eq!(diff.hunks().count(), 1);
+    }
+
+    fn files_with_format_results(results: &[Option<bool>]) -> Vec<Arc<Mutex<FileObj>>> {
+        results
+            .iter()
+            .enumerate()
+            .map(|(i, failed)| {
+                let mut file = FileObj::new(PathBuf::from(format!("file{i}.cpp")));
+                file.format_advice = failed.map(|failed| clang_format::FormatAdvice {
+                    failed,
+                    ..Default::default()
+                });
+                Arc::new(Mutex::new(file))
+            })
+            .collect()
+    }
+
+    #[test]
+    fn format_failed_on_all_files() {
+        // `None` = clang-format was not run on the file (eg. `--ignore-format`)
+        let files = files_with_format_results(&[Some(true), None, Some(true)]);
+        let err = check_format_failures(&files).unwrap_err();
+        assert!(matches!(err, ClangTaskError::FormatFailedOnAllFiles(2)));
+    }
+
+    #[test]
+    fn format_failed_on_some_files() {
+        let files = files_with_format_results(&[Some(true), Some(false)]);
+        check_format_failures(&files).unwrap();
+        // clang-format was not run at all
+        let files = files_with_format_results(&[None, None]);
+        check_format_failures(&files).unwrap();
+        check_format_failures(&[]).unwrap();
     }
 }
