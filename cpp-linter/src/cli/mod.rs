@@ -274,8 +274,9 @@ pub struct SourceOptions {
     /// Set this option with path(s) to ignore (or not ignore).
     ///
     /// - In the case of multiple paths, you can use `|` to separate each path.
-    /// - There is no need to use `./` for each entry; a blank string (`''`)
-    ///   represents the repo-root path.
+    /// - There is no need to use `./` for each entry; a blank entry
+    ///   represents the repo-root path (eg. `'|!src'` ignores everything except `src`).
+    ///   A blank string (`''`) on its own means nothing is ignored.
     /// - This can also have files, but the file's path (relative to
     ///   the [`--repo-root`](#-r-repo-root)) has to be specified with the filename.
     /// - Submodules are automatically ignored. Hidden directories (beginning
@@ -709,11 +710,27 @@ pub fn convert_extra_arg_val(args: &[String]) -> Vec<String> {
     }
 }
 
+/// Converts the parsed value of `--ignore`, `--ignore-tidy` or `--ignore-format` into patterns.
+///
+/// A lone blank value (eg. `--ignore=''`) means "ignore nothing".
+/// Without this, clap gives `[""]`, and a blank entry is the repo root, so every file would be ignored.
+///
+/// A blank entry among other entries still means the repo root,
+/// so `--ignore='|!src'` ignores everything except `src`.
+pub fn ignore_patterns(values: &[String]) -> Vec<&str> {
+    if let [only] = values
+        && only.is_empty()
+    {
+        return vec![];
+    }
+    values.iter().map(String::as_str).collect()
+}
+
 #[cfg(all(test, feature = "bin"))]
 mod test {
     #![allow(clippy::unwrap_used)]
 
-    use super::{Cli, ThreadComments, convert_extra_arg_val};
+    use super::{Cli, ThreadComments, convert_extra_arg_val, ignore_patterns};
     use clap::Parser;
 
     #[test]
@@ -721,6 +738,29 @@ mod test {
         let cli = Cli::try_parse_from(vec!["cpp-linter", "-e", "c,,h"]);
         assert!(cli.is_err());
         println!("{}", cli.unwrap_err());
+    }
+
+    #[test]
+    fn blank_ignore_ignores_nothing() {
+        for (args, expected) in [
+            (vec!["--ignore="], vec![]),
+            (vec!["-i", ""], vec![]),
+            (vec!["--ignore=|!src"], vec!["", "!src"]),
+            (vec!["--ignore=.github|target"], vec![".github", "target"]),
+            (vec![], vec![".github", "target"]),
+        ] {
+            let cli = Cli::parse_from([vec!["cpp-linter"], args.clone()].concat());
+            assert_eq!(
+                ignore_patterns(&cli.source_options.ignore),
+                expected,
+                "{args:?}"
+            );
+        }
+        let cli = Cli::parse_from(["cpp-linter", "--ignore-tidy=", "--ignore-format="]);
+        let tidy = cli.tidy_options.ignore_tidy.unwrap();
+        let format = cli.format_options.ignore_format.unwrap();
+        assert!(ignore_patterns(&tidy).is_empty());
+        assert!(ignore_patterns(&format).is_empty());
     }
 
     #[test]

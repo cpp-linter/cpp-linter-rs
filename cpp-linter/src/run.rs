@@ -19,7 +19,7 @@ use log::{LevelFilter, set_max_level};
 // project specific modules/crates
 use crate::{
     clang_tools::capture_clang_tools_output,
-    cli::{ClangParams, Cli, CliCommand, FeedbackInput, LinesChangedOnly},
+    cli::{ClangParams, Cli, CliCommand, FeedbackInput, LinesChangedOnly, ignore_patterns},
     common_fs::{FileObj, mk_path_abs},
     rest_client::RestClient,
 };
@@ -83,11 +83,7 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
     }
 
     let mut file_filter = FileFilter::new(
-        &cli.source_options
-            .ignore
-            .iter()
-            .map(|s| s.as_str())
-            .collect::<Vec<&str>>(),
+        &ignore_patterns(&cli.source_options.ignore),
         &cli.source_options
             .extensions
             .iter()
