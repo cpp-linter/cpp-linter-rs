@@ -139,6 +139,38 @@ pub struct GeneralOptions {
     )]
     pub verbosity: Verbosity,
 
+    /// Exit with code 1 when any check fails.
+    ///
+    /// By default, cpp-linter exits with code 0 even when checks fail,
+    /// and a CI workflow reads the `checks-failed` output variable instead.
+    /// Use this option when only the exit code is read, as in a shell script,
+    /// a git hook or a coding agent.
+    ///
+    /// This can also be enabled with the `CPP_LINTER_STRICT_EXIT` environment variable
+    /// (`PRE_COMMIT=1` has the same effect).
+    ///
+    /// Exit codes:
+    ///
+    /// - `0`: no check failed, or checks failed without this option.
+    /// - `1`: checks failed (with this option), or the run stopped on an error,
+    ///   which is printed on a line starting with `Error:`.
+    /// - `2`: the command line arguments are invalid.
+    #[cfg_attr(
+        feature = "bin",
+        arg(
+            short = 'S',
+            long,
+            env = "CPP_LINTER_STRICT_EXIT",
+            default_value_t = false,
+            default_missing_value = "true",
+            num_args = 0..=1,
+            action = ArgAction::Set,
+            value_parser = FalseyValueParser::new(),
+            help_heading = "General options",
+        )
+    )]
+    pub strict: bool,
+
     /// Whether to use the system's available package managers.
     ///
     /// By default, this matches the value of a CI environment variable.
@@ -543,6 +575,8 @@ pub struct FeedbackOptions {
     /// format.
     ///
     /// A relative path is relative to the current working directory.
+    /// Use `-` to write the SARIF log to stdout instead of a file.
+    /// Outside CI, file annotations are then not printed, so stdout holds only the SARIF log.
     ///
     /// The SARIF file only includes clang-tidy diagnostics that are also
     /// reported in other forms of feedback. So, source filters like

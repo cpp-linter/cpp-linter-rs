@@ -6,6 +6,7 @@
 
 use std::{
     collections::{BTreeMap, HashMap},
+    io::Write,
     path::Path,
     sync::{Arc, Mutex},
 };
@@ -222,6 +223,9 @@ fn make_rule(note: &TidyNotification) -> ReportingDescriptor {
 }
 
 impl SarifLog {
+    /// The `output_file` path that [`Self::write`] treats as stdout.
+    pub const STDOUT: &str = "-";
+
     /// Create a SARIF log from the clang-tidy advice about the given `files`.
     ///
     /// Like other forms of feedback, only the diagnostics about the given `files` are
@@ -313,14 +317,24 @@ impl SarifLog {
     /// Write the SARIF log (as JSON) to the given `output_file` path.
     ///
     /// Any missing parent directories are created.
+    /// If `output_file` is [`Self::STDOUT`] (`-`), the SARIF log is written to stdout.
     pub fn write(&self, output_file: &Path) -> Result<(), ClientError> {
+        let json = serde_json::to_string_pretty(self).map_err(ClientError::SarifSerialize)?;
+        if output_file == Path::new(Self::STDOUT) {
+            let mut out = std::io::stdout().lock();
+            return writeln!(out, "{json}")
+                .and_then(|()| out.flush())
+                .map_err(|e| ClientError::SarifFileWriteFailed {
+                    file_path: output_file.to_path_buf(),
+                    source: e,
+                });
+        }
         if let Some(parent) = output_file.parent() {
             std::fs::create_dir_all(parent).map_err(|e| ClientError::MkDirFailed {
                 file_path: output_file.to_path_buf(),
                 source: e,
             })?;
         }
-        let json = serde_json::to_string_pretty(self).map_err(ClientError::SarifSerialize)?;
         std::fs::write(output_file, json).map_err(|e| ClientError::SarifFileWriteFailed {
             file_path: output_file.to_path_buf(),
             source: e,

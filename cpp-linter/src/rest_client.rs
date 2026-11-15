@@ -187,8 +187,19 @@ impl RestClient {
             tally_format_advice(files).map_err(ClientError::MutexPoisoned)?;
         let mut comment = None;
 
-        if feedback_inputs.file_annotations {
-            let mut annotations = Self::make_annotations(files, &feedback_inputs.style)?;
+        let is_local = self.client_kind() == "local";
+        let sarif_to_stdout = feedback_inputs
+            .sarif_file
+            .as_deref()
+            .is_some_and(|p| p == Path::new(SarifLog::STDOUT));
+        // Outside CI, annotations are printed to stdout.
+        // When the SARIF log goes to stdout, leave them out so stdout is only JSON.
+        if feedback_inputs.file_annotations && !(is_local && sarif_to_stdout) {
+            // Outside CI, annotations are printed as one line each, after the file and line,
+            // so a short title (the check's name) is enough.
+            let short_titles = is_local;
+            let mut annotations =
+                Self::build_annotations(files, &feedback_inputs.style, short_titles)?;
             for annotation in &mut annotations {
                 annotation.path = prefix_feedback_path(&annotation.path, &self.repo_root_prefix);
             }
@@ -229,7 +240,11 @@ impl RestClient {
                 &feedback_inputs.repo_root,
             )?
             .write(output_file)?;
-            log::info!("Wrote SARIF log to {}", output_file.to_string_lossy());
+            if output_file == Path::new(SarifLog::STDOUT) {
+                log::info!("Wrote SARIF log to stdout");
+            } else {
+                log::info!("Wrote SARIF log to {}", output_file.to_string_lossy());
+            }
         }
         let output_vars = [
             OutputVariable {
@@ -368,6 +383,19 @@ impl RestClient {
         files: &[Arc<Mutex<FileObj>>],
         style: &str,
     ) -> Result<Vec<FileAnnotation>, ClientError> {
+        Self::build_annotations(files, style, false)
+    }
+
+    /// Make the file annotations for [`Self::make_annotations`].
+    ///
+    /// With `short_titles`, a title is only the name of the check
+    /// (`clang-format` or the clang-tidy diagnostic) instead of a sentence
+    /// that repeats the file name and line.
+    fn build_annotations(
+        files: &[Arc<Mutex<FileObj>>],
+        style: &str,
+        short_titles: bool,
+    ) -> Result<Vec<FileAnnotation>, ClientError> {
         let style_guide = summarize_style(style);
         let mut annotations = vec![];
 
@@ -395,7 +423,11 @@ impl RestClient {
                         end_line: None,
                         start_column: None,
                         end_column: None,
-                        title: Some(format!("clang-format failed on {name}")),
+                        title: Some(if short_titles {
+                            "clang-format".to_string()
+                        } else {
+                            format!("clang-format failed on {name}")
+                        }),
                         message: format!(
                             "clang-format exited with an error for {name}, so its formatting was not checked. See the logs for details."
                         ),
@@ -403,7 +435,11 @@ impl RestClient {
                 }
                 // post annotation if any applicable lines were formatted
                 if !lines.is_empty() {
-                    let title = format!("Run clang-format on {name}");
+                    let title = if short_titles {
+                        "clang-format".to_string()
+                    } else {
+                        format!("Run clang-format on {name}")
+                    };
                     let message = format!(
                         "File {name} does not conform to {style_guide} style guidelines. (lines {line_set})",
                         line_set = lines
@@ -433,10 +469,14 @@ impl RestClient {
                 for note in &tidy_advice.notes {
                     let path = file.name.to_string_lossy().replace('\\', "/");
                     if note.filename == path {
-                        let title = format!(
-                            "{}:{}:{} [{}]",
-                            note.filename, note.line, note.cols, note.diagnostic
-                        );
+                        let title = if short_titles {
+                            note.diagnostic.clone()
+                        } else {
+                            format!(
+                                "{}:{}:{} [{}]",
+                                note.filename, note.line, note.cols, note.diagnostic
+                            )
+                        };
                         let annotation = FileAnnotation {
                             severity: match note.severity.as_str() {
                                 "warning" => AnnotationLevel::Warning,
@@ -990,6 +1030,26 @@ mod test {
             tidy.fmt_github()
                 .starts_with("::warning file=tests/demo/demo.cpp,line=1,col=1,")
         );
+    }
+
+    #[test]
+    fn short_annotation_titles() {
+        let files = make_dummy_files("warning");
+        let annotations = RestClient::build_annotations(&files, "llvm", true).unwrap();
+        let titles = annotations
+            .iter()
+            .map(|a| a.title.as_deref().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(titles, vec!["clang-format", "clang-diagnostic-error"]);
+
+        let file = FileObj::new(PathBuf::from("tests/demo/demo.cpp"));
+        let file = Arc::new(Mutex::new(file));
+        file.lock().unwrap().format_advice = Some(FormatAdvice {
+            failed: true,
+            ..Default::default()
+        });
+        let annotations = RestClient::build_annotations(&[file], "llvm", true).unwrap();
+        assert_eq!(annotations[0].title.as_deref(), Some("clang-format"));
     }
 
     #[test]

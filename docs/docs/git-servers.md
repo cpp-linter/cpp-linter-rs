@@ -12,6 +12,7 @@
 [passive-reviews]: cli.md#-r-passive-reviews
 [no-lgtm]: cli.md#-g-no-lgtm
 [file-annotations]: cli.md#-a-file-annotations
+[strict]: cli.md#-s-strict
 [step-summary]: cli.md#-w-step-summary
 [lines-changed-only]: cli.md#-l-lines-changed-only
 [files-changed-only]: cli.md#-f-files-changed-only
@@ -115,7 +116,7 @@ GitLab v17.9 or newer is needed.
 - GitLab has no step summary and no output variables. The values of the output variables are
   printed in the job's log, for example `checks-failed: 5`.
 - cpp-linter exits with code 0 when checks fail. Because there are no output variables, a job that
-  should fail on findings has to look for the `checks-failed` line in the log.
+  should fail on findings needs [`--strict`][strict], which makes cpp-linter exit with code 1.
 - Turn off [`--file-annotations`][file-annotations]. GitLab has no equivalent, and each annotation
   would be printed in the job's log instead.
 

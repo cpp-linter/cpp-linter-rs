@@ -8,7 +8,7 @@ use clap::{ValueEnum, builder::PossibleValue};
 
 #[cfg(feature = "bin")]
 use super::{Cli, convert_extra_arg_val, ignore_patterns};
-use crate::clang_tools::clang_tidy::CompilationUnit;
+use crate::{clang_tools::clang_tidy::CompilationUnit, sarif::SarifLog};
 
 use git_bot_feedback::FileFilter;
 
@@ -374,11 +374,14 @@ impl From<&Cli> for FeedbackInput {
                 .summary_output_file
                 .as_deref()
                 .map(absolute_or_given),
-            sarif_file: args
-                .feedback_options
-                .sarif_file
-                .as_deref()
-                .map(absolute_or_given),
+            sarif_file: args.feedback_options.sarif_file.as_deref().map(|path| {
+                // `-` means stdout, so it is not a path to make absolute.
+                if path == Path::new(SarifLog::STDOUT) {
+                    path.to_path_buf()
+                } else {
+                    absolute_or_given(path)
+                }
+            }),
             gen_patch: args.feedback_options.gen_patch
                 || args.feedback_options.gen_patch_path.is_some(),
             patch_path: match &args.feedback_options.gen_patch_path {

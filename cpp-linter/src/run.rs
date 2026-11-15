@@ -12,7 +12,10 @@ use std::{
 
 // non-std crates
 use anyhow::{Context, Result, anyhow};
-use clang_tools_manager::{RequestedVersion, logger::try_init_logger};
+use clang_tools_manager::{
+    RequestedVersion,
+    logger::{set_log_to_stderr, try_init_logger},
+};
 use clap::Parser;
 use log::{LevelFilter, set_max_level};
 
@@ -65,6 +68,10 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
         )
     })?;
     let mut rest_api_client = RestClient::new(&repo_root_abs)?;
+    if rest_api_client.client_kind() == "local" {
+        // Outside CI, keep stdout for results (file annotations, `--sarif-file -`).
+        set_log_to_stderr(true);
+    }
     set_max_level(
         if cli.general_options.verbosity.is_debug() || rest_api_client.is_debug_enabled() {
             LevelFilter::Debug
@@ -201,7 +208,9 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
         .post_feedback(&arc_files, user_inputs, clang_versions)
         .await?;
     rest_api_client.end_log_group("Posting feedback");
-    if env::var("PRE_COMMIT").is_ok_and(|v| v == "1") && checks_failed > 0 {
+    if (cli.general_options.strict || env::var("PRE_COMMIT").is_ok_and(|v| v == "1"))
+        && checks_failed > 0
+    {
         return Err(anyhow!("Some checks did not pass"));
     }
     Ok(())
@@ -380,6 +389,61 @@ pub(crate) mod test {
         ])
         .await
         .unwrap_err();
+        drop(tmp_gh_out);
+    }
+
+    #[tokio::test]
+    async fn strict_exit() {
+        let tmp_gh_out = setup_tmp_gh_out_path();
+        unsafe {
+            env::remove_var("PRE_COMMIT");
+            env::remove_var("CPP_LINTER_STRICT_EXIT");
+        }
+        let tmp_workspace = setup_tmp_workspace();
+        let args = |strict: Option<&str>| {
+            let mut args = vec![
+                "cpp-linter".to_string(),
+                "--lines-changed-only".to_string(),
+                "false".to_string(),
+                "--repo-root".to_string(),
+                tmp_workspace.path().to_str().unwrap().to_string(),
+            ];
+            if let Some(value) = strict {
+                args.push(value.to_string());
+            }
+            args
+        };
+        // checks fail on the demo files, but the default exit code is still 0
+        run_main(args(None)).await.unwrap();
+        run_main(args(Some("--strict"))).await.unwrap_err();
+        run_main(args(Some("--strict=false"))).await.unwrap();
+        unsafe {
+            env::set_var("CPP_LINTER_STRICT_EXIT", "true");
+        }
+        run_main(args(None)).await.unwrap_err();
+        drop(tmp_gh_out);
+    }
+
+    #[tokio::test]
+    async fn sarif_to_stdout() {
+        let tmp_gh_out = setup_tmp_gh_out_path();
+        let tmp_workspace = setup_tmp_workspace();
+        run_main(vec![
+            "cpp-linter".to_string(),
+            "--lines-changed-only".to_string(),
+            "false".to_string(),
+            "--style".to_string(),
+            String::new(),
+            "--sarif-file".to_string(),
+            "-".to_string(),
+            "--repo-root".to_string(),
+            tmp_workspace.path().to_str().unwrap().to_string(),
+        ])
+        .await
+        .unwrap();
+        // no file named `-` is created
+        assert!(!std::path::Path::new("-").exists());
+        assert!(!tmp_workspace.path().join("-").exists());
         drop(tmp_gh_out);
     }
 
