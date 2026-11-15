@@ -823,12 +823,13 @@ mod test {
 
     /// Patches and suggestions for a file whose last line has no line break.
     #[test]
+    #[allow(clippy::single_range_in_vec_init)]
     fn no_final_newline() {
         let repo_root = TempDir::new().unwrap();
-        let file_name = PathBuf::from("nonl.cpp");
+        let file_name = PathBuf::from("no_newline.cpp");
         let patched_file = NamedTempFile::new().unwrap();
         let patch_path = repo_root.path().join("fixes.patch");
-        const HEADER: &str = "--- a/nonl.cpp\n+++ b/nonl.cpp\n";
+        const HEADER: &str = "--- a/no_newline.cpp\n+++ b/no_newline.cpp\n";
         const LAST_LINE_CHANGED: &str = "@@ -1,2 +1,2 @@\n-int  a;\n-int  b;\n\
             \\ No newline at end of file\n+int a;\n+int b;\n\\ No newline at end of file\n";
         const NEWLINE_ADDED: &str =
