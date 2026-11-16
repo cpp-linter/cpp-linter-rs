@@ -1262,5 +1262,16 @@ mod test {
             msg.ends_with("The thread comment lists every finding."),
             "{msg}"
         );
+
+        let inputs = FeedbackInput {
+            step_summary: true,
+            thread_comments: ThreadComments::On,
+            ..Default::default()
+        };
+        let msg = annotation_cap_message(&annotations(0, 11), &inputs).unwrap();
+        assert!(
+            msg.ends_with("The step summary and the thread comment list every finding."),
+            "{msg}"
+        );
     }
 }
