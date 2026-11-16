@@ -154,16 +154,20 @@ impl TidyAdvice {
     pub(crate) fn get_suggestion_help(&self, start_line: u32, end_line: u32) -> String {
         let mut diagnostics = vec![];
         for note in &self.notes {
-            for fixed_line in &note.fixed_lines {
-                if (start_line..=end_line).contains(fixed_line) {
-                    diagnostics.push(format!(
-                        "- {} [{}]\n",
-                        note.rationale,
-                        note.diagnostic_link()
-                    ));
-                    for skipped in &note.skipped_fixes {
-                        diagnostics.push(format!("  - :warning: {}\n", skipped.describe()));
-                    }
+            // A fix can change more than one line of the same hunk.
+            // List the note's rationale once, not once per fixed line.
+            if note
+                .fixed_lines
+                .iter()
+                .any(|fixed_line| (start_line..=end_line).contains(fixed_line))
+            {
+                diagnostics.push(format!(
+                    "- {} [{}]\n",
+                    note.rationale,
+                    note.diagnostic_link()
+                ));
+                for skipped in &note.skipped_fixes {
+                    diagnostics.push(format!("  - :warning: {}\n", skipped.describe()));
                 }
             }
         }
