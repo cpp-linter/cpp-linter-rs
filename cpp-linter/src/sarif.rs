@@ -320,22 +320,19 @@ impl SarifLog {
     /// If `output_file` is [`Self::STDOUT`] (`-`), the SARIF log is written to stdout.
     pub fn write(&self, output_file: &Path) -> Result<(), ClientError> {
         let json = serde_json::to_string_pretty(self).map_err(ClientError::SarifSerialize)?;
-        if output_file == Path::new(Self::STDOUT) {
+        let written = if output_file == Path::new(Self::STDOUT) {
             let mut out = std::io::stdout().lock();
-            return writeln!(out, "{json}")
-                .and_then(|()| out.flush())
-                .map_err(|e| ClientError::SarifFileWriteFailed {
+            writeln!(out, "{json}").and_then(|()| out.flush())
+        } else {
+            if let Some(parent) = output_file.parent() {
+                std::fs::create_dir_all(parent).map_err(|e| ClientError::MkDirFailed {
                     file_path: output_file.to_path_buf(),
                     source: e,
-                });
-        }
-        if let Some(parent) = output_file.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| ClientError::MkDirFailed {
-                file_path: output_file.to_path_buf(),
-                source: e,
-            })?;
-        }
-        std::fs::write(output_file, json).map_err(|e| ClientError::SarifFileWriteFailed {
+                })?;
+            }
+            std::fs::write(output_file, json)
+        };
+        written.map_err(|e| ClientError::SarifFileWriteFailed {
             file_path: output_file.to_path_buf(),
             source: e,
         })
