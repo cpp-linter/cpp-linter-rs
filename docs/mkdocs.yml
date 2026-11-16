@@ -5,11 +5,12 @@ repo_url: "https://github.com/cpp-linter/cpp-linter-rs"
 repo_name: "cpp-linter/cpp-linter-rs"
 edit_uri: "edit/main/docs/docs/"
 nav:
-  - index.md
+  # MkDocs NG labels a bare file name with the page's title; keep the short labels.
+  - Home: index.md
   - cli.md
-  - migration.md
+  - Migration: migration.md
   - pr-review-caveats.md
-  - permissions.md
+  - Permissions: permissions.md
   - git-servers.md
   - python.md
   - node.md
@@ -91,6 +92,8 @@ extra_css:
 
 plugins:
   - search
+  # llms.txt and a Markdown copy of every page, for AI agents (MkDocs NG).
+  - llms_txt
   - include-markdown
   - gen-files:
       scripts:

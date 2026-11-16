@@ -58,6 +58,7 @@ words:
   - libgit
   - libnghttp
   - linenums
+  - llms
   - manylinux
   - markdownlint
   - maturin

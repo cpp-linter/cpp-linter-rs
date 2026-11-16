@@ -61,6 +61,10 @@ test = [
 ]
 
 [tool.uv]
+# mkdocs-ng and mkdocs-ng-material replace mkdocs and mkdocs-material, which
+# are no longer maintained. The plugins still depend on "mkdocs"; mkdocs-ng
+# provides it, so keep the upstream package out.
+override-dependencies = ["mkdocs; sys_platform == 'never'"]
 # we don't need to build the python binding every time we spin up a venv
 package = false
 
