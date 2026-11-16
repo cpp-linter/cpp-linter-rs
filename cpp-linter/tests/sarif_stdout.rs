@@ -18,6 +18,9 @@ fn sarif_to_stdout_is_valid_json() {
         .env_remove("GITEA_ACTIONS")
         .env_remove("FORGEJO_ACTIONS")
         .env_remove("GITLAB_CI")
+        // checks fail in the demo, so don't exit with an error
+        .env_remove("CPP_LINTER_STRICT_EXIT")
+        .env_remove("PRE_COMMIT")
         .args([
             format!("-V={}", env::var("CLANG_VERSION").unwrap_or_default()),
             "--lines-changed-only=false".to_string(),

@@ -60,6 +60,14 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
         return Ok(());
     }
 
+    let sarif_to_stdout = cli
+        .feedback_options
+        .sarif_file
+        .as_deref()
+        .is_some_and(SarifLog::is_stdout);
+    // Until the client is known, keep log messages off stdout if it is meant for the SARIF log.
+    // This also resets the choice made by a previous call (from the Python or Node.js bindings).
+    set_log_to_stderr(sarif_to_stdout);
     try_init_logger();
 
     let repo_root_abs = mk_path_abs(&cli.source_options.repo_root).with_context(|| {
@@ -69,17 +77,9 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
         )
     })?;
     let mut rest_api_client = RestClient::new(&repo_root_abs)?;
-    if rest_api_client.client_kind() == "local"
-        && cli
-            .feedback_options
-            .sarif_file
-            .as_deref()
-            .is_some_and(SarifLog::is_stdout)
-    {
-        // `--sarif-file -` writes the SARIF log to stdout,
-        // so everything else goes to stderr to keep stdout valid JSON.
-        set_log_to_stderr(true);
-    }
+    // `--sarif-file -` writes the SARIF log to stdout, so in a local run everything else
+    // goes to stderr to keep stdout valid JSON. In CI, logs stay on stdout.
+    set_log_to_stderr(sarif_to_stdout && rest_api_client.client_kind() == "local");
     set_max_level(
         if cli.general_options.verbosity.is_debug() || rest_api_client.is_debug_enabled() {
             LevelFilter::Debug
@@ -230,6 +230,7 @@ pub(crate) mod test {
 
     use super::run_main;
     use crate::{cli::ClangParams, test_common::setup_tmp_workspace};
+    use clang_tools_manager::logger::is_log_to_stderr;
     use std::env;
 
     /// helper to avoid writing to the same GITHUB_OUTPUT file in parallel-running tests.
@@ -453,6 +454,36 @@ pub(crate) mod test {
         assert!(!std::path::Path::new("-").exists());
         assert!(!tmp_workspace.path().join("-").exists());
         drop(tmp_gh_out);
+    }
+
+    #[tokio::test]
+    async fn sarif_to_stdout_then_not() {
+        unsafe {
+            // a local run
+            env::remove_var("GITHUB_ACTIONS");
+        }
+        let tmp_workspace = setup_tmp_workspace();
+        let args = |sarif_file: &str| {
+            vec![
+                "cpp-linter".to_string(),
+                "-l=false".to_string(),
+                "-f=false".to_string(),
+                "--style=".to_string(),
+                "--tidy-checks=-*".to_string(),
+                format!("--sarif-file={sarif_file}"),
+                "--repo-root".to_string(),
+                tmp_workspace.path().to_str().unwrap().to_string(),
+                "demo/demo.cpp".to_string(),
+            ]
+        };
+        run_main(args("-")).await.unwrap();
+        assert!(is_log_to_stderr());
+        // a later call (like from the Python or Node.js bindings) without `--sarif-file -`
+        // writes log messages to stdout again
+        let sarif_path = tmp_workspace.path().join("cpp-linter.sarif");
+        run_main(args(sarif_path.to_str().unwrap())).await.unwrap();
+        assert!(!is_log_to_stderr());
+        assert!(sarif_path.exists());
     }
 
     // Verifies that the system gracefully handles cases where all analysis is disabled.

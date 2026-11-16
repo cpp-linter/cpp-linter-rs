@@ -43,6 +43,13 @@ pub fn set_log_to_stderr(enabled: bool) {
     LOG_TO_STDERR.store(enabled, Ordering::Relaxed);
 }
 
+/// Are log messages written to stderr instead of stdout?
+///
+/// See [`set_log_to_stderr()`].
+pub fn is_log_to_stderr() -> bool {
+    LOG_TO_STDERR.load(Ordering::Relaxed)
+}
+
 impl SimpleLogger {
     #[allow(clippy::expect_used)]
     fn write_record(&self, out: &mut impl Write, record: &Record) {
@@ -93,7 +100,7 @@ impl Log for SimpleLogger {
     }
 
     fn log(&self, record: &Record) {
-        if LOG_TO_STDERR.load(Ordering::Relaxed) {
+        if is_log_to_stderr() {
             self.write_record(&mut stderr().lock(), record);
         } else {
             self.write_record(&mut stdout().lock(), record);
