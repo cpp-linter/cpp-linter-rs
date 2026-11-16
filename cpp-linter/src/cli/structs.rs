@@ -7,7 +7,7 @@ use std::{
 use clap::{ValueEnum, builder::PossibleValue};
 
 #[cfg(feature = "bin")]
-use super::{Cli, convert_extra_arg_val};
+use super::{Cli, convert_extra_arg_val, ignore_patterns};
 use crate::clang_tools::clang_tidy::CompilationUnit;
 
 use git_bot_feedback::FileFilter;
@@ -269,16 +269,22 @@ impl From<&Cli> for ClangParams {
             .map(|ext| ext.as_str())
             .collect();
         let tidy_filter = args.tidy_options.ignore_tidy.as_ref().map(|ignore_tidy| {
-            let ignore_tidy: Vec<&str> = ignore_tidy.iter().map(|s| s.as_str()).collect();
-            FileFilter::new(&ignore_tidy, &extensions.clone(), Some("clang-tidy"))
+            FileFilter::new(
+                &ignore_patterns(ignore_tidy),
+                &extensions.clone(),
+                Some("clang-tidy"),
+            )
         });
         let format_filter = args
             .format_options
             .ignore_format
             .as_ref()
             .map(|ignore_format| {
-                let ignore_format: Vec<&str> = ignore_format.iter().map(|s| s.as_str()).collect();
-                FileFilter::new(&ignore_format, &extensions, Some("clang-format"))
+                FileFilter::new(
+                    &ignore_patterns(ignore_format),
+                    &extensions,
+                    Some("clang-format"),
+                )
             });
         // A relative database path is relative to the working directory (like v1),
         // not to the repo root.

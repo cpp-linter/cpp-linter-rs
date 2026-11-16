@@ -207,7 +207,7 @@ impl FileObj {
         diff: &Diff,
         patch_path: &Path,
     ) -> Result<(), FileObjError> {
-        let printer = BasicLineDiffPrinter(&input.interner);
+        let printer = PatchPrinter(BasicLineDiffPrinter(&input.interner));
         let diff_config = UnifiedDiffConfig::default();
         let unified_diff = diff.unified_diff(&printer, diff_config, input).to_string();
         if !unified_diff.is_empty() {
@@ -361,7 +361,7 @@ impl FileObj {
             .to_owned();
         let mut config = UnifiedDiffConfig::default();
         config.context_len(0);
-        let printer = BasicLineDiffPrinter(&input.interner);
+        let printer = PatchPrinter(BasicLineDiffPrinter(&input.interner));
         let mut patch_buff = String::new();
         let mut hunks_in_patch = 0u32;
         for hunk in diff.hunks() {
@@ -394,6 +394,11 @@ impl FileObj {
                         {
                             let line = &input.interner[*token];
                             suggestion.push_str(line);
+                        }
+                        if !suggestion.ends_with('\n') {
+                            // the last line of the file has no line break;
+                            // keep the closing fence on its own line.
+                            suggestion.push('\n');
                         }
                         suggestion.push_str("```\n");
                     }
@@ -429,6 +434,66 @@ impl FileObj {
         }
         review_comments.tool_total += hunks_in_patch;
         Ok(())
+    }
+}
+
+/// A [`UnifiedDiffPrinter`] that writes patches `git apply` accepts.
+///
+/// [`BasicLineDiffPrinter`] ends a line that has no trailing newline (the last
+/// line of a file) with a plain line break. `git apply` then rejects the patch,
+/// because the file it patches does not have that line break.
+/// This printer adds the `\ No newline at end of file` marker instead, as `git diff` does.
+pub(crate) struct PatchPrinter<'a>(pub BasicLineDiffPrinter<'a, str>);
+
+impl PatchPrinter<'_> {
+    const NO_NEWLINE: &'static str = "\n\\ No newline at end of file\n";
+
+    fn display_lines(
+        &self,
+        mut f: impl std::fmt::Write,
+        prefix: char,
+        tokens: &[gix_imara_diff::Token],
+    ) -> std::fmt::Result {
+        for &token in tokens {
+            let line = self.0.0[token];
+            write!(f, "{prefix}{line}")?;
+            if !line.ends_with('\n') {
+                f.write_str(Self::NO_NEWLINE)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+impl UnifiedDiffPrinter for PatchPrinter<'_> {
+    fn display_header(
+        &self,
+        f: impl std::fmt::Write,
+        start_before: u32,
+        start_after: u32,
+        len_before: u32,
+        len_after: u32,
+    ) -> std::fmt::Result {
+        self.0
+            .display_header(f, start_before, start_after, len_before, len_after)
+    }
+
+    fn display_context_token(
+        &self,
+        f: impl std::fmt::Write,
+        token: gix_imara_diff::Token,
+    ) -> std::fmt::Result {
+        self.display_lines(f, ' ', &[token])
+    }
+
+    fn display_hunk(
+        &self,
+        mut f: impl std::fmt::Write,
+        before: &[gix_imara_diff::Token],
+        after: &[gix_imara_diff::Token],
+    ) -> std::fmt::Result {
+        self.display_lines(&mut f, '-', before)?;
+        self.display_lines(&mut f, '+', after)
     }
 }
 
@@ -754,5 +819,84 @@ mod test {
             .make_suggestions_from_patch(&mut review_comments, false, repo_root.path(), &patch_path)
             .unwrap();
         assert!(review_comments.not_posted.is_empty());
+    }
+
+    /// Patches and suggestions for a file whose last line has no line break.
+    #[test]
+    #[allow(clippy::single_range_in_vec_init)]
+    fn no_final_newline() {
+        let repo_root = TempDir::new().unwrap();
+        let file_name = PathBuf::from("no_newline.cpp");
+        let patched_file = NamedTempFile::new().unwrap();
+        let patch_path = repo_root.path().join("fixes.patch");
+        const HEADER: &str = "--- a/no_newline.cpp\n+++ b/no_newline.cpp\n";
+        const LAST_LINE_CHANGED: &str = "@@ -1,2 +1,2 @@\n-int  a;\n-int  b;\n\
+            \\ No newline at end of file\n+int a;\n+int b;\n\\ No newline at end of file\n";
+        const NEWLINE_ADDED: &str =
+            "@@ -1,1 +1,1 @@\n-int a;\n\\ No newline at end of file\n+int a;\n";
+        // (original, patched, patch file, review patch without context lines)
+        for (original, patched, expected, expected_review) in [
+            (
+                "int  a;\nint  b;",
+                "int a;\nint b;",
+                LAST_LINE_CHANGED,
+                LAST_LINE_CHANGED,
+            ),
+            // the last line is context
+            (
+                "int  a;\nint b;",
+                "int a;\nint b;",
+                "@@ -1,2 +1,2 @@\n-int  a;\n+int a;\n int b;\n\\ No newline at end of file\n",
+                "@@ -1,1 +1,1 @@\n-int  a;\n+int a;\n",
+            ),
+            ("int a;", "int a;\n", NEWLINE_ADDED, NEWLINE_ADDED),
+        ] {
+            fs::write(repo_root.path().join(&file_name), original).unwrap();
+            fs::write(patched_file.path(), patched).unwrap();
+
+            // the patch file (eg. for `git apply`)
+            let mut file_obj = FileObj::new(file_name.clone());
+            file_obj.patched_path = Some(patched_file.path().to_path_buf());
+            let _ = fs::remove_file(&patch_path);
+            file_obj
+                .maybe_append_patch(repo_root.path(), &patch_path)
+                .unwrap();
+            assert_eq!(
+                fs::read_to_string(&patch_path).unwrap(),
+                format!("{HEADER}{expected}")
+            );
+
+            // the patch in a PR review's summary (for fixes outside the diff)
+            let mut review_comments = ReviewComments::default();
+            file_obj
+                .make_suggestions_from_patch(
+                    &mut review_comments,
+                    false,
+                    repo_root.path(),
+                    &patch_path,
+                )
+                .unwrap();
+            assert!(review_comments.comments.is_empty());
+            assert_eq!(
+                review_comments.full_patch,
+                format!("{HEADER}{expected_review}")
+            );
+        }
+
+        // a suggestion keeps the closing fence on its own line
+        fs::write(repo_root.path().join(&file_name), "int  a;").unwrap();
+        fs::write(patched_file.path(), "int a;").unwrap();
+        let mut file_obj = FileObj::from(file_name, vec![1], vec![1..=1]);
+        file_obj.patched_path = Some(patched_file.path().to_path_buf());
+        let mut review_comments = ReviewComments::default();
+        file_obj
+            .make_suggestions_from_patch(&mut review_comments, false, repo_root.path(), &patch_path)
+            .unwrap();
+        assert_eq!(review_comments.comments.len(), 1);
+        assert!(
+            review_comments.comments[0]
+                .suggestion
+                .ends_with("```suggestion\nint a;\n```\n")
+        );
     }
 }
