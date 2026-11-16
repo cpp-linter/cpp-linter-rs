@@ -897,9 +897,9 @@ dependencies = [
 
 [[package]]
 name = "git-bot-feedback"
-version = "0.12.2"
+version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5254772a875cefdd12f361bb1b4d89469868474d54d554f8eb1c2f6edce6c1c2"
+checksum = "4b59004ceb4f7e055f4e05681a181c6c9c58b393633ed5665c90f905b9cd2fde"
 dependencies = [
  "async-trait",
  "chrono",
