@@ -2,7 +2,7 @@
 
 use std::{
     env,
-    io::{BufRead, Write, stdout},
+    io::{BufRead, Write, stderr, stdout},
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
@@ -187,17 +187,10 @@ impl RestClient {
             tally_format_advice(files).map_err(ClientError::MutexPoisoned)?;
         let mut comment = None;
 
-        let is_local = self.client_kind() == "local";
-        let sarif_to_stdout = feedback_inputs
-            .sarif_file
-            .as_deref()
-            .is_some_and(|p| p == Path::new(SarifLog::STDOUT));
-        // Outside CI, annotations are printed to stdout.
-        // When the SARIF log goes to stdout, leave them out so stdout is only JSON.
-        if feedback_inputs.file_annotations && !(is_local && sarif_to_stdout) {
-            // Outside CI, annotations are printed as one line each, after the file and line,
+        if feedback_inputs.file_annotations {
+            // Outside CI, an annotation is shown with its file and line,
             // so a short title (the check's name) is enough.
-            let short_titles = is_local;
+            let short_titles = self.client_kind() == "local";
             let mut annotations =
                 Self::build_annotations(files, &feedback_inputs.style, short_titles)?;
             for annotation in &mut annotations {
@@ -240,7 +233,7 @@ impl RestClient {
                 &feedback_inputs.repo_root,
             )?
             .write(output_file)?;
-            if output_file == Path::new(SarifLog::STDOUT) {
+            if SarifLog::is_stdout(output_file) {
                 log::info!("Wrote SARIF log to stdout");
             } else {
                 log::info!("Wrote SARIF log to {}", output_file.to_string_lossy());
@@ -566,10 +559,18 @@ impl RestClient {
             }])?;
 
             log::info!("Generated patch content:");
-            let stdout_handle = stdout();
             let mut reader = std::io::BufReader::new(patch_file);
             let mut raw_line = Vec::new();
-            let mut stdout_lock = stdout_handle.lock();
+            // `--sarif-file -` writes the SARIF log to stdout; keep stdout valid JSON.
+            let mut stdout_lock: Box<dyn Write> = if feedback_inputs
+                .sarif_file
+                .as_deref()
+                .is_some_and(SarifLog::is_stdout)
+            {
+                Box::new(stderr().lock())
+            } else {
+                Box::new(stdout().lock())
+            };
             while let bytes_read = reader
                 .read_until(b'\n', &mut raw_line)
                 .map_err(ClientError::PatchReadFailed)?

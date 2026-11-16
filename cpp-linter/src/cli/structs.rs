@@ -376,7 +376,7 @@ impl From<&Cli> for FeedbackInput {
                 .map(absolute_or_given),
             sarif_file: args.feedback_options.sarif_file.as_deref().map(|path| {
                 // `-` means stdout, so it is not a path to make absolute.
-                if path == Path::new(SarifLog::STDOUT) {
+                if SarifLog::is_stdout(path) {
                     path.to_path_buf()
                 } else {
                     absolute_or_given(path)

@@ -25,6 +25,7 @@ use crate::{
     cli::{ClangParams, Cli, CliCommand, FeedbackInput, LinesChangedOnly, ignore_patterns},
     common_fs::{FileObj, mk_path_abs},
     rest_client::RestClient,
+    sarif::SarifLog,
 };
 use git_bot_feedback::FileFilter;
 
@@ -68,8 +69,15 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
         )
     })?;
     let mut rest_api_client = RestClient::new(&repo_root_abs)?;
-    if rest_api_client.client_kind() == "local" {
-        // Outside CI, keep stdout for results (file annotations, `--sarif-file -`).
+    if rest_api_client.client_kind() == "local"
+        && cli
+            .feedback_options
+            .sarif_file
+            .as_deref()
+            .is_some_and(SarifLog::is_stdout)
+    {
+        // `--sarif-file -` writes the SARIF log to stdout,
+        // so everything else goes to stderr to keep stdout valid JSON.
         set_log_to_stderr(true);
     }
     set_max_level(

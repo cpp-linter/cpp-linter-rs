@@ -37,8 +37,8 @@ static LOG_TO_STDERR: AtomicBool = AtomicBool::new(false);
 
 /// Write all log messages (including log grouping commands) to stderr instead of stdout.
 ///
-/// This is meant for local (non-CI) use, where stdout is kept for results
-/// that other programs read, such as file annotations or a SARIF log.
+/// This is meant for local (non-CI) use, when stdout is kept for output
+/// that other programs read, such as a SARIF log.
 /// In CI, logs stay on stdout so that log grouping commands and log messages
 /// are shown in order.
 pub fn set_log_to_stderr(enabled: bool) {

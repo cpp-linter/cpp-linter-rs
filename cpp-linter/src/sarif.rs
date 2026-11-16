@@ -226,6 +226,11 @@ impl SarifLog {
     /// The `output_file` path that [`Self::write`] treats as stdout.
     pub const STDOUT: &str = "-";
 
+    /// Is the given `output_file` [`Self::STDOUT`]?
+    pub fn is_stdout(output_file: &Path) -> bool {
+        output_file == Path::new(Self::STDOUT)
+    }
+
     /// Create a SARIF log from the clang-tidy advice about the given `files`.
     ///
     /// Like other forms of feedback, only the diagnostics about the given `files` are
@@ -320,7 +325,7 @@ impl SarifLog {
     /// If `output_file` is [`Self::STDOUT`] (`-`), the SARIF log is written to stdout.
     pub fn write(&self, output_file: &Path) -> Result<(), ClientError> {
         let json = serde_json::to_string_pretty(self).map_err(ClientError::SarifSerialize)?;
-        let written = if output_file == Path::new(Self::STDOUT) {
+        let written = if Self::is_stdout(output_file) {
             let mut out = std::io::stdout().lock();
             writeln!(out, "{json}").and_then(|()| out.flush())
         } else {

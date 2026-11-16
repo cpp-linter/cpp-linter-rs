@@ -152,8 +152,9 @@ pub struct GeneralOptions {
     /// Exit codes:
     ///
     /// - `0`: no check failed, or checks failed without this option.
-    /// - `1`: checks failed (with this option), or the run stopped on an error,
-    ///   which is printed on a line starting with `Error:`.
+    /// - `1`: checks failed (with this option), or the run stopped on an error.
+    ///   The `cpp-linter` executable prints the error on a line starting with `Error:`.
+    ///   The Python and Node.js bindings raise it as an exception instead.
     /// - `2`: the command line arguments are invalid.
     #[cfg_attr(
         feature = "bin",
@@ -576,7 +577,8 @@ pub struct FeedbackOptions {
     ///
     /// A relative path is relative to the current working directory.
     /// Use `-` to write the SARIF log to stdout instead of a file.
-    /// Outside CI, file annotations are then not printed, so stdout holds only the SARIF log.
+    /// Outside CI, log messages (including file annotations) and the generated patch
+    /// then go to stderr, so stdout holds only the SARIF log.
     ///
     /// The SARIF file only includes clang-tidy diagnostics that are also
     /// reported in other forms of feedback. So, source filters like
