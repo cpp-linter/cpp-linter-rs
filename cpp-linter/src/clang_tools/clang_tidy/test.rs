@@ -307,6 +307,25 @@ fn suggestion_help_with_and_without_fixes() {
 }
 
 #[test]
+fn suggestion_help_lists_a_multi_line_fix_once() {
+    use super::{SkippedFix, TidyAdvice};
+
+    // One fix that changes two lines of the same hunk (e.g. adding braces).
+    let mut note = dummy_note("demo.cpp", vec![5, 6]);
+    note.skipped_fixes.push(SkippedFix {
+        file: "demo.h".to_string(),
+        reason: "it is not one of the analyzed files".to_string(),
+    });
+    let advice = TidyAdvice { notes: vec![note] };
+    let help = advice.get_suggestion_help(1, 10);
+    assert_eq!(help.matches("a dummy rationale").count(), 1);
+    assert_eq!(help.matches(":warning:").count(), 1);
+    // The note is still listed when only one of its fixed lines is in the hunk.
+    let help = advice.get_suggestion_help(6, 8);
+    assert_eq!(help.matches("a dummy rationale").count(), 1);
+}
+
+#[test]
 fn suggestion_help_with_skipped_fixes() {
     use super::{SkippedFix, TidyAdvice};
 
