@@ -562,6 +562,12 @@ pub struct FeedbackOptions {
 
     /// Set this option to false to disable the use of
     /// file annotations as feedback.
+    ///
+    /// > [!NOTE]
+    /// > GitHub shows only the first 10 annotations of each level
+    /// > (error, warning, notice) in a step, and 50 in a job.
+    /// > cpp-linter logs a warning when some annotations will not be shown.
+    /// > The step summary and the thread comment list every finding.
     #[cfg_attr(feature = "bin", arg(
         short = 'a',
         long,
