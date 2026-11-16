@@ -35,12 +35,15 @@ fn sarif_to_stdout_is_valid_json() {
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(output.status.success(), "{stderr}");
 
-    let sarif: serde_json::Value = serde_json::from_slice(&output.stdout)
-        .unwrap_or_else(|e| panic!("stdout is not JSON ({e}): {stderr}"));
+    let sarif: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap_or_else(|e| {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        panic!("stdout is not JSON ({e}):\n{stdout}\nstderr:\n{stderr}")
+    });
     assert_eq!(sarif["version"], "2.1.0");
     assert!(!sarif["runs"][0]["results"].as_array().unwrap().is_empty());
 
-    // logs, file annotations (incl. clang-format's) and the patch go to stderr
+    // logs, download progress bars (if clang tools were installed),
+    // file annotations (incl. clang-format's) and the patch go to stderr
     assert!(stderr.contains("Wrote SARIF log to stdout"), "{stderr}");
     assert!(stderr.contains("does not conform to"), "{stderr}");
     assert!(stderr.contains("Generated patch content:"), "{stderr}");

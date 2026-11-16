@@ -4,7 +4,7 @@
 use std::{
     env,
     io::{Write, stderr, stdout},
-    sync::atomic::{AtomicBool, Ordering},
+    sync::atomic::Ordering,
 };
 
 use clap::builder::{
@@ -27,15 +27,13 @@ pub const CLI_HELP_STYLE: Styles = Styles::styled()
     .context_value(Style::new().fg_color(Some(Color::Ansi(AnsiColor::Cyan))))
     .invalid(Style::new().fg_color(Some(Color::Ansi(AnsiColor::BrightRed))));
 
+use crate::LOG_TO_STDERR;
+
 #[derive(Default)]
 struct SimpleLogger;
 
-/// Should log messages be written to stderr instead of stdout?
-///
-/// See [`set_log_to_stderr()`].
-static LOG_TO_STDERR: AtomicBool = AtomicBool::new(false);
-
-/// Write all log messages (including log grouping commands) to stderr instead of stdout.
+/// Write all log messages (including log grouping commands) and
+/// progress bars (see [`ProgressBar`](crate::ProgressBar)) to stderr instead of stdout.
 ///
 /// This is meant for local (non-CI) use, when stdout is kept for output
 /// that other programs read, such as a SARIF log.
