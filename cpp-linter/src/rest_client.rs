@@ -987,6 +987,34 @@ mod test {
     }
 
     #[tokio::test]
+    async fn annotations_over_cap_on_github() {
+        let tmp_dir = tempdir().unwrap();
+        let repo_root = env::current_dir().unwrap();
+        let gh_out_path = NamedTempFile::new_in(tmp_dir.path()).unwrap();
+        unsafe {
+            env::set_var("GITHUB_ACTIONS", "true");
+            env::set_var("GITHUB_REPOSITORY", "cpp-linter/cpp-linter-rs");
+            env::set_var("GITHUB_SHA", "deadbeef123");
+            env::set_var("GITHUB_WORKSPACE", &repo_root);
+            env::set_var("GITHUB_OUTPUT", gh_out_path.path());
+        }
+        let mut rest_api_client = RestClient::new(&repo_root).unwrap();
+        // 11 warnings: one more than GitHub shows in a step
+        let files = (0..11)
+            .flat_map(|_| make_dummy_files("warning"))
+            .collect::<Vec<_>>();
+        let feedback_inputs = FeedbackInput {
+            file_annotations: true,
+            ..Default::default()
+        };
+        let checks_failed = rest_api_client
+            .post_feedback(&files, feedback_inputs, dummy_versions())
+            .await
+            .unwrap();
+        assert_eq!(checks_failed, 22);
+    }
+
+    #[tokio::test]
     async fn thread_comment_without_summary() {
         unsafe {
             env::remove_var("GITHUB_ACTIONS");
