@@ -1,7 +1,10 @@
 use std::{
-    io::{IsTerminal, Result, Write, stdout},
+    io::{IsTerminal, Result, Write, stderr, stdout},
     num::NonZero,
+    sync::atomic::Ordering,
 };
+
+use crate::LOG_TO_STDERR;
 
 /// A simple progress bar implementation that supports both interactive and non-interactive terminals.
 pub struct ProgressBar {
@@ -14,11 +17,11 @@ pub struct ProgressBar {
     /// This is primarily used for tracking how many times the progress has changed.
     /// When `total` is unknown, this is the only way to track progress, and it will be incremented on every update..
     steps: u32,
-    /// A mutex lock on the stdout.
+    /// A mutex lock on the stdout (or stderr if log messages are written to stderr).
     ///
     /// Using this instead of `print!()` allows for faster writes to stdout and
     /// prevents other threads from interrupting the output of the progress bar.
-    stdout_handle: std::io::StdoutLock<'static>,
+    stdout_handle: Box<dyn Write>,
     /// Is the terminal session interactive?
     is_interactive: bool,
     /// The leading prompt to display before the progress bar (e.g. "Downloading")
@@ -51,8 +54,18 @@ impl ProgressBar {
     /// // stdout lock is released when `progress_bar` goes out of scope
     /// ```
     pub fn new(total: Option<NonZero<u64>>, prompt: &str) -> Self {
-        let stdout_handle = stdout().lock();
-        let is_interactive = stdout_handle.is_terminal();
+        // Follow the log messages, so the progress bar is not mixed into
+        // output that other programs read from stdout (like a SARIF log).
+        let (stdout_handle, is_interactive): (Box<dyn Write>, bool) =
+            if LOG_TO_STDERR.load(Ordering::Relaxed) {
+                let handle = stderr().lock();
+                let is_interactive = handle.is_terminal();
+                (Box::new(handle), is_interactive)
+            } else {
+                let handle = stdout().lock();
+                let is_interactive = handle.is_terminal();
+                (Box::new(handle), is_interactive)
+            };
         Self {
             total,
             current: 0,
@@ -182,6 +195,16 @@ mod tests {
             progress_bar.inc(1).unwrap();
         }
         progress_bar.finish().unwrap();
+    }
+
+    #[test]
+    fn to_stderr() {
+        crate::LOG_TO_STDERR.store(true, std::sync::atomic::Ordering::Relaxed);
+        let mut progress_bar = ProgressBar::new(Some(NonZero::new(2).unwrap()), "Processing");
+        progress_bar.render().unwrap();
+        progress_bar.inc(2).unwrap();
+        progress_bar.finish().unwrap();
+        crate::LOG_TO_STDERR.store(false, std::sync::atomic::Ordering::Relaxed);
     }
 
     #[test]

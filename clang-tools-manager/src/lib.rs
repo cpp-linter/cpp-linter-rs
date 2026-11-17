@@ -25,6 +25,12 @@ pub use version::{ClangVersion, GetToolError, RequestedVersion, RequestedVersion
 mod progress_bar;
 pub use progress_bar::ProgressBar;
 
+/// Should log messages and progress bars be written to stderr instead of stdout?
+///
+/// This is set with `logger::set_log_to_stderr()` (requires the `bin` feature).
+pub(crate) static LOG_TO_STDERR: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
 pub mod logger;
 
 #[cfg(all(test, unix))]

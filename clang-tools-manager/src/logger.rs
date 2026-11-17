@@ -3,7 +3,8 @@
 
 use std::{
     env,
-    io::{Write, stdout},
+    io::{Write, stderr, stdout},
+    sync::atomic::Ordering,
 };
 
 use clap::builder::{
@@ -26,10 +27,61 @@ pub const CLI_HELP_STYLE: Styles = Styles::styled()
     .context_value(Style::new().fg_color(Some(Color::Ansi(AnsiColor::Cyan))))
     .invalid(Style::new().fg_color(Some(Color::Ansi(AnsiColor::BrightRed))));
 
+use crate::LOG_TO_STDERR;
+
 #[derive(Default)]
 struct SimpleLogger;
 
+/// Write all log messages (including log grouping commands) and
+/// progress bars (see [`ProgressBar`](crate::ProgressBar)) to stderr instead of stdout.
+///
+/// This is meant for local (non-CI) use, when stdout is kept for output
+/// that other programs read, such as a SARIF log.
+/// In CI, logs stay on stdout so that log grouping commands and log messages
+/// are shown in order.
+pub fn set_log_to_stderr(enabled: bool) {
+    LOG_TO_STDERR.store(enabled, Ordering::Relaxed);
+}
+
+/// Are log messages written to stderr instead of stdout?
+///
+/// See [`set_log_to_stderr()`].
+pub fn is_log_to_stderr() -> bool {
+    LOG_TO_STDERR.load(Ordering::Relaxed)
+}
+
 impl SimpleLogger {
+    #[allow(clippy::expect_used)]
+    fn write_record(&self, out: &mut impl Write, record: &Record) {
+        if record.target() == "CI_LOG_GROUPING" {
+            // this log is meant to manipulate a CI workflow's log grouping
+            writeln!(out, "{}", record.args()).expect("Failed to write log command");
+            out.flush().expect("Failed to flush log command");
+        } else if self.enabled(record.metadata()) {
+            let module = record.module_path();
+            if module.is_none_or(|v| v.starts_with("cpp_linter") || v.starts_with("clang_tools")) {
+                writeln!(
+                    out,
+                    "[{}]: {}",
+                    Self::level_color(&record.level()),
+                    record.args()
+                )
+                .expect("Failed to write log message");
+            } else if let Some(module) = module {
+                writeln!(
+                    out,
+                    "[{}]{{{}:{}}}: {}",
+                    Self::level_color(&record.level()),
+                    module,
+                    record.line().unwrap_or_default(),
+                    record.args()
+                )
+                .expect("Failed to write detailed log message");
+            }
+            out.flush().expect("Failed to flush log message");
+        }
+    }
+
     fn level_color(level: &Level) -> String {
         let name = format!("{:>5}", level.as_str().to_uppercase());
         match level {
@@ -42,44 +94,16 @@ impl SimpleLogger {
     }
 }
 
-#[allow(clippy::expect_used)]
 impl Log for SimpleLogger {
     fn enabled(&self, metadata: &Metadata) -> bool {
         metadata.level() <= log::max_level()
     }
 
     fn log(&self, record: &Record) {
-        let mut stdout = stdout().lock();
-        if record.target() == "CI_LOG_GROUPING" {
-            // this log is meant to manipulate a CI workflow's log grouping
-            writeln!(stdout, "{}", record.args()).expect("Failed to write log command to stdout");
-            stdout
-                .flush()
-                .expect("Failed to flush log command in stdout");
-        } else if self.enabled(record.metadata()) {
-            let module = record.module_path();
-            if module.is_none_or(|v| v.starts_with("cpp_linter") || v.starts_with("clang_tools")) {
-                writeln!(
-                    stdout,
-                    "[{}]: {}",
-                    Self::level_color(&record.level()),
-                    record.args()
-                )
-                .expect("Failed to write log message to stdout");
-            } else if let Some(module) = module {
-                writeln!(
-                    stdout,
-                    "[{}]{{{}:{}}}: {}",
-                    Self::level_color(&record.level()),
-                    module,
-                    record.line().unwrap_or_default(),
-                    record.args()
-                )
-                .expect("Failed to write detailed log message to stdout");
-            }
-            stdout
-                .flush()
-                .expect("Failed to flush log message in stdout");
+        if is_log_to_stderr() {
+            self.write_record(&mut stderr().lock(), record);
+        } else {
+            self.write_record(&mut stdout().lock(), record);
         }
     }
 
@@ -163,5 +187,29 @@ mod test {
                 .build(),
         );
         logger.flush();
+    }
+
+    #[test]
+    fn records_to_stderr() {
+        super::set_log_to_stderr(true);
+        let logger = SimpleLogger;
+        let info = Record::builder()
+            .args(format_args!("written to stderr"))
+            .level(Level::Info)
+            .module_path(Some("cpp_linter"))
+            .build();
+        logger.log(&info);
+        let group = Record::builder()
+            .args(format_args!("start_log_group: dummy"))
+            .target("CI_LOG_GROUPING")
+            .level(Level::Info)
+            .build();
+        logger.log(&group);
+        super::set_log_to_stderr(false);
+
+        // the same format is used for either stream
+        let mut out = Vec::new();
+        logger.write_record(&mut out, &group);
+        assert_eq!(String::from_utf8(out).unwrap(), "start_log_group: dummy\n");
     }
 }
