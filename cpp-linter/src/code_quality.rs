@@ -375,6 +375,11 @@ mod test {
             replacements: vec![],
             failed: true,
         });
+        // a file with only clang-tidy findings
+        let mut tidy_only = FileObj::new(PathBuf::from("src/other.c"));
+        tidy_only.tidy_advice = Some(TidyAdvice {
+            notes: vec![note("src/other.c", 4, "warning", "readability-y")],
+        });
         // a file without findings
         let mut clean = FileObj::new(PathBuf::from("src/clean.cpp"));
         clean.format_advice = Some(FormatAdvice::default());
@@ -384,6 +389,7 @@ mod test {
         vec![
             Arc::new(Mutex::new(src)),
             Arc::new(Mutex::new(other)),
+            Arc::new(Mutex::new(tidy_only)),
             Arc::new(Mutex::new(clean)),
             Arc::new(Mutex::new(skipped)),
         ]
@@ -448,11 +454,11 @@ mod test {
         let tmp_dir = tempfile::tempdir().unwrap();
         let files = make_files(tmp_dir.path());
         let report = CodeQualityReport::new(&files, "llvm", tmp_dir.path(), Path::new("")).unwrap();
-        assert_eq!(report.len(), 7);
+        assert_eq!(report.len(), 8);
         assert!(!report.is_empty());
         let json = to_json(&report);
         let issues = json.as_array().unwrap();
-        assert_eq!(issues.len(), 7);
+        assert_eq!(issues.len(), 8);
         for issue in issues {
             // fields required by GitLab
             for field in ["description", "check_name", "fingerprint", "severity"] {
@@ -499,6 +505,10 @@ mod test {
         assert_eq!(issues[6]["check_name"], "clang-format");
         assert_eq!(issues[6]["severity"], "major");
         assert_eq!(issues[6]["location"]["path"], "src/other.c");
+
+        // a file with only clang-tidy findings
+        assert_eq!(issues[7]["check_name"], "readability-y");
+        assert_eq!(issues[7]["location"]["path"], "src/other.c");
 
         // all fingerprints are unique
         let mut fingerprints = issues
@@ -597,6 +607,16 @@ mod test {
             err,
             ClientError::CodeQualityFileWriteFailed { .. }
         ));
+
+        // the output path has no parent (and is not a writable file)
+        #[cfg(unix)]
+        {
+            let err = report.write(Path::new("/")).unwrap_err();
+            assert!(matches!(
+                err,
+                ClientError::CodeQualityFileWriteFailed { .. }
+            ));
+        }
     }
 
     #[test]
