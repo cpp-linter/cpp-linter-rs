@@ -514,7 +514,7 @@ dependencies = [
 
 [[package]]
 name = "cpp-linter-py"
-version = "2.0.0-rc.24"
+version = "2.0.0-rc.25"
 dependencies = [
  "cpp-linter",
  "pyo3",
