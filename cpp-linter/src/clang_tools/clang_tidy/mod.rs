@@ -143,6 +143,11 @@ impl TidyNotification {
     }
 }
 
+/// The heading of a review suggestion that no clang-tidy note fixes.
+///
+/// Such a suggestion only has changes from clang-format.
+pub(crate) const FORMAT_SUGGESTION_HEADING: &str = "### clang-format suggestion\n";
+
 /// A struct to hold notification from clang-tidy about a single file
 #[derive(Debug, Clone)]
 pub struct TidyAdvice {
@@ -171,15 +176,10 @@ impl TidyAdvice {
                 }
             }
         }
-        format!(
-            "### clang-tidy {}\n{}",
-            if diagnostics.is_empty() {
-                "suggestion"
-            } else {
-                "diagnostic(s)"
-            },
-            diagnostics.join("")
-        )
+        if diagnostics.is_empty() {
+            return FORMAT_SUGGESTION_HEADING.to_string();
+        }
+        format!("### clang-tidy diagnostic(s)\n{}", diagnostics.join(""))
     }
 }
 
