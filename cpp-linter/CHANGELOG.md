@@ -6,6 +6,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
+## [cpp-linter/v2.0.0-rc.26] - 2026-11-17
+
+### <!-- 1 --> 🚀 Added
+
+- Skip posting thread or review comments on PRs from forks by @2bndy5 in [#557](https://github.com/cpp-linter/cpp-linter-rs/pull/557)
+- Add `--strict` and `--sarif-file -` for local runs by @shenxianpeng in [#584](https://github.com/cpp-linter/cpp-linter-rs/pull/584)
+- Log when GitHub will drop file annotations over its per-step cap by @shenxianpeng in [#583](https://github.com/cpp-linter/cpp-linter-rs/pull/583)
+
+### <!-- 4 --> 🛠️ Fixed
+
+- Skip a file when clang-format fails to run by @shenxianpeng in [#550](https://github.com/cpp-linter/cpp-linter-rs/pull/550)
+- Leave `clang-analyzer-*` out of the default `--tidy-checks` by @shenxianpeng in [#561](https://github.com/cpp-linter/cpp-linter-rs/pull/561)
+- Don't drop clang-tidy diagnostics when colors are on by @shenxianpeng in [#563](https://github.com/cpp-linter/cpp-linter-rs/pull/563)
+- Make clang tool install logs say what actually happened by @shenxianpeng in [#572](https://github.com/cpp-linter/cpp-linter-rs/pull/572)
+- Don't abort the run on non-UTF-8 files or hide clang-format failures by @shenxianpeng in [#573](https://github.com/cpp-linter/cpp-linter-rs/pull/573)
+- Blank `--ignore` ignores every file; patches break on a missing final newline by @shenxianpeng in [#574](https://github.com/cpp-linter/cpp-linter-rs/pull/574)
+- List a clang-tidy note once per review suggestion by @shenxianpeng in [#582](https://github.com/cpp-linter/cpp-linter-rs/pull/582)
+
+### <!-- 6 --> 📦 Dependency updates
+
+- Bump the cargo group with 6 updates by @dependabot[bot] in [#553](https://github.com/cpp-linter/cpp-linter-rs/pull/553)
+- Bump the cargo group with 4 updates by @dependabot[bot] in [#576](https://github.com/cpp-linter/cpp-linter-rs/pull/576)
+- Bump git-bot-feedback by @2bndy5 in [#580](https://github.com/cpp-linter/cpp-linter-rs/pull/580)
+- Bump version to clang-tools-manager/v0.3.4 by @2bndy5 in [`d2b636d`](https://github.com/cpp-linter/cpp-linter-rs/commit/d2b636dd3afaa3fc5b10d37ae848b049b7e1c9ab)
+
+### <!-- 8 --> 📝 Documentation
+
+- Add GitHub Sponsors as a funding channel by @shenxianpeng in [#571](https://github.com/cpp-linter/cpp-linter-rs/pull/571)
+
+[cpp-linter/v2.0.0-rc.26]: https://github.com/cpp-linter/cpp-linter-rs/compare/cpp-linter/v2.0.0-rc.25...cpp-linter/v2.0.0-rc.26
+
+Full commit diff: [`cpp-linter/v2.0.0-rc.25...cpp-linter/v2.0.0-rc.26`][cpp-linter/v2.0.0-rc.26]
+
 ## [cpp-linter/v2.0.0-rc.25] - 2026-11-02
 
 ### <!-- 1 --> 🚀 Added
@@ -24,6 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Bump the cargo group with 6 updates by @dependabot[bot] in [#543](https://github.com/cpp-linter/cpp-linter-rs/pull/543)
 - Bump version to clang-tools-manager/v0.3.3 by @2bndy5 in [`7a545d4`](https://github.com/cpp-linter/cpp-linter-rs/commit/7a545d412640d71dc50767e45f0adb8f9227fd96)
+- Bump version to cpp-linter/v2.0.0-rc.25 by @2bndy5 in [`1918797`](https://github.com/cpp-linter/cpp-linter-rs/commit/1918797c3e7f4e82f8dbf1db9f8203419672f490)
 
 [cpp-linter/v2.0.0-rc.25]: https://github.com/cpp-linter/cpp-linter-rs/compare/cpp-linter/v2.0.0-rc.24...cpp-linter/v2.0.0-rc.25
 
