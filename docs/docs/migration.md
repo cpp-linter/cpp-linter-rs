@@ -13,6 +13,7 @@
 [pr-review]: cli.md#-p-pr-review
 [gen-patch]: cli.md#-f-gen-patch
 [sarif-file]: cli.md#-sarif-file
+[code-quality-file]: cli.md#-code-quality-file
 [gen-patch-path]: cli.md#-gen-patch-path
 [summary-output-file]: cli.md#-o-summary-output-file
 [quick-start]: index.md#quick-start
@@ -165,6 +166,8 @@ With the default `--repo-root` of `.`, nothing changes.
 
 - [`--sarif-file`][sarif-file] writes clang-tidy diagnostics as a SARIF 2.1.0 file, for example to
   upload to GitHub code scanning.
+- [`--code-quality-file`][code-quality-file] writes clang-format and clang-tidy findings as a GitLab
+  Code Quality report, to show them in GitLab merge requests.
 - [`--gen-patch`][gen-patch] and [`--gen-patch-path`][gen-patch-path] produce one patch of the
   clang-format and clang-tidy fixes, described above.
 - [`--mod-sys`][mod-sys] and [`--no-mod-sys`][no-mod-sys] control whether system package managers

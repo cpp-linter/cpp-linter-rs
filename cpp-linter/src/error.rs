@@ -76,6 +76,21 @@ pub enum ClientError {
         source: std::io::Error,
     },
 
+    /// Error when failing to serialize the GitLab Code Quality report.
+    #[error("Failed to serialize the Code Quality report: {0}")]
+    CodeQualitySerialize(#[source] serde_json::Error),
+
+    /// Error when failing to write a given Code Quality report file.
+    #[error("Failed to write Code Quality report to file '{file_path:?}': {source}")]
+    CodeQualityFileWriteFailed {
+        /// The path to the Code Quality report file that failed to be written.
+        file_path: std::path::PathBuf,
+
+        /// The underlying error from trying to write the Code Quality report file.
+        #[source]
+        source: std::io::Error,
+    },
+
     /// Error when failing to determine the parent directory of a given file path.
     #[error("Failed to create a parent directory for the path '{file_path:?}'")]
     MkDirFailed {

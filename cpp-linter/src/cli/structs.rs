@@ -330,6 +330,9 @@ pub struct FeedbackInput {
     /// An optional file path to which clang-tidy diagnostics are written in SARIF format.
     pub sarif_file: Option<PathBuf>,
 
+    /// An optional file path to which findings are written as a GitLab Code Quality report.
+    pub code_quality_file: Option<PathBuf>,
+
     /// Whether to post file annotations.
     pub file_annotations: bool,
 
@@ -382,6 +385,11 @@ impl From<&Cli> for FeedbackInput {
                     absolute_or_given(path)
                 }
             }),
+            code_quality_file: args
+                .feedback_options
+                .code_quality_file
+                .as_deref()
+                .map(absolute_or_given),
             gen_patch: args.feedback_options.gen_patch
                 || args.feedback_options.gen_patch_path.is_some(),
             patch_path: match &args.feedback_options.gen_patch_path {
@@ -406,6 +414,7 @@ impl Default for FeedbackInput {
             repo_root: PathBuf::from("."),
             summary_output_file: None,
             sarif_file: None,
+            code_quality_file: None,
             gen_patch: false,
             patch_path: ClangParams::default_patch_path(Path::new(".")),
         }
@@ -517,6 +526,8 @@ mod test {
             "summary.md",
             "--sarif-file",
             "out/results.sarif",
+            "--code-quality-file",
+            "out/gl-code-quality.json",
         ]);
         let feedback_input = FeedbackInput::from(&cli);
         // a relative path is relative to the working directory, not the repo root
@@ -528,6 +539,10 @@ mod test {
         assert_eq!(
             feedback_input.sarif_file,
             Some(cwd.join("out/results.sarif"))
+        );
+        assert_eq!(
+            feedback_input.code_quality_file,
+            Some(cwd.join("out/gl-code-quality.json"))
         );
     }
 
