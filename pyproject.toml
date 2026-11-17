@@ -32,7 +32,7 @@ classifiers = [
 dynamic = ["version"]
 
 [project.scripts]
-cpp-linter = "cpp_linter:main"
+cpp-linter = "cpp_linter:cli"
 
 [project.urls]
 source =  "https://github.com/cpp-linter/cpp-linter-rs"

@@ -17,6 +17,7 @@ crate-type = ["cdylib"]
 bench = false
 
 [dependencies]
+anyhow = { workspace = true }
 pyo3 = { workspace = true }
 cpp-linter = { path = "../../cpp-linter", features = ["bin"] }
 tokio = { workspace = true }
