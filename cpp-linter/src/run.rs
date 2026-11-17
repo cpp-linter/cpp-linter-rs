@@ -25,7 +25,6 @@ use crate::{
     cli::{ClangParams, Cli, CliCommand, FeedbackInput, LinesChangedOnly, ignore_patterns},
     common_fs::{FileObj, mk_path_abs},
     rest_client::RestClient,
-    sarif::SarifLog,
 };
 use git_bot_feedback::FileFilter;
 
@@ -60,14 +59,17 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
         return Ok(());
     }
 
-    let sarif_to_stdout = cli
-        .feedback_options
-        .sarif_file
-        .as_deref()
-        .is_some_and(SarifLog::is_stdout);
-    // Until the client is known, keep log messages off stdout if it is meant for the SARIF log.
+    if cli.feedback_options.is_sarif_to_stdout() && cli.feedback_options.is_code_quality_to_stdout()
+    {
+        return Err(anyhow!(
+            "Only one of --sarif-file and --code-quality-file can be `-` (stdout)"
+        ));
+    }
+    let report_to_stdout = cli.feedback_options.is_sarif_to_stdout()
+        || cli.feedback_options.is_code_quality_to_stdout();
+    // Until the client is known, keep log messages off stdout if it is meant for a report.
     // This also resets the choice made by a previous call (from the Python or Node.js bindings).
-    set_log_to_stderr(sarif_to_stdout);
+    set_log_to_stderr(report_to_stdout);
     try_init_logger();
 
     let repo_root_abs = mk_path_abs(&cli.source_options.repo_root).with_context(|| {
@@ -77,9 +79,9 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
         )
     })?;
     let mut rest_api_client = RestClient::new(&repo_root_abs)?;
-    // `--sarif-file -` writes the SARIF log to stdout, so in a local run everything else
-    // goes to stderr to keep stdout valid JSON. In CI, logs stay on stdout.
-    set_log_to_stderr(sarif_to_stdout && rest_api_client.client_kind() == "local");
+    // `--sarif-file -` or `--code-quality-file -` writes a report to stdout, so in a local run
+    // everything else goes to stderr to keep stdout valid JSON. In CI, logs stay on stdout.
+    set_log_to_stderr(report_to_stdout && rest_api_client.client_kind() == "local");
     set_max_level(
         if cli.general_options.verbosity.is_debug() || rest_api_client.is_debug_enabled() {
             LevelFilter::Debug
@@ -454,6 +456,18 @@ pub(crate) mod test {
         assert!(!std::path::Path::new("-").exists());
         assert!(!tmp_workspace.path().join("-").exists());
         drop(tmp_gh_out);
+    }
+
+    #[tokio::test]
+    async fn only_one_report_to_stdout() {
+        let err = run_main(vec![
+            "cpp-linter".to_string(),
+            "--sarif-file=-".to_string(),
+            "--code-quality-file=-".to_string(),
+        ])
+        .await
+        .unwrap_err();
+        assert!(err.to_string().contains("Only one of"), "{err}");
     }
 
     #[tokio::test]

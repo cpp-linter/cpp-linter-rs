@@ -10,6 +10,9 @@ use clang_tools_manager::{RequestedVersion, logger::CLI_HELP_STYLE};
 #[cfg(feature = "bin")]
 use clap::{ArgAction, Args, Parser, Subcommand, ValueEnum, builder::FalseyValueParser};
 
+// project specific modules
+use crate::common_fs::is_stdout;
+
 mod structs;
 pub use structs::{ClangParams, FeedbackInput, LinesChangedOnly, ThreadComments};
 
@@ -601,6 +604,9 @@ pub struct FeedbackOptions {
     /// [GitLab Code Quality report](https://docs.gitlab.com/ci/testing/code_quality/#code-quality-report-format).
     ///
     /// A relative path is relative to the current working directory.
+    /// Use `-` to write the report to stdout instead of a file. As with `--sarif-file -`,
+    /// log messages and the generated patch then go to stderr outside CI.
+    /// Only one of `--sarif-file` and `--code-quality-file` can be `-`.
     ///
     /// Like the SARIF file, the report only includes findings that are also
     /// reported in other forms of feedback. So, source filters like
@@ -717,6 +723,16 @@ impl FeedbackOptions {
     /// Are Pull Request reviews enabled by any given `--pr-review` value (or its aliases)?
     pub fn is_pr_review(&self) -> bool {
         self.pr_review.iter().any(|enabled| *enabled)
+    }
+
+    /// Does `--sarif-file` write the SARIF log to stdout (`-`)?
+    pub fn is_sarif_to_stdout(&self) -> bool {
+        self.sarif_file.as_deref().is_some_and(is_stdout)
+    }
+
+    /// Does `--code-quality-file` write the Code Quality report to stdout (`-`)?
+    pub fn is_code_quality_to_stdout(&self) -> bool {
+        self.code_quality_file.as_deref().is_some_and(is_stdout)
     }
 }
 
