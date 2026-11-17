@@ -153,8 +153,8 @@ pub struct GeneralOptions {
     ///
     /// - `0`: no check failed, or checks failed without this option.
     /// - `1`: checks failed (with this option), or the run stopped on an error.
-    ///   The `cpp-linter` executable prints the error on a line starting with `Error:`.
-    ///   The Python and Node.js bindings raise it as an exception instead.
+    ///   The `cpp-linter` command prints the error on a line starting with `Error:`.
+    ///   The `main()` function of the Python and Node.js bindings raises it as an exception instead.
     /// - `2`: the command line arguments are invalid.
     #[cfg_attr(
         feature = "bin",

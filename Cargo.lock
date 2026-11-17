@@ -516,6 +516,7 @@ dependencies = [
 name = "cpp-linter-py"
 version = "2.0.0-rc.25"
 dependencies = [
+ "anyhow",
  "cpp-linter",
  "pyo3",
  "tokio",
