@@ -298,8 +298,12 @@ impl RestClient {
             }
         }
         if let Some(output_file) = &feedback_inputs.code_quality_file {
-            let report =
-                CodeQualityReport::new(files, &feedback_inputs.style, &feedback_inputs.repo_root)?;
+            let report = CodeQualityReport::new(
+                files,
+                &feedback_inputs.style,
+                &feedback_inputs.repo_root,
+                &self.repo_root_prefix,
+            )?;
             report.write(output_file)?;
             log::info!(
                 "Wrote {} finding(s) to the Code Quality report {}",

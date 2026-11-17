@@ -8,7 +8,7 @@
 
 use std::{
     collections::HashMap,
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
     sync::{Arc, Mutex},
 };
 
@@ -104,15 +104,20 @@ pub(crate) fn fingerprint(
         .collect()
 }
 
-/// The path of `file` relative to `repo_root`, with `/` separators and no `./` prefix.
-fn relative_path(file: &Path, repo_root: &Path) -> String {
-    let path = file.strip_prefix(repo_root).unwrap_or(file);
-    let path = path.to_string_lossy().replace('\\', "/");
-    let mut path = path.as_str();
-    while let Some(stripped) = path.strip_prefix("./") {
-        path = stripped;
-    }
-    path.to_string()
+/// The path of `file` relative to the git repository, with `/` separators and no `./` prefix.
+///
+/// `file` is relative to `repo_root` (the `--repo-root`), which is `path_prefix`
+/// in the git repository (empty if `--repo-root` is the repository's root).
+fn relative_path(file: &Path, repo_root: &Path, path_prefix: &Path) -> String {
+    let path = path_prefix.join(file.strip_prefix(repo_root).unwrap_or(file));
+    path.components()
+        // drop `.` components (eg. a `./` prefix)
+        .filter(|c| !matches!(c, Component::CurDir))
+        .map(|c| c.as_os_str().to_string_lossy())
+        .collect::<Vec<_>>()
+        .join("/")
+        // a Windows-style path given on another platform
+        .replace('\\', "/")
 }
 
 /// The source lines of a file, used to make fingerprints.
@@ -191,12 +196,16 @@ impl CodeQualityReport {
     /// skipped.
     ///
     /// The `style` is the `--style` value, used to describe clang-format findings.
-    /// All file paths are relative to the given `repo_root` path, which is also
-    /// where the source files are read from to make fingerprints.
+    /// The source files are read from the given `repo_root` path to make fingerprints.
+    ///
+    /// GitLab needs paths relative to the git repository. So, if `repo_root` is a
+    /// sub-directory of the git repository, then `path_prefix` is that sub-directory
+    /// (relative to the git repository's root), and it is prepended to the file paths.
     pub fn new(
         files: &[Arc<Mutex<FileObj>>],
         style: &str,
         repo_root: &Path,
+        path_prefix: &Path,
     ) -> Result<Self, ClientError> {
         let style_guide = summarize_style(style);
         let mut builder = IssueBuilder::default();
@@ -214,7 +223,7 @@ impl CodeQualityReport {
             if format_advice.is_none() && tidy_notes.is_empty() {
                 continue;
             }
-            let path = relative_path(&file.name, repo_root);
+            let path = relative_path(&file.name, repo_root, path_prefix);
             let source = SourceLines::read(&repo_root.join(&file.name));
 
             if let Some(format_advice) = format_advice {
@@ -387,9 +396,23 @@ mod test {
     #[test]
     fn paths() {
         let root = Path::new("/repo");
-        assert_eq!(relative_path(Path::new("./src/a.c"), root), "src/a.c");
-        assert_eq!(relative_path(Path::new("/repo/src/a.c"), root), "src/a.c");
-        assert_eq!(relative_path(Path::new(r"src\a.c"), root), "src/a.c");
+        let none = Path::new("");
+        assert_eq!(relative_path(Path::new("./src/a.c"), root, none), "src/a.c");
+        assert_eq!(
+            relative_path(Path::new("/repo/src/a.c"), root, none),
+            "src/a.c"
+        );
+        assert_eq!(relative_path(Path::new(r"src\a.c"), root, none), "src/a.c");
+        // `--repo-root` is a sub-directory of the git repository
+        let prefix = Path::new("native");
+        assert_eq!(
+            relative_path(Path::new("./src/a.c"), root, prefix),
+            "native/src/a.c"
+        );
+        assert_eq!(
+            relative_path(Path::new("/repo/src/a.c"), root, prefix),
+            "native/src/a.c"
+        );
     }
 
     #[test]
@@ -424,7 +447,7 @@ mod test {
     fn code_quality_report() {
         let tmp_dir = tempfile::tempdir().unwrap();
         let files = make_files(tmp_dir.path());
-        let report = CodeQualityReport::new(&files, "llvm", tmp_dir.path()).unwrap();
+        let report = CodeQualityReport::new(&files, "llvm", tmp_dir.path(), Path::new("")).unwrap();
         assert_eq!(report.len(), 7);
         assert!(!report.is_empty());
         let json = to_json(&report);
@@ -491,7 +514,9 @@ mod test {
     fn fingerprint_ignores_line_numbers() {
         let tmp_dir = tempfile::tempdir().unwrap();
         let files = make_files(tmp_dir.path());
-        let before = to_json(&CodeQualityReport::new(&files, "file", tmp_dir.path()).unwrap());
+        let before = to_json(
+            &CodeQualityReport::new(&files, "file", tmp_dir.path(), Path::new("")).unwrap(),
+        );
 
         // add a line above the findings, and move them down by one line
         std::fs::write(
@@ -507,7 +532,9 @@ mod test {
                 }
             }
         }
-        let after = to_json(&CodeQualityReport::new(&files, "file", tmp_dir.path()).unwrap());
+        let after = to_json(
+            &CodeQualityReport::new(&files, "file", tmp_dir.path(), Path::new("")).unwrap(),
+        );
         for index in [2, 3, 4] {
             assert_ne!(
                 before[index]["location"]["lines"]["begin"],
@@ -524,7 +551,7 @@ mod test {
     #[test]
     fn empty_report() {
         let tmp_dir = tempfile::tempdir().unwrap();
-        let report = CodeQualityReport::new(&[], "llvm", tmp_dir.path()).unwrap();
+        let report = CodeQualityReport::new(&[], "llvm", tmp_dir.path(), Path::new("")).unwrap();
         assert!(report.is_empty());
         let out_path = tmp_dir.path().join("gl-code-quality.json");
         report.write(&out_path).unwrap();
@@ -536,8 +563,13 @@ mod test {
     fn write_report() {
         let tmp_dir = tempfile::tempdir().unwrap();
         let out_path = tmp_dir.path().join("sub/dir/gl-code-quality.json");
-        let report =
-            CodeQualityReport::new(&make_files(tmp_dir.path()), "llvm", tmp_dir.path()).unwrap();
+        let report = CodeQualityReport::new(
+            &make_files(tmp_dir.path()),
+            "llvm",
+            tmp_dir.path(),
+            Path::new(""),
+        )
+        .unwrap();
         report.write(&out_path).unwrap();
         let bytes = std::fs::read(&out_path).unwrap();
         // GitLab rejects a byte order mark
@@ -551,7 +583,7 @@ mod test {
         use crate::error::ClientError;
 
         let tmp_dir = tempfile::tempdir().unwrap();
-        let report = CodeQualityReport::new(&[], "llvm", tmp_dir.path()).unwrap();
+        let report = CodeQualityReport::new(&[], "llvm", tmp_dir.path(), Path::new("")).unwrap();
 
         // the parent "directory" is actually a file
         let not_a_dir = tmp_dir.path().join("not-a-dir");
@@ -572,6 +604,6 @@ mod test {
         let tmp_dir = tempfile::tempdir().unwrap();
         let files = make_files(tmp_dir.path());
         crate::test_common::poison_mutex(&files[0]);
-        assert!(CodeQualityReport::new(&files, "llvm", tmp_dir.path()).is_err());
+        assert!(CodeQualityReport::new(&files, "llvm", tmp_dir.path(), Path::new("")).is_err());
     }
 }

@@ -441,6 +441,7 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
     assert_eq!(format_paths.len(), format_checks_failed);
     for issue in issues {
         let path = issue["location"]["path"].as_str().unwrap();
+        assert!(Path::new(path).is_relative(), "{path} is not relative");
         assert!(
             tmp_dir.path().join(path).is_file(),
             "{path} is not relative to the repo root"
