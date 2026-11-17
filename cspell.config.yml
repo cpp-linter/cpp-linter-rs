@@ -13,6 +13,7 @@ words:
   - chrono
   - clippy
   - codecov
+  - codequality
   - codspeed
   - consts
   - cooldown

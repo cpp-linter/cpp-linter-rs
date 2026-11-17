@@ -21,6 +21,7 @@ use crate::{
         clang_tidy::tally_tidy_advice,
     },
     cli::{FeedbackInput, ThreadComments},
+    code_quality::CodeQualityReport,
     common_fs::FileObj,
     error::ClientError,
     sarif::SarifLog,
@@ -295,6 +296,16 @@ impl RestClient {
             } else {
                 log::info!("Wrote SARIF log to {}", output_file.to_string_lossy());
             }
+        }
+        if let Some(output_file) = &feedback_inputs.code_quality_file {
+            let report =
+                CodeQualityReport::new(files, &feedback_inputs.style, &feedback_inputs.repo_root)?;
+            report.write(output_file)?;
+            log::info!(
+                "Wrote {} finding(s) to the Code Quality report {}",
+                report.len(),
+                output_file.to_string_lossy()
+            );
         }
         let output_vars = [
             OutputVariable {

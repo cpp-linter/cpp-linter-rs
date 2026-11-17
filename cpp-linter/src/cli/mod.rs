@@ -596,6 +596,29 @@ pub struct FeedbackOptions {
     )]
     pub sarif_file: Option<PathBuf>,
 
+    /// Provide this option with a path to which clang-format and clang-tidy
+    /// findings are written as a
+    /// [GitLab Code Quality report](https://docs.gitlab.com/ci/testing/code_quality/#code-quality-report-format).
+    ///
+    /// A relative path is relative to the current working directory.
+    ///
+    /// Like the SARIF file, the report only includes findings that are also
+    /// reported in other forms of feedback. So, source filters like
+    /// [`--lines-changed-only`](#-l-lines-changed-only) and
+    /// [`--ignore-tidy`](#-d-ignore-tidy) are respected.
+    /// Unlike the SARIF file, the report also includes clang-format findings.
+    /// The report is written even if no findings were found (an empty array).
+    ///
+    /// > [!TIP]
+    /// > In GitLab CI/CD, declare the file as a
+    /// > [`codequality` report artifact](https://docs.gitlab.com/ci/yaml/artifacts_reports/#artifactsreportscodequality)
+    /// > to show the findings in merge requests.
+    #[cfg_attr(
+        feature = "bin",
+        arg(long, value_name = "PATH", help_heading = "Feedback options",)
+    )]
+    pub code_quality_file: Option<PathBuf>,
+
     /// Set this option to false to disable the use of
     /// file annotations as feedback.
     ///

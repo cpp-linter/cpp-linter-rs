@@ -23,6 +23,7 @@ const REMAINING_RATE_LIMIT_HEADER: &str = "x-ratelimit-remaining";
 
 const SUMMARY_OUT_FILE_NAME: &str = "summary_output.md";
 const SARIF_FILE_NAME: &str = "results/clang-tidy.sarif";
+const CODE_QUALITY_FILE_NAME: &str = "results/gl-code-quality.json";
 
 #[derive(PartialEq, Clone, Copy, Debug)]
 enum EventType {
@@ -297,6 +298,7 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
     };
     let summary_out_file_path = out_dir_path.join(SUMMARY_OUT_FILE_NAME);
     let sarif_file_path = out_dir_path.join(SARIF_FILE_NAME);
+    let code_quality_file_path = out_dir_path.join(CODE_QUALITY_FILE_NAME);
 
     let mut args = vec![
         "cpp-linter".to_string(),
@@ -317,6 +319,10 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
         ),
         format!("--gen-patch={}", test_params.gen_patch),
         format!("--sarif-file={}", sarif_file_path.to_str().unwrap()),
+        format!(
+            "--code-quality-file={}",
+            code_quality_file_path.to_str().unwrap()
+        ),
     ];
     if test_params.force_lgtm {
         args.push("-e=c".to_string());
@@ -409,6 +415,37 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
             .as_str()
             .unwrap();
         assert!(!uri.contains(' '), "URI should be percent-encoded: {uri}");
+    }
+
+    // verify the Code Quality report has 1 issue per clang-tidy concern,
+    // and clang-format issues for each file that is not formatted
+    let format_checks_failed = output_vars
+        .lines()
+        .find_map(|line| line.strip_prefix("clang-format-checks-failed="))
+        .expect("clang-format-checks-failed output variable not found")
+        .trim()
+        .parse::<usize>()
+        .unwrap();
+    let code_quality: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&code_quality_file_path).unwrap()).unwrap();
+    let issues = code_quality.as_array().unwrap();
+    let (format_issues, tidy_issues): (Vec<_>, Vec<_>) = issues
+        .iter()
+        .partition(|issue| issue["check_name"] == "clang-format");
+    assert_eq!(tidy_issues.len(), tidy_checks_failed);
+    let mut format_paths = format_issues
+        .iter()
+        .map(|issue| issue["location"]["path"].as_str().unwrap())
+        .collect::<Vec<_>>();
+    format_paths.dedup();
+    assert_eq!(format_paths.len(), format_checks_failed);
+    for issue in issues {
+        let path = issue["location"]["path"].as_str().unwrap();
+        assert!(
+            tmp_dir.path().join(path).is_file(),
+            "{path} is not relative to the repo root"
+        );
+        assert!(issue["location"]["lines"]["begin"].as_u64().unwrap() >= 1);
     }
 }
 

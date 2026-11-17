@@ -17,6 +17,7 @@
 // project specific modules/crates
 pub mod clang_tools;
 pub mod cli;
+pub mod code_quality;
 pub mod common_fs;
 pub mod error;
 mod git;

@@ -17,6 +17,8 @@
 [lines-changed-only]: cli.md#-l-lines-changed-only
 [files-changed-only]: cli.md#-f-files-changed-only
 [diff-base]: cli.md#-b-diff-base
+[code-quality-file]: cli.md#-code-quality-file
+[gitlab-code-quality]: https://docs.gitlab.com/ci/testing/code_quality/
 
 cpp-linter is not limited to GitHub. It detects the git server from the environment variables that
 the CI runner sets, and uses [git-bot-feedback][] to talk to the server's REST API.
@@ -47,6 +49,7 @@ Without a known CI environment, cpp-linter runs locally. The list of changed fil
 | [`--step-summary`][step-summary] | yes | appended to the file named by `GITHUB_STEP_SUMMARY` | no |
 | Output variables (`checks-failed` and others) | yes | yes | printed in the log only |
 | Collapsed groups in the log | yes | yes | yes |
+| [`--code-quality-file`][code-quality-file] report shown in merge requests | no | no | yes |
 
 On every server, feedback is only posted to pull requests from a branch in the same repository.
 For a pull request from a fork, cpp-linter still analyzes the changed files, but it skips the thread
@@ -119,6 +122,9 @@ GitLab v17.9 or newer is needed.
   should fail on findings needs [`--strict`][strict], which makes cpp-linter exit with code 1.
 - Turn off [`--file-annotations`][file-annotations]. GitLab has no equivalent, and each annotation
   would be printed in the job's log instead.
+- To see the findings in the merge request, write a [Code Quality report][gitlab-code-quality]
+  with [`--code-quality-file`][code-quality-file] and declare it as a `codequality` report artifact.
+  The report holds both clang-format and clang-tidy findings.
 
 ```yaml title=".gitlab-ci.yml"
 cpp-linter:
@@ -133,6 +139,11 @@ cpp-linter:
       --thread-comments=update
       --pr-review=true
       --file-annotations=false
+      --code-quality-file=gl-code-quality.json
+  artifacts:
+    when: always
+    reports:
+      codequality: gl-code-quality.json
 ```
 
 The token is not passed in the example because GitLab exposes CI/CD variables to the job as
