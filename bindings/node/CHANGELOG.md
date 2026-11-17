@@ -6,6 +6,46 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
+## [cpp-linter-js/v2.0.0-rc.24] - 2026-11-17
+
+### <!-- 1 --> 🚀 Added
+
+- Skip posting thread or review comments on PRs from forks by @2bndy5 in [#557](https://github.com/cpp-linter/cpp-linter-rs/pull/557)
+- Add `--strict` and `--sarif-file -` for local runs by @shenxianpeng in [#584](https://github.com/cpp-linter/cpp-linter-rs/pull/584)
+- Log when GitHub will drop file annotations over its per-step cap by @shenxianpeng in [#583](https://github.com/cpp-linter/cpp-linter-rs/pull/583)
+
+### <!-- 4 --> 🛠️ Fixed
+
+- Skip a file when clang-format fails to run by @shenxianpeng in [#550](https://github.com/cpp-linter/cpp-linter-rs/pull/550)
+- Leave `clang-analyzer-*` out of the default `--tidy-checks` by @shenxianpeng in [#561](https://github.com/cpp-linter/cpp-linter-rs/pull/561)
+- Don't drop clang-tidy diagnostics when colors are on by @shenxianpeng in [#563](https://github.com/cpp-linter/cpp-linter-rs/pull/563)
+- Make clang tool install logs say what actually happened by @shenxianpeng in [#572](https://github.com/cpp-linter/cpp-linter-rs/pull/572)
+- Don't abort the run on non-UTF-8 files or hide clang-format failures by @shenxianpeng in [#573](https://github.com/cpp-linter/cpp-linter-rs/pull/573)
+- Blank `--ignore` ignores every file; patches break on a missing final newline by @shenxianpeng in [#574](https://github.com/cpp-linter/cpp-linter-rs/pull/574)
+- List a clang-tidy note once per review suggestion by @shenxianpeng in [#582](https://github.com/cpp-linter/cpp-linter-rs/pull/582)
+
+### <!-- 6 --> 📦 Dependency updates
+
+- Bump the cargo group with 6 updates by @dependabot[bot] in [#553](https://github.com/cpp-linter/cpp-linter-rs/pull/553)
+- Bump mypy from 2.4.0 to 2.4.1 in the uv-pip group across 1 directory by @dependabot[bot] in [#555](https://github.com/cpp-linter/cpp-linter-rs/pull/555)
+- Bump the npm group with 2 updates by @dependabot[bot] in [#554](https://github.com/cpp-linter/cpp-linter-rs/pull/554)
+- Bump ruff from 0.17.1 to 0.17.4 in the uv-pip group by @dependabot[bot] in [#578](https://github.com/cpp-linter/cpp-linter-rs/pull/578)
+- Bump the npm group with 3 updates by @dependabot[bot] in [#577](https://github.com/cpp-linter/cpp-linter-rs/pull/577)
+- Bump the cargo group with 4 updates by @dependabot[bot] in [#576](https://github.com/cpp-linter/cpp-linter-rs/pull/576)
+- Bump git-bot-feedback by @2bndy5 in [#580](https://github.com/cpp-linter/cpp-linter-rs/pull/580)
+- Bump version to clang-tools-manager/v0.3.4 by @2bndy5 in [`d2b636d`](https://github.com/cpp-linter/cpp-linter-rs/commit/d2b636dd3afaa3fc5b10d37ae848b049b7e1c9ab)
+- Bump version to cpp-linter/v2.0.0-rc.26 by @2bndy5 in [`3e08470`](https://github.com/cpp-linter/cpp-linter-rs/commit/3e084701e69600a575c85bbb08a5129f940d0ddb)
+- Bump version to cpp-linter-py/v2.0.0-rc.25 by @2bndy5 in [`5f0e651`](https://github.com/cpp-linter/cpp-linter-rs/commit/5f0e651f1fca0726c873390947784756efa851b7)
+
+### <!-- 8 --> 📝 Documentation
+
+- Add GitHub Sponsors as a funding channel by @shenxianpeng in [#571](https://github.com/cpp-linter/cpp-linter-rs/pull/571)
+- Build the docs with MkDocs NG and publish llms.txt by @shenxianpeng in [#585](https://github.com/cpp-linter/cpp-linter-rs/pull/585)
+
+[cpp-linter-js/v2.0.0-rc.24]: https://github.com/cpp-linter/cpp-linter-rs/compare/cpp-linter-js/v2.0.0-rc.23...cpp-linter-js/v2.0.0-rc.24
+
+Full commit diff: [`cpp-linter-js/v2.0.0-rc.23...cpp-linter-js/v2.0.0-rc.24`][cpp-linter-js/v2.0.0-rc.24]
+
 ## [cpp-linter-js/v2.0.0-rc.23] - 2026-11-03
 
 ### <!-- 1 --> 🚀 Added
@@ -28,6 +68,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump version to clang-tools-manager/v0.3.3 by @2bndy5 in [`7a545d4`](https://github.com/cpp-linter/cpp-linter-rs/commit/7a545d412640d71dc50767e45f0adb8f9227fd96)
 - Bump version to cpp-linter/v2.0.0-rc.25 by @2bndy5 in [`1918797`](https://github.com/cpp-linter/cpp-linter-rs/commit/1918797c3e7f4e82f8dbf1db9f8203419672f490)
 - Bump version to cpp-linter-py/v2.0.0-rc.24 by @2bndy5 in [`e26cce7`](https://github.com/cpp-linter/cpp-linter-rs/commit/e26cce73b06c565b030a2158229bf0f1af989cbc)
+- Bump version to cpp-linter-js/v2.0.0-rc.23 by @2bndy5 in [`389dde6`](https://github.com/cpp-linter/cpp-linter-rs/commit/389dde6fbfedaff2c573848caa763fd7c93fcfcb)
 
 ### <!-- 8 --> 📝 Documentation
 

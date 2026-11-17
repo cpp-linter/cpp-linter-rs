@@ -503,7 +503,7 @@ dependencies = [
 
 [[package]]
 name = "cpp-linter-js"
-version = "2.0.0-rc.23"
+version = "2.0.0-rc.24"
 dependencies = [
  "anyhow",
  "cpp-linter",
