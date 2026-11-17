@@ -301,9 +301,9 @@ fn suggestion_help_with_and_without_fixes() {
     let help = advice.get_suggestion_help(1, 10);
     assert!(help.contains("clang-tidy diagnostic(s)"));
     assert!(help.contains("a dummy rationale"));
-    // No fixed line within the range falls back to a plain "suggestion" header.
+    // No fixed line within the range: the suggestion only has clang-format changes.
     let help = advice.get_suggestion_help(20, 30);
-    assert!(help.contains("clang-tidy suggestion"));
+    assert_eq!(help, "### clang-format suggestion\n");
 }
 
 #[test]

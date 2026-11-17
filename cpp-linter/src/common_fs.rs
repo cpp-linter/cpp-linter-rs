@@ -15,8 +15,9 @@ use gix_imara_diff::{
 
 use crate::{
     clang_tools::{
-        DiffContents, ReviewComments, Suggestion, clang_format::FormatAdvice,
-        clang_tidy::TidyAdvice,
+        DiffContents, ReviewComments, Suggestion,
+        clang_format::FormatAdvice,
+        clang_tidy::{FORMAT_SUGGESTION_HEADING, TidyAdvice},
     },
     cli::LinesChangedOnly,
     error::FileObjError,
@@ -375,7 +376,7 @@ impl FileObj {
                         .tidy_advice
                         .as_ref()
                         .map(|t| t.get_suggestion_help(start_line, end_line))
-                        .unwrap_or_default();
+                        .unwrap_or_else(|| FORMAT_SUGGESTION_HEADING.to_string());
                     if hunk.is_pure_removal() {
                         suggestion.push_str(
                             format!(
