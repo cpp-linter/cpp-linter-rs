@@ -56,6 +56,58 @@ fn repo_root_prefix(repo_root: &Path, workspace_root: Option<PathBuf>) -> PathBu
         .unwrap_or_default()
 }
 
+/// GitHub keeps only this many annotations of each level (error, warning, notice) per step.
+pub const GITHUB_ANNOTATIONS_PER_STEP_LIMIT: usize = 10;
+
+/// GitHub keeps only this many annotations in total per job.
+pub const GITHUB_ANNOTATIONS_PER_JOB_LIMIT: usize = 50;
+
+/// Describe the file annotations that GitHub will not show,
+/// because it keeps only the first [`GITHUB_ANNOTATIONS_PER_STEP_LIMIT`] annotations
+/// of each level in a step.
+///
+/// Returns [`None`] if every annotation fits in the step.
+/// The job limit ([`GITHUB_ANNOTATIONS_PER_JOB_LIMIT`]) is only mentioned,
+/// because annotations from other steps of the job are unknown.
+fn annotation_cap_message(
+    annotations: &[FileAnnotation],
+    feedback_inputs: &FeedbackInput,
+) -> Option<String> {
+    let mut over_limit = vec![];
+    for (level, name) in [
+        (AnnotationLevel::Error, "error"),
+        (AnnotationLevel::Warning, "warning"),
+        (AnnotationLevel::Notice, "notice"),
+    ] {
+        let count = annotations.iter().filter(|a| a.severity == level).count();
+        if count > GITHUB_ANNOTATIONS_PER_STEP_LIMIT {
+            over_limit.push(format!(
+                "{} of {count} {name} annotations",
+                count - GITHUB_ANNOTATIONS_PER_STEP_LIMIT
+            ));
+        }
+    }
+    if over_limit.is_empty() {
+        return None;
+    }
+    let full_list = match (
+        feedback_inputs.step_summary,
+        feedback_inputs.thread_comments != ThreadComments::Off,
+    ) {
+        (true, true) => "The step summary and the thread comment list every finding.",
+        (true, false) => "The step summary lists every finding.",
+        (false, true) => "The thread comment lists every finding.",
+        (false, false) => {
+            "Use `--step-summary` or `--thread-comments` to get a list of every finding."
+        }
+    };
+    Some(format!(
+        "GitHub shows only the first {GITHUB_ANNOTATIONS_PER_STEP_LIMIT} annotations of each level in a step \
+        (and {GITHUB_ANNOTATIONS_PER_JOB_LIMIT} in a job), so {} are not shown. {full_list}",
+        over_limit.join(" and "),
+    ))
+}
+
 fn prefix_feedback_path(file_path: &str, repo_root_prefix: &Path) -> String {
     repo_root_prefix
         .join(file_path)
@@ -197,6 +249,11 @@ impl RestClient {
                 annotation.path = prefix_feedback_path(&annotation.path, &self.repo_root_prefix);
             }
             self.client.write_file_annotations(&annotations)?;
+            if self.client.client_kind() == "github"
+                && let Some(msg) = annotation_cap_message(&annotations, &feedback_inputs)
+            {
+                log::warn!("{msg}");
+            }
         }
         if feedback_inputs.step_summary || feedback_inputs.summary_output_file.is_some() {
             let summary = Self::make_comment(
@@ -750,11 +807,11 @@ mod test {
     use semver::Version;
     use tempfile::{NamedTempFile, tempdir};
 
-    use git_bot_feedback::{AnnotationLevel, FileFilter};
+    use git_bot_feedback::{AnnotationLevel, FileAnnotation, FileFilter};
 
     use super::{
-        RestClient, USER_OUTREACH, normalize_changed_file_name, prefix_feedback_path,
-        repo_root_prefix,
+        RestClient, USER_OUTREACH, annotation_cap_message, normalize_changed_file_name,
+        prefix_feedback_path, repo_root_prefix,
     };
     use crate::{
         clang_tools::{
@@ -971,6 +1028,34 @@ mod test {
     }
 
     #[tokio::test]
+    async fn annotations_over_cap_on_github() {
+        let tmp_dir = tempdir().unwrap();
+        let repo_root = env::current_dir().unwrap();
+        let gh_out_path = NamedTempFile::new_in(tmp_dir.path()).unwrap();
+        unsafe {
+            env::set_var("GITHUB_ACTIONS", "true");
+            env::set_var("GITHUB_REPOSITORY", "cpp-linter/cpp-linter-rs");
+            env::set_var("GITHUB_SHA", "deadbeef123");
+            env::set_var("GITHUB_WORKSPACE", &repo_root);
+            env::set_var("GITHUB_OUTPUT", gh_out_path.path());
+        }
+        let mut rest_api_client = RestClient::new(&repo_root).unwrap();
+        // 11 warnings: one more than GitHub shows in a step
+        let files = (0..11)
+            .flat_map(|_| make_dummy_files("warning"))
+            .collect::<Vec<_>>();
+        let feedback_inputs = FeedbackInput {
+            file_annotations: true,
+            ..Default::default()
+        };
+        let checks_failed = rest_api_client
+            .post_feedback(&files, feedback_inputs, dummy_versions())
+            .await
+            .unwrap();
+        assert_eq!(checks_failed, 22);
+    }
+
+    #[tokio::test]
     async fn thread_comment_without_summary() {
         unsafe {
             env::remove_var("GITHUB_ACTIONS");
@@ -1180,5 +1265,74 @@ mod test {
         )
         .unwrap();
         assert!(!limited.contains("A test dummy rationale"));
+    }
+
+    // ************************* tests for GitHub's annotation limits
+
+    fn annotations(warnings: usize, notices: usize) -> Vec<FileAnnotation> {
+        let make = |severity| FileAnnotation {
+            severity,
+            path: "demo.cpp".to_string(),
+            message: "a dummy message".to_string(),
+            ..Default::default()
+        };
+        let mut result = vec![make(AnnotationLevel::Warning); warnings];
+        result.extend(vec![make(AnnotationLevel::Notice); notices]);
+        result
+    }
+
+    #[test]
+    fn annotations_within_limits() {
+        let inputs = FeedbackInput::default();
+        assert!(annotation_cap_message(&[], &inputs).is_none());
+        assert!(annotation_cap_message(&annotations(10, 10), &inputs).is_none());
+        let msg = annotation_cap_message(&annotations(11, 0), &inputs).unwrap();
+        assert!(msg.ends_with("to get a list of every finding."), "{msg}");
+    }
+
+    #[test]
+    fn annotations_over_step_limit() {
+        let inputs = FeedbackInput {
+            step_summary: true,
+            thread_comments: ThreadComments::Off,
+            ..Default::default()
+        };
+        let msg = annotation_cap_message(&annotations(20, 1), &inputs).unwrap();
+        assert!(
+            msg.contains("so 10 of 20 warning annotations are not shown."),
+            "{msg}"
+        );
+        assert!(
+            msg.ends_with("The step summary lists every finding."),
+            "{msg}"
+        );
+
+        let inputs = FeedbackInput {
+            step_summary: false,
+            thread_comments: ThreadComments::Update,
+            ..Default::default()
+        };
+        let msg = annotation_cap_message(&annotations(11, 12), &inputs).unwrap();
+        assert!(
+            msg.contains(
+                "so 1 of 11 warning annotations and 2 of 12 notice annotations are not shown."
+            ),
+            "{msg}"
+        );
+        assert!(
+            msg.ends_with("The thread comment lists every finding."),
+            "{msg}"
+        );
+
+        let inputs = FeedbackInput {
+            step_summary: true,
+            thread_comments: ThreadComments::On,
+            ..Default::default()
+        };
+        let msg = annotation_cap_message(&annotations(0, 11), &inputs).unwrap();
+        assert!(
+            msg.ends_with("The step summary and the thread comment list every finding."),
+            "{msg}"
+        );
     }
 }
