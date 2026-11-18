@@ -5,8 +5,8 @@
 #![cfg(feature = "bin")]
 
 use std::{
-    env,
-    path::PathBuf,
+    env, fs,
+    path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
 
@@ -30,6 +30,23 @@ use crate::{
 use git_bot_feedback::FileFilter;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// Can the given `file` (relative to `repo_root`) be opened and read as a regular file?
+///
+/// If not, a warning is logged that says why the file is skipped.
+fn is_readable_file(repo_root: &Path, file: &FileObj) -> bool {
+    let path = repo_root.join(&file.name);
+    let reason = match fs::File::open(&path).and_then(|f| f.metadata()) {
+        Ok(meta) if meta.is_file() => return true,
+        Ok(_) => "it is not a regular file".to_string(),
+        Err(e) => e.to_string(),
+    };
+    log::warn!(
+        "Skipping {}: {reason}",
+        file.name.to_string_lossy().replace('\\', "/")
+    );
+    false
+}
 
 /// This is the backend entry point for console applications.
 ///
@@ -173,6 +190,10 @@ pub async fn run_main(args: Vec<String>) -> Result<()> {
     // The file lists from git and the directory walk are unordered.
     // Sort them, so the order of feedback (comments, annotations, etc) is deterministic.
     files.sort_by(|a, b| a.name.cmp(&b.name));
+    // A listed file can be impossible to read: a dangling symlink (eg. into a submodule
+    // that is not checked out), a file removed by an earlier CI step, or a directory.
+    // Skip it with a warning instead of stopping the whole run.
+    files.retain(|file| is_readable_file(&cli.source_options.repo_root, file));
     let mut arc_files = vec![];
     log::info!("Giving attention to the following files:");
     for file in files {
@@ -430,6 +451,55 @@ pub(crate) mod test {
             env::set_var("CPP_LINTER_STRICT_EXIT", "true");
         }
         run_main(args(None)).await.unwrap_err();
+        drop(tmp_gh_out);
+    }
+
+    #[test]
+    fn unreadable_files_are_skipped() {
+        use super::is_readable_file;
+        use crate::common_fs::FileObj;
+        use std::path::PathBuf;
+
+        let tmp_workspace = setup_tmp_workspace();
+        let root = tmp_workspace.path();
+        assert!(is_readable_file(
+            root,
+            &FileObj::new(PathBuf::from("demo/demo.cpp"))
+        ));
+        // a missing file (eg. removed by an earlier CI step)
+        assert!(!is_readable_file(
+            root,
+            &FileObj::new(PathBuf::from("demo/missing.cpp"))
+        ));
+        // a directory with a source file extension
+        std::fs::create_dir(root.join("folder.cpp")).unwrap();
+        assert!(!is_readable_file(
+            root,
+            &FileObj::new(PathBuf::from("folder.cpp"))
+        ));
+    }
+
+    /// A dangling symlink (eg. into a submodule that is not checked out) does not stop the run.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn dangling_symlink() {
+        let tmp_gh_out = setup_tmp_gh_out_path();
+        let tmp_workspace = setup_tmp_workspace();
+        std::os::unix::fs::symlink(
+            "not-checked-out/missing.cpp",
+            tmp_workspace.path().join("demo/dangling.cpp"),
+        )
+        .unwrap();
+        run_main(vec![
+            "cpp-linter".to_string(),
+            "-l=false".to_string(),
+            "--style=llvm".to_string(),
+            "--tidy-checks=-*".to_string(),
+            "--repo-root".to_string(),
+            tmp_workspace.path().to_str().unwrap().to_string(),
+        ])
+        .await
+        .unwrap();
         drop(tmp_gh_out);
     }
 
