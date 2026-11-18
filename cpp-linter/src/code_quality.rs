@@ -605,6 +605,8 @@ mod test {
     fn write_report_to_stdout() {
         let tmp_dir = tempfile::tempdir().unwrap();
         let report = CodeQualityReport::new(&[], "llvm", tmp_dir.path(), Path::new("")).unwrap();
+        // start without a file named `-` in the working directory
+        let _ = std::fs::remove_file("-");
         report
             .write(Path::new(crate::common_fs::STDOUT_PATH))
             .unwrap();
