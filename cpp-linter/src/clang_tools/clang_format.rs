@@ -443,6 +443,7 @@ mod tests {
             let mut clang_params = make_clang_params(tmp_workspace.path(), fake_format);
             clang_params.lines_changed_only = LinesChangedOnly::On;
             // only lines 2 and 3 were added; line 1 is unchanged
+            #[allow(clippy::single_range_in_vec_init)]
             let file = Mutex::new(FileObj::from(
                 PathBuf::from("demo/wrap.cpp"),
                 vec![2, 3],
