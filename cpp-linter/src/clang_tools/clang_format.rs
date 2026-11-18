@@ -162,9 +162,13 @@ pub fn run_clang_format(
                 if ranges.is_empty() {
                     Some(replacement)
                 } else {
-                    // only include replacements that fall within the specified line ranges
+                    // Only include replacements that touch the specified line ranges.
+                    // clang-format was limited to these ranges with `--lines`, but it
+                    // formats whole statements, so a fix for a changed line can also
+                    // change an unchanged line next to it (eg. re-wrapping the arguments
+                    // of a call). Such a fix still belongs to the changed lines.
                     if ranges.iter().any(|range| {
-                        range.contains(replacement.start()) && range.contains(replacement.end())
+                        range.start() <= replacement.end() && replacement.start() <= range.end()
                     }) {
                         Some(replacement)
                     } else {
@@ -416,6 +420,39 @@ mod tests {
             let advice = file.format_advice.as_ref().unwrap();
             assert!(!advice.failed);
             assert!(!advice.replacements.is_empty());
+        }
+
+        /// A fix that starts on an unchanged line but also changes a changed line is
+        /// reported. A fix that only changes unchanged lines is not.
+        #[test]
+        fn fix_overlapping_changed_lines() {
+            use crate::cli::LinesChangedOnly;
+
+            let tmp_workspace = setup_tmp_workspace();
+            fs::write(
+                tmp_workspace.path().join("demo/wrap.cpp"),
+                "int x = f(1,\n          2,\n          3);\nint y;\nint  z;\n",
+            )
+            .unwrap();
+            let tools_dir = tempfile::tempdir().unwrap();
+            let fake_format = make_fake_tool(
+                tools_dir.path(),
+                "clang-format",
+                r"printf 'int x = f(1, 2, 3);\nint y;\nint z;\n'",
+            );
+            let mut clang_params = make_clang_params(tmp_workspace.path(), fake_format);
+            clang_params.lines_changed_only = LinesChangedOnly::On;
+            // only lines 2 and 3 were added; line 1 is unchanged
+            let file = Mutex::new(FileObj::from(
+                PathBuf::from("demo/wrap.cpp"),
+                vec![2, 3],
+                vec![1..=3],
+            ));
+            let mut file = file.lock().unwrap();
+            run_clang_format(&mut file, &clang_params).unwrap();
+            let advice = file.format_advice.as_ref().unwrap();
+            // the fix for lines 1-3 is kept, the fix for line 5 (not changed) is not
+            assert_eq!(advice.replacements, vec![RangeInclusive::new(1, 3)]);
         }
 
         /// A source file that is not UTF-8 (eg. GBK) gets format advice like any other.
