@@ -8,6 +8,7 @@
 
 use std::{
     collections::HashMap,
+    io::Write,
     path::{Component, Path, PathBuf},
     sync::{Arc, Mutex},
 };
@@ -17,7 +18,11 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 
 // project-specific modules/crates
-use crate::{clang_tools::clang_format::summarize_style, common_fs::FileObj, error::ClientError};
+use crate::{
+    clang_tools::clang_format::summarize_style,
+    common_fs::{FileObj, is_stdout},
+    error::ClientError,
+};
 
 /// The `check_name` (and tool name in fingerprints) used for clang-format findings.
 const CLANG_FORMAT: &str = "clang-format";
@@ -290,17 +295,25 @@ impl CodeQualityReport {
     /// Write the report (as JSON) to the given `output_file` path.
     ///
     /// Any missing parent directories are created.
-    /// The file is written even if there are no findings (an empty array),
+    /// If `output_file` is [`STDOUT_PATH`](crate::common_fs::STDOUT_PATH) (`-`),
+    /// the report is written to stdout.
+    /// The report is written even if there are no findings (an empty array),
     /// and it never starts with a byte order mark (GitLab rejects one).
     pub fn write(&self, output_file: &Path) -> Result<(), ClientError> {
         let json = serde_json::to_string_pretty(self).map_err(ClientError::CodeQualitySerialize)?;
-        if let Some(parent) = output_file.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| ClientError::MkDirFailed {
-                file_path: output_file.to_path_buf(),
-                source: e,
-            })?;
-        }
-        std::fs::write(output_file, json).map_err(|e| ClientError::CodeQualityFileWriteFailed {
+        let written = if is_stdout(output_file) {
+            let mut out = std::io::stdout().lock();
+            writeln!(out, "{json}").and_then(|()| out.flush())
+        } else {
+            if let Some(parent) = output_file.parent() {
+                std::fs::create_dir_all(parent).map_err(|e| ClientError::MkDirFailed {
+                    file_path: output_file.to_path_buf(),
+                    source: e,
+                })?;
+            }
+            std::fs::write(output_file, json)
+        };
+        written.map_err(|e| ClientError::CodeQualityFileWriteFailed {
             file_path: PathBuf::from(output_file),
             source: e,
         })
@@ -586,6 +599,19 @@ mod test {
         assert!(!bytes.starts_with(&[0xEF, 0xBB, 0xBF]));
         let written: Value = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(written, to_json(&report));
+    }
+
+    #[test]
+    fn write_report_to_stdout() {
+        let tmp_dir = tempfile::tempdir().unwrap();
+        let report = CodeQualityReport::new(&[], "llvm", tmp_dir.path(), Path::new("")).unwrap();
+        // start without a file named `-` in the working directory
+        let _ = std::fs::remove_file("-");
+        report
+            .write(Path::new(crate::common_fs::STDOUT_PATH))
+            .unwrap();
+        // no file named `-` is created
+        assert!(!Path::new("-").exists());
     }
 
     #[test]

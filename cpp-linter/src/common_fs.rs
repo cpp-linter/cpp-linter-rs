@@ -498,6 +498,14 @@ impl UnifiedDiffPrinter for PatchPrinter<'_> {
     }
 }
 
+/// The output path (`-`) that means stdout for `--sarif-file` and `--code-quality-file`.
+pub const STDOUT_PATH: &str = "-";
+
+/// Is the given output `path` [`STDOUT_PATH`] (`-`)?
+pub fn is_stdout(path: &Path) -> bool {
+    path == Path::new(STDOUT_PATH)
+}
+
 /// Make the given `path` absolute.
 ///
 /// This function will canonicalize the path and remove any `\\?\` prefix

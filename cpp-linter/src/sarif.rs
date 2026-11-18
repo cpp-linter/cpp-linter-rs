@@ -224,11 +224,11 @@ fn make_rule(note: &TidyNotification) -> ReportingDescriptor {
 
 impl SarifLog {
     /// The `output_file` path that [`Self::write`] treats as stdout.
-    pub const STDOUT: &str = "-";
+    pub const STDOUT: &str = crate::common_fs::STDOUT_PATH;
 
     /// Is the given `output_file` [`Self::STDOUT`]?
     pub fn is_stdout(output_file: &Path) -> bool {
-        output_file == Path::new(Self::STDOUT)
+        crate::common_fs::is_stdout(output_file)
     }
 
     /// Create a SARIF log from the clang-tidy advice about the given `files`.

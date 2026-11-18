@@ -22,7 +22,7 @@ use crate::{
     },
     cli::{FeedbackInput, ThreadComments},
     code_quality::CodeQualityReport,
-    common_fs::FileObj,
+    common_fs::{FileObj, is_stdout},
     error::ClientError,
     sarif::SarifLog,
 };
@@ -291,7 +291,7 @@ impl RestClient {
                 &feedback_inputs.repo_root,
             )?
             .write(output_file)?;
-            if SarifLog::is_stdout(output_file) {
+            if is_stdout(output_file) {
                 log::info!("Wrote SARIF log to stdout");
             } else {
                 log::info!("Wrote SARIF log to {}", output_file.to_string_lossy());
@@ -308,7 +308,11 @@ impl RestClient {
             log::info!(
                 "Wrote {} finding(s) to the Code Quality report {}",
                 report.len(),
-                output_file.to_string_lossy()
+                if is_stdout(output_file) {
+                    "on stdout".into()
+                } else {
+                    output_file.to_string_lossy()
+                }
             );
         }
         let output_vars = [
@@ -633,12 +637,9 @@ impl RestClient {
             log::info!("Generated patch content:");
             let mut reader = std::io::BufReader::new(patch_file);
             let mut raw_line = Vec::new();
-            // `--sarif-file -` writes the SARIF log to stdout; keep stdout valid JSON.
-            let mut stdout_lock: Box<dyn Write> = if feedback_inputs
-                .sarif_file
-                .as_deref()
-                .is_some_and(SarifLog::is_stdout)
-            {
+            // `--sarif-file -` or `--code-quality-file -` writes a report to stdout;
+            // keep stdout valid JSON.
+            let mut stdout_lock: Box<dyn Write> = if feedback_inputs.report_to_stdout() {
                 Box::new(stderr().lock())
             } else {
                 Box::new(stdout().lock())

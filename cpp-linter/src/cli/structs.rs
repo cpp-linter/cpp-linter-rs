@@ -8,7 +8,9 @@ use clap::{ValueEnum, builder::PossibleValue};
 
 #[cfg(feature = "bin")]
 use super::{Cli, convert_extra_arg_val, ignore_patterns};
-use crate::{clang_tools::clang_tidy::CompilationUnit, sarif::SarifLog};
+use crate::clang_tools::clang_tidy::CompilationUnit;
+#[cfg(feature = "bin")]
+use crate::common_fs::is_stdout;
 
 use git_bot_feedback::FileFilter;
 
@@ -18,6 +20,18 @@ use git_bot_feedback::FileFilter;
 #[cfg(feature = "bin")]
 fn absolute_or_given(path: &Path) -> PathBuf {
     std::path::absolute(path).unwrap_or_else(|_| path.to_path_buf())
+}
+
+/// Like [`absolute_or_given()`], but keep `-` (stdout) as it is.
+///
+/// Used for `--sarif-file` and `--code-quality-file`.
+#[cfg(feature = "bin")]
+fn output_path_or_stdout(path: &Path) -> PathBuf {
+    if is_stdout(path) {
+        path.to_path_buf()
+    } else {
+        absolute_or_given(path)
+    }
 }
 
 /// An enum to describe `--lines-changed-only` CLI option's behavior.
@@ -359,6 +373,19 @@ pub struct FeedbackInput {
     pub patch_path: PathBuf,
 }
 
+impl FeedbackInput {
+    /// Is a report (`--sarif-file -` or `--code-quality-file -`) written to stdout?
+    ///
+    /// Then other output (the generated patch, and log messages in a local run)
+    /// goes to stderr, so that stdout holds only the report.
+    pub fn report_to_stdout(&self) -> bool {
+        [&self.sarif_file, &self.code_quality_file]
+            .into_iter()
+            .flatten()
+            .any(|path| crate::common_fs::is_stdout(path))
+    }
+}
+
 #[cfg(feature = "bin")]
 impl From<&Cli> for FeedbackInput {
     /// Construct a [`FeedbackInput`] instance from a [`Cli`] instance.
@@ -377,19 +404,16 @@ impl From<&Cli> for FeedbackInput {
                 .summary_output_file
                 .as_deref()
                 .map(absolute_or_given),
-            sarif_file: args.feedback_options.sarif_file.as_deref().map(|path| {
-                // `-` means stdout, so it is not a path to make absolute.
-                if SarifLog::is_stdout(path) {
-                    path.to_path_buf()
-                } else {
-                    absolute_or_given(path)
-                }
-            }),
+            sarif_file: args
+                .feedback_options
+                .sarif_file
+                .as_deref()
+                .map(output_path_or_stdout),
             code_quality_file: args
                 .feedback_options
                 .code_quality_file
                 .as_deref()
-                .map(absolute_or_given),
+                .map(output_path_or_stdout),
             gen_patch: args.feedback_options.gen_patch
                 || args.feedback_options.gen_patch_path.is_some(),
             patch_path: match &args.feedback_options.gen_patch_path {
