@@ -102,6 +102,15 @@ them back:
 cpp-linter --tidy-checks="boost-*,bugprone-*,performance-*,readability-*,portability-*,modernize-*,clang-analyzer-*,cppcoreguidelines-*"
 ```
 
+## Invalid option values stop the run
+
+v1 accepted any value for [`--lines-changed-only`][lines-changed-only] and treated an unknown one
+as `false`. It also kept going when [`--version`][version] was not a version or a path.
+
+v2 checks these values before it starts. `--lines-changed-only` takes `true`, `false` or `diff`, and
+`--version` takes a version requirement or a path. Any other value prints an error and exits with
+code 2, so a typo in a workflow input fails the job instead of being ignored.
+
 ## Fixes are written to a patch
 
 In v1, `--fix` applied clang-format fixes in place, editing the files in the working tree.
