@@ -73,12 +73,13 @@ pub fn plural(count: u64, noun: &str) -> String {
 ///
 /// The text keeps its meaning in a paragraph, a list item or a table cell:
 /// `*`, `_` and the like are shown as they are instead of starting emphasis,
-/// `<` and `>` are not taken as HTML, a `|` does not end a table cell,
+/// `<`, `>` and `&` are not taken as HTML, a `|` does not end a table cell,
 /// and line breaks do not end the list item or table row.
 pub fn escape(text: &str) -> String {
     let mut escaped = String::with_capacity(text.len());
     for c in text.trim().chars() {
         match c {
+            '&' => escaped.push_str("&amp;"),
             '<' => escaped.push_str("&lt;"),
             '>' => escaped.push_str("&gt;"),
             '\r' => {}
@@ -93,10 +94,8 @@ pub fn escape(text: &str) -> String {
     escaped
 }
 
-/// Describe line ranges in words: `line 12`, `lines 3-11, 20`.
-///
-/// Ranges that touch or overlap are joined.
-pub fn describe_lines(ranges: &[RangeInclusive<u32>]) -> String {
+/// Sort line ranges and join those that touch or overlap: `3..=5, 6..=11` is `(3, 11)`.
+pub fn join_ranges(ranges: &[RangeInclusive<u32>]) -> Vec<(u32, u32)> {
     let mut sorted = ranges
         .iter()
         .filter(|r| !r.is_empty())
@@ -110,6 +109,14 @@ pub fn describe_lines(ranges: &[RangeInclusive<u32>]) -> String {
             _ => joined.push((start, end)),
         }
     }
+    joined
+}
+
+/// Describe line ranges in words: `line 12`, `lines 3-11, 20`.
+///
+/// Ranges that touch or overlap are joined.
+pub fn describe_lines(ranges: &[RangeInclusive<u32>]) -> String {
+    let joined = join_ranges(ranges);
     let single = joined.len() == 1 && joined[0].0 == joined[0].1;
     let list = joined
         .iter()
@@ -175,6 +182,10 @@ mod test {
             r"conversion 'int \*' to 'char \*' in a\|b &lt;T&gt;"
         );
         assert_eq!(escape("line one\r\nline two"), "line one line two");
+        assert_eq!(
+            escape("a &lt;T&gt; && b"),
+            "a &amp;lt;T&amp;gt; &amp;&amp; b"
+        );
     }
 
     #[test]

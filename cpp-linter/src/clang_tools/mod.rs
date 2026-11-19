@@ -330,9 +330,10 @@ impl ReviewComments {
         summary_only: bool,
     ) -> String {
         let total = comments.len() as u32;
-        // Only congratulate if there were no reused comments,
+        // Only congratulate if there were no findings, no reused comments,
         // no fix parts left for the user to apply, and no concerns that could not be posted.
-        let is_lgtm = self.full_patch.is_empty()
+        let is_lgtm = self.tool_total == 0
+            && self.full_patch.is_empty()
             && total_review_comments == 0
             && self.skipped_fixes.is_empty()
             && self.not_posted.is_empty();
@@ -645,6 +646,25 @@ mod tests {
             summary_only,
         );
         assert!(review_summary.contains("1 comment was already posted in a previous review."));
+    }
+
+    /// A summary-only review of a finding with no fix shows no pass mark.
+    #[test]
+    fn summary_only_review_with_findings_is_not_passed() {
+        let clang_versions = ClangVersions {
+            format_version: None,
+            tidy_version: Some(PSEUDO_VERSION),
+        };
+        let review = ReviewComments {
+            tool_total: 1,
+            in_diff: 1,
+            ..Default::default()
+        };
+        let summary = review.summarize(&clang_versions, &[], 0, true);
+        assert!(summary.contains("/warned.png"), "{summary}");
+        assert!(summary.contains("**Found 1 issue**"), "{summary}");
+        let clean = ReviewComments::default().summarize(&clang_versions, &[], 0, true);
+        assert!(clean.contains("/passed.png"), "{clean}");
     }
 
     #[test]
