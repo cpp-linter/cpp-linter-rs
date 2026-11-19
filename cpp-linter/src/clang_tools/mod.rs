@@ -345,12 +345,12 @@ impl ReviewComments {
         let headline = if summary_only && self.tool_total > 0 {
             format!("**Found {}**", plural(self.tool_total.into(), "issue"))
         } else if total > 0 {
-            format!("**{}**", plural(total.into(), "suggestion"))
+            format!("**{}**", plural(total.into(), "comment"))
         } else if is_lgtm {
             log::info!("No concerns to report: LGTM");
             String::from("No issues in this diff")
         } else {
-            String::from("No new suggestions in this diff")
+            String::from("No new comments in this diff")
         };
         let versions = [
             (
@@ -393,9 +393,9 @@ impl ReviewComments {
             body.push_str(&format!(
                 "\n{} already posted in a previous review.\n",
                 if dupes == 1 {
-                    String::from("1 suggestion was")
+                    String::from("1 comment was")
                 } else {
-                    format!("{dupes} suggestions were")
+                    format!("{dupes} comments were")
                 }
             ));
         }
@@ -644,7 +644,7 @@ mod tests {
             total_review_comments,
             summary_only,
         );
-        assert!(review_summary.contains("1 suggestion was already posted in a previous review."));
+        assert!(review_summary.contains("1 comment was already posted in a previous review."));
     }
 
     #[test]
