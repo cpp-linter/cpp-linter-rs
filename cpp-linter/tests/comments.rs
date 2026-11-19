@@ -351,6 +351,9 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
                 .trim()
                 .to_string()
         });
+    let patch_written = patch_path_from_output
+        .as_deref()
+        .is_some_and(|p| fs::metadata(p).is_ok_and(|meta| meta.len() > 0));
     if test_params.gen_patch
         && let patch_path_from_output = patch_path_from_output.unwrap()
     {
@@ -374,6 +377,12 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
     let summary_content = std::fs::read_to_string(&summary_out_file_path).unwrap();
     assert!(summary_content.contains(COMMENT_MARKER));
     assert!(summary_content.contains(USER_OUTREACH));
+    // the report points to the patch exactly when this run wrote one
+    assert_eq!(
+        summary_content.contains("`fix-patch-path`"),
+        patch_written,
+        "{summary_content}"
+    );
 
     // verify the SARIF log has 1 result per clang-tidy concern
     let tidy_checks_failed = output_vars

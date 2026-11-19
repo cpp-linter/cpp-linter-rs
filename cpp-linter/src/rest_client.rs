@@ -254,38 +254,6 @@ impl RestClient {
                 log::warn!("{msg}");
             }
         }
-        // Only point to the patch when this run wrote one (and `fix-patch-path` names it).
-        let patch_exists = (feedback_inputs.gen_patch || feedback_inputs.pr_review)
-            && std::fs::metadata(&feedback_inputs.patch_path).is_ok_and(|meta| meta.len() > 0);
-        if feedback_inputs.step_summary || feedback_inputs.summary_output_file.is_some() {
-            let summary = Self::make_comment(
-                files,
-                format_checks_failed,
-                tidy_checks_failed,
-                &clang_versions,
-                None,
-                patch_exists,
-                feedback_inputs.format_run(),
-            )?;
-            if feedback_inputs.step_summary {
-                self.client.append_step_summary(&summary)?;
-            }
-            if let Some(output_file) = &feedback_inputs.summary_output_file {
-                if let Some(parent) = output_file.parent() {
-                    std::fs::create_dir_all(parent).map_err(|e| ClientError::MkDirFailed {
-                        file_path: output_file.clone(),
-                        source: e,
-                    })?;
-                }
-                std::fs::write(output_file, &summary).map_err(|e| {
-                    ClientError::SummaryOutputFileWriteFailed {
-                        file_path: output_file.to_owned(),
-                        source: e,
-                    }
-                })?;
-            }
-            comment = Some(summary);
-        }
         if let Some(output_file) = &feedback_inputs.sarif_file {
             SarifLog::new(
                 files,
@@ -409,6 +377,39 @@ impl RestClient {
                 file.maybe_append_patch(&feedback_inputs.repo_root, &feedback_inputs.patch_path)?;
             }
             self.show_patch(&feedback_inputs)?;
+        }
+
+        // Only point to the patch once this run has written it (`fix-patch-path` names it).
+        let patch_exists = (feedback_inputs.gen_patch || feedback_inputs.pr_review)
+            && std::fs::metadata(&feedback_inputs.patch_path).is_ok_and(|meta| meta.len() > 0);
+        if feedback_inputs.step_summary || feedback_inputs.summary_output_file.is_some() {
+            let summary = Self::make_comment(
+                files,
+                format_checks_failed,
+                tidy_checks_failed,
+                &clang_versions,
+                None,
+                patch_exists,
+                feedback_inputs.format_run(),
+            )?;
+            if feedback_inputs.step_summary {
+                self.client.append_step_summary(&summary)?;
+            }
+            if let Some(output_file) = &feedback_inputs.summary_output_file {
+                if let Some(parent) = output_file.parent() {
+                    std::fs::create_dir_all(parent).map_err(|e| ClientError::MkDirFailed {
+                        file_path: output_file.clone(),
+                        source: e,
+                    })?;
+                }
+                std::fs::write(output_file, &summary).map_err(|e| {
+                    ClientError::SummaryOutputFileWriteFailed {
+                        file_path: output_file.to_owned(),
+                        source: e,
+                    }
+                })?;
+            }
+            comment = Some(summary);
         }
 
         if feedback_inputs.thread_comments != ThreadComments::Off {
@@ -932,8 +933,19 @@ impl Findings {
             }
         }
 
+        // The reserve covers each section's wrapper and its "not shown" note. Below that
+        // (a limit barely larger than the heading), a section is left out entirely.
+        let within = |len: usize| len.saturating_add(USER_OUTREACH.len()) <= ctx.max_len;
+        let before = comment.len();
         self.push_tidy_section(&mut comment, &tidy_result, fits);
+        if !within(comment.len()) {
+            comment.truncate(before);
+        }
+        let before = comment.len();
         self.push_format_section(&mut comment, fits);
+        if !within(comment.len()) {
+            comment.truncate(before);
+        }
         let how_to_fix = self.how_to_fix(ctx);
         if !how_to_fix.is_empty() && fits(comment.len() + how_to_fix.len()) {
             comment.push_str(&how_to_fix);
@@ -1784,7 +1796,8 @@ mod test {
             RestClient::make_comment(&files, 1, 51, &dummy_versions(), None, true, "llvm".into())
                 .unwrap();
         let head = unlimited.find("\n<details").unwrap();
-        for max_len in (head + USER_OUTREACH.len() + super::OMITTED_RESERVE)..unlimited.len() {
+        // From a limit that only fits the heading, the table and the footer.
+        for max_len in (head + USER_OUTREACH.len())..unlimited.len() {
             let limited = RestClient::make_comment(
                 &files,
                 1,
