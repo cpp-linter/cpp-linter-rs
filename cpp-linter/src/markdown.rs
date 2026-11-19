@@ -166,7 +166,7 @@ pub fn shell_quote(word: &str) -> String {
 
 #[cfg(test)]
 mod test {
-    use super::{Status, describe_lines, escape, fenced, plural, shell_quote};
+    use super::{RangeInclusive, Status, describe_lines, escape, fenced, plural, shell_quote};
 
     #[test]
     fn plurals() {
@@ -190,7 +190,7 @@ mod test {
 
     #[test]
     fn lines_in_words() {
-        assert_eq!(describe_lines(&[12..=12]), "line 12");
+        assert_eq!(describe_lines(&[RangeInclusive::new(12, 12)]), "line 12");
         assert_eq!(describe_lines(&[3..=5, 6..=11, 20..=20]), "lines 3-11, 20");
         assert_eq!(describe_lines(&[20..=20, 4..=4]), "lines 4, 20");
     }

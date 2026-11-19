@@ -1153,6 +1153,7 @@ mod test {
         default::Default,
         env,
         io::Read,
+        ops::RangeInclusive,
         path::PathBuf,
         sync::{Arc, Mutex},
     };
@@ -1523,7 +1524,7 @@ mod test {
             Run: clang-format -i --style=file src/demo.cpp"
         );
         file.lock().unwrap().format_advice = Some(FormatAdvice {
-            replacements: vec![4..=4],
+            replacements: vec![RangeInclusive::new(4, 4)],
             ..Default::default()
         });
         let annotations =
