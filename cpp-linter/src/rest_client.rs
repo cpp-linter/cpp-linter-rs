@@ -864,7 +864,7 @@ impl Findings {
             if let Some(version) = version {
                 comment.push_str(&format!(
                     "| {} | **{tool}** {version} | {result} |\n",
-                    row_status.glyph()
+                    row_status.small_mark()
                 ));
             }
         }
@@ -909,7 +909,9 @@ impl Findings {
                 let skipped = note
                     .skipped_fixes
                     .iter()
-                    .map(|skipped| format!("<br>⚠ {}", skipped.describe()))
+                    .map(|skipped| {
+                        format!("<br>{} {}", Status::Warned.small_mark(), skipped.describe())
+                    })
                     .collect::<String>();
                 let row = format!(
                     "| {} | {severity}{}{fixable}<br>{}{skipped} |\n",
@@ -1290,7 +1292,9 @@ mod test {
             RestClient::make_comment(&files, 0, 1, &dummy_versions(), None, true, "file").unwrap();
         assert!(
             comment.contains(
-                " · ⚡ fixable<br>clang-diagnostic-error<br>⚠ Part of this fix was not \
+                " · ⚡ fixable<br>clang-diagnostic-error<br><img alt=\"⚠\" width=\"16\" height=\"16\" \
+                src=\"https://raw.githubusercontent.com/cpp-linter/.github/main/branding/status/warned.png\"> \
+                Part of this fix was not \
                 applied to `tests/demo/demo.hpp` because it is not one of the analyzed files. |\n"
             ),
             "{comment}"
@@ -1462,7 +1466,9 @@ mod test {
         );
         assert!(comment.contains("/failed.png"), "{comment}");
         assert!(
-            comment.contains("| ✖ | **clang-format** 1.2.3 | clang-format failed on 1 file |"),
+            comment.contains(
+                "/failed.png\"> | **clang-format** 1.2.3 | clang-format failed on 1 file |"
+            ),
             "{comment}"
         );
         // nothing to format, so no "How to fix"
@@ -1480,11 +1486,11 @@ mod test {
             "{comment}"
         );
         assert!(
-            comment.contains("| ⚠ | **clang-format** 1.2.3 | 1 file needs formatting |"),
+            comment.contains("/warned.png\"> | **clang-format** 1.2.3 | 1 file needs formatting |"),
             "{comment}"
         );
         assert!(
-            comment.contains("| ✔ | **clang-tidy** 1.2.3 | no findings |"),
+            comment.contains("/passed.png\"> | **clang-tidy** 1.2.3 | no findings |"),
             "{comment}"
         );
         assert!(

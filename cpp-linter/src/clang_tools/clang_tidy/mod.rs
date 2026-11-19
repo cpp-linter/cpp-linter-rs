@@ -16,7 +16,12 @@ use regex::Regex;
 use serde::Deserialize;
 
 // project-specific modules/crates
-use crate::{cli::ClangParams, common_fs::FileObj, error::ClangCaptureError, markdown};
+use crate::{
+    cli::ClangParams,
+    common_fs::FileObj,
+    error::ClangCaptureError,
+    markdown::{self, Status},
+};
 
 pub mod other_files;
 use other_files::{OtherFileFix, Replacement, TidyFixes};
@@ -156,25 +161,29 @@ impl TidyNotification {
     /// a line with the severity and the linked diagnostic name, then the rationale,
     /// then the parts of the fix that were not applied (if any).
     pub(crate) fn review_text(&self) -> String {
-        let (glyph, severity) = match self.severity.as_str() {
-            "error" => ("✖", String::from("Error")),
-            "warning" => ("⚠", String::from("Warning")),
+        let (mark, severity) = match self.severity.as_str() {
+            "error" => (Status::Failed.small_mark(), String::from("Error")),
+            "warning" => (Status::Warned.small_mark(), String::from("Warning")),
             other => {
                 let mut chars = other.chars();
                 let word = chars
                     .next()
                     .map(|first| first.to_uppercase().collect::<String>() + chars.as_str())
                     .unwrap_or_default();
-                ("ℹ", word)
+                (String::from("ℹ"), word)
             }
         };
         let mut text = format!(
-            "**{glyph} {severity}** · {}\n\n{}\n",
+            "{mark} **{severity}** · {}\n\n{}\n",
             self.diagnostic_link(),
             markdown::escape(&self.rationale)
         );
         for skipped in &self.skipped_fixes {
-            text.push_str(&format!("\n⚠ {}\n", skipped.describe()));
+            text.push_str(&format!(
+                "\n{} {}\n",
+                Status::Warned.small_mark(),
+                skipped.describe()
+            ));
         }
         text
     }

@@ -27,7 +27,7 @@ pub enum Status {
 }
 
 impl Status {
-    /// The text glyph for this status, used where an image does not fit (eg. in a table).
+    /// The text glyph for this status: the `alt` text of its marks, and plain text where an image does not fit.
     pub fn glyph(self) -> &'static str {
         match self {
             Status::Passed => "✔",
@@ -41,13 +41,22 @@ impl Status {
     /// The `alt` text is the [`Self::glyph`], so the heading still reads
     /// right where images are not shown.
     pub fn mark(self) -> String {
+        self.mark_sized(20, " align=\"top\"")
+    }
+
+    /// The `<img>` of this status's mark, sized for a line of text (eg. a table cell).
+    pub fn small_mark(self) -> String {
+        self.mark_sized(16, "")
+    }
+
+    fn mark_sized(self, size: u8, extra: &str) -> String {
         let name = match self {
             Status::Passed => "passed",
             Status::Warned => "warned",
             Status::Failed => "failed",
         };
         format!(
-            "<img alt=\"{}\" width=\"20\" height=\"20\" align=\"top\" src=\"{STATUS_MARK_URL}/{name}.png\">",
+            "<img alt=\"{}\" width=\"{size}\" height=\"{size}\"{extra} src=\"{STATUS_MARK_URL}/{name}.png\">",
             self.glyph()
         )
     }
@@ -193,5 +202,7 @@ mod test {
         assert!(Status::Passed.mark().contains("alt=\"✔\""));
         assert!(Status::Failed.mark().ends_with("/failed.png\">"));
         assert_eq!(Status::Warned.glyph(), "⚠");
+        assert!(Status::Warned.small_mark().contains("width=\"16\""));
+        assert!(!Status::Warned.small_mark().contains("align"));
     }
 }
