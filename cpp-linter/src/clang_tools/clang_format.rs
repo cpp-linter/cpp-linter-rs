@@ -52,6 +52,34 @@ pub fn summarize_style(style: &str) -> String {
     }
 }
 
+/// Describe the given `--style` for a sentence such as "Line 4 does not match {description}."
+///
+/// - `file` (or no value): the style in `.clang-format`
+/// - `file:<path>`: the style in that file
+/// - a predefined style (eg. `llvm`): the LLVM style
+/// - anything else (eg. `{BasedOnStyle: llvm}`): the configured style
+pub fn describe_style(style: &str) -> String {
+    if style.is_empty() || style == "file" {
+        String::from("the style in .clang-format")
+    } else if let Some(path) = style.strip_prefix("file:") {
+        format!("the style in {path}")
+    } else if [
+        "google",
+        "chromium",
+        "microsoft",
+        "mozilla",
+        "webkit",
+        "llvm",
+        "gnu",
+    ]
+    .contains(&style)
+    {
+        format!("the {} style", summarize_style(style))
+    } else {
+        String::from("the configured style")
+    }
+}
+
 /// Get a total count of clang-format advice from the given list of [FileObj]s.
 pub fn tally_format_advice(files: &[Arc<Mutex<FileObj>>]) -> Result<u64, String> {
     let mut total = 0;
@@ -749,5 +777,22 @@ mod tests {
             };
             println!("{style}{l}{style:#}");
         }
+    }
+
+    #[test]
+    fn style_descriptions() {
+        use super::describe_style;
+        assert_eq!(describe_style("file"), "the style in .clang-format");
+        assert_eq!(describe_style(""), "the style in .clang-format");
+        assert_eq!(
+            describe_style("file:../.clang-format"),
+            "the style in ../.clang-format"
+        );
+        assert_eq!(describe_style("llvm"), "the LLVM style");
+        assert_eq!(describe_style("google"), "the Google style");
+        assert_eq!(
+            describe_style("{BasedOnStyle: llvm}"),
+            "the configured style"
+        );
     }
 }

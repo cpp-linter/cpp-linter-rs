@@ -266,25 +266,24 @@ impl FileObj {
                     "{file_name} is not UTF-8 encoded, so its fixes are only in the patch file, not in the PR review"
                 );
                 review_comments.not_posted.push(format!(
-                    "- **{file_name}**: {fixes} fix(es) are only in the patch file because the file is not UTF-8 encoded"
+                    "- **{file_name}**: {} only in the patch file because the file is not UTF-8 encoded",
+                    if fixes == 1 {
+                        String::from("1 fix is")
+                    } else {
+                        format!("{fixes} fixes are")
+                    }
                 ));
             }
         }
         if let Some(advice) = &self.tidy_advice {
             // now check for clang-tidy warnings with no fixes applied
-            let file_ext = self
-                .name
-                .extension()
-                .unwrap_or_default()
-                .to_str()
-                .unwrap_or_default();
-            // Count of clang-tidy diagnostics that had no fixes applied
+            // (a count of such clang-tidy diagnostics)
             let mut total = 0;
             for note in &advice.notes {
                 if note.filename == file_name {
                     for skipped in &note.skipped_fixes {
                         review_comments.skipped_fixes.push(format!(
-                            "- **{file_name}:{}** [{}]: {}",
+                            "- **{file_name}:{}** {}: {}",
                             note.line,
                             note.diagnostic_link(),
                             skipped.describe()
@@ -303,29 +302,14 @@ impl FileObj {
                         continue;
                     }
                     review_comments.in_diff += 1;
-                    let mut suggestion = format!(
-                        "### clang-tidy diagnostic\n**{file_name}:{}:{}** {}: [{}]\n\n> {}\n",
-                        note.line,
-                        note.cols,
-                        note.severity,
-                        note.diagnostic_link(),
-                        note.rationale
-                    );
-                    if !note.suggestion.is_empty() {
-                        suggestion.push_str(
-                            format!("\n```{file_ext}\n{}\n```\n", note.suggestion.join("\n"))
-                                .as_str(),
-                        );
-                    }
-                    for skipped in &note.skipped_fixes {
-                        suggestion.push_str(&format!("\n:warning: {}\n", skipped.describe()));
-                    }
+                    let suggestion = note.review_text();
                     let mut is_merged = false;
                     for s in &mut review_comments.comments {
                         if s.path == file_name
                             && s.line_end >= note.line
                             && s.line_start <= note.line
                         {
+                            s.suggestion.push('\n');
                             s.suggestion.push_str(suggestion.as_str());
                             is_merged = true;
                             break;
@@ -701,18 +685,18 @@ mod test {
         assert_eq!(new_suggestion.line_start, 3);
         assert_eq!(new_suggestion.line_end, 3);
         assert!(new_suggestion.suggestion.contains("rationale for line 3"));
-        assert!(new_suggestion.suggestion.contains("```cpp\nline3\n```"));
+        // The comment is shown under the line, so the code snippet is left out.
+        assert!(!new_suggestion.suggestion.contains("line3"));
+        assert!(!new_suggestion.suggestion.contains("test_file.cpp:3"));
         let skipped = "Part of this fix was not applied to `test_file.h` \
             because it is not one of the analyzed files.";
         assert!(
             new_suggestion
                 .suggestion
-                .contains(&format!("\n:warning: {skipped}\n"))
+                .contains(&format!("\n⚠ {skipped}\n"))
         );
         assert_eq!(review_comments.skipped_fixes.len(), 1);
-        assert!(
-            review_comments.skipped_fixes[0].starts_with("- **test_file.cpp:3** [[readability")
-        );
+        assert!(review_comments.skipped_fixes[0].starts_with("- **test_file.cpp:3** [readability"));
         assert!(review_comments.skipped_fixes[0].ends_with(skipped));
 
         // Processing the same file again merges duplicate suggestions
@@ -804,7 +788,7 @@ mod test {
         assert_eq!(
             review_comments.not_posted,
             vec![
-                "- **gbk.cpp**: 1 fix(es) are only in the patch file because the file is not UTF-8 encoded"
+                "- **gbk.cpp**: 1 fix is only in the patch file because the file is not UTF-8 encoded"
             ]
         );
 

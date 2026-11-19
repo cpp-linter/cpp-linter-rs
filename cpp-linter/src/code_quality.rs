@@ -19,7 +19,7 @@ use sha2::{Digest, Sha256};
 
 // project-specific modules/crates
 use crate::{
-    clang_tools::clang_format::summarize_style,
+    clang_tools::clang_format::describe_style,
     common_fs::{FileObj, is_stdout},
     error::ClientError,
 };
@@ -212,7 +212,7 @@ impl CodeQualityReport {
         repo_root: &Path,
         path_prefix: &Path,
     ) -> Result<Self, ClientError> {
-        let style_guide = summarize_style(style);
+        let style_description = describe_style(style);
         let mut builder = IssueBuilder::default();
         for file in files {
             let file = file
@@ -250,7 +250,7 @@ impl CodeQualityReport {
                         CLANG_FORMAT,
                         CLANG_FORMAT,
                         format!(
-                            "Code does not conform to {style_guide} style guidelines. Run clang-format to fix it."
+                            "Code does not match {style_description}. Run clang-format to fix it."
                         ),
                         Severity::Minor,
                         &path,
@@ -492,7 +492,7 @@ mod test {
         assert_eq!(issues[0]["location"]["lines"]["end"], 3);
         assert_eq!(
             issues[0]["description"],
-            "Code does not conform to LLVM style guidelines. Run clang-format to fix it."
+            "Code does not match the LLVM style. Run clang-format to fix it."
         );
         // line numbers start at 1
         assert_eq!(issues[1]["location"]["lines"]["begin"], 1);
@@ -567,7 +567,7 @@ mod test {
         }
         assert_eq!(
             after[0]["description"],
-            "Code does not conform to Custom style guidelines. Run clang-format to fix it."
+            "Code does not match the style in .clang-format. Run clang-format to fix it."
         );
     }
 

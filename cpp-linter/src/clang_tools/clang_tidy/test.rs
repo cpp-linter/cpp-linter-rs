@@ -297,13 +297,15 @@ fn suggestion_help_with_and_without_fixes() {
     let advice = TidyAdvice {
         notes: vec![dummy_note("demo.cpp", vec![5])],
     };
-    // A fixed line within the range yields a "diagnostic(s)" header plus the rationale.
+    // A fixed line within the range yields the severity, the diagnostic and the rationale.
     let help = advice.get_suggestion_help(1, 10);
-    assert!(help.contains("clang-tidy diagnostic(s)"));
-    assert!(help.contains("a dummy rationale"));
+    assert_eq!(
+        help,
+        "**⚠ Warning** · [modernize-use-auto](https://clang.llvm.org/extra/clang-tidy/checks/modernize/use-auto.html)\n\na dummy rationale\n"
+    );
     // No fixed line within the range: the suggestion only has clang-format changes.
     let help = advice.get_suggestion_help(20, 30);
-    assert_eq!(help, "### clang-format suggestion\n");
+    assert_eq!(help, "**clang-format** suggests this formatting.\n");
 }
 
 #[test]
@@ -319,7 +321,7 @@ fn suggestion_help_lists_a_multi_line_fix_once() {
     let advice = TidyAdvice { notes: vec![note] };
     let help = advice.get_suggestion_help(1, 10);
     assert_eq!(help.matches("a dummy rationale").count(), 1);
-    assert_eq!(help.matches(":warning:").count(), 1);
+    assert_eq!(help.matches("⚠ Part of this fix").count(), 1);
     // The note is still listed when only one of its fixed lines is in the hunk.
     let help = advice.get_suggestion_help(6, 8);
     assert_eq!(help.matches("a dummy rationale").count(), 1);
@@ -337,7 +339,7 @@ fn suggestion_help_with_skipped_fixes() {
     let advice = TidyAdvice { notes: vec![note] };
     let help = advice.get_suggestion_help(5, 5);
     assert!(help.contains(
-        "\n  - :warning: Part of this fix was not applied to `demo.h` \
+        "\n⚠ Part of this fix was not applied to `demo.h` \
         because it is not one of the analyzed files.\n"
     ));
 }

@@ -226,15 +226,15 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) -> 
                 // results can be non-deterministic because different clang-versions output different diagnostic/changes
                 ".*" // match anything
             } else if test_params.force_lgtm {
-                ".*No concerns to report. Great job! :tada:.*"
+                ".*No issues in this diff.*"
             } else if test_params.summary_only {
-                ".*Click here for the full patch of fixes.*"
+                ".*The full patch of fixes.*"
             } else {
-                ".*Click here for a patch of fixes outside the diff.*"
+                ".*A patch of fixes outside the diff.*"
             }
         };
         let review_summary = format!(
-            "{}## Cpp-linter Review{tool_summary}{}",
+            "{}## <img [^>]+> cpp-linter review{tool_summary}{}",
             regex::escape(format!("{}", COMMENT_MARKER.escape_default()).as_str()),
             regex::escape(format!("{}", USER_OUTREACH.escape_default()).as_str()),
         );

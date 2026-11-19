@@ -21,6 +21,7 @@ pub mod code_quality;
 pub mod common_fs;
 pub mod error;
 mod git;
+pub(crate) mod markdown;
 pub mod rest_client;
 pub mod run;
 pub mod sarif;

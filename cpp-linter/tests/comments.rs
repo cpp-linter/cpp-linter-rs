@@ -219,14 +219,11 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) {
         );
     }
 
-    let new_comment_match = Matcher::Regex(format!(
-        "# Cpp-Linter Report :{}:",
-        if test_params.force_lgtm {
-            "heavy_check_mark"
-        } else {
-            "warning"
-        }
-    ));
+    let new_comment_match = Matcher::Regex(String::from(if test_params.force_lgtm {
+        "## <img alt=\\\\\"✔\\\\\"[^>]+> cpp-linter passed"
+    } else {
+        "## <img alt=\\\\\"[⚠✖]\\\\\"[^>]+> cpp-linter found "
+    }));
 
     let lgtm_allowed = !test_params.force_lgtm || !test_params.no_lgtm;
 

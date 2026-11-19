@@ -161,7 +161,7 @@ async fn fix_analyzed_header() {
         .as_ref()
         .unwrap()
         .get_suggestion_help(2, 2);
-    assert!(help.starts_with("### clang-tidy diagnostic(s)"), "{help}");
+    assert!(help.starts_with("**⚠ Warning** · "), "{help}");
     assert!(help.contains(&note.rationale), "{help}");
     assert_eq!(tally_tidy_advice(&files).unwrap(), 1);
 }
