@@ -336,6 +336,7 @@ impl ReviewComments {
         // Only congratulate if there were no findings, no reused comments,
         // no fix parts left for the user to apply, and no concerns that could not be posted.
         let is_lgtm = self.tool_total == 0
+            && !self.has_errors
             && self.full_patch.is_empty()
             && total_review_comments == 0
             && self.skipped_fixes.is_empty()

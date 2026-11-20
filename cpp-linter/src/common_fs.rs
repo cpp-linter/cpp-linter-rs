@@ -526,7 +526,7 @@ mod test {
 
     use super::{FileObj, FormatAdvice};
     use crate::{
-        clang_tools::ReviewComments,
+        clang_tools::{ClangVersions, ReviewComments},
         cli::{ClangParams, LinesChangedOnly},
     };
 
@@ -748,6 +748,10 @@ mod test {
             )
             .unwrap();
         assert!(without_patch.has_errors);
+        // An error with nothing to post still keeps the review from passing.
+        assert_eq!(without_patch.tool_total, 0);
+        let summary = without_patch.summarize(&ClangVersions::default(), &[], 0, false);
+        assert!(summary.contains("/m/hf.png"), "{summary}");
 
         // Processing the same file again merges duplicate suggestions
         file_obj
