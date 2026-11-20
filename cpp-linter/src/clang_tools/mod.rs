@@ -370,9 +370,8 @@ impl ReviewComments {
         .filter_map(|(tool_name, version)| version.map(|ver| format!("{tool_name} {ver}")))
         .collect::<Vec<_>>();
         body.push_str(&headline);
-        for version in versions {
-            body.push_str(" · ");
-            body.push_str(&version);
+        if !versions.is_empty() {
+            body.push_str(&format!(" ({})", versions.join(", ")));
         }
         body.push('\n');
 
@@ -666,10 +665,10 @@ mod tests {
             ..Default::default()
         };
         let summary = review.summarize(&clang_versions, &[], 0, true);
-        assert!(summary.contains("/warned.png"), "{summary}");
+        assert!(summary.contains("/m/hw.png"), "{summary}");
         assert!(summary.contains("**Found 1 issue**"), "{summary}");
         let clean = ReviewComments::default().summarize(&clang_versions, &[], 0, true);
-        assert!(clean.contains("/passed.png"), "{clean}");
+        assert!(clean.contains("/m/hp.png"), "{clean}");
     }
 
     /// An error in the diff makes the review's mark red, like the thread comment's.
@@ -686,7 +685,7 @@ mod tests {
             ..Default::default()
         };
         let summary = review.summarize(&clang_versions, &[], 0, true);
-        assert!(summary.contains("/failed.png"), "{summary}");
+        assert!(summary.contains("/m/hf.png"), "{summary}");
     }
 
     #[test]

@@ -174,7 +174,7 @@ impl TidyNotification {
             }
         };
         let mut text = format!(
-            "{mark} **{severity}** · {}\n\n{}\n",
+            "{mark} **{severity}**: {}\n\n{}\n",
             self.diagnostic_link(),
             markdown::escape(&self.rationale)
         );

@@ -10,11 +10,12 @@ use std::ops::RangeInclusive;
 
 /// Where the status marks are hosted.
 ///
-/// These are solid circles in the brand colors: a green check, a gold exclamation mark
-/// and a red cross, see `branding/status/` in the cpp-linter/.github repository.
+/// The marks are drawn from the logo: its amber ring with a green check, an amber "!" or a
+/// red cross (`branding/status/brush/` in the cpp-linter/.github repository builds them).
+/// Heading marks keep the ring (`hp`, `hw`, `hf`); row marks are the glyph alone
+/// (`p`, `w`, `f`). The org site serves them under a short path to keep comments small.
 /// Posted comments keep pointing here, so these files must not move.
-pub const STATUS_MARK_URL: &str =
-    "https://raw.githubusercontent.com/cpp-linter/.github/main/branding/status";
+pub const STATUS_MARK_URL: &str = "https://cpp-linter.github.io/m";
 
 /// The overall result of a report, shown as a mark in front of its heading.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -42,22 +43,22 @@ impl Status {
     /// The `alt` text is the [`Self::glyph`], so the heading still reads
     /// right where images are not shown.
     pub fn mark(self) -> String {
-        self.mark_sized(20, " align=\"top\"")
+        self.mark_sized("h", 24, "top")
     }
 
     /// The `<img>` of this status's mark, sized for a line of text (eg. a table cell).
     pub fn small_mark(self) -> String {
-        self.mark_sized(16, "")
+        self.mark_sized("", 20, "absmiddle")
     }
 
-    fn mark_sized(self, size: u8, extra: &str) -> String {
+    fn mark_sized(self, prefix: &str, size: u8, align: &str) -> String {
         let name = match self {
-            Status::Passed => "passed",
-            Status::Warned => "warned",
-            Status::Failed => "failed",
+            Status::Passed => "p",
+            Status::Warned => "w",
+            Status::Failed => "f",
         };
         format!(
-            "<img alt=\"{}\" width=\"{size}\" height=\"{size}\"{extra} src=\"{STATUS_MARK_URL}/{name}.png\">",
+            "<img alt=\"{}\" width=\"{size}\" align=\"{align}\" src=\"{STATUS_MARK_URL}/{prefix}{name}.png\">",
             self.glyph()
         )
     }
@@ -212,9 +213,14 @@ mod test {
     #[test]
     fn marks() {
         assert!(Status::Passed.mark().contains("alt=\"✔\""));
-        assert!(Status::Failed.mark().ends_with("/failed.png\">"));
+        assert_eq!(
+            Status::Failed.mark(),
+            "<img alt=\"✖\" width=\"24\" align=\"top\" src=\"https://cpp-linter.github.io/m/hf.png\">"
+        );
         assert_eq!(Status::Warned.glyph(), "⚠");
-        assert!(Status::Warned.small_mark().contains("width=\"16\""));
-        assert!(!Status::Warned.small_mark().contains("align"));
+        assert_eq!(
+            Status::Warned.small_mark(),
+            "<img alt=\"⚠\" width=\"20\" align=\"absmiddle\" src=\"https://cpp-linter.github.io/m/w.png\">"
+        );
     }
 }

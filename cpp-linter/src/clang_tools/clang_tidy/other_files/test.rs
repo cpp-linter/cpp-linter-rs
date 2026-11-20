@@ -162,7 +162,7 @@ async fn fix_analyzed_header() {
         .unwrap()
         .get_suggestion_help(2, 2);
     assert!(
-        help.starts_with("<img alt=\"⚠\"") && help.contains("> **Warning** · "),
+        help.starts_with("<img alt=\"⚠\"") && help.contains("> **Warning**: "),
         "{help}"
     );
     assert!(help.contains(&note.rationale), "{help}");

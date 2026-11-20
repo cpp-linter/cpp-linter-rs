@@ -705,7 +705,7 @@ mod test {
         assert!(
             new_suggestion
                 .suggestion
-                .contains(&format!("/warned.png\"> {skipped}\n"))
+                .contains(&format!("/m/w.png\"> {skipped}\n"))
         );
         assert_eq!(review_comments.skipped_fixes.len(), 1);
         assert!(review_comments.skipped_fixes[0].starts_with("- **test_file.cpp:3** [readability"));

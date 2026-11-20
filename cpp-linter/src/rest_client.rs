@@ -37,8 +37,8 @@ pub const USER_AGENT: &str = concat!("cpp-linter/", env!("CARGO_PKG_VERSION"),);
 
 /// The user outreach message displayed in bot comments.
 pub const USER_OUTREACH: &str = concat!(
-    "\n\n<sub>:sparkles: Powered by [**cpp-linter**](https://cpp-linter.github.io)",
-    " &bull; [:speech_balloon: Feedback]",
+    "\n\n<sub>Powered by [**cpp-linter**](https://cpp-linter.github.io)",
+    " | [Feedback]",
     "(https://github.com/cpp-linter/cpp-linter-action/issues)</sub>"
 );
 
@@ -846,7 +846,7 @@ impl Findings {
             .flat_map(|file| file.tidy_notes.iter().map(move |note| (file, note)))
     }
 
-    /// Describe the clang-tidy notes in a few words: `1 error, 2 warnings · 1 fixable`.
+    /// Describe the clang-tidy notes in a few words: `1 error, 2 warnings, 1 fixable`.
     ///
     /// Also returns the status of the clang-tidy check.
     fn tidy_result(&self) -> (Status, String) {
@@ -871,7 +871,7 @@ impl Findings {
         }
         let mut result = counts.join(", ");
         if fixable > 0 {
-            result.push_str(&format!(" · {fixable} fixable"));
+            result.push_str(&format!(", {fixable} fixable"));
         }
         let status = if errors > 0 {
             Status::Failed
@@ -934,7 +934,7 @@ impl Findings {
                 .filter_map(|(tool, version)| version.map(|ver| format!("{tool} {ver}")))
                 .collect::<Vec<_>>();
             details.push(format!("{} checked", plural(ctx.files_checked, "file")));
-            comment.push_str(&details.join(" · "));
+            comment.push_str(&details.join(", "));
             comment.push_str(USER_OUTREACH);
             return comment;
         }
@@ -947,7 +947,7 @@ impl Findings {
             Status::Warned
         };
         comment.push_str(&format!(
-            "## {} cpp-linter found {} in {}\n\n| | Check | Result |\n|:-:|:--|:--|\n",
+            "## {} cpp-linter found {} in {}\n\n| Tool | Result |\n|:--|:--|\n",
             status.mark(),
             plural(ctx.total, "issue"),
             plural(self.0.len() as u64, "file"),
@@ -958,7 +958,7 @@ impl Findings {
         ]) {
             if let Some(version) = version {
                 comment.push_str(&format!(
-                    "| {} | **{tool}** {version} | {result} |\n",
+                    "| {} **{tool}** {version} | {result} |\n",
                     row_status.small_mark()
                 ));
             }
@@ -1001,7 +1001,7 @@ impl Findings {
         // A short list is open, so nobody has to click to see it.
         let open = if count <= 10 { " open" } else { "" };
         let mut section =
-            format!("\n<details{open}><summary><b>clang-tidy</b> · {summary}</summary>\n");
+            format!("\n<details{open}><summary><b>clang-tidy</b>: {summary}</summary>\n");
         let mut omitted = 0;
         for file in &self.0 {
             let header = format!(
@@ -1017,7 +1017,7 @@ impl Findings {
                 let fixable = if note.fixed_lines.is_empty() {
                     ""
                 } else {
-                    " · ⚡ fixable"
+                    " (fixable)"
                 };
                 let skipped = note
                     .skipped_fixes
@@ -1075,19 +1075,19 @@ impl Findings {
             return;
         }
         let mut section = format!(
-            "\n<details><summary><b>clang-format</b> · {}</summary>\n\n",
+            "\n<details><summary><b>clang-format</b>: {}</summary>\n\n",
             plural(files.len() as u64, "file")
         );
         let mut omitted = 0;
         for file in files {
             let item = if file.format_lines.is_empty() {
                 format!(
-                    "- {} · clang-format failed to run; see the logs\n",
+                    "- {}: clang-format failed to run; see the logs\n",
                     file.display_name()
                 )
             } else {
                 format!(
-                    "- {} · {}\n",
+                    "- {}, {}\n",
                     file.display_name(),
                     markdown::describe_lines(&file.format_lines)
                 )
@@ -1137,12 +1137,12 @@ impl Findings {
                 .map(|version| format!(" with clang-format {}", version.major))
                 .unwrap_or_default();
             let scope = if ctx.format_run.lines_only {
-                " It formats only the lines listed above."
+                "the listed lines"
             } else {
-                ""
+                "these files"
             };
             let mut part = format!(
-                "**Formatting.** Run this in the repository root{with_version}.{scope}\n\n{}",
+                "From the repository root, format {scope}{with_version}:\n\n{}",
                 markdown::fenced(
                     "bash",
                     &ctx.format_run
@@ -1159,8 +1159,7 @@ impl Findings {
         }
         if ctx.patch_exists {
             parts.push(String::from(
-                "**All fixes as one patch.** The `fix-patch-path` output of this step names a patch file \
-                with every fix from clang-format and clang-tidy. Apply it with `git apply`.\n",
+                "Apply every fix at once: this step's `fix-patch-path` output is a patch for `git apply`.\n",
             ));
         }
         let notes = self.tidy_notes().collect::<Vec<_>>();
@@ -1178,7 +1177,7 @@ impl Findings {
                 ));
             }
             let mut part = format!(
-                "**With an AI coding agent.** Paste this prompt:\n\n{}",
+                "Give this to your coding agent:\n\n{}",
                 markdown::fenced("text", &prompt)
             );
             if notes.len() > MAX_NOTES_IN_PROMPT {
@@ -1194,9 +1193,17 @@ impl Findings {
             return String::new();
         }
         let mut section = String::from("\n<details><summary><b>How to fix</b></summary>\n");
-        for part in parts {
+        for (i, part) in parts.iter().enumerate() {
             section.push('\n');
-            section.push_str(&part);
+            // Each way after the first is an alternative: "Or apply every fix at once: …".
+            match part.char_indices().nth(1).filter(|_| i > 0) {
+                Some((second, _)) => {
+                    section.push_str("Or ");
+                    section.push_str(&part[..second].to_lowercase());
+                    section.push_str(&part[second..]);
+                }
+                None => section.push_str(part),
+            }
         }
         section.push_str(CLOSER);
         section
@@ -1426,7 +1433,7 @@ mod test {
             "{comment}"
         );
         assert!(
-            comment.contains("- `member/tests/demo/demo.cpp` · lines 1-2"),
+            comment.contains("- `member/tests/demo/demo.cpp`, lines 1-2"),
             "{comment}"
         );
         assert!(
@@ -1503,14 +1510,17 @@ mod test {
                 .unwrap();
         assert!(
             comment.contains(
-                " · ⚡ fixable<br>clang-diagnostic-error<br><img alt=\"⚠\" width=\"16\" height=\"16\" \
-                src=\"https://raw.githubusercontent.com/cpp-linter/.github/main/branding/status/warned.png\"> \
+                " (fixable)<br>clang-diagnostic-error<br><img alt=\"⚠\" width=\"20\" align=\"absmiddle\" \
+                src=\"https://cpp-linter.github.io/m/w.png\"> \
                 Part of this fix was not \
                 applied to `tests/demo/demo.hpp` because it is not one of the analyzed files. |\n"
             ),
             "{comment}"
         );
-        assert!(comment.contains("**All fixes as one patch.**"), "{comment}");
+        assert!(
+            comment.contains("Or apply every fix at once: this step's `fix-patch-path`"),
+            "{comment}"
+        );
     }
 
     fn dummy_versions() -> ClangVersions {
@@ -1746,14 +1756,13 @@ mod test {
             RestClient::make_comment(&files, 1, 0, &dummy_versions(), None, false, "llvm".into())
                 .unwrap();
         assert!(
-            comment.contains("- `tests/demo/demo.cpp` · clang-format failed to run; see the logs"),
+            comment.contains("- `tests/demo/demo.cpp`: clang-format failed to run; see the logs"),
             "{comment}"
         );
-        assert!(comment.contains("/failed.png"), "{comment}");
+        assert!(comment.contains("/m/hf.png"), "{comment}");
         assert!(
-            comment.contains(
-                "/failed.png\"> | **clang-format** 1.2.3 | clang-format failed on 1 file |"
-            ),
+            comment
+                .contains("/m/f.png\"> **clang-format** 1.2.3 | clang-format failed on 1 file |"),
             "{comment}"
         );
         // nothing to format, so no "How to fix"
@@ -1772,15 +1781,15 @@ mod test {
             "{comment}"
         );
         assert!(
-            comment.contains("/warned.png\"> | **clang-format** 1.2.3 | 1 file needs formatting |"),
+            comment.contains("/m/w.png\"> **clang-format** 1.2.3 | 1 file needs formatting |"),
             "{comment}"
         );
         assert!(
-            comment.contains("/passed.png\"> | **clang-tidy** 1.2.3 | no findings |"),
+            comment.contains("/m/p.png\"> **clang-tidy** 1.2.3 | no findings |"),
             "{comment}"
         );
         assert!(
-            comment.contains("- `tests/demo/demo.cpp` · lines 1-2\n"),
+            comment.contains("- `tests/demo/demo.cpp`, lines 1-2\n"),
             "{comment}"
         );
         assert!(!comment.contains("<b>clang-tidy</b>"), "{comment}");
@@ -1882,7 +1891,7 @@ mod test {
             RestClient::make_comment(&files, 1, 1, &dummy_versions(), None, false, "llvm".into())
                 .unwrap();
         assert!(unlimited.contains("| 1 | **error:** A test dummy rationale"));
-        assert!(unlimited.contains("/failed.png"), "{unlimited}");
+        assert!(unlimited.contains("/m/hf.png"), "{unlimited}");
         assert!(unlimited.contains("How to fix"));
         // No room for the clang-tidy note and the clang-format list.
         let head = unlimited.find("\n<details").unwrap();
