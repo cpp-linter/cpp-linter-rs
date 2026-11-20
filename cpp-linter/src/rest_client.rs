@@ -236,12 +236,16 @@ impl RestClient {
         clang_versions: ClangVersions,
     ) -> Result<u64, ClientError> {
         let tidy_checks_failed = tally_tidy_advice(files).map_err(ClientError::MutexPoisoned)?;
+        let format_run = FormatRun {
+            path_prefix: &self.repo_root_prefix,
+            ..feedback_inputs.format_run()
+        };
         let format_checks_failed =
             tally_format_advice(files).map_err(ClientError::MutexPoisoned)?;
         let mut comment = None;
 
         if feedback_inputs.file_annotations {
-            let mut annotations = Self::build_annotations(files, feedback_inputs.format_run())?;
+            let mut annotations = Self::build_annotations(files, format_run)?;
             for annotation in &mut annotations {
                 annotation.path = prefix_feedback_path(&annotation.path, &self.repo_root_prefix);
             }
@@ -299,6 +303,8 @@ impl RestClient {
         ];
         self.client.write_output_variables(&output_vars)?;
 
+        // Write the patch first, so the reports can point to it.
+        let mut review = None;
         if self.client.is_pr_event() && feedback_inputs.pr_review {
             let summary_only = ["true", "on", "1"].contains(
                 &env::var("CPP_LINTER_PR_REVIEW_SUMMARY_ONLY")
@@ -319,7 +325,52 @@ impl RestClient {
                 )?;
             }
             self.show_patch(&feedback_inputs)?;
+            review = Some((review_comments, summary_only));
+        } else if feedback_inputs.gen_patch {
+            for file in files {
+                let file = file
+                    .lock()
+                    .map_err(|e| ClientError::MutexPoisoned(e.to_string()))?;
+                file.maybe_append_patch(&feedback_inputs.repo_root, &feedback_inputs.patch_path)?;
+            }
+            self.show_patch(&feedback_inputs)?;
+        }
 
+        // Only point to the patch once this run has written it (`fix-patch-path` names it).
+        let patch_exists = (feedback_inputs.gen_patch || feedback_inputs.pr_review)
+            && std::fs::metadata(&feedback_inputs.patch_path).is_ok_and(|meta| meta.len() > 0);
+        if feedback_inputs.step_summary || feedback_inputs.summary_output_file.is_some() {
+            let summary = Self::make_comment(
+                files,
+                format_checks_failed,
+                tidy_checks_failed,
+                &clang_versions,
+                None,
+                patch_exists,
+                format_run,
+            )?;
+            if feedback_inputs.step_summary {
+                self.client.append_step_summary(&summary)?;
+            }
+            if let Some(output_file) = &feedback_inputs.summary_output_file {
+                if let Some(parent) = output_file.parent() {
+                    std::fs::create_dir_all(parent).map_err(|e| ClientError::MkDirFailed {
+                        file_path: output_file.clone(),
+                        source: e,
+                    })?;
+                }
+                std::fs::write(output_file, &summary).map_err(|e| {
+                    ClientError::SummaryOutputFileWriteFailed {
+                        file_path: output_file.to_owned(),
+                        source: e,
+                    }
+                })?;
+            }
+            comment = Some(summary);
+        }
+
+        // Post the review after the summary, so a failed review does not lose the summary.
+        if let Some((review_comments, summary_only)) = review {
             if self.client.is_pr_same_remote() {
                 let mut options = ReviewOptions {
                     marker: COMMENT_MARKER.to_string(),
@@ -367,47 +418,6 @@ impl RestClient {
             } else {
                 log::warn!("PR is from a different remote, skipping review.");
             }
-        } else if feedback_inputs.gen_patch {
-            for file in files {
-                let file = file
-                    .lock()
-                    .map_err(|e| ClientError::MutexPoisoned(e.to_string()))?;
-                file.maybe_append_patch(&feedback_inputs.repo_root, &feedback_inputs.patch_path)?;
-            }
-            self.show_patch(&feedback_inputs)?;
-        }
-
-        // Only point to the patch once this run has written it (`fix-patch-path` names it).
-        let patch_exists = (feedback_inputs.gen_patch || feedback_inputs.pr_review)
-            && std::fs::metadata(&feedback_inputs.patch_path).is_ok_and(|meta| meta.len() > 0);
-        if feedback_inputs.step_summary || feedback_inputs.summary_output_file.is_some() {
-            let summary = Self::make_comment(
-                files,
-                format_checks_failed,
-                tidy_checks_failed,
-                &clang_versions,
-                None,
-                patch_exists,
-                feedback_inputs.format_run(),
-            )?;
-            if feedback_inputs.step_summary {
-                self.client.append_step_summary(&summary)?;
-            }
-            if let Some(output_file) = &feedback_inputs.summary_output_file {
-                if let Some(parent) = output_file.parent() {
-                    std::fs::create_dir_all(parent).map_err(|e| ClientError::MkDirFailed {
-                        file_path: output_file.clone(),
-                        source: e,
-                    })?;
-                }
-                std::fs::write(output_file, &summary).map_err(|e| {
-                    ClientError::SummaryOutputFileWriteFailed {
-                        file_path: output_file.to_owned(),
-                        source: e,
-                    }
-                })?;
-            }
-            comment = Some(summary);
         }
 
         if feedback_inputs.thread_comments != ThreadComments::Off {
@@ -425,7 +435,7 @@ impl RestClient {
                     &clang_versions,
                     Some(u16::MAX as u64),
                     patch_exists,
-                    feedback_inputs.format_run(),
+                    format_run,
                 )?);
             }
             let options = ThreadCommentOptions {
@@ -530,8 +540,10 @@ impl RestClient {
                             } else {
                                 "does"
                             },
-                            format_run
-                                .command([(name.as_str(), format_advice.replacements.as_slice())]),
+                            format_run.command([(
+                                format_run.file_name(&name).as_str(),
+                                format_advice.replacements.as_slice()
+                            )]),
                         ),
                     });
                 }
@@ -587,7 +599,7 @@ impl RestClient {
         patch_exists: bool,
         format_run: FormatRun<'_>,
     ) -> Result<String, ClientError> {
-        let findings = Findings::collect(files)?;
+        let findings = Findings::collect(files, format_run)?;
         Ok(findings.to_markdown(&CommentContext {
             total: format_checks_failed + tidy_checks_failed,
             files_checked: files.len() as u64,
@@ -667,6 +679,9 @@ const OMITTED_RESERVE: usize = 600;
 /// The most files listed in one `clang-format -i` command of a comment.
 const MAX_FILES_IN_COMMAND: usize = 50;
 
+/// The most clang-tidy findings listed in the prompt for an AI coding agent.
+const MAX_NOTES_IN_PROMPT: usize = 50;
+
 /// How clang-format ran in this check, to tell the user how to run it the same way.
 #[derive(Debug, Clone, Copy)]
 pub struct FormatRun<'a> {
@@ -677,6 +692,11 @@ pub struct FormatRun<'a> {
     /// Then a command to fix the formatting must not format the whole file;
     /// it passes the lines that need formatting with `--lines`.
     pub lines_only: bool,
+    /// Where `--repo-root` is in the git repository (empty when it is the repository root).
+    ///
+    /// File names in a report are relative to the repository root, so that the commands
+    /// in it can be run there.
+    pub path_prefix: &'a Path,
 }
 
 impl<'a> From<&'a str> for FormatRun<'a> {
@@ -685,7 +705,15 @@ impl<'a> From<&'a str> for FormatRun<'a> {
         Self {
             style,
             lines_only: false,
+            path_prefix: Path::new(""),
         }
+    }
+}
+
+impl FormatRun<'_> {
+    /// The name of a file as a report shows it: relative to the repository root.
+    fn file_name(&self, name: &str) -> String {
+        prefix_feedback_path(name, self.path_prefix)
     }
 }
 
@@ -770,7 +798,7 @@ impl FileFindings {
 struct Findings(Vec<FileFindings>);
 
 impl Findings {
-    fn collect(files: &[Arc<Mutex<FileObj>>]) -> Result<Self, ClientError> {
+    fn collect(files: &[Arc<Mutex<FileObj>>], format_run: FormatRun) -> Result<Self, ClientError> {
         let mut findings = vec![];
         for file in files {
             let file = file
@@ -796,7 +824,7 @@ impl Findings {
                 continue;
             }
             findings.push(FileFindings {
-                name: file.name.to_string_lossy().replace('\\', "/"),
+                name: format_run.file_name(&file.name.to_string_lossy()),
                 format_failed: format_advice.is_some_and(|advice| advice.failed),
                 format_lines: format_advice
                     .map(|advice| advice.replacements.clone())
@@ -931,23 +959,30 @@ impl Findings {
             }
         }
 
+        // "How to fix" matters most when there are many findings, so room for it is kept
+        // before the findings are listed (if it fits at all).
+        let how_to_fix = self.how_to_fix(ctx);
+        let how_to_fix = if fits(comment.len() + how_to_fix.len()) {
+            how_to_fix
+        } else {
+            String::new()
+        };
+        let fits_findings = |len: usize| fits(len + how_to_fix.len());
         // The reserve covers each section's wrapper and its "not shown" note. Below that
         // (a limit barely larger than the heading), a section is left out entirely.
-        let within = |len: usize| len.saturating_add(USER_OUTREACH.len()) <= ctx.max_len;
+        let within =
+            |len: usize| len.saturating_add(how_to_fix.len() + USER_OUTREACH.len()) <= ctx.max_len;
         let before = comment.len();
-        self.push_tidy_section(&mut comment, &tidy_result, fits);
+        self.push_tidy_section(&mut comment, &tidy_result, fits_findings);
         if !within(comment.len()) {
             comment.truncate(before);
         }
         let before = comment.len();
-        self.push_format_section(&mut comment, fits);
+        self.push_format_section(&mut comment, fits_findings);
         if !within(comment.len()) {
             comment.truncate(before);
         }
-        let how_to_fix = self.how_to_fix(ctx);
-        if !how_to_fix.is_empty() && fits(comment.len() + how_to_fix.len()) {
-            comment.push_str(&how_to_fix);
-        }
+        comment.push_str(&how_to_fix);
         comment.push_str(USER_OUTREACH);
         comment
     }
@@ -1126,7 +1161,7 @@ impl Findings {
         let notes = self.tidy_notes().collect::<Vec<_>>();
         if !notes.is_empty() {
             let mut prompt = String::from("Fix these clang-tidy findings:\n");
-            for (file, note) in notes {
+            for (file, note) in notes.iter().take(MAX_NOTES_IN_PROMPT) {
                 prompt.push_str(&format!(
                     "- {}:{}:{}: {}: {} [{}]\n",
                     file.name,
@@ -1137,10 +1172,18 @@ impl Findings {
                     note.diagnostic
                 ));
             }
-            parts.push(format!(
+            let mut part = format!(
                 "**With an AI coding agent.** Paste this prompt:\n\n{}",
                 markdown::fenced("text", &prompt)
-            ));
+            );
+            if notes.len() > MAX_NOTES_IN_PROMPT {
+                part.push_str(&format!(
+                    "\nThis covers the first {MAX_NOTES_IN_PROMPT} of {} findings. \
+                    The workflow log lists every finding.\n",
+                    notes.len()
+                ));
+            }
+            parts.push(part);
         }
         if parts.is_empty() {
             return String::new();
@@ -1164,7 +1207,7 @@ mod test {
         env,
         io::Read,
         ops::RangeInclusive,
-        path::PathBuf,
+        path::{Path, PathBuf},
         sync::{Arc, Mutex},
     };
 
@@ -1358,6 +1401,51 @@ mod test {
             ..Default::default()
         });
         vec![Arc::new(Mutex::new(file))]
+    }
+
+    /// With `--repo-root` in a subdirectory, file names and commands are relative
+    /// to the repository root, where the comment says to run them.
+    #[test]
+    fn comment_names_files_from_the_repository_root() {
+        let files = make_dummy_files("warning");
+        let format_run = FormatRun {
+            style: "file",
+            lines_only: false,
+            path_prefix: Path::new("member"),
+        };
+        let comment =
+            RestClient::make_comment(&files, 1, 1, &dummy_versions(), None, false, format_run)
+                .unwrap();
+        assert!(
+            comment.contains("**`member/tests/demo/demo.cpp`**"),
+            "{comment}"
+        );
+        assert!(
+            comment.contains("- `member/tests/demo/demo.cpp` · lines 1-2"),
+            "{comment}"
+        );
+        assert!(
+            comment.contains("clang-format -i --style=file member/tests/demo/demo.cpp\n"),
+            "{comment}"
+        );
+        assert!(
+            comment.contains("- member/tests/demo/demo.cpp:1:1: warning:"),
+            "{comment}"
+        );
+        assert!(!comment.contains(" tests/demo/demo.cpp"), "{comment}");
+
+        let annotations = RestClient::build_annotations(&files, format_run).unwrap();
+        let format_annotation = annotations
+            .iter()
+            .find(|a| a.title.as_deref() == Some("clang-format"))
+            .unwrap();
+        assert!(
+            format_annotation
+                .message
+                .ends_with("Run: clang-format -i --style=file member/tests/demo/demo.cpp"),
+            "{}",
+            format_annotation.message
+        );
     }
 
     #[test]
@@ -1560,6 +1648,7 @@ mod test {
         let format_run = FormatRun {
             style: "file",
             lines_only: true,
+            path_prefix: Path::new(""),
         };
         let annotations =
             RestClient::build_annotations(&[Arc::new(Mutex::new(file))], format_run).unwrap();
@@ -1583,6 +1672,7 @@ mod test {
         let scoped = FormatRun {
             style: "llvm",
             lines_only: true,
+            path_prefix: Path::new(""),
         };
         assert_eq!(
             scoped.command(files),
@@ -1770,20 +1860,6 @@ mod test {
         assert!(unlimited.contains("| 1 | **error:** A test dummy rationale"));
         assert!(unlimited.contains("/failed.png"), "{unlimited}");
         assert!(unlimited.contains("How to fix"));
-        // No room for "How to fix", but the clang-tidy note still fits.
-        let how_to_fix = unlimited.find("\n<details><summary><b>How to fix").unwrap();
-        let limited = RestClient::make_comment(
-            &files,
-            1,
-            1,
-            &dummy_versions(),
-            Some((how_to_fix + USER_OUTREACH.len() + super::OMITTED_RESERVE) as u64),
-            false,
-            "llvm".into(),
-        )
-        .unwrap();
-        assert!(limited.contains("A test dummy rationale"));
-        assert!(!limited.contains("How to fix"));
         // No room for the clang-tidy note and the clang-format list.
         let head = unlimited.find("\n<details").unwrap();
         let limited = RestClient::make_comment(
@@ -1802,6 +1878,61 @@ mod test {
             "{limited}"
         );
         assert!(limited.ends_with(USER_OUTREACH));
+    }
+
+    /// With many findings and too little room, "How to fix" is kept and findings are left out.
+    #[test]
+    fn how_to_fix_outlasts_the_findings() {
+        let files = make_dummy_files("warning");
+        {
+            let mut file = files[0].lock().unwrap();
+            let notes = &mut file.tidy_advice.as_mut().unwrap().notes;
+            let note = notes[0].clone();
+            notes.extend(std::iter::repeat_n(note, 20));
+        }
+        let unlimited =
+            RestClient::make_comment(&files, 1, 21, &dummy_versions(), None, false, "llvm".into())
+                .unwrap();
+        let head = unlimited.find("\n<details").unwrap();
+        let how_to_fix_len = unlimited.len()
+            - unlimited.find("\n<details><summary><b>How to fix").unwrap()
+            - USER_OUTREACH.len();
+        let max_len = head + how_to_fix_len + USER_OUTREACH.len() + super::OMITTED_RESERVE + 500;
+        assert!(max_len < unlimited.len());
+        let limited = RestClient::make_comment(
+            &files,
+            1,
+            21,
+            &dummy_versions(),
+            Some(max_len as u64),
+            false,
+            "llvm".into(),
+        )
+        .unwrap();
+        assert!(limited.len() <= max_len);
+        assert!(limited.contains("<b>How to fix</b>"), "{limited}");
+        assert!(limited.contains("more are not shown here"), "{limited}");
+    }
+
+    /// The prompt for an AI coding agent lists at most 50 findings.
+    #[test]
+    fn ai_prompt_is_capped() {
+        let files = make_dummy_files("warning");
+        {
+            let mut file = files[0].lock().unwrap();
+            let notes = &mut file.tidy_advice.as_mut().unwrap().notes;
+            let note = notes[0].clone();
+            notes.extend(std::iter::repeat_n(note, 59));
+        }
+        let comment =
+            RestClient::make_comment(&files, 1, 60, &dummy_versions(), None, false, "llvm".into())
+                .unwrap();
+        let prompt = &comment[comment.find("Fix these clang-tidy findings").unwrap()..];
+        assert_eq!(prompt.matches("A test dummy rationale").count(), 50);
+        assert!(
+            prompt.contains("This covers the first 50 of 60 findings."),
+            "{prompt}"
+        );
     }
 
     /// A length-limited comment never grows past its limit, even when both

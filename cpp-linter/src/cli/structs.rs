@@ -383,6 +383,7 @@ impl FeedbackInput {
         FormatRun {
             style: &self.style,
             lines_only: self.format_lines_only,
+            path_prefix: Path::new(""),
         }
     }
 

@@ -311,6 +311,9 @@ pub struct ReviewComments {
     /// a file that clang-format failed to run on, or fixes for a file that is
     /// not UTF-8 encoded.
     pub not_posted: Vec<String>,
+    /// Whether a finding in the diff is an error (from clang-tidy),
+    /// or clang-format failed to run on a file.
+    pub has_errors: bool,
 }
 
 /// The notice added to a review summary instead of a patch that does not fit.
@@ -339,6 +342,8 @@ impl ReviewComments {
             && self.not_posted.is_empty();
         let status = if is_lgtm {
             Status::Passed
+        } else if self.has_errors {
+            Status::Failed
         } else {
             Status::Warned
         };
@@ -665,6 +670,23 @@ mod tests {
         assert!(summary.contains("**Found 1 issue**"), "{summary}");
         let clean = ReviewComments::default().summarize(&clang_versions, &[], 0, true);
         assert!(clean.contains("/passed.png"), "{clean}");
+    }
+
+    /// An error in the diff makes the review's mark red, like the thread comment's.
+    #[test]
+    fn review_with_errors_is_failed() {
+        let clang_versions = ClangVersions {
+            format_version: None,
+            tidy_version: Some(PSEUDO_VERSION),
+        };
+        let review = ReviewComments {
+            tool_total: 1,
+            in_diff: 1,
+            has_errors: true,
+            ..Default::default()
+        };
+        let summary = review.summarize(&clang_versions, &[], 0, true);
+        assert!(summary.contains("/failed.png"), "{summary}");
     }
 
     #[test]

@@ -244,6 +244,7 @@ impl FileObj {
         let file_name = self.name.to_string_lossy().replace("\\", "/");
         if self.format_advice.as_ref().is_some_and(|a| a.failed) {
             // There is nothing to suggest, but the review must not approve this file.
+            review_comments.has_errors = true;
             review_comments.not_posted.push(format!(
                 "- **{file_name}**: clang-format failed to run, so the formatting was not checked (see the logs)"
             ));
@@ -280,6 +281,12 @@ impl FileObj {
             // (a count of such clang-tidy diagnostics)
             let mut total = 0;
             for note in &advice.notes {
+                if note.filename == file_name
+                    && note.severity == "error"
+                    && self.is_line_in_diff(&note.line)
+                {
+                    review_comments.has_errors = true;
+                }
                 if note.filename == file_name {
                     for skipped in &note.skipped_fixes {
                         review_comments.skipped_fixes.push(format!(
@@ -658,6 +665,7 @@ mod test {
                 // a diagnostic about an included header is not about this file's line 4
                 TidyNotification {
                     filename: "test_file.h".to_string(),
+                    severity: "error".to_string(),
                     ..note(4, vec![])
                 },
             ],
@@ -698,6 +706,32 @@ mod test {
         assert_eq!(review_comments.skipped_fixes.len(), 1);
         assert!(review_comments.skipped_fixes[0].starts_with("- **test_file.cpp:3** [readability"));
         assert!(review_comments.skipped_fixes[0].ends_with(skipped));
+        // the error is about another file, so the review is not marked as failed
+        assert!(!review_comments.has_errors);
+
+        // an error on a changed line of this file marks the review as failed
+        let mut with_error = ReviewComments::default();
+        let mut errored = FileObj::from(
+            PathBuf::from("test_file.cpp"),
+            vec![1, 3],
+            vec![1..=1, 3..=4],
+        );
+        errored.patched_path = Some(patched_file.path().to_path_buf());
+        errored.tidy_advice = Some(TidyAdvice {
+            notes: vec![TidyNotification {
+                severity: "error".to_string(),
+                ..note(3, vec![])
+            }],
+        });
+        errored
+            .make_suggestions_from_patch(
+                &mut with_error,
+                false,
+                repo_root.path(),
+                &ClangParams::default_patch_path(repo_root.path()),
+            )
+            .unwrap();
+        assert!(with_error.has_errors);
 
         // Processing the same file again merges duplicate suggestions
         file_obj

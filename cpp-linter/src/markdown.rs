@@ -10,8 +10,9 @@ use std::ops::RangeInclusive;
 
 /// Where the status marks are hosted.
 ///
-/// These are the cpp-linter brand mark (an amber circle) with a check, a cross or an
-/// exclamation mark inside, see `branding/status/` in the cpp-linter/.github repository.
+/// These are solid circles in the brand colors: a green check, a gold exclamation mark
+/// and a red cross, see `branding/status/` in the cpp-linter/.github repository.
+/// Posted comments keep pointing here, so these files must not move.
 pub const STATUS_MARK_URL: &str =
     "https://raw.githubusercontent.com/cpp-linter/.github/main/branding/status";
 

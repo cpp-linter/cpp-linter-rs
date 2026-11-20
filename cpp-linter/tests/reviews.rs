@@ -277,6 +277,8 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) -> 
         format_ignore.push_str("|**/*.cpp|**/*.h");
         tidy_ignore.push_str("|**/*.hpp");
     }
+    let summary_dir = TempDir::new().unwrap();
+    let summary_file = summary_dir.path().join("summary.md");
     let mut args = vec![
         "cpp-linter".to_string(),
         "-v=debug".to_string(),
@@ -291,6 +293,7 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) -> 
         format!("-p={}", tmp_dir.path().join("build").to_str().unwrap()),
         "-i=build/**".to_string(),
         format!("--repo-root={}", tmp_dir.path().to_str().unwrap()),
+        format!("--summary-output-file={}", summary_file.to_str().unwrap()),
     ];
     if test_params.force_lgtm {
         if test_params.pr_review {
@@ -317,6 +320,11 @@ async fn setup(lib_root: &Path, tmp_dir: &TempDir, test_params: &TestParams) -> 
     }
     for mock in mocks {
         mock.assert();
+    }
+    if !test_params.bad_pr_info {
+        // the summary is written even when the review could not be posted
+        let summary = std::fs::read_to_string(&summary_file).unwrap();
+        assert!(summary.contains("cpp-linter"), "{summary}");
     }
     posted_review.lock().unwrap().take()
 }
