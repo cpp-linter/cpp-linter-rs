@@ -1440,7 +1440,7 @@ mod test {
         assert!(!comment.contains(" tests/demo/demo.cpp"), "{comment}");
 
         // a style file given relative to `--repo-root`
-        let lines = [1..=2];
+        let lines = [RangeInclusive::new(1, 2)];
         let style_file = FormatRun {
             style: "file:config/.clang-format",
             ..format_run
