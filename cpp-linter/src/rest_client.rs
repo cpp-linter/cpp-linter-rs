@@ -1160,9 +1160,13 @@ impl Findings {
         }
         if ctx.patch_exists {
             // The patch also has the formatting, so it is another way to do the step above.
-            let lead = if parts.is_empty() { "A" } else { "Or a" };
+            let lead = if parts.is_empty() {
+                "Apply"
+            } else {
+                "Or apply"
+            };
             parts.push(format!(
-                "{lead}pply every fix at once: this step's `fix-patch-path` output is a patch for `git apply`.\n",
+                "{lead} every fix at once: this step's `fix-patch-path` output is a patch for `git apply`.\n",
             ));
         }
         let notes = self.tidy_notes().collect::<Vec<_>>();
