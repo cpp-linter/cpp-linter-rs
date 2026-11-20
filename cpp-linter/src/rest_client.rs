@@ -724,10 +724,15 @@ impl FormatRun<'_> {
         &self,
         files: impl IntoIterator<Item = (&'f str, &'f [RangeInclusive<u32>])>,
     ) -> String {
-        let style = if self.style.is_empty() {
-            "file"
-        } else {
-            self.style
+        let style = match self.style {
+            "" => String::from("file"),
+            // a relative path to a style file is relative to `--repo-root`
+            style => match style.strip_prefix("file:") {
+                Some(path) if Path::new(path).is_relative() => {
+                    format!("file:{}", self.file_name(path))
+                }
+                _ => style.to_string(),
+            },
         };
         let base = format!(
             "clang-format -i {}",
@@ -1433,6 +1438,25 @@ mod test {
             "{comment}"
         );
         assert!(!comment.contains(" tests/demo/demo.cpp"), "{comment}");
+
+        // a style file given relative to `--repo-root`
+        let lines = [1..=2];
+        let style_file = FormatRun {
+            style: "file:config/.clang-format",
+            ..format_run
+        };
+        assert_eq!(
+            style_file.command([("a.cpp", &lines[..])]),
+            "clang-format -i --style=file:member/config/.clang-format a.cpp"
+        );
+        let absolute = FormatRun {
+            style: "file:/etc/.clang-format",
+            ..format_run
+        };
+        assert_eq!(
+            absolute.command([("a.cpp", &lines[..])]),
+            "clang-format -i --style=file:/etc/.clang-format a.cpp"
+        );
 
         let annotations = RestClient::build_annotations(&files, format_run).unwrap();
         let format_annotation = annotations

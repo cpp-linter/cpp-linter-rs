@@ -249,6 +249,16 @@ impl FileObj {
                 "- **{file_name}**: clang-format failed to run, so the formatting was not checked (see the logs)"
             ));
         }
+        // An error on a changed line fails the review, with or without a patched file.
+        if let Some(advice) = &self.tidy_advice
+            && advice.notes.iter().any(|note| {
+                note.filename == file_name
+                    && note.severity == "error"
+                    && self.is_line_in_diff(&note.line)
+            })
+        {
+            review_comments.has_errors = true;
+        }
         let Some(contents) = self.read_contents(repo_root)? else {
             return Ok(());
         };
@@ -281,12 +291,6 @@ impl FileObj {
             // (a count of such clang-tidy diagnostics)
             let mut total = 0;
             for note in &advice.notes {
-                if note.filename == file_name
-                    && note.severity == "error"
-                    && self.is_line_in_diff(&note.line)
-                {
-                    review_comments.has_errors = true;
-                }
                 if note.filename == file_name {
                     for skipped in &note.skipped_fixes {
                         review_comments.skipped_fixes.push(format!(
@@ -732,6 +736,18 @@ mod test {
             )
             .unwrap();
         assert!(with_error.has_errors);
+        // also without a patched file (no fixes were made)
+        errored.patched_path = None;
+        let mut without_patch = ReviewComments::default();
+        errored
+            .make_suggestions_from_patch(
+                &mut without_patch,
+                false,
+                repo_root.path(),
+                &ClangParams::default_patch_path(repo_root.path()),
+            )
+            .unwrap();
+        assert!(without_patch.has_errors);
 
         // Processing the same file again merges duplicate suggestions
         file_obj
