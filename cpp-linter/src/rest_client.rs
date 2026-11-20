@@ -1159,8 +1159,10 @@ impl Findings {
             parts.push(part);
         }
         if ctx.patch_exists {
-            parts.push(String::from(
-                "Apply every fix at once: this step's `fix-patch-path` output is a patch for `git apply`.\n",
+            // The patch also has the formatting, so it is another way to do the step above.
+            let lead = if parts.is_empty() { "A" } else { "Or a" };
+            parts.push(format!(
+                "{lead}pply every fix at once: this step's `fix-patch-path` output is a patch for `git apply`.\n",
             ));
         }
         let notes = self.tidy_notes().collect::<Vec<_>>();
@@ -1178,7 +1180,7 @@ impl Findings {
                 ));
             }
             let mut part = format!(
-                "Give this to your coding agent:\n\n{}",
+                "For the clang-tidy findings, give this to your coding agent:\n\n{}",
                 markdown::fenced("text", &prompt)
             );
             if notes.len() > MAX_NOTES_IN_PROMPT {
@@ -1194,17 +1196,9 @@ impl Findings {
             return String::new();
         }
         let mut section = String::from("\n<details><summary><b>How to fix</b></summary>\n");
-        for (i, part) in parts.iter().enumerate() {
+        for part in parts {
             section.push('\n');
-            // Each way after the first is an alternative: "Or apply every fix at once: …".
-            match part.char_indices().nth(1).filter(|_| i > 0) {
-                Some((second, _)) => {
-                    section.push_str("Or ");
-                    section.push_str(&part[..second].to_lowercase());
-                    section.push_str(&part[second..]);
-                }
-                None => section.push_str(part),
-            }
+            section.push_str(&part);
         }
         section.push_str(CLOSER);
         section
@@ -1520,6 +1514,11 @@ mod test {
         );
         assert!(
             comment.contains("Or apply every fix at once: this step's `fix-patch-path`"),
+            "{comment}"
+        );
+        // The prompt is for the clang-tidy findings, not another way to do the formatting.
+        assert!(
+            comment.contains("\nFor the clang-tidy findings, give this to your coding agent:"),
             "{comment}"
         );
     }
