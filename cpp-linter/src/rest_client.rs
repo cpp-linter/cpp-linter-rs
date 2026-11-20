@@ -37,7 +37,7 @@ pub const USER_AGENT: &str = concat!("cpp-linter/", env!("CARGO_PKG_VERSION"),);
 
 /// The user outreach message displayed in bot comments.
 pub const USER_OUTREACH: &str = concat!(
-    "\n\n---\n<sub>:sparkles: Powered by [**cpp-linter**](https://cpp-linter.github.io)",
+    "\n\n<sub>:sparkles: Powered by [**cpp-linter**](https://cpp-linter.github.io)",
     " &bull; [:speech_balloon: Feedback]",
     "(https://github.com/cpp-linter/cpp-linter-action/issues)</sub>"
 );
