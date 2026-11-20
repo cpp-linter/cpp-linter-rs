@@ -309,6 +309,16 @@ fn suggestion_help_with_and_without_fixes() {
 }
 
 #[test]
+fn review_text_for_other_severities() {
+    let mut note = dummy_note("demo.cpp", vec![]);
+    note.severity = String::from("note");
+    assert_eq!(
+        note.review_text(),
+        "ℹ **Note** · [modernize-use-auto](https://clang.llvm.org/extra/clang-tidy/checks/modernize/use-auto.html)\n\na dummy rationale\n"
+    );
+}
+
+#[test]
 fn suggestion_help_lists_a_multi_line_fix_once() {
     use super::{SkippedFix, TidyAdvice};
 

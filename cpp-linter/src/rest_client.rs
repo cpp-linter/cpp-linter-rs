@@ -1175,8 +1175,8 @@ mod test {
     use git_bot_feedback::{AnnotationLevel, FileAnnotation, FileFilter};
 
     use super::{
-        FormatRun, RestClient, USER_OUTREACH, annotation_cap_message, normalize_changed_file_name,
-        prefix_feedback_path, repo_root_prefix,
+        FileFindings, Findings, FormatRun, RestClient, USER_OUTREACH, annotation_cap_message,
+        normalize_changed_file_name, prefix_feedback_path, repo_root_prefix,
     };
     use crate::{
         clang_tools::{
@@ -1187,6 +1187,7 @@ mod test {
         cli::{FeedbackInput, ThreadComments},
         common_fs::FileObj,
         error::ClientError,
+        markdown::Status,
     };
     use clang_tools_manager::logger::try_init_logger;
 
@@ -1588,6 +1589,30 @@ mod test {
             "clang-format -i --style=llvm --lines=1:3 a.cpp\n\
             clang-format -i --style=llvm --lines=1:2 'b c.cpp'"
         );
+        // no style given: clang-format looks for a .clang-format file
+        assert_eq!(
+            FormatRun::from("").command([("a.cpp", &lines[..])]),
+            "clang-format -i --style=file a.cpp"
+        );
+    }
+
+    #[test]
+    fn findings_without_formatting() {
+        let findings = Findings(vec![FileFindings {
+            name: String::from("odd`name.cpp"),
+            format_failed: false,
+            format_lines: vec![],
+            tidy_notes: vec![],
+        }]);
+        // a backtick can't go in a code span, so the name is escaped instead
+        assert_eq!(findings.0[0].display_name(), "odd\\`name.cpp");
+        assert_eq!(
+            findings.format_result(),
+            (Status::Passed, String::from("all files formatted"))
+        );
+        let mut comment = String::from("heading\n");
+        findings.push_format_section(&mut comment, |_| true);
+        assert_eq!(comment, "heading\n");
     }
 
     #[test]

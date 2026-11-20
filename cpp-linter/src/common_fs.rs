@@ -756,6 +756,48 @@ mod test {
         assert!(review_comments.not_posted[0].starts_with("- **failed.cpp**: clang-format failed"));
     }
 
+    /// Two separate fixes in a file that is not UTF-8 are counted in the summary.
+    #[test]
+    #[allow(clippy::single_range_in_vec_init)]
+    fn non_utf8_file_with_two_fixes() {
+        let repo_root = TempDir::new().unwrap();
+        let file_name = PathBuf::from("gbk2.cpp");
+        let filler = "int x;\n".repeat(10);
+        let original = [
+            &b"// \xd6\xd0\xce\xc4\nint  a;\n"[..],
+            filler.as_bytes(),
+            b"int  b;\n",
+        ]
+        .concat();
+        let patched = [
+            &b"// \xd6\xd0\xce\xc4\nint a;\n"[..],
+            filler.as_bytes(),
+            b"int b;\n",
+        ]
+        .concat();
+        fs::write(repo_root.path().join(&file_name), &original).unwrap();
+        let patched_file = NamedTempFile::new().unwrap();
+        fs::write(patched_file.path(), &patched).unwrap();
+
+        let mut file_obj = FileObj::from(file_name, vec![2, 13], vec![1..=13]);
+        file_obj.patched_path = Some(patched_file.path().to_path_buf());
+        let mut review_comments = ReviewComments::default();
+        file_obj
+            .make_suggestions_from_patch(
+                &mut review_comments,
+                false,
+                repo_root.path(),
+                &repo_root.path().join("fixes.patch"),
+            )
+            .unwrap();
+        assert_eq!(
+            review_comments.not_posted,
+            vec![
+                "- **gbk2.cpp**: 2 fixes are only in the patch file because the file is not UTF-8 encoded"
+            ]
+        );
+    }
+
     /// A source file that is not UTF-8 (here: GBK) must not abort the run.
     /// Its fixes go into the patch file byte for byte, but not into review suggestions.
     #[test]
