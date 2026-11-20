@@ -1,6 +1,7 @@
 version: "0.2"
 language: en
 words:
+  - absmiddle
   - armv
   - bindgen
   - binstall
