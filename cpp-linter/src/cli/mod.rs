@@ -103,6 +103,10 @@ pub struct GeneralOptions {
     ///   `18.1.8` accepts 18.1.8 or a newer 18.x release, and `16` accepts any 16.x release.
     ///   Use `=18.1.8` to require exactly that version. System package managers
     ///   are not used for such a version because they only install by major version.
+    /// - `latest` for the newest major version that cpp-linter can install
+    ///   from its static binaries (any minor or patch release of it).
+    ///   This version is fixed when cpp-linter is built, so it only changes
+    ///   with a cpp-linter update.
     /// - A blank string (`''`) to use the platform's default
     ///   installed version.
     /// - A path to where the clang tools are
