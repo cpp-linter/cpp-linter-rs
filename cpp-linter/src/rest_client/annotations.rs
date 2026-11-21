@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 
 use git_bot_feedback::{AnnotationLevel, FileAnnotation};
 
-use super::{FormatRun, RestClient};
+use super::{FormatRun, RestClient, lock_file};
 use crate::{
     clang_tools::clang_format::describe_style,
     cli::{FeedbackInput, ThreadComments},
@@ -87,9 +87,7 @@ impl RestClient {
         let mut annotations = vec![];
 
         for file in files {
-            let file = file
-                .lock()
-                .map_err(|e| ClientError::MutexPoisoned(e.to_string()))?;
+            let file = lock_file(file)?;
             let name = file.name.to_string_lossy().replace('\\', "/");
             if let Some(format_advice) = &file.format_advice {
                 if format_advice.failed {

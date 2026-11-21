@@ -6,7 +6,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use super::{COMMENT_MARKER, FormatRun, RestClient, USER_OUTREACH};
+use super::{COMMENT_MARKER, FormatRun, RestClient, USER_OUTREACH, lock_file};
 use crate::{
     clang_tools::{ClangVersions, clang_tidy::TidyNotification},
     common_fs::FileObj,
@@ -108,9 +108,7 @@ impl Findings {
     fn collect(files: &[Arc<Mutex<FileObj>>], format_run: FormatRun) -> Result<Self, ClientError> {
         let mut findings = vec![];
         for file in files {
-            let file = file
-                .lock()
-                .map_err(|e| ClientError::MutexPoisoned(e.to_string()))?;
+            let file = lock_file(file)?;
             let format_advice = file
                 .format_advice
                 .as_ref()

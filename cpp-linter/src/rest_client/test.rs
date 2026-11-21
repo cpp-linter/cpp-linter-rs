@@ -676,6 +676,45 @@ fn comment_with_poisoned_mutex() {
 }
 
 #[test]
+fn annotations_with_poisoned_mutex() {
+    let files = make_dummy_files("warning");
+    crate::test_common::poison_mutex(&files[0]);
+    assert!(matches!(
+        RestClient::make_annotations(&files, "llvm".into()),
+        Err(ClientError::MutexPoisoned(_))
+    ));
+}
+
+/// A clang tool that did not run has no version, so it gets no row in the table.
+#[test]
+fn comment_without_a_tool_version() {
+    let files = make_dummy_files("warning");
+    let versions = ClangVersions {
+        format_version: Some(Version::new(1, 2, 3)),
+        tidy_version: None,
+    };
+    let comment =
+        RestClient::make_comment(&files, 1, 0, &versions, None, false, "file".into()).unwrap();
+    assert!(comment.contains("**clang-format** 1.2.3 |"), "{comment}");
+    assert!(!comment.contains("**clang-tidy**"), "{comment}");
+}
+
+/// Without files to format, the patch is the first way to fix, not an alternative.
+#[test]
+fn patch_is_the_first_fix() {
+    let files = make_dummy_files("warning");
+    files[0].lock().unwrap().format_advice = None;
+    let comment =
+        RestClient::make_comment(&files, 0, 1, &dummy_versions(), None, true, "file".into())
+            .unwrap();
+    assert!(
+        comment.contains("\nApply every fix at once: this step's `fix-patch-path`"),
+        "{comment}"
+    );
+    assert!(!comment.contains("Or apply"), "{comment}");
+}
+
+#[test]
 fn comment_too_long_for_tidy_note() {
     let files = make_dummy_files("error");
     let unlimited =

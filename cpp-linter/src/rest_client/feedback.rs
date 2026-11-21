@@ -12,7 +12,7 @@ use git_bot_feedback::{
 };
 
 use super::{
-    COMMENT_MARKER, FormatRun, RestClient, annotations::annotation_cap_message,
+    COMMENT_MARKER, FormatRun, RestClient, annotations::annotation_cap_message, lock_file,
     paths::prefix_feedback_path,
 };
 use crate::{
@@ -117,9 +117,7 @@ impl RestClient {
             );
             let mut review_comments = ReviewComments::default();
             for file in files {
-                let file = file
-                    .lock()
-                    .map_err(|e| ClientError::MutexPoisoned(e.to_string()))?;
+                let file = lock_file(file)?;
                 file.make_suggestions_from_patch(
                     &mut review_comments,
                     summary_only,
@@ -131,9 +129,7 @@ impl RestClient {
             review = Some((review_comments, summary_only));
         } else if feedback_inputs.gen_patch {
             for file in files {
-                let file = file
-                    .lock()
-                    .map_err(|e| ClientError::MutexPoisoned(e.to_string()))?;
+                let file = lock_file(file)?;
                 file.maybe_append_patch(&feedback_inputs.repo_root, &feedback_inputs.patch_path)?;
             }
             self.show_patch(&feedback_inputs)?;

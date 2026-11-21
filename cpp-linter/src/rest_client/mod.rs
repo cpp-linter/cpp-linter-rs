@@ -8,7 +8,10 @@
 //! - `format_run`: how clang-format ran, to repeat it in commands.
 //! - `paths`: file names relative to the repository root.
 
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    sync::{Arc, Mutex, MutexGuard},
+};
 
 use git_bot_feedback::{FileFilter, LinesChangedOnly, RestApiClient, client::init_client};
 
@@ -133,4 +136,10 @@ impl RestClient {
     pub fn end_log_group(&self, name: &str) {
         self.client.end_log_group(name)
     }
+}
+
+/// Lock a file of the check, for the feedback about it.
+fn lock_file(file: &Arc<Mutex<FileObj>>) -> Result<MutexGuard<'_, FileObj>, ClientError> {
+    file.lock()
+        .map_err(|e| ClientError::MutexPoisoned(e.to_string()))
 }
