@@ -244,9 +244,20 @@ impl FileObj {
         let file_name = self.name.to_string_lossy().replace("\\", "/");
         if self.format_advice.as_ref().is_some_and(|a| a.failed) {
             // There is nothing to suggest, but the review must not approve this file.
+            review_comments.has_errors = true;
             review_comments.not_posted.push(format!(
                 "- **{file_name}**: clang-format failed to run, so the formatting was not checked (see the logs)"
             ));
+        }
+        // An error on a changed line fails the review, with or without a patched file.
+        if let Some(advice) = &self.tidy_advice
+            && advice.notes.iter().any(|note| {
+                note.filename == file_name
+                    && note.severity == "error"
+                    && self.is_line_in_diff(&note.line)
+            })
+        {
+            review_comments.has_errors = true;
         }
         let Some(contents) = self.read_contents(repo_root)? else {
             return Ok(());
@@ -266,25 +277,24 @@ impl FileObj {
                     "{file_name} is not UTF-8 encoded, so its fixes are only in the patch file, not in the PR review"
                 );
                 review_comments.not_posted.push(format!(
-                    "- **{file_name}**: {fixes} fix(es) are only in the patch file because the file is not UTF-8 encoded"
+                    "- **{file_name}**: {} only in the patch file because the file is not UTF-8 encoded",
+                    if fixes == 1 {
+                        String::from("1 fix is")
+                    } else {
+                        format!("{fixes} fixes are")
+                    }
                 ));
             }
         }
         if let Some(advice) = &self.tidy_advice {
             // now check for clang-tidy warnings with no fixes applied
-            let file_ext = self
-                .name
-                .extension()
-                .unwrap_or_default()
-                .to_str()
-                .unwrap_or_default();
-            // Count of clang-tidy diagnostics that had no fixes applied
+            // (a count of such clang-tidy diagnostics)
             let mut total = 0;
             for note in &advice.notes {
                 if note.filename == file_name {
                     for skipped in &note.skipped_fixes {
                         review_comments.skipped_fixes.push(format!(
-                            "- **{file_name}:{}** [{}]: {}",
+                            "- **{file_name}:{}** {}: {}",
                             note.line,
                             note.diagnostic_link(),
                             skipped.describe()
@@ -303,29 +313,14 @@ impl FileObj {
                         continue;
                     }
                     review_comments.in_diff += 1;
-                    let mut suggestion = format!(
-                        "### clang-tidy diagnostic\n**{file_name}:{}:{}** {}: [{}]\n\n> {}\n",
-                        note.line,
-                        note.cols,
-                        note.severity,
-                        note.diagnostic_link(),
-                        note.rationale
-                    );
-                    if !note.suggestion.is_empty() {
-                        suggestion.push_str(
-                            format!("\n```{file_ext}\n{}\n```\n", note.suggestion.join("\n"))
-                                .as_str(),
-                        );
-                    }
-                    for skipped in &note.skipped_fixes {
-                        suggestion.push_str(&format!("\n:warning: {}\n", skipped.describe()));
-                    }
+                    let suggestion = note.review_text();
                     let mut is_merged = false;
                     for s in &mut review_comments.comments {
                         if s.path == file_name
                             && s.line_end >= note.line
                             && s.line_start <= note.line
                         {
+                            s.suggestion.push('\n');
                             s.suggestion.push_str(suggestion.as_str());
                             is_merged = true;
                             break;
@@ -531,7 +526,7 @@ mod test {
 
     use super::{FileObj, FormatAdvice};
     use crate::{
-        clang_tools::ReviewComments,
+        clang_tools::{ClangVersions, ReviewComments},
         cli::{ClangParams, LinesChangedOnly},
     };
 
@@ -674,6 +669,7 @@ mod test {
                 // a diagnostic about an included header is not about this file's line 4
                 TidyNotification {
                     filename: "test_file.h".to_string(),
+                    severity: "error".to_string(),
                     ..note(4, vec![])
                 },
             ],
@@ -701,19 +697,61 @@ mod test {
         assert_eq!(new_suggestion.line_start, 3);
         assert_eq!(new_suggestion.line_end, 3);
         assert!(new_suggestion.suggestion.contains("rationale for line 3"));
-        assert!(new_suggestion.suggestion.contains("```cpp\nline3\n```"));
+        // The comment is shown under the line, so the code snippet is left out.
+        assert!(!new_suggestion.suggestion.contains("line3"));
+        assert!(!new_suggestion.suggestion.contains("test_file.cpp:3"));
         let skipped = "Part of this fix was not applied to `test_file.h` \
             because it is not one of the analyzed files.";
         assert!(
             new_suggestion
                 .suggestion
-                .contains(&format!("\n:warning: {skipped}\n"))
+                .contains(&format!("/m/w.png\"> {skipped}\n"))
         );
         assert_eq!(review_comments.skipped_fixes.len(), 1);
-        assert!(
-            review_comments.skipped_fixes[0].starts_with("- **test_file.cpp:3** [[readability")
-        );
+        assert!(review_comments.skipped_fixes[0].starts_with("- **test_file.cpp:3** [readability"));
         assert!(review_comments.skipped_fixes[0].ends_with(skipped));
+        // the error is about another file, so the review is not marked as failed
+        assert!(!review_comments.has_errors);
+
+        // an error on a changed line of this file marks the review as failed
+        let mut with_error = ReviewComments::default();
+        let mut errored = FileObj::from(
+            PathBuf::from("test_file.cpp"),
+            vec![1, 3],
+            vec![1..=1, 3..=4],
+        );
+        errored.patched_path = Some(patched_file.path().to_path_buf());
+        errored.tidy_advice = Some(TidyAdvice {
+            notes: vec![TidyNotification {
+                severity: "error".to_string(),
+                ..note(3, vec![])
+            }],
+        });
+        errored
+            .make_suggestions_from_patch(
+                &mut with_error,
+                false,
+                repo_root.path(),
+                &ClangParams::default_patch_path(repo_root.path()),
+            )
+            .unwrap();
+        assert!(with_error.has_errors);
+        // also without a patched file (no fixes were made)
+        errored.patched_path = None;
+        let mut without_patch = ReviewComments::default();
+        errored
+            .make_suggestions_from_patch(
+                &mut without_patch,
+                false,
+                repo_root.path(),
+                &ClangParams::default_patch_path(repo_root.path()),
+            )
+            .unwrap();
+        assert!(without_patch.has_errors);
+        // An error with nothing to post still keeps the review from passing.
+        assert_eq!(without_patch.tool_total, 0);
+        let summary = without_patch.summarize(&ClangVersions::default(), &[], 0, false);
+        assert!(summary.contains("/m/hf.png"), "{summary}");
 
         // Processing the same file again merges duplicate suggestions
         file_obj
@@ -772,6 +810,48 @@ mod test {
         assert!(review_comments.not_posted[0].starts_with("- **failed.cpp**: clang-format failed"));
     }
 
+    /// Two separate fixes in a file that is not UTF-8 are counted in the summary.
+    #[test]
+    #[allow(clippy::single_range_in_vec_init)]
+    fn non_utf8_file_with_two_fixes() {
+        let repo_root = TempDir::new().unwrap();
+        let file_name = PathBuf::from("gbk2.cpp");
+        let filler = "int x;\n".repeat(10);
+        let original = [
+            &b"// \xd6\xd0\xce\xc4\nint  a;\n"[..],
+            filler.as_bytes(),
+            b"int  b;\n",
+        ]
+        .concat();
+        let patched = [
+            &b"// \xd6\xd0\xce\xc4\nint a;\n"[..],
+            filler.as_bytes(),
+            b"int b;\n",
+        ]
+        .concat();
+        fs::write(repo_root.path().join(&file_name), &original).unwrap();
+        let patched_file = NamedTempFile::new().unwrap();
+        fs::write(patched_file.path(), &patched).unwrap();
+
+        let mut file_obj = FileObj::from(file_name, vec![2, 13], vec![1..=13]);
+        file_obj.patched_path = Some(patched_file.path().to_path_buf());
+        let mut review_comments = ReviewComments::default();
+        file_obj
+            .make_suggestions_from_patch(
+                &mut review_comments,
+                false,
+                repo_root.path(),
+                &repo_root.path().join("fixes.patch"),
+            )
+            .unwrap();
+        assert_eq!(
+            review_comments.not_posted,
+            vec![
+                "- **gbk2.cpp**: 2 fixes are only in the patch file because the file is not UTF-8 encoded"
+            ]
+        );
+    }
+
     /// A source file that is not UTF-8 (here: GBK) must not abort the run.
     /// Its fixes go into the patch file byte for byte, but not into review suggestions.
     #[test]
@@ -804,7 +884,7 @@ mod test {
         assert_eq!(
             review_comments.not_posted,
             vec![
-                "- **gbk.cpp**: 1 fix(es) are only in the patch file because the file is not UTF-8 encoded"
+                "- **gbk.cpp**: 1 fix is only in the patch file because the file is not UTF-8 encoded"
             ]
         );
 

@@ -11,6 +11,7 @@ use super::{Cli, convert_extra_arg_val, ignore_patterns};
 use crate::clang_tools::clang_tidy::CompilationUnit;
 #[cfg(feature = "bin")]
 use crate::common_fs::is_stdout;
+use crate::rest_client::FormatRun;
 
 use git_bot_feedback::FileFilter;
 
@@ -353,6 +354,9 @@ pub struct FeedbackInput {
     /// The clang-format style to show in file annotations.
     pub style: String,
 
+    /// Whether clang-format only checked the changed lines (see `--lines-changed-only`).
+    pub format_lines_only: bool,
+
     /// Whether to post a PR review.
     pub pr_review: bool,
 
@@ -374,6 +378,15 @@ pub struct FeedbackInput {
 }
 
 impl FeedbackInput {
+    /// How clang-format ran, to tell the user how to run it the same way.
+    pub fn format_run(&self) -> FormatRun<'_> {
+        FormatRun {
+            style: &self.style,
+            lines_only: self.format_lines_only,
+            path_prefix: Path::new(""),
+        }
+    }
+
     /// Is a report (`--sarif-file -` or `--code-quality-file -`) written to stdout?
     ///
     /// Then other output (the generated patch, and log messages in a local run)
@@ -392,6 +405,7 @@ impl From<&Cli> for FeedbackInput {
     fn from(args: &Cli) -> Self {
         FeedbackInput {
             style: args.format_options.style.clone(),
+            format_lines_only: args.source_options.lines_changed_only != LinesChangedOnly::Off,
             no_lgtm: args.feedback_options.no_lgtm,
             step_summary: args.feedback_options.step_summary,
             thread_comments: args.feedback_options.thread_comments.clone(),
@@ -433,6 +447,7 @@ impl Default for FeedbackInput {
             step_summary: false,
             file_annotations: true,
             style: "llvm".to_string(),
+            format_lines_only: false,
             pr_review: false,
             passive_reviews: false,
             repo_root: PathBuf::from("."),

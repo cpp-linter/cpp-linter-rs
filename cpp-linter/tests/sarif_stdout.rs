@@ -48,7 +48,7 @@ fn sarif_to_stdout_is_valid_json() {
     // logs, download progress bars (if clang tools were installed),
     // file annotations (incl. clang-format's) and the patch go to stderr
     assert!(stderr.contains("Wrote SARIF log to stdout"), "{stderr}");
-    assert!(stderr.contains("does not conform to"), "{stderr}");
+    assert!(stderr.contains("not match the LLVM style"), "{stderr}");
     assert!(stderr.contains("Generated patch content:"), "{stderr}");
     assert!(!tmp.path().join("-").exists());
 }

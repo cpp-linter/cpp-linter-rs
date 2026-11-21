@@ -19,6 +19,7 @@ use crate::{
     clang_tools::clang_tidy::CompilationUnit,
     cli::ClangParams,
     error::{ClangCaptureError, ClangTaskError},
+    markdown::{Status, plural},
     rest_client::{RestClient, USER_OUTREACH},
 };
 pub mod clang_format;
@@ -310,6 +311,9 @@ pub struct ReviewComments {
     /// a file that clang-format failed to run on, or fixes for a file that is
     /// not UTF-8 encoded.
     pub not_posted: Vec<String>,
+    /// Whether a finding in the diff is an error (from clang-tidy),
+    /// or clang-format failed to run on a file.
+    pub has_errors: bool,
 }
 
 /// The notice added to a review summary instead of a patch that does not fit.
@@ -328,31 +332,50 @@ impl ReviewComments {
         total_review_comments: u32,
         summary_only: bool,
     ) -> String {
-        let mut body = String::from("## Cpp-linter Review\n");
+        let total = comments.len() as u32;
+        // Only congratulate if there were no findings, no reused comments,
+        // no fix parts left for the user to apply, and no concerns that could not be posted.
+        let is_lgtm = self.tool_total == 0
+            && !self.has_errors
+            && self.full_patch.is_empty()
+            && total_review_comments == 0
+            && self.skipped_fixes.is_empty()
+            && self.not_posted.is_empty();
+        let status = if is_lgtm {
+            Status::Passed
+        } else if self.has_errors {
+            Status::Failed
+        } else {
+            Status::Warned
+        };
+        let mut body = format!("## {} cpp-linter review\n\n", status.mark());
+        let headline = if summary_only && self.tool_total > 0 {
+            format!("**Found {}**", plural(self.tool_total.into(), "issue"))
+        } else if total > 0 {
+            format!("**{}**", plural(total.into(), "comment"))
+        } else if is_lgtm {
+            log::info!("No concerns to report: LGTM");
+            String::from("No issues in this diff")
+        } else {
+            String::from("No new comments in this diff")
+        };
         let versions = [
             (
                 ClangTool::ClangFormat,
                 clang_versions.format_version.as_ref(),
             ),
             (ClangTool::ClangTidy, clang_versions.tidy_version.as_ref()),
-        ];
-        for (tool_name, tool_version) in versions {
-            if let Some(ver) = tool_version {
-                // If a tool was used, then we know it's version at this point.
-                body.push_str(format!("### Used {tool_name} v{ver}\n").as_str());
-            }
+        ]
+        .into_iter()
+        // If a tool was used, then we know its version at this point.
+        .filter_map(|(tool_name, version)| version.map(|ver| format!("{tool_name} {ver}")))
+        .collect::<Vec<_>>();
+        body.push_str(&headline);
+        if !versions.is_empty() {
+            body.push_str(&format!(" ({})", versions.join(", ")));
         }
+        body.push('\n');
 
-        let total = comments.len() as u32;
-        if summary_only && self.tool_total > 0 {
-            body.push_str(
-                format!(
-                    "\nFound {} areas of concern according to clang tools output.\n",
-                    self.tool_total
-                )
-                .as_str(),
-            );
-        }
         if !summary_only && self.in_diff != self.tool_total {
             log::info!(
                 "Only {} out of {} concerns fit within this pull request's diff.",
@@ -361,7 +384,7 @@ impl ReviewComments {
             );
             body.push_str(
                 format!(
-                    "\nOnly {} out of {} concerns fit within this pull request's diff.\n",
+                    "\nOnly {} of {} findings are in this pull request's diff.\n",
                     self.in_diff, self.tool_total,
                 )
                 .as_str(),
@@ -373,9 +396,14 @@ impl ReviewComments {
             log::info!(
                 "Found and removed {dupes} concerns that were duplicates of previous reviews."
             );
-            body.push_str(
-                format!("\n{dupes} suggestions were duplicates of previous reviews.\n").as_str(),
-            );
+            body.push_str(&format!(
+                "\n{} already posted in a previous review.\n",
+                if dupes == 1 {
+                    String::from("1 comment was")
+                } else {
+                    format!("{dupes} comments were")
+                }
+            ));
         }
         self.summarize_skipped_fixes(&mut body);
         self.summarize_not_posted(&mut body);
@@ -383,14 +411,14 @@ impl ReviewComments {
         // It can also contain suggestions that were duplicates of previous reviews.
         if !self.full_patch.is_empty() {
             let current_len = body.len() + USER_OUTREACH.len();
-            let mut patch_prefix = "\n<details><summary>Click here for ".to_string();
+            let mut patch_prefix = "\n<details><summary>".to_string();
             if summary_only {
-                patch_prefix.push_str("the full patch of fixes");
+                patch_prefix.push_str("The full patch of fixes");
             } else {
-                patch_prefix.push_str("a patch of fixes outside the diff");
+                patch_prefix.push_str("A patch of fixes outside the diff");
             }
-            patch_prefix.push_str("</summary><p>\n\n```diff\n");
-            let patch_suffix = "```\n\n</p></details>\n";
+            patch_prefix.push_str("</summary>\n\n```diff\n");
+            let patch_suffix = "```\n\n</details>\n";
 
             if (current_len + patch_prefix.len() + self.full_patch.len() + patch_suffix.len())
                 > u16::MAX as usize
@@ -404,14 +432,6 @@ impl ReviewComments {
                 body.push_str(self.full_patch.as_str());
                 body.push_str(patch_suffix);
             }
-        } else if total_review_comments == 0
-            && self.skipped_fixes.is_empty()
-            && self.not_posted.is_empty()
-        {
-            // Only congratulate if there was no reused comments,
-            // no fix parts left for the user to apply, and no concerns that could not be posted
-            log::info!("No concerns to report: LGTM");
-            body.push_str("\nNo concerns to report. Great job! :tada:\n");
         }
         body.push_str(USER_OUTREACH);
         body
@@ -432,7 +452,7 @@ impl ReviewComments {
     ///
     /// The same length limit applies as in [`Self::summarize_skipped_fixes()`].
     fn summarize_not_posted(&self, body: &mut String) {
-        const HEADING: &str = "\nSome concerns could not be posted as suggestions:\n\n";
+        const HEADING: &str = "\nSome findings could not be posted as suggestions:\n\n";
         Self::summarize_list(
             body,
             HEADING,
@@ -630,7 +650,43 @@ mod tests {
             total_review_comments,
             summary_only,
         );
-        assert!(review_summary.contains("suggestions were duplicates of previous reviews"));
+        assert!(review_summary.contains("1 comment was already posted in a previous review."));
+    }
+
+    /// A summary-only review of a finding with no fix shows no pass mark.
+    #[test]
+    fn summary_only_review_with_findings_is_not_passed() {
+        let clang_versions = ClangVersions {
+            format_version: None,
+            tidy_version: Some(PSEUDO_VERSION),
+        };
+        let review = ReviewComments {
+            tool_total: 1,
+            in_diff: 1,
+            ..Default::default()
+        };
+        let summary = review.summarize(&clang_versions, &[], 0, true);
+        assert!(summary.contains("/m/hw.png"), "{summary}");
+        assert!(summary.contains("**Found 1 issue**"), "{summary}");
+        let clean = ReviewComments::default().summarize(&clang_versions, &[], 0, true);
+        assert!(clean.contains("/m/hp.png"), "{clean}");
+    }
+
+    /// An error in the diff makes the review's mark red, like the thread comment's.
+    #[test]
+    fn review_with_errors_is_failed() {
+        let clang_versions = ClangVersions {
+            format_version: None,
+            tidy_version: Some(PSEUDO_VERSION),
+        };
+        let review = ReviewComments {
+            tool_total: 1,
+            in_diff: 1,
+            has_errors: true,
+            ..Default::default()
+        };
+        let summary = review.summarize(&clang_versions, &[], 0, true);
+        assert!(summary.contains("/m/hf.png"), "{summary}");
     }
 
     #[test]
@@ -648,8 +704,8 @@ mod tests {
             .summarize(&clang_versions, &[], 2, false)
         };
         // concerns merged into fewer comments still fit within the diff
-        assert!(!summarize(6).contains("concerns fit within"));
-        assert!(summarize(2).contains("\nOnly 2 out of 6 concerns fit within"));
+        assert!(!summarize(6).contains("findings are in this"));
+        assert!(summarize(2).contains("\nOnly 2 of 6 findings are in this pull request's diff."));
     }
 
     #[test]
@@ -666,7 +722,7 @@ mod tests {
         assert!(
             review_summary.contains("Please apply these parts yourself:\n\n- first\n- second\n")
         );
-        assert!(!review_summary.contains("No concerns to report"));
+        assert!(!review_summary.contains("No issues in this diff"));
     }
 
     #[test]
@@ -681,9 +737,9 @@ mod tests {
         }
         .summarize(&clang_versions, &[], 0, false);
         assert!(review_summary.contains(
-            "Some concerns could not be posted as suggestions:\n\n- **demo.cpp**: clang-format failed\n"
+            "Some findings could not be posted as suggestions:\n\n- **demo.cpp**: clang-format failed\n"
         ));
-        assert!(!review_summary.contains("No concerns to report"));
+        assert!(!review_summary.contains("No issues in this diff"));
     }
 
     #[test]

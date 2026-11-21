@@ -16,7 +16,12 @@ use regex::Regex;
 use serde::Deserialize;
 
 // project-specific modules/crates
-use crate::{cli::ClangParams, common_fs::FileObj, error::ClangCaptureError};
+use crate::{
+    cli::ClangParams,
+    common_fs::FileObj,
+    error::ClangCaptureError,
+    markdown::{self, Status},
+};
 
 pub mod other_files;
 use other_files::{OtherFileFix, Replacement, TidyFixes};
@@ -146,7 +151,43 @@ impl TidyNotification {
 /// The heading of a review suggestion that no clang-tidy note fixes.
 ///
 /// Such a suggestion only has changes from clang-format.
-pub(crate) const FORMAT_SUGGESTION_HEADING: &str = "### clang-format suggestion\n";
+pub(crate) const FORMAT_SUGGESTION_HEADING: &str = "**clang-format** suggests this formatting.\n";
+
+impl TidyNotification {
+    /// Describe this notification in a PR review comment (in markdown).
+    ///
+    /// The comment is shown under the line it is about,
+    /// so the file name and line number are left out:
+    /// a line with the severity and the linked diagnostic name, then the rationale,
+    /// then the parts of the fix that were not applied (if any).
+    pub(crate) fn review_text(&self) -> String {
+        let (mark, severity) = match self.severity.as_str() {
+            "error" => (Status::Failed.small_mark(), String::from("Error")),
+            "warning" => (Status::Warned.small_mark(), String::from("Warning")),
+            other => {
+                let mut chars = other.chars();
+                let word = chars
+                    .next()
+                    .map(|first| first.to_uppercase().collect::<String>() + chars.as_str())
+                    .unwrap_or_default();
+                (String::from("ℹ"), word)
+            }
+        };
+        let mut text = format!(
+            "{mark} **{severity}**: {}\n\n{}\n",
+            self.diagnostic_link(),
+            markdown::escape(&self.rationale)
+        );
+        for skipped in &self.skipped_fixes {
+            text.push_str(&format!(
+                "\n{} {}\n",
+                Status::Warned.small_mark(),
+                skipped.describe()
+            ));
+        }
+        text
+    }
+}
 
 /// A struct to hold notification from clang-tidy about a single file
 #[derive(Debug, Clone)]
@@ -160,26 +201,19 @@ impl TidyAdvice {
         let mut diagnostics = vec![];
         for note in &self.notes {
             // A fix can change more than one line of the same hunk.
-            // List the note's rationale once, not once per fixed line.
+            // Describe the note once, not once per fixed line.
             if note
                 .fixed_lines
                 .iter()
                 .any(|fixed_line| (start_line..=end_line).contains(fixed_line))
             {
-                diagnostics.push(format!(
-                    "- {} [{}]\n",
-                    note.rationale,
-                    note.diagnostic_link()
-                ));
-                for skipped in &note.skipped_fixes {
-                    diagnostics.push(format!("  - :warning: {}\n", skipped.describe()));
-                }
+                diagnostics.push(note.review_text());
             }
         }
         if diagnostics.is_empty() {
             return FORMAT_SUGGESTION_HEADING.to_string();
         }
-        format!("### clang-tidy diagnostic(s)\n{}", diagnostics.join(""))
+        diagnostics.join("\n")
     }
 }
 
