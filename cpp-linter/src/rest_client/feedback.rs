@@ -52,7 +52,17 @@ impl RestClient {
             for annotation in &mut annotations {
                 annotation.path = prefix_feedback_path(&annotation.path, &self.repo_root_prefix);
             }
-            self.client.write_file_annotations(&annotations)?;
+            if self.client.client_kind() == "local" && feedback_inputs.report_to_stdout() {
+                // The local client prints annotations to stdout,
+                // which must hold only the report.
+                let mut err = stderr().lock();
+                for annotation in &annotations {
+                    writeln!(err, "{}", annotation.fmt_local())
+                        .map_err(ClientError::StdoutWriteFailed)?;
+                }
+            } else {
+                self.client.write_file_annotations(&annotations)?;
+            }
             if self.client.client_kind() == "github"
                 && let Some(msg) = annotation_cap_message(&annotations, &feedback_inputs)
             {
