@@ -897,3 +897,70 @@ fn annotations_over_step_limit() {
         "{msg}"
     );
 }
+
+// ************************* tests for listing changed files
+
+/// An ignored untracked file is not read, so one that can't be read doesn't stop the run.
+#[cfg(unix)]
+#[tokio::test]
+async fn ignored_untracked_file_is_not_read() {
+    use std::{fs, os::unix::fs::PermissionsExt, process::Command};
+
+    let tmp = tempdir().unwrap();
+    let root = tmp.path().canonicalize().unwrap();
+    let git = |args: &[&str]| {
+        let status = Command::new("git")
+            .current_dir(&root)
+            .args(args)
+            .status()
+            .unwrap();
+        assert!(status.success(), "git {args:?}");
+    };
+    git(&["init", "-q"]);
+    git(&[
+        "-c",
+        "user.name=test",
+        "-c",
+        "user.email=test@example.com",
+        "commit",
+        "-q",
+        "--allow-empty",
+        "-m",
+        "init",
+    ]);
+    fs::create_dir_all(root.join("src")).unwrap();
+    fs::write(root.join("src/ok.cpp"), "int main() {}\n").unwrap();
+    fs::create_dir_all(root.join("vendor")).unwrap();
+    let unreadable = root.join("vendor/broken.cpp");
+    fs::write(&unreadable, "int x;\n").unwrap();
+    fs::set_permissions(&unreadable, fs::Permissions::from_mode(0o000)).unwrap();
+
+    // a local run, not a CI run
+    unsafe {
+        for var in [
+            "GITHUB_ACTIONS",
+            "GITEA_ACTIONS",
+            "FORGEJO_ACTIONS",
+            "GITLAB_CI",
+        ] {
+            env::remove_var(var);
+        }
+    }
+    let cur_dir = env::current_dir().unwrap();
+    env::set_current_dir(&root).unwrap();
+    let client = RestClient::new(&root).unwrap();
+    assert_eq!(client.client_kind(), "local");
+    let file_filter = FileFilter::new(&["vendor"], &["cpp"], None);
+    let files = client
+        .get_list_of_changed_files(
+            &file_filter,
+            &git_bot_feedback::LinesChangedOnly::Off,
+            &None,
+            false,
+        )
+        .await;
+    env::set_current_dir(cur_dir).unwrap();
+
+    let names: Vec<PathBuf> = files.unwrap().into_iter().map(|f| f.name).collect();
+    assert_eq!(names, vec![PathBuf::from("src/ok.cpp")]);
+}
