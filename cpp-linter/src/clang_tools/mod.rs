@@ -3,6 +3,7 @@
 
 use std::{
     fs,
+    path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
 
@@ -29,6 +30,19 @@ use clang_tidy::{
     other_files::{TidyFixes, apply_other_file_fixes},
     run_clang_tidy,
 };
+
+/// The path to give a clang tool for the source file at `name`.
+///
+/// clang-format and clang-tidy read an argument that starts with `-` as an option,
+/// so a relative path like `-file.cpp` is given as `./-file.cpp`.
+/// (`--` can't be used instead: clang-tidy reads the arguments after it as compiler options.)
+pub(crate) fn tool_file_arg(name: &Path) -> PathBuf {
+    if name.as_os_str().as_encoded_bytes().starts_with(b"-") {
+        Path::new(".").join(name)
+    } else {
+        name.to_path_buf()
+    }
+}
 
 /// A collection of cached logs: a [`Vec`] of tuples that hold
 /// - log level
@@ -856,5 +870,21 @@ mod tests {
         let files = files_with_format_results(&[None, None]);
         check_format_failures(&files).unwrap();
         check_format_failures(&[]).unwrap();
+    }
+
+    #[test]
+    fn tool_file_arg_for_dash_names() {
+        assert_eq!(
+            tool_file_arg(Path::new("-dash.cpp")),
+            Path::new(".").join("-dash.cpp")
+        );
+        assert_eq!(
+            tool_file_arg(Path::new("src/-dash.cpp")),
+            PathBuf::from("src/-dash.cpp")
+        );
+        assert_eq!(
+            tool_file_arg(Path::new("a-b.cpp")),
+            PathBuf::from("a-b.cpp")
+        );
     }
 }

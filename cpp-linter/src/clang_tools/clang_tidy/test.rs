@@ -573,6 +573,48 @@ fn fixes_not_cached_when_gen_patch_false() {
     assert_eq!(fixes.others.len(), 1);
 }
 
+/// A file name that starts with `-` is not read as an option by clang-tidy.
+#[test]
+fn file_name_starts_with_dash() {
+    let tmp_workspace = tempfile::TempDir::with_prefix("cpp-linter-unit-tests_").unwrap();
+    fs::write(tmp_workspace.path().join("fix.h"), FIX_HEADER).unwrap();
+    fs::write(tmp_workspace.path().join("-fix.cpp"), FIX_SOURCE).unwrap();
+    let clang_params = ClangParams {
+        tidy_checks: "-*,readability-non-const-parameter".to_string(),
+        clang_tidy_command: Some(get_tidy_exe()),
+        repo_root: tmp_workspace.path().to_path_buf(),
+        lines_changed_only: LinesChangedOnly::On,
+        gen_patch: true,
+        ..Default::default()
+    };
+    // only line 2 (the diagnostic's line) was added, so `--line-filter` is used too
+    #[allow(clippy::single_range_in_vec_init)]
+    let file = Mutex::new(FileObj::from(
+        PathBuf::from("-fix.cpp"),
+        vec![2],
+        vec![2..=2],
+    ));
+    let mut file = file.lock().unwrap();
+    let (logs, _fixes) = run_clang_tidy(&mut file, &clang_params).unwrap();
+    let file_arg = format!(" {}", Path::new(".").join("-fix.cpp").display());
+    assert!(
+        logs.iter().any(|(_, msg)| msg.contains(&file_arg)),
+        "{logs:?}"
+    );
+    let notes = &file.tidy_advice.as_ref().unwrap().notes;
+    let note = notes
+        .iter()
+        .find(|n| n.diagnostic == "readability-non-const-parameter")
+        .unwrap();
+    assert_eq!(note.filename, "-fix.cpp");
+    assert_eq!(note.fixed_lines, vec![2]);
+    let patched = fs::read_to_string(file.patched_path.as_ref().unwrap()).unwrap();
+    assert_eq!(
+        patched,
+        FIX_SOURCE.replace("set(int *p)", "set(const int *p)")
+    );
+}
+
 fn dummy_fixes(target: &Path) -> String {
     let target = target.to_string_lossy();
     format!(

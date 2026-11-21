@@ -13,7 +13,10 @@ use log::Level;
 
 // project-specific crates/modules
 use crate::{
-    clang_tools::DiffContents, cli::ClangParams, common_fs::FileObj, error::ClangCaptureError,
+    clang_tools::{DiffContents, tool_file_arg},
+    cli::ClangParams,
+    common_fs::FileObj,
+    error::ClangCaptureError,
 };
 
 /// A struct to hold clang-format advice for a single file.
@@ -115,7 +118,7 @@ pub fn run_clang_format(
     }
     let cache_path = clang_params.get_cache_path();
     let file_name = file.name.to_string_lossy().to_string();
-    cmd.arg(file.name.to_path_buf().as_os_str());
+    cmd.arg(tool_file_arg(&file.name));
     logs.push((
         Level::Info,
         format!(
@@ -231,7 +234,7 @@ pub fn run_clang_format(
                 cmd.arg(format!("--lines={}:{}", range.start(), range.end()).as_str());
             }
         }
-        cmd.arg(&file_name);
+        cmd.arg(tool_file_arg(&file.name));
         let output = cmd
             .output()
             .map_err(|e| ClangCaptureError::FailedToRunCommand {
@@ -793,6 +796,42 @@ mod tests {
         assert_eq!(
             describe_style("{BasedOnStyle: llvm}"),
             "the configured style"
+        );
+    }
+
+    /// A file name that starts with `-` is not read as an option by clang-format,
+    /// both when getting the format advice and when formatting clang-tidy's fixes.
+    #[test]
+    fn file_name_starts_with_dash() {
+        use clang_tools_manager::{ClangTool, RequestedVersion};
+        use std::{fs, str::FromStr};
+
+        let clang_format = ClangTool::ClangFormat
+            .get_exe_path(
+                &RequestedVersion::from_str(
+                    std::env::var("CLANG_VERSION").unwrap_or_default().as_str(),
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        let tmp_workspace = tempfile::TempDir::with_prefix("cpp-linter-unit-tests_").unwrap();
+        fs::write(tmp_workspace.path().join("-dash.cpp"), "int  a;\nint b;\n").unwrap();
+        let clang_params = make_clang_params(tmp_workspace.path(), clang_format);
+        // simulate a file already patched by clang-tidy
+        let patched_path = clang_params.get_cache_path().join("-dash.cpp");
+        fs::create_dir_all(patched_path.parent().unwrap()).unwrap();
+        fs::write(&patched_path, "int  a;\nint  b;\n").unwrap();
+        let mut file = FileObj::new(PathBuf::from("-dash.cpp"));
+        file.patched_path = Some(patched_path.clone());
+        let file = Mutex::new(file);
+        let mut file = file.lock().unwrap();
+        run_clang_format(&mut file, &clang_params).unwrap();
+        let advice = file.format_advice.as_ref().unwrap();
+        assert!(!advice.failed);
+        assert_eq!(advice.replacements, vec![RangeInclusive::new(1, 1)]);
+        assert_eq!(
+            fs::read_to_string(&patched_path).unwrap(),
+            "int a;\nint b;\n"
         );
     }
 }
