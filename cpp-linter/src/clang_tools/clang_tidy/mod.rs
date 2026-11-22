@@ -17,6 +17,7 @@ use serde::Deserialize;
 
 // project-specific modules/crates
 use crate::{
+    clang_tools::tool_file_arg,
     cli::ClangParams,
     common_fs::FileObj,
     error::ClangCaptureError,
@@ -661,7 +662,7 @@ fn build_tidy_command(
     }
     cmd.arg("--export-fixes");
     cmd.arg(fixes_path);
-    cmd.arg(file_name.as_ref());
+    cmd.arg(tool_file_arg(&file.name));
     Ok(cmd)
 }
 
