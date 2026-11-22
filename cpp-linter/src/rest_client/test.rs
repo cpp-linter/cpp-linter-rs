@@ -510,6 +510,17 @@ fn format_commands() {
         FormatRun::from("").command([("a.cpp", &lines[..])]),
         "clang-format -i --style=file a.cpp"
     );
+    // a name that starts with `-` would be read as an option
+    let dash = [("-a.cpp", &lines[..1]), ("-b c.cpp", &lines[..1])];
+    assert_eq!(
+        whole.command(dash),
+        "clang-format -i --style=llvm ./-a.cpp './-b c.cpp'"
+    );
+    assert_eq!(
+        scoped.command(dash),
+        "clang-format -i --style=llvm --lines=1:2 ./-a.cpp\n\
+        clang-format -i --style=llvm --lines=1:2 './-b c.cpp'"
+    );
 }
 
 #[test]

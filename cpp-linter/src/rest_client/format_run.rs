@@ -70,11 +70,11 @@ impl FormatRun<'_> {
                     command.push_str(&format!(" --lines={start}:{end}"));
                 }
                 command.push(' ');
-                command.push_str(&markdown::shell_quote(file));
+                command.push_str(&file_arg(file));
                 commands.push(command);
             } else {
                 whole_files.push(' ');
-                whole_files.push_str(&markdown::shell_quote(file));
+                whole_files.push_str(&file_arg(file));
             }
         }
         if self.lines_only {
@@ -82,5 +82,17 @@ impl FormatRun<'_> {
         } else {
             whole_files
         }
+    }
+}
+
+/// A file name as a shell word for clang-format.
+///
+/// clang-format reads a word that starts with `-` as an option,
+/// so a name like `-file.cpp` is written as `./-file.cpp`.
+fn file_arg(file: &str) -> String {
+    if file.starts_with('-') {
+        markdown::shell_quote(&format!("./{file}"))
+    } else {
+        markdown::shell_quote(file)
     }
 }
