@@ -11,6 +11,9 @@ use std::{collections::HashMap, path::PathBuf, str::FromStr};
 #[command(styles(CLI_HELP_STYLE))]
 pub struct CliOptions {
     /// The desired version of clang to install.
+    ///
+    /// Takes a version requirement (eg. `18` or `=18.1.8`), `latest` for
+    /// the newest major version of the static binaries, or a path.
     #[arg(
         short,
         long,

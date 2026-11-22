@@ -269,6 +269,21 @@ pub enum RequestedVersionParsingError {
     NonCanonicalPath(String, std::io::Error),
 }
 
+impl RequestedVersion {
+    /// The value that requests the newest major version
+    /// in the range of the static binaries (see [`RequestedVersion::latest()`]).
+    pub const LATEST: &str = "latest";
+
+    /// Request the newest major version in the range of the static binaries
+    /// that this build knows about (any minor or patch release of it).
+    ///
+    /// The range is read when this crate is built, so it does not change at run time.
+    pub fn latest() -> Self {
+        let major = *StaticDistDownloader::get_major_version_range().end();
+        Self::Requirement(VersionReq::parse(&major.to_string()).unwrap_or(VersionReq::STAR))
+    }
+}
+
 impl FromStr for RequestedVersion {
     type Err = RequestedVersionParsingError;
 
@@ -277,6 +292,8 @@ impl FromStr for RequestedVersion {
             Ok(Self::SystemDefault)
         } else if input == "CPP-LINTER-VERSION" {
             Ok(Self::NoValue)
+        } else if input.eq_ignore_ascii_case(Self::LATEST) {
+            Ok(Self::latest())
         } else if let Ok(req) = VersionReq::parse(input) {
             Ok(Self::Requirement(req))
         } else {
@@ -312,7 +329,10 @@ mod tests {
     use semver::VersionReq;
     use tempfile::TempDir;
 
-    use super::{RequestedVersion, RequestedVersionParsingError, requires_exact_version};
+    use super::{
+        RequestedVersion, RequestedVersionParsingError, StaticDistDownloader,
+        requires_exact_version,
+    };
     use crate::{ClangTool, utils::normalize_path};
 
     // See also crate::tool::tests module for other `RequestedVersion::from_str()` tests.
@@ -407,6 +427,17 @@ mod tests {
             RequestedVersion::from_str("CPP-LINTER-VERSION").unwrap(),
             RequestedVersion::NoValue
         );
+    }
+
+    #[test]
+    fn validate_version_latest() {
+        let major = *StaticDistDownloader::get_major_version_range().end();
+        let expected =
+            RequestedVersion::Requirement(VersionReq::parse(&format!("^{major}")).unwrap());
+        for input in ["latest", "LATEST", "Latest"] {
+            assert_eq!(RequestedVersion::from_str(input).unwrap(), expected);
+        }
+        assert_eq!(RequestedVersion::latest(), expected);
     }
 
     #[test]
