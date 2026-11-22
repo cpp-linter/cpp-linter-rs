@@ -515,7 +515,7 @@ dependencies = [
 
 [[package]]
 name = "cpp-linter-py"
-version = "2.0.0-rc.25"
+version = "2.0.0-rc.26"
 dependencies = [
  "anyhow",
  "cpp-linter",
