@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
+## [clang-tools-manager/v0.4.0] - 2026-11-22
+
+### <!-- 1 --> 🚀 Added
+
+- Accept `latest` for `--version` by @shenxianpeng in [#599](https://github.com/cpp-linter/cpp-linter-rs/pull/599)
+
+[clang-tools-manager/v0.4.0]: https://github.com/cpp-linter/cpp-linter-rs/compare/clang-tools-manager/v0.3.4...clang-tools-manager/v0.4.0
+
+Full commit diff: [`clang-tools-manager/v0.3.4...clang-tools-manager/v0.4.0`][clang-tools-manager/v0.4.0]
+
 ## [clang-tools-manager/v0.3.4] - 2026-11-17
 
 ### <!-- 1 --> 🚀 Added
@@ -15,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### <!-- 4 --> 🛠️ Fixed
 
 - Make clang tool install logs say what actually happened by @shenxianpeng in [#572](https://github.com/cpp-linter/cpp-linter-rs/pull/572)
+
+### <!-- 6 --> 📦 Dependency updates
+
+- Bump version to clang-tools-manager/v0.3.4 by @2bndy5 in [`d2b636d`](https://github.com/cpp-linter/cpp-linter-rs/commit/d2b636dd3afaa3fc5b10d37ae848b049b7e1c9ab)
 
 [clang-tools-manager/v0.3.4]: https://github.com/cpp-linter/cpp-linter-rs/compare/clang-tools-manager/v0.3.3...clang-tools-manager/v0.3.4
 
