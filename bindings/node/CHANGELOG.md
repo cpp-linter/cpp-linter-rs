@@ -6,6 +6,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
+## [cpp-linter-js/v2.0.0-rc.25] - 2026-11-22
+
+### <!-- 1 --> 🚀 Added
+
+- Add --code-quality-file for GitLab Code Quality reports by @shenxianpeng in [#586](https://github.com/cpp-linter/cpp-linter-rs/pull/586)
+- Make the comment, review and annotations read at a glance by @shenxianpeng in [#595](https://github.com/cpp-linter/cpp-linter-rs/pull/595)
+- Accept `latest` for `--version` by @shenxianpeng in [#599](https://github.com/cpp-linter/cpp-linter-rs/pull/599)
+
+### <!-- 4 --> 🛠️ Fixed
+
+- Print errors without a traceback from the pip and npm `cpp-linter` commands by @shenxianpeng in [#587](https://github.com/cpp-linter/cpp-linter-rs/pull/587)
+- Label review suggestions that only clang-format changes as clang-format by @shenxianpeng in [#588](https://github.com/cpp-linter/cpp-linter-rs/pull/588)
+- Skip files that can't be read instead of stopping the run by @shenxianpeng in [#591](https://github.com/cpp-linter/cpp-linter-rs/pull/591)
+- Report clang-format fixes that also change an unchanged line by @shenxianpeng in [#593](https://github.com/cpp-linter/cpp-linter-rs/pull/593)
+- Write the Code Quality report to stdout with `--code-quality-file -` by @shenxianpeng in [#590](https://github.com/cpp-linter/cpp-linter-rs/pull/590)
+- Drop the Star and Sponsor links from the comment footer by @shenxianpeng in [#594](https://github.com/cpp-linter/cpp-linter-rs/pull/594)
+- Pass file names that start with `-` to clang-format and clang-tidy as `./-name` by @shenxianpeng in [#600](https://github.com/cpp-linter/cpp-linter-rs/pull/600)
+
+### <!-- 6 --> 📦 Dependency updates
+
+- Bump mkdocs-ng-material to 9.8.2 by @shenxianpeng in [#589](https://github.com/cpp-linter/cpp-linter-rs/pull/589)
+- Bump git-bot-feedback to 0.12.4 by @shenxianpeng in [#598](https://github.com/cpp-linter/cpp-linter-rs/pull/598)
+- Bump version to clang-tools-manager/v0.4.0 by @2bndy5 in [`0dff4fc`](https://github.com/cpp-linter/cpp-linter-rs/commit/0dff4fcd00e6034ab2eefd1a88441fdbd9b8a42e)
+- Bump version to cpp-linter/v2.0.0-rc.27 by @2bndy5 in [`aadde2b`](https://github.com/cpp-linter/cpp-linter-rs/commit/aadde2ba070ee7fd33110ff8bb7a86fe294bcab3)
+- Bump version to cpp-linter-py/v2.0.0-rc.26 by @2bndy5 in [`12a6fe5`](https://github.com/cpp-linter/cpp-linter-rs/commit/12a6fe5ed049516a328bcf5c32317de6cd41e836)
+
+### <!-- 9 --> 🗨️ Changed
+
+- Split the rest_client module into sub-modules by @shenxianpeng in [#597](https://github.com/cpp-linter/cpp-linter-rs/pull/597)
+
+[cpp-linter-js/v2.0.0-rc.25]: https://github.com/cpp-linter/cpp-linter-rs/compare/cpp-linter-js/v2.0.0-rc.24...cpp-linter-js/v2.0.0-rc.25
+
+Full commit diff: [`cpp-linter-js/v2.0.0-rc.24...cpp-linter-js/v2.0.0-rc.25`][cpp-linter-js/v2.0.0-rc.25]
+
 ## [cpp-linter-js/v2.0.0-rc.24] - 2026-11-17
 
 ### <!-- 1 --> 🚀 Added
@@ -36,6 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump version to clang-tools-manager/v0.3.4 by @2bndy5 in [`d2b636d`](https://github.com/cpp-linter/cpp-linter-rs/commit/d2b636dd3afaa3fc5b10d37ae848b049b7e1c9ab)
 - Bump version to cpp-linter/v2.0.0-rc.26 by @2bndy5 in [`3e08470`](https://github.com/cpp-linter/cpp-linter-rs/commit/3e084701e69600a575c85bbb08a5129f940d0ddb)
 - Bump version to cpp-linter-py/v2.0.0-rc.25 by @2bndy5 in [`5f0e651`](https://github.com/cpp-linter/cpp-linter-rs/commit/5f0e651f1fca0726c873390947784756efa851b7)
+- Bump version to cpp-linter-js/v2.0.0-rc.24 by @2bndy5 in [`4ec7603`](https://github.com/cpp-linter/cpp-linter-rs/commit/4ec760382988a8e7e7915b8db874e9bd41abe626)
 
 ### <!-- 8 --> 📝 Documentation
 
