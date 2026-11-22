@@ -899,9 +899,9 @@ dependencies = [
 
 [[package]]
 name = "git-bot-feedback"
-version = "0.12.3"
+version = "0.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b59004ceb4f7e055f4e05681a181c6c9c58b393633ed5665c90f905b9cd2fde"
+checksum = "1173b3c651a9669c34fbbb9e16c21ba82a0bc29466751008745046995962e885"
 dependencies = [
  "async-trait",
  "chrono",
@@ -2504,7 +2504,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.4.3",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",

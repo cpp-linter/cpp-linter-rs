@@ -91,9 +91,15 @@ impl RestClient {
         ignore_index: bool,
     ) -> Result<Vec<FileObj>, ClientError> {
         let mut changed_files_filter = file_filter.clone();
-        changed_files_filter.ignored.clear();
-        changed_files_filter.not_ignored.clear();
-        changed_files_filter.not_ignored.insert(String::new());
+        if !self.repo_root_prefix.as_os_str().is_empty() {
+            // The patterns are relative to `--repo-root`, but the client lists files
+            // relative to the git root, so they are applied after the prefix is removed.
+            // Without a prefix, the client applies them itself and doesn't read
+            // ignored untracked files at all.
+            changed_files_filter.ignored.clear();
+            changed_files_filter.not_ignored.clear();
+            changed_files_filter.not_ignored.insert(String::new());
+        }
         let files = self
             .client
             .get_list_of_changed_files(
