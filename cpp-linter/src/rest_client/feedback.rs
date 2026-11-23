@@ -197,11 +197,15 @@ impl RestClient {
                 };
 
                 let total_review_comments = options.comments.len() as u32;
-                self.client.cull_pr_reviews(&mut options).await?;
                 let has_changes = review_comments.tool_total > 0
                     || review_comments.has_errors
                     || !review_comments.skipped_fixes.is_empty()
                     || !review_comments.not_posted.is_empty();
+                if has_changes && !feedback_inputs.passive_reviews {
+                    // Culling must not remove a request for changes that this review keeps.
+                    options.action = ReviewAction::RequestChanges;
+                }
+                self.client.cull_pr_reviews(&mut options).await?;
                 let is_lgtm = options.comments.is_empty() && !has_changes;
                 options.action = if feedback_inputs.passive_reviews {
                     ReviewAction::Comment
