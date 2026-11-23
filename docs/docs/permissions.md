@@ -84,3 +84,15 @@ The [`pr-review`](cli.md#-p-pr-review) and [`passive-reviews`](cli.md#-r-passive
     permissions:
       pull-requests: write
 ```
+
+## Code Scanning
+
+Uploading the [`--sarif-file`](cli.md#-sarif-file) to GitHub code scanning with the
+`github/codeql-action/upload-sarif` action requires the following permissions:
+
+```yaml
+    permissions:
+      security-events: write
+```
+
+See [GitHub Code Scanning](code-scanning.md) for a complete workflow.

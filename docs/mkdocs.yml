@@ -11,6 +11,7 @@ nav:
   - Migration: migration.md
   - pr-review-caveats.md
   - Permissions: permissions.md
+  - code-scanning.md
   - git-servers.md
   - python.md
   - node.md

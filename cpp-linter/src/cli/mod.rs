@@ -597,6 +597,8 @@ pub struct FeedbackOptions {
     /// > In GitHub Actions, the SARIF file can be uploaded to
     /// > [GitHub code scanning](https://docs.github.com/en/code-security/code-scanning/integrating-with-code-scanning/uploading-a-sarif-file-to-github)
     /// > with the `github/codeql-action/upload-sarif` action.
+    /// > Code scanning treats each upload for a branch as the full state of that branch,
+    /// > so scan whole files there. See [GitHub Code Scanning](code-scanning.md).
     #[cfg_attr(
         feature = "bin",
         arg(long, value_name = "PATH", help_heading = "Feedback options",)
