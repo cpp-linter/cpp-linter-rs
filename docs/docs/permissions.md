@@ -93,6 +93,9 @@ Uploading the [`--sarif-file`](cli.md#-sarif-file) to GitHub code scanning with 
 ```yaml
     permissions:
       security-events: write
+      # only needed in a private repository
+      actions: read
+      contents: read
 ```
 
 See [GitHub Code Scanning](code-scanning.md) for a complete workflow.

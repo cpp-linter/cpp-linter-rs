@@ -46,6 +46,7 @@ jobs:
       contents: read
       pull-requests: read
       security-events: write
+      actions: read # only needed in a private repository
     steps:
       - uses: actions/checkout@v4
       # install cpp-linter here, see "Quick start"
@@ -61,10 +62,6 @@ jobs:
           --files-changed-only="$FILES_CHANGED_ONLY"
           --sarif-file=cpp-linter.sarif
       - name: Upload to code scanning
-        # The token of a pull request from a fork is read-only and cannot upload.
-        if: >-
-          github.event_name == 'push' ||
-          github.event.pull_request.head.repo.full_name == github.repository
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: cpp-linter.sarif
@@ -77,5 +74,3 @@ See [Quick start][quick-start] for the ways to install cpp-linter.
   alert is fixed closes it.
 - `category` names this analysis. Keep it the same in every run, so that code scanning compares
   each upload with the earlier ones.
-- The token of a pull request from a fork is read-only, so the upload is skipped for those.
-  Their alerts show up after the merge, with the next push to the default branch.
