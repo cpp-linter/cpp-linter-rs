@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
+## [cpp-linter-py/v2.0.0-rc.27] - 2026-11-24
+
+### <!-- 4 --> 🛠️ Fixed
+
+- Write file names that start with `-` as `./-name` in the clang-format command hint by @shenxianpeng in [#601](https://github.com/cpp-linter/cpp-linter-rs/pull/601)
+- Set the review action before culling when changes are requested by @shenxianpeng in [#607](https://github.com/cpp-linter/cpp-linter-rs/pull/607)
+
+### <!-- 6 --> 📦 Dependency updates
+
+- Bump version to cpp-linter-js/v2.0.0-rc.25 by @2bndy5 in [`3f8c98c`](https://github.com/cpp-linter/cpp-linter-rs/commit/3f8c98c7228744c076dadb2f2d0a5db8d6bae1bb)
+- Bump the cargo group with 4 updates by @dependabot[bot] in [#604](https://github.com/cpp-linter/cpp-linter-rs/pull/604)
+- Bump git-bot-feedback to 0.12.5 by @shenxianpeng in [#608](https://github.com/cpp-linter/cpp-linter-rs/pull/608)
+- Bump ruff from 0.17.4 to 0.17.5 in the uv-pip group by @dependabot[bot] in [#606](https://github.com/cpp-linter/cpp-linter-rs/pull/606)
+- Bump version to cpp-linter/v2.0.0-rc.28 by @2bndy5 in [`dc4b247`](https://github.com/cpp-linter/cpp-linter-rs/commit/dc4b247d0e87f34650e42d54f37a40879fdb985d)
+
+### <!-- 8 --> 📝 Documentation
+
+- Add a GitHub code scanning recipe for `--sarif-file` by @shenxianpeng in [#609](https://github.com/cpp-linter/cpp-linter-rs/pull/609)
+
+[cpp-linter-py/v2.0.0-rc.27]: https://github.com/cpp-linter/cpp-linter-rs/compare/cpp-linter-py/v2.0.0-rc.26...cpp-linter-py/v2.0.0-rc.27
+
+Full commit diff: [`cpp-linter-py/v2.0.0-rc.26...cpp-linter-py/v2.0.0-rc.27`][cpp-linter-py/v2.0.0-rc.27]
+
 ## [cpp-linter-py/v2.0.0-rc.26] - 2026-11-22
 
 ### <!-- 1 --> 🚀 Added
@@ -31,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump git-bot-feedback to 0.12.4 by @shenxianpeng in [#598](https://github.com/cpp-linter/cpp-linter-rs/pull/598)
 - Bump version to clang-tools-manager/v0.4.0 by @2bndy5 in [`0dff4fc`](https://github.com/cpp-linter/cpp-linter-rs/commit/0dff4fcd00e6034ab2eefd1a88441fdbd9b8a42e)
 - Bump version to cpp-linter/v2.0.0-rc.27 by @2bndy5 in [`aadde2b`](https://github.com/cpp-linter/cpp-linter-rs/commit/aadde2ba070ee7fd33110ff8bb7a86fe294bcab3)
+- Bump version to cpp-linter-py/v2.0.0-rc.26 by @2bndy5 in [`12a6fe5`](https://github.com/cpp-linter/cpp-linter-rs/commit/12a6fe5ed049516a328bcf5c32317de6cd41e836)
 
 ### <!-- 9 --> 🗨️ Changed
 
