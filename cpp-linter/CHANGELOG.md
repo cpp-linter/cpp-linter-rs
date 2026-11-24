@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
+## [cpp-linter/v2.0.0-rc.28] - 2026-11-24
+
+### <!-- 4 --> 🛠️ Fixed
+
+- Write file names that start with `-` as `./-name` in the clang-format command hint by @shenxianpeng in [#601](https://github.com/cpp-linter/cpp-linter-rs/pull/601)
+- Set the review action before culling when changes are requested by @shenxianpeng in [#607](https://github.com/cpp-linter/cpp-linter-rs/pull/607)
+
+### <!-- 6 --> 📦 Dependency updates
+
+- Bump git-bot-feedback to 0.12.5 by @shenxianpeng in [#608](https://github.com/cpp-linter/cpp-linter-rs/pull/608)
+
+### <!-- 8 --> 📝 Documentation
+
+- Add a GitHub code scanning recipe for `--sarif-file` by @shenxianpeng in [#609](https://github.com/cpp-linter/cpp-linter-rs/pull/609)
+
+[cpp-linter/v2.0.0-rc.28]: https://github.com/cpp-linter/cpp-linter-rs/compare/cpp-linter/v2.0.0-rc.27...cpp-linter/v2.0.0-rc.28
+
+Full commit diff: [`cpp-linter/v2.0.0-rc.27...cpp-linter/v2.0.0-rc.28`][cpp-linter/v2.0.0-rc.28]
+
 ## [cpp-linter/v2.0.0-rc.27] - 2026-11-22
 
 ### <!-- 1 --> 🚀 Added
@@ -28,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Bump git-bot-feedback to 0.12.4 by @shenxianpeng in [#598](https://github.com/cpp-linter/cpp-linter-rs/pull/598)
 - Bump version to clang-tools-manager/v0.4.0 by @2bndy5 in [`0dff4fc`](https://github.com/cpp-linter/cpp-linter-rs/commit/0dff4fcd00e6034ab2eefd1a88441fdbd9b8a42e)
+- Bump version to cpp-linter/v2.0.0-rc.27 by @2bndy5 in [`aadde2b`](https://github.com/cpp-linter/cpp-linter-rs/commit/aadde2ba070ee7fd33110ff8bb7a86fe294bcab3)
 
 ### <!-- 9 --> 🗨️ Changed
 
