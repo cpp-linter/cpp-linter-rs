@@ -65,8 +65,8 @@ name = "clang-tools-manager"
 name = "cli-gen"
 release = false
 
-# Same layout as the git-cliff config in .config/cliff.toml, adapted to the
-# variables release-plz provides (`package`, `remote.link`, `previous.version`).
+# Keeps the layout of the existing changelogs, using the variables
+# release-plz provides (`package`, `remote.link`, `previous.version`).
 [changelog]
 header = """
 # Changelog

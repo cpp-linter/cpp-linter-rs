@@ -104,8 +104,15 @@ Releases are prepared by [release-plz] (see `release-plz.toml`).
    and to npm's `next` tag.
 
 To choose a version yourself (e.g. to start or end release candidates),
-run the "Set release version" workflow. It opens a PR with the new version;
-after it is merged, the release PR keeps that version.
+open a PR that sets it (needs [cargo-edit]):
+
+```sh
+cargo set-version -p cpp-linter -p cpp-linter-py -p cpp-linter-js 2.0.0
+.github/sync-node-version.sh
+```
+
+After it is merged, the release PR keeps that version.
 
 [nur]: https://nur-taskrunner.github.io/docs/
 [release-plz]: https://release-plz.dev/
+[cargo-edit]: https://github.com/killercup/cargo-edit
