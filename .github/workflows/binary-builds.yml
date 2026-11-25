@@ -216,6 +216,24 @@ jobs:
         with:
           name: ${{ needs.seed-build-script.outputs.artifact-name }}
           path: clang-tools-manager
+      # release-plz pushes the clang-tools-manager and cpp-linter tags together;
+      # cpp-linter can only be published once its clang-tools-manager version is on crates.io.
+      - name: Wait for clang-tools-manager on crates.io
+        if: startsWith(github.ref_name, 'cpp-linter/v')
+        run: |-
+          ver=$(cargo metadata --format-version 1 --no-deps \
+            | jq -r '.packages[] | select(.name == "clang-tools-manager") | .version')
+          for _ in $(seq 1 30); do
+            if curl -sSf -A "cpp-linter-rs CI (github.com/cpp-linter/cpp-linter-rs)" \
+              "https://crates.io/api/v1/crates/clang-tools-manager/${ver}" > /dev/null; then
+              echo "clang-tools-manager ${ver} is on crates.io"
+              exit 0
+            fi
+            echo "Waiting for clang-tools-manager ${ver} on crates.io"
+            sleep 60
+          done
+          echo "::error::clang-tools-manager ${ver} is not on crates.io after 30 minutes"
+          exit 1
       - name: Establish provenance
         id: auth
         uses: rust-lang/crates-io-auth-action@3268eb413133e2960fa4ae0e963ca76380c54cd9 # v1.0.6

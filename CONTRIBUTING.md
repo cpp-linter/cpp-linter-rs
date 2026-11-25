@@ -87,4 +87,25 @@ In CI, docs are built using
 nur docs --build
 ```
 
+## Releasing
+
+Releases are prepared by [release-plz] (see `release-plz.toml`).
+
+1. On every push to `main`, release-plz opens or updates a release PR titled
+   "chore: release". It bumps the versions from the conventional commit
+   messages (`fix` → patch, `feat` → minor, `!` → major) and adds the
+   changelog entries.
+2. cpp-linter, cpp-linter-py and cpp-linter-js always get the same version.
+   clang-tools-manager has its own version.
+3. Review the release PR (the changelog can be edited there) and merge it.
+4. release-plz then pushes a `{package}/v{version}` tag for each released
+   package and creates its GitHub release. The tags trigger the builds that
+   publish to crates.io, PyPI and npm. Pre-releases (`-rc.N`) go to TestPyPI
+   and to npm's `next` tag.
+
+To choose a version yourself (e.g. to start or end release candidates),
+run the "Set release version" workflow. It opens a PR with the new version;
+after it is merged, the release PR keeps that version.
+
 [nur]: https://nur-taskrunner.github.io/docs/
+[release-plz]: https://release-plz.dev/

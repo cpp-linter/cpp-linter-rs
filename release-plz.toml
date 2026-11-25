@@ -1,0 +1,130 @@
+# Configuration for release-plz (https://release-plz.dev/docs/config).
+#
+# On every push to main, release-plz keeps one release PR up to date
+# (version bumps + changelogs). Merging that PR makes release-plz push one
+# `{package}/v{version}` tag per released package and create its GitHub release.
+# Those tags trigger the deploy workflows, as before:
+# - binary-builds.yml: crates.io + binaries (cpp-linter, clang-tools-manager)
+# - python-packaging.yml: PyPI, or TestPyPI for pre-releases (cpp-linter-py)
+# - node-js-packaging.yml: npm, `next` dist-tag for pre-releases (cpp-linter-js)
+
+[workspace]
+# Publishing is done by the tag-triggered workflows above.
+publish = false
+semver_check = false
+# Only release when a release PR (branch `release-plz-*`) is merged.
+release_always = false
+git_tag_name = "{{ package }}/v{{ version }}"
+git_release_name = "{{ package }}/v{{ version }}"
+# Pre-release versions (e.g. 2.1.0-rc.1) become GitHub pre-releases.
+git_release_type = "auto"
+git_release_latest = false
+
+# cpp-linter, cpp-linter-py and cpp-linter-js always share one version,
+# so cargo, pip and npm users see the same version number.
+[[package]]
+name = "cpp-linter"
+version_group = "cpp-linter"
+git_release_latest = true
+
+[[package]]
+name = "cpp-linter-py"
+version_group = "cpp-linter"
+# Not on crates.io: the last release is read from git tags.
+git_only = true
+changelog_include = ["cpp-linter", "clang-tools-manager"]
+git_release_body = """
+{%- if changelog -%}
+{{ changelog }}
+{%- else -%}
+Python binding of cpp-linter {{ version }}. \
+See the [cpp-linter {{ version }} release](https://github.com/cpp-linter/cpp-linter-rs/releases/tag/cpp-linter/v{{ version }}) for the changes.
+{%- endif -%}
+"""
+
+[[package]]
+name = "cpp-linter-js"
+version_group = "cpp-linter"
+# Not on crates.io: the last release is read from git tags.
+git_only = true
+changelog_include = ["cpp-linter", "clang-tools-manager"]
+git_release_body = """
+{%- if changelog -%}
+{{ changelog }}
+{%- else -%}
+Node.js binding of cpp-linter {{ version }}. \
+See the [cpp-linter {{ version }} release](https://github.com/cpp-linter/cpp-linter-rs/releases/tag/cpp-linter/v{{ version }}) for the changes.
+{%- endif -%}
+"""
+
+[[package]]
+name = "clang-tools-manager"
+
+# Only used to generate the docs.
+[[package]]
+name = "cli-gen"
+release = false
+
+# Same layout as the git-cliff config in .config/cliff.toml, adapted to the
+# variables release-plz provides (`package`, `remote.link`, `previous.version`).
+[changelog]
+header = """
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+<!-- markdownlint-disable MD024 -->
+"""
+body = """
+{%- set this_tag = package ~ "/v" ~ version -%}
+## [{{ version }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | upper_first }}
+{% for commit in commits %}
+- {{ commit.message | split(pat="\n") | first | upper_first | trim }}\
+    {% if commit.remote.username %} by @{{ commit.remote.username }}{%- endif -%}
+    {% if commit.remote.pr_number %} in \
+    [#{{ commit.remote.pr_number }}]({{ remote.link }}/pull/{{ commit.remote.pr_number }})
+    {%- else %} in \
+    [`{{ commit.id | truncate(length=7, end="") }}`]({{ remote.link }}/commit/{{ commit.id }})
+    {%- endif -%}
+{% endfor %}
+{% endfor -%}
+{%- if previous.version -%}
+    {%- if previous.version is starting_with(package ~ "/") -%}
+        {%- set prev_tag = previous.version -%}
+    {%- else -%}
+        {%- set prev_tag = package ~ "/v" ~ previous.version -%}
+    {%- endif %}
+[{{ version }}]: {{ remote.link }}/compare/{{ prev_tag }}...{{ this_tag }}
+
+Full commit diff: [`{{ prev_tag }}...{{ this_tag }}`][{{ version }}]
+{% endif %}
+"""
+trim = true
+sort_commits = "oldest"
+protect_breaking_commits = true
+commit_preprocessors = [
+    # remove issue numbers from commits
+    { pattern = '\((\w+\s)?#([0-9]+)\)', replace = "" },
+]
+commit_parsers = [
+    { message = "^build: bump version to ", skip = true },
+    { message = "^chore: release", skip = true },
+    { field = "breaking", pattern = "true", group = "<!-- 0 --> 💥 Breaking changes" },
+    { field = "group", pattern = "^(add|feat)$", group = "<!-- 1 --> 🚀 Added" },
+    { field = "group", pattern = "^deprecate$", group = "<!-- 2 --> 🚫 Deprecated" },
+    { field = "group", pattern = "^(remove|delete)$", group = "<!-- 3 --> 🗑️ Removed" },
+    { field = "group", pattern = "^(fix|perf)$", group = "<!-- 4 --> 🛠️ Fixed" },
+    { field = "group", pattern = "^security$", group = "<!-- 5 --> 🔐 Security" },
+    { field = "group", pattern = "^build$", group = "<!-- 6 --> 📦 Dependency updates" },
+    { field = "group", pattern = "^test$", group = "<!-- 7 -->🚦 Tests" },
+    { field = "group", pattern = "^docs$", group = "<!-- 8 --> 📝 Documentation" },
+    { field = "group", pattern = "^(chore|style|refactor)$", group = "<!-- 9 --> 🗨️ Changed" },
+    # Unconventional commit messages
+    { message = "^[aA]dd", group = "<!-- 1 --> 🚀 Added" },
+    { message = "^[fF]ix", group = "<!-- 4 --> 🛠️ Fixed" },
+    { message = "^.*", group = "<!-- 9 --> 🗨️ Changed" },
+]
