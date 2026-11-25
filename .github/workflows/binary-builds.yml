@@ -2,26 +2,13 @@ name: Binary builds
 
 on:
   push:
-    branches: [main]
-    paths:
-      - cpp-linter/src/**
-      - cpp-linter/Cargo.toml
-      - clang-tools-manager/src/**
-      - clang-tools-manager/Cargo.toml
-      - Cargo.toml
-      - Cargo.lock
     tags:
       - cpp-linter/v*
       - clang-tools-manager/v*
   pull_request:
     branches: [main]
-    paths:
-      - cpp-linter/src/**
-      - cpp-linter/Cargo.toml
-      - clang-tools-manager/src/**
-      - clang-tools-manager/Cargo.toml
-      - Cargo.toml
-      - Cargo.lock
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -36,6 +23,10 @@ concurrency:
 jobs:
   seed-build-script:
     name: Pre-seed static binaries' versions
+    # On PRs, only the release PR is built, once it is marked ready for review.
+    if: >-
+      github.event_name != 'pull_request'
+      || (startsWith(github.head_ref, 'release-plz-') && !github.event.pull_request.draft)
     uses: $/.github/workflows/pre-seed-versions.yml
 
   create-assets:

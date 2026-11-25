@@ -14,6 +14,9 @@ publish = false
 semver_check = false
 # Only release when a release PR (branch `release-plz-*`) is merged.
 release_always = false
+# Open the release PR as a draft; marking it ready for review runs the
+# release builds (binary-builds, python-packaging, node-js-packaging) on it.
+pr_draft = true
 git_tag_name = "{{ package }}/v{{ version }}"
 git_release_name = "{{ package }}/v{{ version }}"
 # Pre-release versions (e.g. 2.1.0-rc.1) become GitHub pre-releases.
