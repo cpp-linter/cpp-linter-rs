@@ -9,7 +9,8 @@
 # - node-js-packaging.yml: npm, `next` dist-tag for pre-releases (cpp-linter-js)
 
 [workspace]
-# Publishing is done by the tag-triggered workflows above.
+# Only cpp-linter and clang-tools-manager are published by release-plz (to
+# crates.io, see below); PyPI and npm are published by the tag-triggered workflows.
 publish = false
 semver_check = false
 # Only release when a release PR (branch `release-plz-*`) is merged.
@@ -29,6 +30,7 @@ git_release_latest = false
 name = "cpp-linter"
 version_group = "cpp-linter"
 git_release_latest = true
+publish = true
 
 [[package]]
 name = "cpp-linter-py"
@@ -62,6 +64,10 @@ See the [cpp-linter {{ version }} release](https://github.com/cpp-linter/cpp-lin
 
 [[package]]
 name = "clang-tools-manager"
+publish = true
+# The packaged static-binaries-index.json (downloaded in release-plz.yml) is
+# not checked in, but docs.rs builds need it.
+publish_allow_dirty = true
 
 # Only used to generate the docs.
 [[package]]

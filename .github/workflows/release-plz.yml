@@ -1,26 +1,25 @@
 name: Release-plz
 
 # Keeps the release PR up to date on every push to main.
-# When the release PR is merged, tags each released package and creates
-# its GitHub release; the tags trigger the deploy workflows.
+# When the release PR is merged, publishes the crates to crates.io, tags each
+# released package and creates its GitHub release; the tags trigger the
+# workflows that upload the binaries and publish to PyPI and npm.
 # See release-plz.toml for the details.
 
 on:
   push:
     branches: [main]
-  # cpp-linter and clang-tools-manager are compared with crates.io, which is
-  # updated only after the deploy workflows finish; refresh the PR daily.
-  schedule:
-    - cron: "17 3 * * *"
   workflow_dispatch:
 
 permissions: {}
 
 jobs:
   release:
-    name: Tag and create GitHub releases
+    name: Publish, tag and create GitHub releases
     if: github.repository_owner == 'cpp-linter' && github.event_name == 'push'
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write # trusted publishing to crates.io
     steps:
       # Tags pushed with the default GITHUB_TOKEN do not trigger other workflows,
       # so release-plz uses a token of the release GitHub App.
@@ -39,7 +38,13 @@ jobs:
           persist-credentials: true # needed to push tags
       - name: Install Rust
         run: rustup update stable --no-self-update
-      - name: Tag released packages
+      # Packaged with clang-tools-manager so that docs.rs builds need no network.
+      - name: Download static binaries index
+        run: >-
+          curl --fail --silent --show-error --location --retry 3
+          --output clang-tools-manager/static-binaries-index.json
+          https://cpp-linter.github.io/clang-tools-static-binaries/index.json
+      - name: Publish and tag released packages
         uses: release-plz/action@66b324fd6c72d05d2a08568492ecdd62bfb8a62b # v0.5.148
         with:
           command: release
@@ -48,7 +53,9 @@ jobs:
 
   release-pr:
     name: Update the release PR
-    if: github.repository_owner == 'cpp-linter'
+    # After `release`, so that versions just published are on crates.io.
+    needs: [release]
+    if: ${{ !failure() && !cancelled() && github.repository_owner == 'cpp-linter' }}
     runs-on: ubuntu-latest
     concurrency:
       group: release-plz-${{ github.ref }}
