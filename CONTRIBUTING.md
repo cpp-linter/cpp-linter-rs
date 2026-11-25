@@ -103,6 +103,10 @@ Releases are prepared by [release-plz] (see `release-plz.toml`).
    publish to crates.io, PyPI and npm. Pre-releases (`-rc.N`) go to TestPyPI
    and to npm's `next` tag.
 
+If release-plz pushes a tag but fails to create its GitHub release, it does
+not retry (the tag already exists). Create that release by hand
+(`gh release create <tag> --verify-tag`) and re-run the failed publish job.
+
 To choose a version yourself (e.g. to start or end release candidates),
 open a PR that sets it (needs [cargo-edit]):
 
