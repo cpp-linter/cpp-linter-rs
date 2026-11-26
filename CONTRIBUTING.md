@@ -91,10 +91,14 @@ nur docs --build
 
 Releases are prepared by [release-plz] (see `release-plz.toml`).
 
-1. On every push to `main`, release-plz opens or updates a release PR titled
+1. To prepare a release, run the "Release-plz" workflow by hand (Actions →
+   Release-plz → Run workflow). It opens or updates a release PR titled
    "chore: release". It bumps the versions from the conventional commit
    messages (`fix` → patch, `feat` → minor, `!` → major) and adds the
-   changelog entries.
+   changelog entries. A package is only bumped if it has a `feat`, `fix` or
+   `perf` commit since its last release (dependency, docs and CI changes alone
+   do not release it). Run the workflow again to refresh the PR after more
+   commits land on `main`.
 2. cpp-linter, cpp-linter-py and cpp-linter-js always get the same version.
    clang-tools-manager has its own version.
 3. The release PR is a draft. Mark it ready for review to run the release
@@ -118,14 +122,21 @@ A new tag starts the tag-triggered builds; if the tag already existed,
 re-run its failed jobs instead.
 
 To choose a version yourself (e.g. to start or end release candidates),
-open a PR that sets it (needs [cargo-edit]):
+open a PR titled `build: set version to <version>` that sets it (needs
+[cargo-edit]). Keep that title: it is what lets release-plz release the new
+version when there is no other `feat`, `fix` or `perf` commit.
 
 ```sh
 cargo set-version -p cpp-linter -p cpp-linter-py -p cpp-linter-js 2.0.0
 .github/sync-node-version.sh
 ```
 
-After it is merged, the release PR keeps that version.
+After it is merged, run the workflow; the release PR keeps that version.
+
+For 2.0.0, edit the cpp-linter changelog in the release PR before merging it:
+crates.io still has the old `2.0.0-rc1` to `2.0.0-rc15` versions, which sort
+after `2.0.0-rc.28` in semver, so release-plz takes `2.0.0-rc9` as the previous
+version and lists commits that earlier release candidates already shipped.
 
 [nur]: https://nur-taskrunner.github.io/docs/
 [release-plz]: https://release-plz.dev/
