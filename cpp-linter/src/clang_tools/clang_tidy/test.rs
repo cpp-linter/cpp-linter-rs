@@ -360,6 +360,26 @@ fn parse_non_utf8_output() {
     assert!(matches!(err, ClangCaptureError::NonUtf8Output { .. }));
 }
 
+/// A missing include, exactly as clang-tidy prints it (it reports clang's fatal
+/// error as `error`), is the note that the comment counts as a missing include.
+#[test]
+fn parse_missing_include() {
+    let notes = parse_tidy_output(
+        b"demo.cpp:1:10: error: 'nope.h' file not found [clang-diagnostic-error]\n",
+        &None,
+        &env::current_dir().unwrap(),
+    )
+    .unwrap();
+    assert_eq!(notes.len(), 1);
+    assert_eq!(notes[0].severity, "error");
+    assert_eq!(notes[0].diagnostic, "clang-diagnostic-error");
+    assert!(
+        notes[0].rationale.ends_with("file not found"),
+        "{:?}",
+        notes[0].rationale
+    );
+}
+
 #[test]
 fn parse_with_database_units() {
     let build_dir = env::current_dir().unwrap().join("build");
