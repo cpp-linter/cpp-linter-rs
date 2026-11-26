@@ -1,6 +1,6 @@
 name: Release-plz
 
-# Keeps the release PR up to date on every push to main.
+# Run by hand (workflow_dispatch) to open or update the release PR.
 # When the release PR is merged, publishes the crates to crates.io, tags each
 # released package and creates its GitHub release; the tags trigger the
 # workflows that upload the binaries and publish to PyPI and npm.
@@ -55,7 +55,11 @@ jobs:
     name: Update the release PR
     # After `release`, so that versions just published are on crates.io.
     needs: [release]
-    if: ${{ !failure() && !cancelled() && github.repository_owner == 'cpp-linter' }}
+    # Only when run by hand, so that a release is prepared only when we want one.
+    if: >-
+      !failure() && !cancelled()
+      && github.repository_owner == 'cpp-linter'
+      && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     concurrency:
       group: release-plz-${{ github.ref }}
