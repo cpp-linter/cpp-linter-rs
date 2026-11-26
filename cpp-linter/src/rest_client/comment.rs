@@ -146,6 +146,18 @@ impl Findings {
             .flat_map(|file| file.tidy_notes.iter().map(move |note| (file, note)))
     }
 
+    /// Count the clang-tidy errors about an included file that was not found.
+    ///
+    /// These usually mean clang-tidy ran without (or with the wrong) compilation database.
+    fn missing_includes(&self) -> u64 {
+        self.tidy_notes()
+            .filter(|(_, note)| {
+                note.diagnostic == "clang-diagnostic-error"
+                    && note.rationale.ends_with("file not found")
+            })
+            .count() as u64
+    }
+
     /// Describe the clang-tidy notes in a few words: `1 error, 2 warnings, 1 fixable`.
     ///
     /// Also returns the status of the clang-tidy check.
@@ -262,6 +274,17 @@ impl Findings {
                     row_status.small_mark()
                 ));
             }
+        }
+
+        let missing = self.missing_includes();
+        if missing > 0 {
+            comment.push_str(&format!(
+                "\nclang-tidy could not find {}, so it likely does not know how this code \
+                is built, and its other findings may be wrong too. Generate a compilation \
+                database (with CMake: `-DCMAKE_EXPORT_COMPILE_COMMANDS=ON`) and pass its \
+                folder as the `database` option.\n",
+                plural(missing, "included file")
+            ));
         }
 
         // "How to fix" matters most when there are many findings, so room for it is kept

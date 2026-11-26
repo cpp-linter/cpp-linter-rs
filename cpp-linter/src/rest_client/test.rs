@@ -267,6 +267,28 @@ fn comment_names_files_from_the_repository_root() {
 }
 
 #[test]
+fn missing_includes_get_a_hint() {
+    let files = make_dummy_files("error");
+    let comment =
+        RestClient::make_comment(&files, 0, 1, &dummy_versions(), None, false, "file".into())
+            .unwrap();
+    assert!(!comment.contains("compilation database"), "{comment}");
+
+    files[0].lock().unwrap().tidy_advice.as_mut().unwrap().notes[0].rationale =
+        String::from("'demo.hpp' file not found");
+    let comment =
+        RestClient::make_comment(&files, 0, 1, &dummy_versions(), None, false, "file".into())
+            .unwrap();
+    assert!(
+        comment.contains("clang-tidy could not find 1 included file, so"),
+        "{comment}"
+    );
+    // the hint comes before the findings
+    let hint = comment.find("Generate a compilation database").unwrap();
+    assert!(hint < comment.find("demo.cpp").unwrap(), "{comment}");
+}
+
+#[test]
 fn skipped_fix_with_pipe_stays_in_its_cell() {
     let files = make_dummy_files("warning");
     files[0].lock().unwrap().tidy_advice.as_mut().unwrap().notes[0]
