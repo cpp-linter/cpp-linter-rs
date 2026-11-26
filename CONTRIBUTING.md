@@ -122,7 +122,9 @@ A new tag starts the tag-triggered builds; if the tag already existed,
 re-run its failed jobs instead.
 
 To choose a version yourself (e.g. to start or end release candidates),
-open a PR that sets it (needs [cargo-edit]):
+open a PR titled `build: set version to <version>` that sets it (needs
+[cargo-edit]). Keep that title: it is what lets release-plz release the new
+version when there is no other `feat`, `fix` or `perf` commit.
 
 ```sh
 cargo set-version -p cpp-linter -p cpp-linter-py -p cpp-linter-js 2.0.0

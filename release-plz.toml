@@ -17,8 +17,9 @@ semver_check = false
 release_always = false
 # Only prepare a release when a package has a feat, fix or perf commit, so
 # that dependency updates (incl. Cargo.lock-only ones), docs and CI changes
-# alone do not bump the version. A version set by hand is always kept.
-release_commits = "^(feat|fix|perf)"
+# alone do not bump the version. A commit titled "build: set version to ..."
+# (see CONTRIBUTING.md) also counts, so a version set by hand is released.
+release_commits = "^(feat|fix|perf)|^build: set version to "
 # Open the release PR as a draft; marking it ready for review runs the
 # release builds (binary-builds, python-packaging, node-js-packaging) on it.
 pr_draft = true
@@ -125,6 +126,7 @@ commit_preprocessors = [
 ]
 commit_parsers = [
     { message = "^build: bump version to ", skip = true },
+    { message = "^build: set version to ", skip = true },
     { message = "^chore: release", skip = true },
     { field = "breaking", pattern = "true", group = "<!-- 0 --> 💥 Breaking changes" },
     { field = "group", pattern = "^(add|feat)$", group = "<!-- 1 --> 🚀 Added" },
