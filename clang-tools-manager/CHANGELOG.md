@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
+## [0.4.1] - 2026-11-26
+
+### <!-- 9 --> 🗨️ Changed
+
+- Update Cargo.lock dependencies
+
+[0.4.1]: https://github.com/cpp-linter/cpp-linter-rs/compare/clang-tools-manager/v0.4.0...clang-tools-manager/v0.4.1
+
+Full commit diff: [`clang-tools-manager/v0.4.0...clang-tools-manager/v0.4.1`][0.4.1]
+
 ## [clang-tools-manager/v0.4.0] - 2026-11-22
 
 ### <!-- 1 --> 🚀 Added

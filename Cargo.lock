@@ -303,7 +303,7 @@ dependencies = [
 
 [[package]]
 name = "clang-tools-manager"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "anyhow",
  "blake2",
@@ -475,7 +475,7 @@ checksum = "7f8f80099a98041a3d1622845c271458a2d73e688351bf3cb999266764b81d48"
 
 [[package]]
 name = "cpp-linter"
-version = "2.0.0-rc.28"
+version = "2.0.0-rc.29"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -504,7 +504,7 @@ dependencies = [
 
 [[package]]
 name = "cpp-linter-js"
-version = "2.0.0-rc.26"
+version = "2.0.0-rc.29"
 dependencies = [
  "anyhow",
  "cpp-linter",
@@ -515,7 +515,7 @@ dependencies = [
 
 [[package]]
 name = "cpp-linter-py"
-version = "2.0.0-rc.27"
+version = "2.0.0-rc.29"
 dependencies = [
  "anyhow",
  "cpp-linter",
