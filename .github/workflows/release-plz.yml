@@ -1,0 +1,99 @@
+name: Release-plz
+
+# Keeps the release PR up to date on every push to main.
+# When the release PR is merged, publishes the crates to crates.io, tags each
+# released package and creates its GitHub release; the tags trigger the
+# workflows that upload the binaries and publish to PyPI and npm.
+# See release-plz.toml for the details.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  release:
+    name: Publish, tag and create GitHub releases
+    if: github.repository_owner == 'cpp-linter' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # trusted publishing to crates.io
+    steps:
+      # Tags pushed with the default GITHUB_TOKEN do not trigger other workflows,
+      # so release-plz uses a token of the release GitHub App.
+      - name: Generate a GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v3.4.0
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write # push tags, create releases
+          permission-pull-requests: read # find the merged release PR
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: true # needed to push tags
+      - name: Install Rust
+        run: rustup update stable --no-self-update
+      # Packaged with clang-tools-manager so that docs.rs builds need no network.
+      - name: Download static binaries index
+        run: >-
+          curl --fail --silent --show-error --location --retry 3
+          --output clang-tools-manager/static-binaries-index.json
+          https://cpp-linter.github.io/clang-tools-static-binaries/index.json
+      - name: Publish and tag released packages
+        uses: release-plz/action@66b324fd6c72d05d2a08568492ecdd62bfb8a62b # v0.5.148
+        with:
+          command: release
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+
+  release-pr:
+    name: Update the release PR
+    # After `release`, so that versions just published are on crates.io.
+    needs: [release]
+    if: ${{ !failure() && !cancelled() && github.repository_owner == 'cpp-linter' }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: release-plz-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      # A PR opened with the default GITHUB_TOKEN would not run CI.
+      - name: Generate a GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v3.4.0
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write # push the release branch
+          permission-pull-requests: write # open and update the release PR
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: true # needed to push the release branch
+      - name: Install Rust
+        run: rustup update stable --no-self-update
+      - name: Update the release PR
+        id: release-plz
+        uses: release-plz/action@66b324fd6c72d05d2a08568492ecdd62bfb8a62b # v0.5.148
+        with:
+          command: release-pr
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+      - name: Sync the Node.js package version in the release PR
+        if: steps.release-plz.outputs.prs_created == 'true'
+        env:
+          PR_BRANCH: ${{ fromJSON(steps.release-plz.outputs.pr).head_branch }}
+        run: |-
+          git fetch origin "${PR_BRANCH}"
+          git switch -C "${PR_BRANCH}" FETCH_HEAD
+          .github/sync-node-version.sh
+          if git diff --quiet; then
+            exit 0
+          fi
+          git commit -am "chore: sync cpp-linter-js version in package.json"
+          git push origin "${PR_BRANCH}"

@@ -87,4 +87,46 @@ In CI, docs are built using
 nur docs --build
 ```
 
+## Releasing
+
+Releases are prepared by [release-plz] (see `release-plz.toml`).
+
+1. On every push to `main`, release-plz opens or updates a release PR titled
+   "chore: release". It bumps the versions from the conventional commit
+   messages (`fix` → patch, `feat` → minor, `!` → major) and adds the
+   changelog entries.
+2. cpp-linter, cpp-linter-py and cpp-linter-js always get the same version.
+   clang-tools-manager has its own version.
+3. The release PR is a draft. Mark it ready for review to run the release
+   builds (binaries, Python wheels, Node.js packages) on it, then merge it.
+4. release-plz then publishes cpp-linter and clang-tools-manager to
+   crates.io, pushes a `{package}/v{version}` tag for each released package
+   and creates its GitHub release. The tags trigger the builds that upload
+   the binaries and publish to PyPI and npm. Pre-releases (`-rc.N`) go to
+   TestPyPI and to npm's `next` tag.
+
+If a release stops halfway, release-plz does not retry it: it skips a package
+whose tag already exists or whose version is already on crates.io. Create the
+missing GitHub release by hand, which also creates the tag if it is missing:
+
+```sh
+# add --prerelease for -rc.N versions
+gh release create <tag> --target <commit of the merged release PR>
+```
+
+A new tag starts the tag-triggered builds; if the tag already existed,
+re-run its failed jobs instead.
+
+To choose a version yourself (e.g. to start or end release candidates),
+open a PR that sets it (needs [cargo-edit]):
+
+```sh
+cargo set-version -p cpp-linter -p cpp-linter-py -p cpp-linter-js 2.0.0
+.github/sync-node-version.sh
+```
+
+After it is merged, the release PR keeps that version.
+
 [nur]: https://nur-taskrunner.github.io/docs/
+[release-plz]: https://release-plz.dev/
+[cargo-edit]: https://github.com/killercup/cargo-edit

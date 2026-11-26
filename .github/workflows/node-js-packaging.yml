@@ -2,29 +2,12 @@ name: Node.js builds
 
 on:
   push:
-    branches: [main]
-    paths:
-      - cpp-linter/src/**
-      - cpp-linter/Cargo.toml
-      - Cargo.toml
-      - Cargo.lock
-      - bindings/node/**
-      - package.json
-      - yarn.lock
-      - .github/workflows/node-js-packaging.yml
     tags:
       - 'cpp-linter-js/v*'
   pull_request:
     branches: [main]
-    paths:
-      - cpp-linter/src/**
-      - cpp-linter/Cargo.toml
-      - Cargo.toml
-      - Cargo.lock
-      - bindings/node/**
-      - package.json
-      - yarn.lock
-      - .github/workflows/node-js-packaging.yml
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
 
 env:
   DEBUG: napi:*
@@ -40,6 +23,10 @@ concurrency:
 jobs:
   seed-build-script:
     name: Pre-seed static binaries' versions
+    # On PRs, only the release PR is built, once it is marked ready for review.
+    if: >-
+      github.event_name != 'pull_request'
+      || (startsWith(github.head_ref, 'release-plz-') && !github.event.pull_request.draft)
     uses: $/.github/workflows/pre-seed-versions.yml
 
   build:
@@ -358,6 +345,18 @@ jobs:
         run: ls -R ./npm
         working-directory: bindings/node
         shell: bash
+      - name: Check that package.json matches the tag
+        if: startsWith(github.ref, 'refs/tags/cpp-linter-js/v')
+        working-directory: bindings/node
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |-
+          want="${TAG#cpp-linter-js/v}"
+          have=$(node -p "require('./package.json').version")
+          if [[ "${have}" != "${want}" ]]; then
+            echo "::error::package.json has version ${have}, but the tag is ${TAG}"
+            exit 1
+          fi
       - name: Publish
         if: startsWith(github.ref, 'refs/tags/cpp-linter-js/v')
         working-directory: bindings/node

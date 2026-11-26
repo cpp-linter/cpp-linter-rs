@@ -188,17 +188,6 @@
 			},
 			"problemMatcher": [],
 			"group": "build"
-		},
-		{
-			"type": "shell",
-			"command": "python",
-			"label": "workspace: bump version",
-			"args": [
-				".github/workflows/bump_version.py",
-				"${input:bumpComponent}"
-			],
-			"problemMatcher": [],
-			"group": "none"
 		}
 	],
 	"inputs": [
@@ -207,18 +196,6 @@
 			"id": "binArgs",
 			"description": "Arguments for the cpp-linter binary executable",
 			"default": "-h"
-		},
-		{
-			"type": "pickString",
-			"id": "bumpComponent",
-			"description": "Which version component to bump?",
-			"default": "patch",
-			"options": [
-				"major",
-				"minor",
-				"patch",
-				"rc"
-			]
 		}
 	]
 }
