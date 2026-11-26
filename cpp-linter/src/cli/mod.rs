@@ -470,11 +470,9 @@ pub struct TidyOptions {
     ///
     /// For example, it can be a CMake build directory in which a file named
     /// compile_commands.json exists (set `CMAKE_EXPORT_COMPILE_COMMANDS` to `ON`).
-    /// When no build path is specified, cpp-linter looks for a compile_commands.json
-    /// in the repository root and then in its `build`, `out`, `builddir`, `_build`,
-    /// `cmake-build-debug` and `cmake-build-release` folders, and warns if there is none.
-    /// Without a compilation database, clang-tidy guesses how each file is compiled and
-    /// often reports false "file not found" errors. See [LLVM docs about
+    /// When no build path is specified, a search for compile_commands.json will be
+    /// attempted through all parent paths of the first input file, and cpp-linter
+    /// warns that clang-tidy may report false "file not found" errors. See [LLVM docs about
     /// setup tooling](https://clang.llvm.org/docs/HowToSetupToolingForLLVM.html)
     /// for an example of setting up Clang Tooling on a source tree.
     #[cfg_attr(

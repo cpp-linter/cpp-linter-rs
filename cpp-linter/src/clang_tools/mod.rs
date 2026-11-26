@@ -145,48 +145,15 @@ async fn analyze_files(
     Ok(logs)
 }
 
-/// Build folders (relative to the repository root) searched for a
-/// compile_commands.json when no `--database` is given.
-const DATABASE_DIRS: [&str; 6] = [
-    "build",
-    "out",
-    "builddir",
-    "_build",
-    "cmake-build-debug",
-    "cmake-build-release",
-];
-
-/// Find the folder of a compile_commands.json when no `--database` is given:
-/// the repository root, then the common build folders in [`DATABASE_DIRS`].
-fn find_database(repo_root: &Path) -> Option<PathBuf> {
-    std::iter::once(repo_root.to_path_buf())
-        .chain(DATABASE_DIRS.iter().map(|dir| repo_root.join(dir)))
-        .find(|dir| dir.join("compile_commands.json").is_file())
-}
-
-/// Without `--database`, use a compile_commands.json found by [`find_database()`],
-/// or warn that clang-tidy has to guess how each file is compiled.
-fn use_found_database(clang_params: &mut ClangParams) {
-    if clang_params.database.is_some() {
-        return;
-    }
-    match find_database(&clang_params.repo_root) {
-        Some(db_path) => {
-            log::info!(
-                "Using the compilation database found in {}",
-                db_path.to_string_lossy()
-            );
-            clang_params.database = Some(db_path);
-        }
-        None => log::warn!(
-            "No compilation database found: --database is not set, and there is no \
-            compile_commands.json in the repository root or in any of {}. \
-            clang-tidy will guess how each file is compiled, so it may report \
-            \"file not found\" errors that are not in the code. \
-            Generate one (with CMake: -DCMAKE_EXPORT_COMPILE_COMMANDS=ON) \
-            and pass its folder with --database.",
-            DATABASE_DIRS.join(", ")
-        ),
+/// Warn that clang-tidy has to guess how each file is compiled when `--database`
+/// is not given.
+fn warn_without_database(clang_params: &ClangParams) {
+    if clang_params.database.is_none() {
+        log::warn!(
+            "--database is not set, so clang-tidy will guess how each file is compiled \
+            and may report \"file not found\" errors that are not in the code. \
+            Pass the folder of a compile_commands.json with --database."
+        );
     }
 }
 
@@ -250,7 +217,7 @@ pub async fn capture_clang_tools_output(
         clang_params.clang_format_command = Some(tool_info.path);
     }
     if clang_params.tidy_checks != "-*" {
-        use_found_database(&mut clang_params);
+        warn_without_database(&clang_params);
     }
     if let Some(db_path) = &clang_params.database {
         let db_path = db_path.join("compile_commands.json");
@@ -671,44 +638,13 @@ mod tests {
     }
 
     #[test]
-    fn find_database_in_build_folder() {
-        let tmp_dir = tempfile::tempdir().unwrap();
-        let root = tmp_dir.path();
-        assert_eq!(find_database(root), None);
-        fs::create_dir(root.join("out")).unwrap();
-        fs::write(root.join("out/compile_commands.json"), "[]").unwrap();
-        assert_eq!(find_database(root), Some(root.join("out")));
-        // "build" comes before "out"
-        fs::create_dir(root.join("build")).unwrap();
-        fs::write(root.join("build/compile_commands.json"), "[]").unwrap();
-        assert_eq!(find_database(root), Some(root.join("build")));
-        // the repository root comes first
-        fs::write(root.join("compile_commands.json"), "[]").unwrap();
-        assert_eq!(find_database(root), Some(root.to_path_buf()));
-    }
-
-    #[test]
-    fn found_db_is_used() {
-        let tmp_dir = tempfile::tempdir().unwrap();
-        let mut clang_params = ClangParams {
-            repo_root: tmp_dir.path().to_path_buf(),
-            ..Default::default()
-        };
+    fn warn_only_without_database() {
         try_init_logger();
-        // nothing found: only a warning
-        use_found_database(&mut clang_params);
-        assert_eq!(clang_params.database, None);
-
-        fs::create_dir(tmp_dir.path().join("build")).unwrap();
-        fs::write(tmp_dir.path().join("build/compile_commands.json"), "[]").unwrap();
-        use_found_database(&mut clang_params);
-        assert_eq!(clang_params.database, Some(tmp_dir.path().join("build")));
-
-        // a given database is kept
-        let given = Some(PathBuf::from("elsewhere"));
-        clang_params.database = given.clone();
-        use_found_database(&mut clang_params);
-        assert_eq!(clang_params.database, given);
+        warn_without_database(&ClangParams::default());
+        warn_without_database(&ClangParams {
+            database: Some(PathBuf::from("build")),
+            ..Default::default()
+        });
     }
 
     #[tokio::test]
