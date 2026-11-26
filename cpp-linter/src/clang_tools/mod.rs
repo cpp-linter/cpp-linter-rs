@@ -679,6 +679,26 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn found_db_is_used() {
+        let tmp_dir = tempfile::tempdir().unwrap();
+        fs::create_dir(tmp_dir.path().join("build")).unwrap();
+        fs::write(tmp_dir.path().join("build/compile_commands.json"), "[]").unwrap();
+        let clang_params = ClangParams {
+            repo_root: tmp_dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        let version = RequestedVersion::default();
+        unsafe {
+            env::remove_var("GITHUB_ACTIONS");
+        }
+        let rest_client = RestClient::new(&PathBuf::from(".")).unwrap();
+        try_init_logger();
+        capture_clang_tools_output(&[], &version, clang_params, &rest_client, false)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
     async fn bad_db_path() {
         test_db_parse("nonexistent/path").await.unwrap();
     }
