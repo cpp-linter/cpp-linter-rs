@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 <!-- markdownlint-disable MD024 -->
 
+## [2.0.0-rc.29] - 2026-11-27
+
+### <!-- 9 --> 🗨️ Changed
+
+- Warn without a compilation database and explain missing includes by @shenxianpeng in [#614](https://github.com/cpp-linter/cpp-linter-rs/pull/614)
+- Point the missing-include hint at the given compilation database by @shenxianpeng in [#615](https://github.com/cpp-linter/cpp-linter-rs/pull/615)
+
+[2.0.0-rc.29]: https://github.com/cpp-linter/cpp-linter-rs/compare/cpp-linter/v2.0.0-rc.28...cpp-linter/v2.0.0-rc.29
+
+Full commit diff: [`cpp-linter/v2.0.0-rc.28...cpp-linter/v2.0.0-rc.29`][2.0.0-rc.29]
+
 ## [cpp-linter/v2.0.0-rc.28] - 2026-11-24
 
 ### <!-- 4 --> 🛠️ Fixed
