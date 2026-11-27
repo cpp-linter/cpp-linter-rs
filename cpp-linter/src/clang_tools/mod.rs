@@ -145,6 +145,18 @@ async fn analyze_files(
     Ok(logs)
 }
 
+/// Warn that clang-tidy has to guess how each file is compiled when `--database`
+/// is not given.
+fn warn_without_database(clang_params: &ClangParams) {
+    if clang_params.database.is_none() {
+        log::warn!(
+            "--database is not set, so clang-tidy will guess how each file is compiled \
+            and may report \"file not found\" errors that are not in the code. \
+            Pass the folder of a compile_commands.json with --database."
+        );
+    }
+}
+
 /// A struct to contain the version numbers of the clang-tools used
 #[derive(Debug, Default)]
 pub struct ClangVersions {
@@ -203,6 +215,9 @@ pub async fn capture_clang_tools_output(
         );
         clang_versions.format_version = Some(tool_info.version);
         clang_params.clang_format_command = Some(tool_info.path);
+    }
+    if clang_params.tidy_checks != "-*" {
+        warn_without_database(&clang_params);
     }
     if let Some(db_path) = &clang_params.database {
         let db_path = db_path.join("compile_commands.json");
@@ -620,6 +635,16 @@ mod tests {
         let rest_client = RestClient::new(&PathBuf::from(".")).unwrap();
         try_init_logger();
         capture_clang_tools_output(&[], &version, clang_params, &rest_client, false).await
+    }
+
+    #[test]
+    fn warn_only_without_database() {
+        try_init_logger();
+        warn_without_database(&ClangParams::default());
+        warn_without_database(&ClangParams {
+            database: Some(PathBuf::from("build")),
+            ..Default::default()
+        });
     }
 
     #[tokio::test]

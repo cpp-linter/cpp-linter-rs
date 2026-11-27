@@ -471,7 +471,8 @@ pub struct TidyOptions {
     /// For example, it can be a CMake build directory in which a file named
     /// compile_commands.json exists (set `CMAKE_EXPORT_COMPILE_COMMANDS` to `ON`).
     /// When no build path is specified, a search for compile_commands.json will be
-    /// attempted through all parent paths of the first input file. See [LLVM docs about
+    /// attempted through all parent paths of the first input file, and cpp-linter
+    /// warns that clang-tidy may report false "file not found" errors. See [LLVM docs about
     /// setup tooling](https://clang.llvm.org/docs/HowToSetupToolingForLLVM.html)
     /// for an example of setting up Clang Tooling on a source tree.
     #[cfg_attr(
