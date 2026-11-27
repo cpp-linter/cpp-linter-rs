@@ -213,8 +213,17 @@ fn comment_names_files_from_the_repository_root() {
         lines_only: false,
         path_prefix: Path::new("member"),
     };
-    let comment =
-        RestClient::make_comment(&files, 1, 1, &dummy_versions(), None, false, format_run).unwrap();
+    let comment = RestClient::make_comment(
+        &files,
+        1,
+        1,
+        &dummy_versions(),
+        None,
+        false,
+        format_run,
+        false,
+    )
+    .unwrap();
     assert!(
         comment.contains("**`member/tests/demo/demo.cpp`**"),
         "{comment}"
@@ -269,16 +278,32 @@ fn comment_names_files_from_the_repository_root() {
 #[test]
 fn missing_includes_get_a_hint() {
     let files = make_dummy_files("error");
-    let comment =
-        RestClient::make_comment(&files, 0, 1, &dummy_versions(), None, false, "file".into())
-            .unwrap();
+    let comment = RestClient::make_comment(
+        &files,
+        0,
+        1,
+        &dummy_versions(),
+        None,
+        false,
+        "file".into(),
+        false,
+    )
+    .unwrap();
     assert!(!comment.contains("compilation database"), "{comment}");
 
     files[0].lock().unwrap().tidy_advice.as_mut().unwrap().notes[0].rationale =
         String::from("'demo.hpp' file not found");
-    let comment =
-        RestClient::make_comment(&files, 0, 1, &dummy_versions(), None, false, "file".into())
-            .unwrap();
+    let comment = RestClient::make_comment(
+        &files,
+        0,
+        1,
+        &dummy_versions(),
+        None,
+        false,
+        "file".into(),
+        false,
+    )
+    .unwrap();
     assert!(
         comment.contains("clang-tidy could not find 1 included file, so"),
         "{comment}"
@@ -286,6 +311,27 @@ fn missing_includes_get_a_hint() {
     // the hint comes before the findings
     let hint = comment.find("Generate a compilation database").unwrap();
     assert!(hint < comment.find("demo.cpp").unwrap(), "{comment}");
+
+    // with a database, the hint points at the database instead
+    let comment = RestClient::make_comment(
+        &files,
+        0,
+        1,
+        &dummy_versions(),
+        None,
+        false,
+        "file".into(),
+        true,
+    )
+    .unwrap();
+    assert!(
+        comment.contains("could not find 1 included file with the given compilation database"),
+        "{comment}"
+    );
+    assert!(
+        !comment.contains("Generate a compilation database"),
+        "{comment}"
+    );
 }
 
 #[test]
@@ -297,9 +343,17 @@ fn skipped_fix_with_pipe_stays_in_its_cell() {
             file: "a|b.h".to_string(),
             reason: "it is not one of the analyzed files".to_string(),
         });
-    let comment =
-        RestClient::make_comment(&files, 0, 1, &dummy_versions(), None, false, "file".into())
-            .unwrap();
+    let comment = RestClient::make_comment(
+        &files,
+        0,
+        1,
+        &dummy_versions(),
+        None,
+        false,
+        "file".into(),
+        false,
+    )
+    .unwrap();
     assert!(comment.contains("`a\\|b.h`"), "{comment}");
 }
 
@@ -314,9 +368,17 @@ fn tidy_comment_with_skipped_fixes() {
             reason: "it is not one of the analyzed files".to_string(),
         });
     }
-    let comment =
-        RestClient::make_comment(&files, 0, 1, &dummy_versions(), None, true, "file".into())
-            .unwrap();
+    let comment = RestClient::make_comment(
+        &files,
+        0,
+        1,
+        &dummy_versions(),
+        None,
+        true,
+        "file".into(),
+        false,
+    )
+    .unwrap();
     assert!(
         comment.contains(
             " (fixable)<br>clang-diagnostic-error<br><img alt=\"⚠\" width=\"20\" align=\"absmiddle\" \
@@ -577,9 +639,17 @@ fn format_failure_feedback() {
     assert_eq!(annotations.len(), 1);
     assert!(matches!(annotations[0].severity, AnnotationLevel::Warning));
     assert_eq!(annotations[0].title.as_deref(), Some("clang-format"));
-    let comment =
-        RestClient::make_comment(&files, 1, 0, &dummy_versions(), None, false, "llvm".into())
-            .unwrap();
+    let comment = RestClient::make_comment(
+        &files,
+        1,
+        0,
+        &dummy_versions(),
+        None,
+        false,
+        "llvm".into(),
+        false,
+    )
+    .unwrap();
     assert!(
         comment.contains("- `tests/demo/demo.cpp`: clang-format failed to run; see the logs"),
         "{comment}"
@@ -597,9 +667,17 @@ fn format_failure_feedback() {
 fn comment_without_tidy_concerns() {
     let files = make_dummy_files("warning");
     files[0].lock().unwrap().tidy_advice = None;
-    let comment =
-        RestClient::make_comment(&files, 1, 0, &dummy_versions(), None, false, "llvm".into())
-            .unwrap();
+    let comment = RestClient::make_comment(
+        &files,
+        1,
+        0,
+        &dummy_versions(),
+        None,
+        false,
+        "llvm".into(),
+        false,
+    )
+    .unwrap();
     assert!(
         comment.contains(" cpp-linter found 1 issue in 1 file\n"),
         "{comment}"
@@ -698,13 +776,31 @@ fn comment_with_poisoned_mutex() {
     crate::test_common::poison_mutex(&files[0]);
     // poisoned while making the clang-format comment
     assert!(
-        RestClient::make_comment(&files, 1, 1, &dummy_versions(), None, false, "llvm".into())
-            .is_err()
+        RestClient::make_comment(
+            &files,
+            1,
+            1,
+            &dummy_versions(),
+            None,
+            false,
+            "llvm".into(),
+            false
+        )
+        .is_err()
     );
     // poisoned while making the clang-tidy comment
     assert!(
-        RestClient::make_comment(&files, 0, 1, &dummy_versions(), None, false, "llvm".into())
-            .is_err()
+        RestClient::make_comment(
+            &files,
+            0,
+            1,
+            &dummy_versions(),
+            None,
+            false,
+            "llvm".into(),
+            false
+        )
+        .is_err()
     );
 }
 
@@ -727,7 +823,8 @@ fn comment_without_a_tool_version() {
         tidy_version: None,
     };
     let comment =
-        RestClient::make_comment(&files, 1, 0, &versions, None, false, "file".into()).unwrap();
+        RestClient::make_comment(&files, 1, 0, &versions, None, false, "file".into(), false)
+            .unwrap();
     assert!(comment.contains("**clang-format** 1.2.3 |"), "{comment}");
     assert!(!comment.contains("**clang-tidy**"), "{comment}");
 }
@@ -737,9 +834,17 @@ fn comment_without_a_tool_version() {
 fn patch_is_the_first_fix() {
     let files = make_dummy_files("warning");
     files[0].lock().unwrap().format_advice = None;
-    let comment =
-        RestClient::make_comment(&files, 0, 1, &dummy_versions(), None, true, "file".into())
-            .unwrap();
+    let comment = RestClient::make_comment(
+        &files,
+        0,
+        1,
+        &dummy_versions(),
+        None,
+        true,
+        "file".into(),
+        false,
+    )
+    .unwrap();
     assert!(
         comment.contains("\nApply every fix at once: this step's `fix-patch-path`"),
         "{comment}"
@@ -750,9 +855,17 @@ fn patch_is_the_first_fix() {
 #[test]
 fn comment_too_long_for_tidy_note() {
     let files = make_dummy_files("error");
-    let unlimited =
-        RestClient::make_comment(&files, 1, 1, &dummy_versions(), None, false, "llvm".into())
-            .unwrap();
+    let unlimited = RestClient::make_comment(
+        &files,
+        1,
+        1,
+        &dummy_versions(),
+        None,
+        false,
+        "llvm".into(),
+        false,
+    )
+    .unwrap();
     assert!(unlimited.contains("| 1 | **error:** A test dummy rationale"));
     assert!(unlimited.contains("/m/hf.png"), "{unlimited}");
     assert!(unlimited.contains("How to fix"));
@@ -766,6 +879,7 @@ fn comment_too_long_for_tidy_note() {
         Some((head + USER_OUTREACH.len() + OMITTED_RESERVE + 100) as u64),
         false,
         "llvm".into(),
+        false,
     )
     .unwrap();
     assert!(!limited.contains("A test dummy rationale"), "{limited}");
@@ -786,9 +900,17 @@ fn how_to_fix_outlasts_the_findings() {
         let note = notes[0].clone();
         notes.extend(std::iter::repeat_n(note, 20));
     }
-    let unlimited =
-        RestClient::make_comment(&files, 1, 21, &dummy_versions(), None, false, "llvm".into())
-            .unwrap();
+    let unlimited = RestClient::make_comment(
+        &files,
+        1,
+        21,
+        &dummy_versions(),
+        None,
+        false,
+        "llvm".into(),
+        false,
+    )
+    .unwrap();
     let head = unlimited.find("\n<details").unwrap();
     let how_to_fix_len = unlimited.len()
         - unlimited.find("\n<details><summary><b>How to fix").unwrap()
@@ -803,6 +925,7 @@ fn how_to_fix_outlasts_the_findings() {
         Some(max_len as u64),
         false,
         "llvm".into(),
+        false,
     )
     .unwrap();
     assert!(limited.len() <= max_len);
@@ -820,9 +943,17 @@ fn ai_prompt_is_capped() {
         let note = notes[0].clone();
         notes.extend(std::iter::repeat_n(note, 59));
     }
-    let comment =
-        RestClient::make_comment(&files, 1, 60, &dummy_versions(), None, false, "llvm".into())
-            .unwrap();
+    let comment = RestClient::make_comment(
+        &files,
+        1,
+        60,
+        &dummy_versions(),
+        None,
+        false,
+        "llvm".into(),
+        false,
+    )
+    .unwrap();
     let prompt = &comment[comment.find("Fix these clang-tidy findings").unwrap()..];
     assert_eq!(prompt.matches("A test dummy rationale").count(), 50);
     assert!(
@@ -842,9 +973,17 @@ fn comment_stays_within_its_limit() {
         let note = notes[0].clone();
         notes.extend(std::iter::repeat_n(note, 50));
     }
-    let unlimited =
-        RestClient::make_comment(&files, 1, 51, &dummy_versions(), None, true, "llvm".into())
-            .unwrap();
+    let unlimited = RestClient::make_comment(
+        &files,
+        1,
+        51,
+        &dummy_versions(),
+        None,
+        true,
+        "llvm".into(),
+        false,
+    )
+    .unwrap();
     let head = unlimited.find("\n<details").unwrap();
     // From a limit that only fits the heading, the table and the footer.
     for max_len in (head + USER_OUTREACH.len())..unlimited.len() {
@@ -856,6 +995,7 @@ fn comment_stays_within_its_limit() {
             Some(max_len as u64),
             true,
             "llvm".into(),
+            false,
         )
         .unwrap();
         assert!(limited.len() <= max_len, "{} > {max_len}", limited.len());
