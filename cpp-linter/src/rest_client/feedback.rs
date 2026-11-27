@@ -157,6 +157,7 @@ impl RestClient {
                 None,
                 patch_exists,
                 format_run,
+                feedback_inputs.has_database,
             )?;
             if feedback_inputs.step_summary {
                 self.client.append_step_summary(&summary)?;
@@ -250,6 +251,7 @@ impl RestClient {
                     Some(u16::MAX as u64),
                     patch_exists,
                     format_run,
+                    feedback_inputs.has_database,
                 )?);
             }
             let options = ThreadCommentOptions {

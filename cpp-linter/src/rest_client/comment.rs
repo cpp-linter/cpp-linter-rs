@@ -49,6 +49,7 @@ impl RestClient {
         max_len: Option<u64>,
         patch_exists: bool,
         format_run: FormatRun<'_>,
+        has_database: bool,
     ) -> Result<String, ClientError> {
         let findings = Findings::collect(files, format_run)?;
         Ok(findings.to_markdown(&CommentContext {
@@ -60,6 +61,7 @@ impl RestClient {
                 .unwrap_or(usize::MAX),
             patch_exists,
             format_run,
+            has_database,
         }))
     }
 }
@@ -77,6 +79,8 @@ struct CommentContext<'a> {
     patch_exists: bool,
     /// How clang-format ran.
     format_run: FormatRun<'a>,
+    /// Whether a compilation database was given (see `database`).
+    has_database: bool,
 }
 
 /// The findings about one file, for a thread comment or step summary.
@@ -278,13 +282,22 @@ impl Findings {
 
         let missing = self.missing_includes();
         if missing > 0 {
-            comment.push_str(&format!(
-                "\nclang-tidy could not find {}, so it likely does not know how this code \
-                is built, and its other findings may be wrong too. Generate a compilation \
-                database (with CMake: `-DCMAKE_EXPORT_COMPILE_COMMANDS=ON`) and pass its \
-                folder as the `database` option.\n",
-                plural(missing, "included file")
-            ));
+            let missing = plural(missing, "included file");
+            comment.push_str(&if ctx.has_database {
+                format!(
+                    "\nclang-tidy could not find {missing} with the given compilation \
+                    database, so its other findings may be wrong too. The database may be \
+                    out of date or not match these sources: check that it was generated \
+                    for this checkout and that the `database` option points to its folder.\n"
+                )
+            } else {
+                format!(
+                    "\nclang-tidy could not find {missing}, so it likely does not know how \
+                    this code is built, and its other findings may be wrong too. Generate a \
+                    compilation database (with CMake: `-DCMAKE_EXPORT_COMPILE_COMMANDS=ON`) \
+                    and pass its folder as the `database` option.\n"
+                )
+            });
         }
 
         // "How to fix" matters most when there are many findings, so room for it is kept

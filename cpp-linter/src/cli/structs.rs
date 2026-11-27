@@ -375,6 +375,9 @@ pub struct FeedbackInput {
 
     /// The path of the generated patch file.
     pub patch_path: PathBuf,
+
+    /// Whether a compilation database was given (see `--database`).
+    pub has_database: bool,
 }
 
 impl FeedbackInput {
@@ -434,6 +437,7 @@ impl From<&Cli> for FeedbackInput {
                 Some(path) => absolute_or_given(path),
                 None => ClangParams::default_patch_path(&args.source_options.repo_root),
             },
+            has_database: args.tidy_options.database.is_some(),
         }
     }
 }
@@ -456,6 +460,7 @@ impl Default for FeedbackInput {
             code_quality_file: None,
             gen_patch: false,
             patch_path: ClangParams::default_patch_path(Path::new(".")),
+            has_database: false,
         }
     }
 }
@@ -606,6 +611,8 @@ mod test {
         let cli = Cli::parse_from(["cpp-linter", "--database", tmp_dir.path().to_str().unwrap()]);
         let clang_params = ClangParams::from(&cli);
         assert_eq!(clang_params.database, Some(tmp_dir.path().to_path_buf()));
+        assert!(FeedbackInput::from(&cli).has_database);
+        assert!(!FeedbackInput::from(&Cli::parse_from(["cpp-linter"])).has_database);
     }
 
     #[test]
