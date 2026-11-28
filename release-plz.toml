@@ -130,6 +130,8 @@ commit_parsers = [
     { message = "^chore: release", skip = true },
     { field = "breaking", pattern = "true", group = "<!-- 0 --> 💥 Breaking changes" },
     # Group by the conventional commit type in the (PR) title, e.g. `feat: ...`.
+    # Match the message, not `field = "group"`: release-plz runs these parsers
+    # twice, so on the second run `group` holds the group set by the first run.
     { message = '^(add|feat)(\(.*\))?!?:', group = "<!-- 1 --> 🚀 Added" },
     { message = '^deprecate(\(.*\))?!?:', group = "<!-- 2 --> 🚫 Deprecated" },
     { message = '^(remove|delete)(\(.*\))?!?:', group = "<!-- 3 --> 🗑️ Removed" },
@@ -139,8 +141,8 @@ commit_parsers = [
     { message = '^test(\(.*\))?!?:', group = "<!-- 7 -->🚦 Tests" },
     { message = '^docs(\(.*\))?!?:', group = "<!-- 8 --> 📝 Documentation" },
     { message = '^(chore|style|refactor|ci)(\(.*\))?!?:', group = "<!-- 9 --> 🗨️ Changed" },
-    # Unconventional commit messages
-    { message = "^[aA]dd", group = "<!-- 1 --> 🚀 Added" },
-    { message = "^[fF]ix", group = "<!-- 4 --> 🛠️ Fixed" },
-    { message = "^.*", group = "<!-- 9 --> 🗨️ Changed" },
+    # Other conventional commit types (e.g. `revert: ...`).
+    { field = "conventional", pattern = "true", group = "<!-- 9 --> 🗨️ Changed" },
+    # Skip commits that do not follow the conventional commit format.
+    { message = "^.*", skip = true },
 ]
